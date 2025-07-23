@@ -18,6 +18,7 @@ type PieceStyle = { id: string; name: string; colors: string[] };
 type BoardTheme = { id: string; name: string; colors: string[] };
 
 const chessPieceStyles: PieceStyle[] = [
+    { id: 'red_black', name: 'Red & Black', colors: ['#dc2626', '#18181b'] },
     { id: 'orange_gold', name: 'Orange & Gold', colors: ['#f97316', '#ca8a04'] },
     { id: 'pink_royal_blue', name: 'Pink & Royal Blue', colors: ['#ec4899', '#3b82f6'] },
     { id: 'natural_purple', name: 'Natural & Purple', colors: ['#e2e8f0', '#8b5cf6'] },
@@ -32,7 +33,14 @@ const boardThemes: BoardTheme[] = [
 
 
 const CheckersPieceComponent = ({ color }: { color: string }) => (
-    <div className="w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg" style={{ backgroundColor: color, border: `2px solid ${color === '#f8fafc' ? '#a1a1aa' : 'transparent'}` }}>
+    <div className="w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg" 
+         style={{ 
+            backgroundColor: color, 
+            border: `3px solid ${color === '#f8fafc' || color === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}` 
+         }}>
+         <div className="w-[calc(100%-6px)] h-[calc(100%-6px)] rounded-full"
+              style={{ border: `1px solid ${color === '#f8fafc' || color === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}`}}
+         />
     </div>
 );
 
@@ -61,7 +69,7 @@ const ChessPiecePreview = () => {
                         <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full flex items-center justify-center', isLight ? 'bg-[--board-light]' : 'bg-[--board-dark]')}>
                            {piece && (
                                 <svg viewBox="0 0 45 45" className="w-full h-full p-1" style={{ color: piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)'}}>
-                                    {getPieceIcon(piece.type, piece.color === 'w' ? 'white' : 'black')}
+                                    {getPieceIcon(piece.type, piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)')}
                                 </svg>
                            )}
                         </div>
@@ -83,7 +91,7 @@ export default function EquipmentPage() {
     const [chessBoardTheme, setChessBoardTheme] = useState('ocean');
 
     // Checkers state
-    const [checkersPieceStyle, setCheckersPieceStyle] = useState('black_white');
+    const [checkersPieceStyle, setCheckersPieceStyle] = useState('red_black');
     const [checkersBoardTheme, setCheckersBoardTheme] = useState('classic');
 
     const [saving, setSaving] = useState(false);
@@ -92,7 +100,7 @@ export default function EquipmentPage() {
         if(userData?.equipment) {
             setChessPieceStyle(userData.equipment.chess.pieceStyle || 'black_white');
             setChessBoardTheme(userData.equipment.chess.boardTheme || 'ocean');
-            setCheckersPieceStyle(userData.equipment.checkers.pieceStyle || 'black_white');
+            setCheckersPieceStyle(userData.equipment.checkers.pieceStyle || 'red_black');
             setCheckersBoardTheme(userData.equipment.checkers.boardTheme || 'classic');
         }
     }, [userData]);

@@ -17,6 +17,7 @@ type BoardTheme = { id: string; name: string; colors: string[] };
 type PieceStyle = { id: string; name: string; colors: string[] };
 
 const pieceStyles: PieceStyle[] = [
+    { id: 'red_black', name: 'Red & Black', colors: ['#dc2626', '#18181b'] },
     { id: 'orange_gold', name: 'Orange & Gold', colors: ['#f97316', '#ca8a04'] },
     { id: 'pink_royal_blue', name: 'Pink & Royal Blue', colors: ['#ec4899', '#3b82f6'] },
     { id: 'natural_purple', name: 'Natural & Purple', colors: ['#e2e8f0', '#8b5cf6'] },
@@ -49,18 +50,25 @@ type CheckersBoardProps = {
 const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) => {
     const pieceColor = piece.player === 'b' ? colors[0] : colors[1];
     const kingColor = piece.player === 'b' ? colors[1] : colors[0];
+    
     return (
         <div className={cn('w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg')}
-             style={{ backgroundColor: pieceColor, border: `2px solid ${pieceColor === '#f8fafc' ? '#a1a1aa' : 'transparent'}`}}
+             style={{ 
+                backgroundColor: pieceColor,
+                border: `3px solid ${pieceColor === '#f8fafc' || pieceColor === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}`
+             }}
         >
+             <div className={cn('w-[calc(100%-6px)] h-[calc(100%-6px)] rounded-full', kingColor)}
+                  style={{ border: `1px solid ${pieceColor === '#f8fafc' || pieceColor === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}`}}
+             />
             {piece.type === 'king' && (
-              <Crown className={cn('w-6 h-6')} style={{ color: kingColor }} />
+              <Crown className={cn('w-6 h-6 absolute')} style={{ color: kingColor }} />
             )}
         </div>
     );
 };
 
-export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'black_white' }: CheckersBoardProps) {
+export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
     const [board, setBoard] = useState<Board>(initialBoard);
     const [currentPlayer, setCurrentPlayer] = useState<Player>('w');
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
@@ -70,7 +78,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'blac
     const [consecutiveJumpPiece, setConsecutiveJumpPiece] = useState<Position | null>(null);
 
     const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
-    const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[3];
+    const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[0];
 
     const getPossibleMovesForPiece = (piece: Piece, pos: Position, currentBoard: Board): Move[] => {
         const moves: Move[] = [];
