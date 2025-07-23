@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Timer, Crown } from 'lucide-react';
+import { ArrowLeft, History, Users, Settings, Crown } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,8 @@ import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import React from 'react';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/context/auth-context';
 
 type GameLayoutProps = {
   children: React.ReactNode;
@@ -19,6 +21,7 @@ type GameLayoutProps = {
 
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
   const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer } = useGame();
+  const { userData } = useAuth();
   const router = useRouter();
 
   const handleCloseDialog = () => {
@@ -61,7 +64,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
       <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] xl:grid-cols-[320px_1fr_320px] gap-6 p-4 md:p-6">
         <aside className="hidden lg:flex flex-col gap-6">
             <PlayerInfo
-              playerName="Player 1 (You)"
+              playerName={userData ? `${userData.firstName} (You)`: "Player 1 (You)"}
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="player avatar"
               isTurn={isP1Turn}
@@ -127,4 +130,3 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
     </>
   );
 }
-
