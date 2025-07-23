@@ -29,23 +29,11 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const router = useRouter();
   const USDT_RATE = 310;
   
-  const [showCloseButton, setShowCloseButton] = useState(false);
-
-  useEffect(() => {
-    if (gameOver) {
-      const timer = setTimeout(() => {
-        setShowCloseButton(true);
-      }, 1000); 
-      return () => clearTimeout(timer);
-    }
-  }, [gameOver]);
-
-
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleCloseDialog = () => {
-    resetGame();
     router.push(isMultiplayer ? '/lobby' : '/practice');
+    resetGame();
   };
 
   const getWinnerMessage = () => {
@@ -108,14 +96,14 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </header>
       <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
         {/* Left Column */}
-        <aside className="hidden lg:flex flex-col gap-6">
+        <div className="hidden lg:flex flex-col gap-6">
             <PlayerInfo
               playerName={userData ? `${userData.firstName} (You)`: "Player 1 (You)"}
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="player avatar"
             />
              <MoveHistory />
-        </aside>
+        </div>
 
         {/* Center Column */}
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
@@ -168,7 +156,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 </div>
                 <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
                 <div className="text-sm text-muted-foreground space-y-2">
-                  <p>{getWinnerMessage().description}</p>
+                    <div>{getWinnerMessage().description}</div>
                   {isMultiplayer && payoutAmount !== null && payoutAmount > 0 && (
                       <div className="p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
                          <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)} (~{(payoutAmount / USDT_RATE).toFixed(2)} USDT)
@@ -177,9 +165,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                {showCloseButton && (
-                    <Button className="w-full" onClick={handleCloseDialog}>Close</Button>
-                )}
+                <Button className="w-full" onClick={handleCloseDialog}>Close</Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
