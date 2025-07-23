@@ -2,23 +2,111 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Timer, Crown } from 'lucide-react';
-import PlayerInfo from './player-info';
-import MoveHistory from './move-history';
+import { Crown, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import React from 'react';
+import { formatTime } from '@/lib/time';
+import { cn } from '@/lib/utils';
+import { getPieceIcon } from '@/lib/get-piece-icon';
 
 type GameLayoutProps = {
   children: React.ReactNode;
   gameType: 'Chess' | 'Checkers';
 };
 
+
+const CapturedPieces = () => {
+    const { capturedByPlayer, capturedByBot } = useGame();
+    const playerColor = capturedByPlayer.length > 0 ? capturedByPlayer[0].color : 'w';
+
+    return (
+        <Card className="w-full h-full bg-card/50 border-none shadow-none">
+            <CardHeader>
+                <CardTitle>Captured Pieces</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div>
+                    <h3 className="text-sm font-semibold mb-2">You captured ({capturedByPlayer.length}):</h3>
+                    <div className="flex flex-wrap gap-2 p-2 bg-black/20 rounded-md min-h-12">
+                        {capturedByPlayer.length === 0 ? <p className="text-xs text-muted-foreground">None</p> :
+                            capturedByPlayer.map((p, i) => (
+                                <svg key={i} viewBox="0 0 45 45" className="w-8 h-8">
+                                    {getPieceIcon(p.type, p.color === 'w' ? '#f8fafc' : '#0f172a')}
+                                </svg>
+                            ))
+                        }
+                    </div>
+                </div>
+                 <div>
+                    <h3 className="text-sm font-semibold mb-2">Opponent captured ({capturedByBot.length}):</h3>
+                    <div className="flex flex-wrap gap-2 p-2 bg-black/20 rounded-md min-h-12">
+                        {capturedByBot.length === 0 ? <p className="text-xs text-muted-foreground">None</p> :
+                            capturedByBot.map((p, i) => (
+                                <svg key={i} viewBox="0 0 45 45" className="w-8 h-8">
+                                    {getPieceIcon(p.type, p.color === 'w' ? '#f8fafc' : '#0f172a')}
+                                </svg>
+                            ))
+                        }
+                    </div>
+                </div>
+                <Link href="/practice" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-4">
+                    <ArrowLeft className="w-4 h-4"/> Back to Setup
+                </Link>
+            </CardContent>
+        </Card>
+    )
+}
+
+const GameInfo = ({gameType}: {gameType: string}) => {
+    const { playerColor, moveHistory, gameOver, winner } = useGame();
+    const router = useRouter();
+
+    const getStatus = () => {
+        if (gameOver) {
+            if(winner === 'draw') return "Draw";
+            return "Finished";
+        }
+        return "Playing";
+    }
+
+    return (
+         <Card className="w-full h-full bg-card/50 border-none shadow-none">
+            <CardHeader>
+                <CardTitle>Game Info</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">Your Color:</span>
+                    <span className="font-medium capitalize">{playerColor === 'w' ? 'White' : 'Black'}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">Opponent:</span>
+                    <span className="font-medium">{gameType} Bot</span>
+                </div>
+                <div className="flex justify-between">
+                    <span className="text-muted-foreground">Moves:</span>
+                    <span className="font-medium">{moveHistory.length}</span>
+                </div>
+                 <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className="font-medium">{getStatus()}</span>
+                </div>
+
+                <Button variant="destructive" className="w-full mt-4" onClick={() => router.push('/practice')}>
+                    Resign
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
+
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { player1Time, player2Time, winner, gameOver, resetGame } = useGame();
+  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer, timeLimit, moveHistory } = useGame();
   const router = useRouter();
 
   const handleCloseDialog = () => {
@@ -27,77 +115,59 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   }
 
   const getWinnerMessage = () => {
-    if (!winner) return { title: "Game Over", description: "The game has ended in a draw."};
-    return winner === 'p1' 
+    if (winner === 'draw') return { title: "Game Over", description: "The game has ended in a draw."};
+
+    const player1Won = winner === 'p1';
+
+    return player1Won 
         ? { title: "🎉 Congratulations! You Win! 🎉", description: "Your brilliant strategy paid off. Well played!" }
         : { title: "😥 Better Luck Next Time 😥", description: "The bot has won this time. Keep practicing!" };
   }
+  
+  const isP1Turn = (playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b');
+  const isP2Turn = (playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w');
+  const opponentColor = playerColor === 'w' ? 'Black' : 'White';
 
 
   return (
     <>
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-10 px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background/80 backdrop-blur-sm">
-        <Link href="/dashboard" passHref>
-          <Button variant="outline" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to Dashboard</span>
-          </Button>
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>
-        <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Game Settings</span>
-            </Button>
-        </div>
-      </header>
-      <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] xl:grid-cols-[320px_1fr_320px] gap-6 p-4 md:p-6">
+    <div className="flex flex-col min-h-screen bg-background text-foreground p-4 md:p-6 lg:p-8">
+      
+        <header className="text-center mb-4">
+            <h1 className="text-2xl font-bold">You ({playerColor === 'w' ? "White" : "Black"}) vs {gameType} Bot</h1>
+            <p className="text-muted-foreground text-sm">Balanced gameplay • {timeLimit/60} minutes per player</p>
+        </header>
+
+      <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] xl:grid-cols-[320px_1fr_320px] gap-6">
         <aside className="hidden lg:flex flex-col gap-6">
-            <PlayerInfo
-              playerName="Player 1 (You)"
-              avatarSrc="https://placehold.co/100x100.png"
-              data-ai-hint="player avatar"
-              isTurn={true}
-              timeRemaining={player1Time}
-            />
-             <Card className="flex-1">
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <History className="w-5 h-5"/>
-                        Move History
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <MoveHistory />
-                </CardContent>
-            </Card>
+            <CapturedPieces/>
         </aside>
 
-        <div className="flex items-center justify-center min-h-0">
+        <div className="flex flex-col items-center justify-center min-h-0 gap-4">
+             {/* Timers */}
+            <div className="w-full flex justify-between items-center max-w-[75vh] lg:max-w-lg">
+                <div className={cn("p-2 rounded-lg transition-all", !isP1Turn && "bg-primary/10")}>
+                    <p className="text-sm font-semibold">Opponent</p>
+                    <p className="text-2xl font-bold">{formatTime(player2Time)}</p>
+                </div>
+                 <div className={cn("p-2 rounded-lg transition-all text-right", isP1Turn && "bg-primary text-primary-foreground")}>
+                    <p className="text-sm font-semibold">You</p>
+                    <p className="text-2xl font-bold">{formatTime(player1Time)}</p>
+                </div>
+            </div>
+            
+            {/* Game Board */}
             {children}
+            
+            {/* Current Turn */}
+            <div className="text-center">
+                <p className="font-bold text-lg">Current Turn: <span className="capitalize">{currentPlayer === 'w' ? 'White' : 'Black'}</span></p>
+                <p className="text-muted-foreground text-sm">{isP1Turn ? "Your turn" : "Opponent's turn"}</p>
+            </div>
         </div>
 
         <aside className="hidden lg:flex flex-col gap-6">
-            <PlayerInfo
-              playerName="Opponent (Bot)"
-              avatarSrc="https://placehold.co/100x100.png"
-              data-ai-hint="gamer portrait"
-              isTurn={false}
-              timeRemaining={player2Time}
-            />
-            <Card className="flex-1">
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <Users className="w-5 h-5" />
-                        Spectators
-                    </CardTitle>
-                    <CardDescription>0 online</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground text-sm">No spectators have joined yet.</p>
-                </CardContent>
-            </Card>
+            <GameInfo gameType={gameType} />
         </aside>
       </main>
     </div>

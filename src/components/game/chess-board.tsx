@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { Chess, Square } from 'chess.js';
+import { Chess, Square, Piece } from 'chess.js';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getPieceIcon } from '@/lib/get-piece-icon.tsx';
@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, moveHistory } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -45,7 +45,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         const boardState = {
             fen: game.fen(),
         };
-        localStorage.setItem('game_state_chess', JSON.stringify(boardState));
+        // localStorage is handled by context now
    },[game]);
 
    useEffect(() => {
@@ -53,8 +53,10 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
             const savedState = localStorage.getItem('game_state_chess');
             if(savedState) {
                 const { fen } = JSON.parse(savedState);
-                const newGame = new Chess(fen);
-                setGame(newGame);
+                if (fen) {
+                    const newGame = new Chess(fen);
+                    setGame(newGame);
+                }
             }
         } catch (e) {
             console.error("Could not load saved game state", e);
@@ -79,9 +81,10 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         const moves = game.moves();
         if (moves.length > 0) {
           const move = moves[Math.floor(Math.random() * moves.length)];
-          game.move(move);
+          const result = game.move(move);
+          setGame(new Chess(game.fen()));
           updateBoardState();
-          switchTurn({ fen: game.fen() });
+          switchTurn({ fen: game.fen() }, result.san, result.captured ? {type: result.captured, color: result.color === 'w' ? 'b' : 'w'} : undefined);
           checkGameOver();
         }
       }, 1000); // 1-second delay for bot move
@@ -111,8 +114,9 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       try {
         const result = game.move(move);
         if (result) {
+            setGame(new Chess(game.fen()));
             updateBoardState();
-            switchTurn({ fen: game.fen() });
+            switchTurn({ fen: game.fen() }, result.san, result.captured ? {type: result.captured, color: result.color === 'w' ? 'b' : 'w'} : undefined);
             checkGameOver();
         }
       } catch (e) {
@@ -123,8 +127,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       }
 
     } else {
-      const piece = game.get(square);
-      if (piece && piece.color === game.turn() && piece.color === playerColor) {
+      const pieceOnSquare = game.get(square);
+      if (pieceOnSquare && pieceOnSquare.color === game.turn() && pieceOnSquare.color === playerColor) {
         setSelectedPiece(square);
         const moves = game.moves({ square, verbose: true });
         setLegalMoves(moves.map(m => m.to));
@@ -159,7 +163,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
                   'w-full h-full flex items-center justify-center transition-transform duration-300 ease-in-out',
                   isSelected ? 'scale-110 -translate-y-1' : ''
                 )}>
-                  <svg viewBox="0 0 28 28" className="w-full h-full p-1">
+                  <svg viewBox="0 0 45 45" className="w-full h-full p-1">
                     {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
                   </svg>
                 </div>

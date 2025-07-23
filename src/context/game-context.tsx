@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 type PlayerColor = 'w' | 'b';
 type Winner = 'p1' | 'p2' | 'draw' | null;
+type Piece = { type: string; color: 'w' | 'b' };
 
 interface GameState {
     playerColor: PlayerColor;
@@ -15,11 +16,14 @@ interface GameState {
     turnStartTime: number | null;
     gameOver: boolean;
     winner: Winner;
+    capturedByPlayer: Piece[];
+    capturedByBot: Piece[];
+    moveHistory: any[];
 }
 
 interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
-    switchTurn: (boardState: any) => void;
+    switchTurn: (boardState: any, move?: any, capturedPiece?: Piece) => void;
     setWinner: (winner: Winner, boardState: any) => void;
     resetGame: () => void;
     player1Time: number;
@@ -38,6 +42,9 @@ const initialGameState: GameState = {
     turnStartTime: null,
     gameOver: false,
     winner: null,
+    capturedByPlayer: [],
+    capturedByBot: [],
+    moveHistory: [],
 };
 
 const getLocalStorageKey = (gameType: 'chess' | 'checkers') => `game_state_${gameType}`;
@@ -49,9 +56,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // This is a placeholder. In a real app, you'd know which game is active.
-    // For now, we'll assume a single game type for storage. This would need to be
-    // enhanced if both games could be active in different tabs.
-    const activeGameType = 'chess'; 
+    const activeGameType = typeof window !== 'undefined' && window.location.pathname.includes('checkers') ? 'checkers' : 'chess';
     const storageKey = getLocalStorageKey(activeGameType);
 
     useEffect(() => {
@@ -133,14 +138,17 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
             currentPlayer: 'w',
             turnStartTime: Date.now(),
             gameOver: false,
-            winner: null
+            winner: null,
+            capturedByPlayer: [],
+            capturedByBot: [],
+            moveHistory: [],
         };
         setPlayer1Time(time);
         setPlayer2Time(time);
         updateAndSaveState(newState);
     };
 
-    const switchTurn = (boardState: any) => {
+    const switchTurn = (boardState: any, move?: any, capturedPiece?: Piece) => {
         if (gameState.gameOver) return;
 
         const now = Date.now();
@@ -149,11 +157,31 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         
         let newP1Time = gameState.p1Time;
         let newP2Time = gameState.p2Time;
+        let newMoveHistory = [...gameState.moveHistory];
+        let newCapturedByPlayer = [...gameState.capturedByPlayer];
+        let newCapturedByBot = [...gameState.capturedByBot];
 
         if (p1IsCurrent) {
             newP1Time -= elapsed;
-        } else {
+            if (move) {
+                if(newMoveHistory.length === 0 || newMoveHistory[newMoveHistory.length-1].black) {
+                     newMoveHistory.push({turn: newMoveHistory.length + 1, white: move});
+                } else {
+                    newMoveHistory[newMoveHistory.length - 1].white = move;
+                }
+            }
+            if(capturedPiece) newCapturedByPlayer.push(capturedPiece);
+
+        } else { // Bot's turn
             newP2Time -= elapsed;
+             if (move) {
+                if(newMoveHistory.length === 0 || newMoveHistory[newMoveHistory.length-1].black) {
+                     newMoveHistory.push({turn: newMoveHistory.length + 1, black: move});
+                } else {
+                    newMoveHistory[newMoveHistory.length - 1].black = move;
+                }
+            }
+            if(capturedPiece) newCapturedByBot.push(capturedPiece);
         }
 
         const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
@@ -161,7 +189,10 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
             currentPlayer: nextPlayer,
             turnStartTime: now,
             p1Time: newP1Time,
-            p2Time: newP2Time
+            p2Time: newP2Time,
+            moveHistory: newMoveHistory,
+            capturedByPlayer: newCapturedByPlayer,
+            capturedByBot: newCapturedByBot,
         }, boardState);
     };
 
