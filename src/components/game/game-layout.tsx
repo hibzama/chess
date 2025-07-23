@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import React, { useEffect } from 'react';
+import React, from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
@@ -32,14 +32,8 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
 
   const handleCloseDialog = () => {
     router.push(isMultiplayer ? '/lobby' : '/practice');
+    resetGame();
   };
-
-  useEffect(() => {
-    // When the component unmounts (e.g., user navigates away), reset the game state.
-    return () => {
-      resetGame();
-    };
-  }, [resetGame]);
 
   const getWinnerMessage = () => {
     const opponentName = isMultiplayer ? "Your opponent" : "The bot";
@@ -150,17 +144,16 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                     <Crown className="w-12 h-12 text-primary" />
                 </div>
                 <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {getWinnerMessage().description}
-                </AlertDialogDescription>
+                <AlertDialogDescription>{getWinnerMessage().description}</AlertDialogDescription>
+                
                 {isMultiplayer && payoutAmount !== null && payoutAmount > 0 && (
-                    <div className="mt-4 p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 text-sm">
+                     <div className="!mt-4 p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 text-sm">
                        <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)} (~{(payoutAmount / USDT_RATE).toFixed(2)} USDT)
                     </div>
                 )}
             </AlertDialogHeader>
             <AlertDialogFooter>
-            <AlertDialogAction onClick={handleCloseDialog}>Close</AlertDialogAction>
+                <AlertDialogAction onClick={handleCloseDialog}>Close</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
