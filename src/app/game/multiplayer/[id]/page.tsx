@@ -54,7 +54,12 @@ export default function MultiplayerGamePage() {
 
     const isCreator = room?.createdBy.uid === user?.uid;
     const hasNavigatedAway = useRef(false);
+    const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
+
+     useEffect(() => {
+        roomStatusRef.current = room?.status;
+    }, [room?.status]);
 
     useEffect(() => {
         if (!roomId || !user) {
@@ -108,7 +113,7 @@ export default function MultiplayerGamePage() {
         try {
             // Check if room still exists before trying to delete/refund
             const roomDoc = await getDoc(roomRef);
-            if (!roomDoc.exists()) {
+            if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
                 if (!isAutoCancel) router.push('/lobby');
                 return; 
             }
@@ -242,14 +247,14 @@ export default function MultiplayerGamePage() {
     // Effect to handle creator navigating away
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (isCreator && room?.status === 'waiting' && !hasNavigatedAway.current) {
+            if (isCreator && roomStatusRef.current === 'waiting' && !hasNavigatedAway.current) {
                 // This is synchronous and limited, so we can't do async operations here.
                 // The main purpose is to set a flag.
             }
         };
     
         const handleUnload = () => {
-            if (isCreator && room?.status === 'waiting' && !hasNavigatedAway.current) {
+             if (isCreator && roomStatusRef.current === 'waiting' && !hasNavigatedAway.current) {
                  handleCancelRoom(true);
             }
         };
@@ -262,11 +267,11 @@ export default function MultiplayerGamePage() {
             window.removeEventListener('beforeunload', handleBeforeUnload);
             window.removeEventListener('pagehide', handleUnload);
             // This is the fallback for component unmount (e.g., router navigation)
-            if (isCreator && room?.status === 'waiting' && !hasNavigatedAway.current) {
+            if (isCreator && roomStatusRef.current === 'waiting' && !hasNavigatedAway.current) {
                 handleCancelRoom(true);
             }
         };
-    }, [isCreator, room?.status]);
+    }, [isCreator, handleCancelRoom]);
 
 
     const equipment = room?.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
