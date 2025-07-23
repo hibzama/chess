@@ -114,7 +114,7 @@ export default function DashboardLayout({
                             <CardContent className="p-2 flex items-center gap-2">
                                 <Wallet className="w-5 h-5 text-primary"/>
                                 <div>
-                                {loading || userData === null ? (
+                                {loading || !userData || typeof userData.balance === 'undefined' ? (
                                     <Skeleton className="h-5 w-20" />
                                     ) : (
                                     <>
