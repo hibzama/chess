@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -51,6 +51,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
                 console.error("Invalid FEN string in saved state:", e);
                 setGame(new Chess());
             }
+        } else {
+             setGame(new Chess());
         }
    }, [boardState]);
 
@@ -68,7 +70,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   }, [game, playerColor, setWinner]);
 
   useEffect(() => {
-    if (!gameOver && currentPlayer !== playerColor) {
+    if (!gameOver && currentPlayer !== playerColor && isMounted) {
       const timer = setTimeout(() => {
         const moves = game.moves();
         if (moves.length > 0) {
@@ -83,7 +85,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       }, 1000); // 1-second delay for bot move
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver]);
+  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver, isMounted]);
 
 
   const getSquareFromIndices = (row: number, col: number): Square => {
@@ -150,7 +152,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
                style={{ backgroundColor: isLightSquare ? theme.colors[0] : theme.colors[1] }}
               onClick={() => handleSquareClick(rowIndex, colIndex)}
             >
-              {piece && (
+              {isMounted && piece && (
                 <div className={cn(
                   'w-full h-full flex items-center justify-center transition-transform duration-300 ease-in-out',
                   isSelected ? 'scale-110 -translate-y-1' : ''

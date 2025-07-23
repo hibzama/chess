@@ -32,6 +32,7 @@ interface GameContextType extends GameState {
     player1Time: number;
     player2Time: number;
     loadGameState: (state: GameState) => void;
+    isMounted: boolean;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -77,12 +78,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
-        setIsMounted(true);
         const savedState = getInitialState();
         setGameState(savedState);
         setPlayer1Time(savedState.p1Time);
         setPlayer2Time(savedState.p2Time);
-    }, [getInitialState]);
+        setIsMounted(true);
+    }, [getInitialState, storageKey]);
 
 
     const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
@@ -190,14 +191,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             
             if (move) {
                 if (prevState.currentPlayer === 'w') {
-                    newMoveHistory.push({ turn: Math.floor(newMoveCount / 2) + 1, white: move });
+                    newMoveHistory.push({ turn: Math.floor((newMoveCount-1) / 2) + 1, white: move });
                 } else {
-                    const lastMove = newMoveHistory[newMoveHistory.length - 1];
-                    if (lastMove && !lastMove.black) {
-                        lastMove.black = move;
+                    const lastMoveIndex = newMoveHistory.length - 1;
+                    if (lastMoveIndex >= 0 && !newMoveHistory[lastMoveIndex].black) {
+                        newMoveHistory[lastMoveIndex] = { ...newMoveHistory[lastMoveIndex], black: move };
                     } else {
-                        // This case should ideally not happen in a normal game flow
-                        newMoveHistory.push({ turn: Math.floor(newMoveCount / 2), black: move });
+                        newMoveHistory.push({ turn: Math.floor((newMoveCount-1) / 2) + 1, black: move });
                     }
                 }
             }
@@ -258,6 +258,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         ...gameState,
         player1Time: isMounted ? player1Time : gameState.timeLimit,
         player2Time: isMounted ? player2Time : gameState.timeLimit,
+        isMounted,
         setupGame,
         switchTurn,
         setWinner,

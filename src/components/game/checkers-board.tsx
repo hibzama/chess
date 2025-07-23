@@ -68,7 +68,7 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
 };
 
 export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
-    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState } = useGame();
+    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted } = useGame();
     const [board, setBoard] = useState<Board>(() => boardState?.board || createInitialBoard());
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
@@ -83,6 +83,8 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
     useEffect(() => {
         if (boardState && boardState.board) {
             setBoard(boardState.board);
+        } else {
+            setBoard(createInitialBoard());
         }
     }, [boardState]);
     
@@ -168,7 +170,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
     
     useEffect(() => {
-        if(gameOver) return;
+        if(gameOver || !isMounted) return;
 
         if (consecutiveJumpPiece) {
              const jumps = getPossibleMovesForPiece(board[consecutiveJumpPiece.row][consecutiveJumpPiece.col]!, consecutiveJumpPiece, board, currentPlayer).filter(m => m.isJump);
@@ -197,7 +199,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             }, 1000);
         }
         
-    }, [board, currentPlayer, consecutiveJumpPiece, getPossibleMovesForPiece, playerColor, switchTurn, calculateAllMoves, gameOver]);
+    }, [board, currentPlayer, consecutiveJumpPiece, getPossibleMovesForPiece, playerColor, switchTurn, calculateAllMoves, gameOver, isMounted]);
 
 
     const handleSquareClick = (row: number, col: number) => {
@@ -311,7 +313,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                             style={{ backgroundColor: isDarkSquare ? theme.colors[1] : theme.colors[0] }}
                             onClick={() => handleSquareClick(rowIndex, colIndex)}
                         >
-                            {piece && (
+                            {isMounted && piece && (
                                 <div className={cn('w-full h-full flex items-center justify-center transition-transform duration-300 ease-in-out',
                                     isSelected ? 'scale-110 -translate-y-1' : ''
                                 )}>
