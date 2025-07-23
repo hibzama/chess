@@ -1,14 +1,131 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+'use client';
+import { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+
+interface Transaction {
+    id: string;
+    userId: string;
+    amount: number;
+    status: 'pending' | 'approved' | 'rejected';
+    createdAt: any;
+    depositMethod: 'bank' | 'binance';
+    user?: { firstName: string; lastName: string; email: string };
+}
 
 export default function PendingDepositsPage() {
+    const [deposits, setDeposits] = useState<Transaction[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const q = query(collection(db, 'transactions'), where('type', '==', 'deposit'), where('status', '==', 'pending'));
+        
+        const unsubscribe = onSnapshot(q, async (snapshot) => {
+            const pendingDeposits: Transaction[] = [];
+            for (const transactionDoc of snapshot.docs) {
+                const depositData = transactionDoc.data() as Transaction;
+                const userDoc = await getDoc(doc(db, 'users', depositData.userId));
+                if (userDoc.exists()) {
+                    pendingDeposits.push({ 
+                        ...depositData, 
+                        id: transactionDoc.id, 
+                        user: userDoc.data() as Transaction['user'] 
+                    });
+                }
+            }
+            setDeposits(pendingDeposits.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const handleTransaction = async (transactionId: string, userId: string, amount: number, newStatus: 'approved' | 'rejected') => {
+        const batch = writeBatch(db);
+        const transactionRef = doc(db, 'transactions', transactionId);
+
+        try {
+            batch.update(transactionRef, { status: newStatus });
+
+            if (newStatus === 'approved') {
+                const userRef = doc(db, 'users', userId);
+                const userDoc = await getDoc(userRef);
+                if (userDoc.exists()) {
+                    const newBalance = (userDoc.data().balance || 0) + amount;
+                    batch.update(userRef, { balance: newBalance });
+                } else {
+                    throw new Error("User not found");
+                }
+            }
+            
+            await batch.commit();
+
+            toast({
+                title: 'Success!',
+                description: `Deposit has been ${newStatus}.`,
+            });
+        } catch (error) {
+            console.error(`Error updating deposit status:`, error);
+            toast({
+                variant: "destructive",
+                title: 'Error',
+                description: 'Failed to update deposit.',
+            });
+        }
+    };
+
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Pending Deposits</CardTitle>
+                <CardDescription>Review and approve or reject new deposit requests.</CardDescription>
             </CardHeader>
             <CardContent>
-                <p>This page will display a list of pending deposit requests for admin approval.</p>
+                {loading ? (
+                    <p>Loading pending deposits...</p>
+                ) : deposits.length === 0 ? (
+                    <p>No pending deposits.</p>
+                ) : (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>User</TableHead>
+                            <TableHead>Amount (LKR)</TableHead>
+                            <TableHead>Method</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {deposits.map((deposit) => (
+                            <TableRow key={deposit.id}>
+                                <TableCell>
+                                    <div className="font-medium">{deposit.user?.firstName} {deposit.user?.lastName}</div>
+                                    <div className="text-sm text-muted-foreground">{deposit.user?.email}</div>
+                                </TableCell>
+                                <TableCell>{deposit.amount.toFixed(2)}</TableCell>
+                                <TableCell>
+                                    <Badge variant="secondary" className="capitalize">{deposit.depositMethod}</Badge>
+                                </TableCell>
+                                <TableCell>{deposit.createdAt ? format(new Date(deposit.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
+                                <TableCell className="text-right space-x-2">
+                                    <Button size="sm" variant="outline" onClick={() => handleTransaction(deposit.id, deposit.userId, deposit.amount, 'approved')}>Approve</Button>
+                                    <Button size="sm" variant="destructive" onClick={() => handleTransaction(deposit.id, deposit.userId, deposit.amount, 'rejected')}>Reject</Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                )}
             </CardContent>
         </Card>
-    )
+    );
 }
