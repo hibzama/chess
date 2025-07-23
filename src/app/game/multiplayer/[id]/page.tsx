@@ -53,7 +53,6 @@ export default function MultiplayerGamePage() {
     const [isJoining, setIsJoining] = useState(false);
 
     const isCreator = room?.createdBy.uid === user?.uid;
-    const hasNavigatedAway = useRef(false);
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
@@ -82,19 +81,15 @@ export default function MultiplayerGamePage() {
                 } 
                 // User is not authorized for this room unless it's a private room they are trying to join
                 else if (roomData.isPrivate || roomData.status !== 'waiting') {
-                    if (!hasNavigatedAway.current) {
-                        toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
-                        router.push('/lobby');
-                    }
+                    toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
+                    router.push('/lobby');
                     return;
                 } else {
                     setRoom(roomData);
                 }
             } else {
-                 if (!hasNavigatedAway.current) {
-                    toast({ title: 'Room Closed', description: "This game room no longer exists." });
-                    router.push('/lobby');
-                }
+                toast({ title: 'Room Closed', description: "This game room no longer exists." });
+                router.push('/lobby');
             }
             setLoading(false);
         });
@@ -102,36 +97,40 @@ export default function MultiplayerGamePage() {
         return () => unsubscribe();
     }, [roomId, user, router, toast]);
 
-    const handleCancelRoom = async (isAutoCancel = false) => {
-        if (!roomId || !user || !room || room.createdBy.uid !== user.uid) return;
+    const handleCancelRoom = useCallback(async (isAutoCancel = false) => {
+        if (!roomId || !user || !room ) return;
     
-        hasNavigatedAway.current = true;
         const batch = writeBatch(db);
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
-    
+        
         try {
-            // Check if room still exists before trying to delete/refund
+            // Re-fetch room data to ensure it's still waiting before cancelling
             const roomDoc = await getDoc(roomRef);
             if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
+                // The room has been joined or doesn't exist anymore, so do nothing.
                 if (!isAutoCancel) router.push('/lobby');
                 return; 
             }
     
             batch.delete(roomRef);
-            batch.update(userRef, { balance: increment(room.wager) });
-            
-            // Create a refund transaction
-            const transactionRef = doc(collection(db, 'transactions'));
-            batch.set(transactionRef, {
-                userId: user.uid,
-                type: 'payout',
-                amount: room.wager,
-                status: 'completed',
-                description: `Refund for cancelled ${room.gameType} game`,
-                gameRoomId: roomId,
-                createdAt: serverTimestamp()
-            });
+
+            // Only refund if there is a wager
+            if (room.wager > 0) {
+                const userRef = doc(db, 'users', user.uid);
+                batch.update(userRef, { balance: increment(room.wager) });
+                
+                // Create a refund transaction
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'payout',
+                    amount: room.wager,
+                    status: 'completed',
+                    description: `Refund for cancelled ${room.gameType} game`,
+                    gameRoomId: roomId,
+                    createdAt: serverTimestamp()
+                });
+            }
 
             await batch.commit();
     
@@ -145,7 +144,7 @@ export default function MultiplayerGamePage() {
             console.error('Failed to cancel room:', error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel the room.' });
         }
-    };
+    }, [roomId, user, room, router, toast]);
     
 
     // Timer for room expiration
@@ -161,7 +160,9 @@ export default function MultiplayerGamePage() {
             if (diff <= 0) {
                 setTimeLeft('00:00');
                 clearInterval(interval);
-                handleCancelRoom(true); // Auto-cancel if expired
+                if (roomStatusRef.current === 'waiting') {
+                    handleCancelRoom(true); 
+                }
             } else {
                 setTimeLeft(formatTime(Math.floor(diff / 1000)));
             }
@@ -169,7 +170,7 @@ export default function MultiplayerGamePage() {
 
         return () => clearInterval(interval);
 
-    }, [room, isCreator]);
+    }, [room, isCreator, handleCancelRoom]);
 
 
     
@@ -246,30 +247,17 @@ export default function MultiplayerGamePage() {
 
     // Effect to handle creator navigating away
     useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (isCreator && roomStatusRef.current === 'waiting' && !hasNavigatedAway.current) {
-                // This is synchronous and limited, so we can't do async operations here.
-                // The main purpose is to set a flag.
-            }
-        };
-    
-        const handleUnload = () => {
-             if (isCreator && roomStatusRef.current === 'waiting' && !hasNavigatedAway.current) {
+        const creatorNavigatingAway = () => {
+             if (isCreator && roomStatusRef.current === 'waiting') {
                  handleCancelRoom(true);
             }
         };
     
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        // Use 'pagehide' for better mobile support
-        window.addEventListener('pagehide', handleUnload);
+        window.addEventListener('beforeunload', creatorNavigatingAway);
     
         return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-            window.removeEventListener('pagehide', handleUnload);
-            // This is the fallback for component unmount (e.g., router navigation)
-            if (isCreator && roomStatusRef.current === 'waiting' && !hasNavigatedAway.current) {
-                handleCancelRoom(true);
-            }
+            window.removeEventListener('beforeunload', creatorNavigatingAway);
+            creatorNavigatingAway();
         };
     }, [isCreator, handleCancelRoom]);
 
@@ -396,3 +384,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     );
 }
+
+    
