@@ -57,13 +57,13 @@ export default function DashboardLayout({
                 <SidebarContent>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/dashboard" passHref legacyBehavior><SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard" passHref><SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="My Rooms"><BarChart3 /><span>My Rooms</span></SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <Link href="/dashboard/wallet" passHref legacyBehavior><SidebarMenuButton tooltip="Wallet"><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard/wallet" passHref><SidebarMenuButton tooltip="Wallet"><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Friends & Community"><Users /><span>Friends & Community</span></SidebarMenuButton>
