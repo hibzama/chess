@@ -37,8 +37,7 @@ export default function MainLayout({
     const router = useRouter();
     const pathname = usePathname();
     const [isMounted, setIsMounted] = React.useState(false);
-    const isMobile = useIsMobile();
-
+    
     React.useEffect(() => {
         setIsMounted(true);
     }, []);
@@ -120,7 +119,7 @@ export default function MainLayout({
                     <SidebarTrigger className="md:hidden"/>
                     <div className="ml-auto flex items-center gap-4">
                        <div className="hidden sm:block">
-                         {isMounted && !isMobile && (
+                         {isMounted && (
                            <Link href="/dashboard/wallet">
                               <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
                                   <CardContent className="p-2 flex items-center gap-2">
@@ -155,5 +154,3 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
-
-    
