@@ -26,13 +26,12 @@ type GameLayoutProps = {
 };
 
 const GameOverDisplay = () => {
-    const { winner, gameOverReason, isMultiplayer, payoutAmount, resetGame } = useGame();
+    const { winner, gameOverReason, isMultiplayer, payoutAmount } = useGame();
     const router = useRouter();
     const USDT_RATE = 310;
 
     const handleReturn = () => {
         router.push('/dashboard');
-        resetGame();
     }
 
     const getWinnerMessage = () => {
@@ -147,47 +146,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   
   return (
     <>
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-10 px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background/80 backdrop-blur-sm">
-        <Link href={isMultiplayer ? "/lobby" : "/practice"} passHref>
-          <Button variant="ghost" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to Lobby</span>
-          </Button>
-        </Link>
-        <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>
-        <div className="flex items-center gap-4">
-            <div className="hidden sm:block">
-                <Link href="/dashboard/wallet">
-                    <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
-                        <CardContent className="p-2 flex items-center gap-2">
-                            <Wallet className="w-5 h-5 text-primary"/>
-                            <div>
-                            {userData?.balance !== undefined ? (
-                                <>
-                                 <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
-                                 <p className="text-xs text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
-                                </>
-                            ) : (
-                                <div className="space-y-1">
-                                    <Skeleton className="h-4 w-16"/>
-                                    <Skeleton className="h-3 w-12"/>
-                                </div>
-                            )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </Link>
-            </div>
-            <Button variant="ghost" size="icon"><Bell /></Button>
-            <Button variant="ghost" size="icon"><Settings /></Button>
-            <Avatar>
-                <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
-                <AvatarFallback>{userData ? `${userData.firstName.charAt(0)}${userData.lastName.charAt(0)}` : '...'}</AvatarFallback>
-            </Avatar>
-        </div>
-      </header>
-      <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
+    <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
         {/* Left Column */}
         <div className="hidden lg:grid grid-rows-[auto,1fr] gap-6">
             <PlayerInfo
@@ -202,7 +161,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
             {headerContent}
             {gameOver ? (
-                <div className="flex items-center justify-center w-full h-full">
+                <div className="flex items-center justify-center w-full h-full min-h-[50vh]">
                     <GameOverDisplay />
                 </div>
             ) : (
@@ -265,7 +224,6 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
              )}
         </aside>
       </main>
-    </div>
     
     <AlertDialog open={isResignConfirmOpen} onOpenChange={setIsResignConfirmOpen}>
         <AlertDialogContent>

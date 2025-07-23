@@ -1,4 +1,5 @@
 'use client'
+import MainLayout from "@/components/layout/main-layout";
 
 export default function GameLayout({
     children,
@@ -6,8 +7,8 @@ export default function GameLayout({
     children: React.ReactNode
   }) {
     return (
-        <>
+        <MainLayout>
             {children}
-        </>
+        </MainLayout>
     )
   }
