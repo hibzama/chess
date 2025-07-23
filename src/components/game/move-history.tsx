@@ -1,4 +1,3 @@
-
 'use client'
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,11 +8,12 @@ import { useEffect, useRef } from 'react';
 
 export default function MoveHistory() {
   const { moveHistory, isMounted } = useGame();
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollAreaRef.current) {
-        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    if (scrollViewportRef.current) {
+        const { scrollHeight } = scrollViewportRef.current;
+        scrollViewportRef.current.scrollTo({ top: scrollHeight, behavior: 'smooth' });
     }
   }, [moveHistory]);
   
@@ -25,8 +25,9 @@ export default function MoveHistory() {
                 Move History
             </CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 p-0 overflow-y-hidden">
-            <ScrollArea className="h-full" ref={scrollAreaRef}>
+        <CardContent className="flex-1 relative p-0">
+          <div className="absolute inset-0">
+            <ScrollArea className="h-full w-full" viewportRef={scrollViewportRef}>
               <Table>
                 <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
@@ -50,6 +51,7 @@ export default function MoveHistory() {
                 </TableBody>
               </Table>
             </ScrollArea>
+          </div>
         </CardContent>
     </Card>
   );
