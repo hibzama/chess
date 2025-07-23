@@ -54,15 +54,15 @@ const NavigationGuard = () => {
     const [nextUrl, setNextUrl] = useState<string | null>(null);
 
     useEffect(() => {
+        // Only apply the navigation guard if the game is NOT over.
+        if (gameOver) return;
+
         const handlePopState = (e: PopStateEvent) => {
-          if (gameOver) return;
           e.preventDefault();
           setShowConfirm(true);
         };
     
         const handleAnchorClick = (e: MouseEvent) => {
-          if (gameOver) return;
-    
           const target = e.target as HTMLElement;
           const anchor = target.closest('a');
     
@@ -79,14 +79,11 @@ const NavigationGuard = () => {
         window.addEventListener('popstate', handlePopState);
         document.addEventListener('click', handleAnchorClick, true);
     
-        // This is a failsafe for when a link is navigated programmatically
         history.pushState(null, '', window.location.href);
 
         return () => {
           window.removeEventListener('popstate', handlePopState);
           document.removeEventListener('click', handleAnchorClick, true);
-          // This clears the added history state, allowing back/forward to work again.
-          history.go(1);
         };
       }, [gameOver, router]);
 
@@ -436,7 +433,7 @@ function MultiplayerGamePageContent() {
 
     return (
         <>
-        {!gameOver && <NavigationGuard />}
+        <NavigationGuard />
          <GameLayout
             gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
             headerContent={

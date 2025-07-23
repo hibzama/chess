@@ -32,8 +32,8 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleCloseDialog = () => {
-    router.push('/lobby');
     resetGame();
+    router.push('/lobby');
   };
 
   const getWinnerMessage = () => {
@@ -47,9 +47,12 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 description = "The game has ended in a draw by agreement or stalemate.";
                 break;
             case 'checkmate':
-            case 'timeout':
                  title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
-                 description = winner === 'p1' ? `You beat your opponent.` : `Your opponent has beaten you.`;
+                 description = winner === 'p1' ? `You beat your opponent by checkmate.` : `Your opponent has checkmated you.`;
+                 break;
+            case 'timeout':
+                 title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
+                 description = winner === 'p1' ? `Your opponent ran out of time.` : "You ran out of time.";
                  break;
             case 'resign':
                  title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
@@ -213,5 +216,3 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </>
   );
 }
-
-    
