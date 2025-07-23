@@ -32,6 +32,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleCloseDialog = () => {
+    resetGame();
     router.push('/dashboard');
   };
 
@@ -148,6 +149,23 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             <div className="text-center font-semibold text-lg p-2 rounded-md bg-card border">
                 Current Turn: <span className="text-primary">{turnText}</span>
             </div>
+            <div className="lg:hidden w-full space-y-4 mt-4">
+                 {isMultiplayer ? (
+                    <>
+                        <CapturedPieces pieceStyle={equipment?.pieceStyle} />
+                        <Card>
+                            <CardContent className="p-4">
+                                <Button variant="destructive" className="w-full" onClick={() => setShowResignModal(true)}>
+                                    <Flag className="w-4 h-4 mr-2" />
+                                    Resign
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    </>
+                 ) : (
+                    <GameInfo />
+                 )}
+            </div>
         </div>
 
         {/* Right Column */}
@@ -174,7 +192,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </main>
     </div>
     
-    <AlertDialog open={gameOver} onOpenChange={(open) => {if (!open) resetGame()}}>
+    <AlertDialog open={gameOver} onOpenChange={(open) => {if (!open) handleCloseDialog()}}>
         <AlertDialogContent>
             <AlertDialogHeader className="items-center text-center">
                 <div className="p-4 rounded-full bg-primary/10 mb-2">

@@ -117,21 +117,23 @@ export default function MainLayout({
                 <header className="px-4 lg:px-6 h-16 flex items-center border-b">
                     <SidebarTrigger className="md:hidden"/>
                     <div className="ml-auto flex items-center gap-4">
-                        <Card className="hidden sm:block bg-card/50 border-primary/20">
-                            <CardContent className="p-2 flex items-center gap-2">
-                                <Wallet className="w-5 h-5 text-primary"/>
-                                <div>
-                                {loading || !userData || typeof userData.balance === 'undefined' ? (
-                                    <Skeleton className="h-5 w-20" />
-                                    ) : (
-                                    <>
-                                        <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
-                                        <p className="text-xs text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
-                                    </>
-                                )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <Link href="/dashboard/wallet">
+                            <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
+                                <CardContent className="p-2 flex items-center gap-2">
+                                    <Wallet className="w-5 h-5 text-primary"/>
+                                    <div>
+                                    {loading || !userData || typeof userData.balance === 'undefined' ? (
+                                        <Skeleton className="h-5 w-20" />
+                                        ) : (
+                                        <>
+                                            <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
+                                            <p className="text-xs text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                                        </>
+                                    )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </Link>
                         <Button variant="ghost" size="icon"><Bell /></Button>
                         <Button variant="ghost" size="icon"><Settings /></Button>
                         <Avatar>
