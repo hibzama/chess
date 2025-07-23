@@ -32,19 +32,19 @@ const boardThemes: BoardTheme[] = [
 
 
 const CheckersPieceComponent = ({ color }: { color: string }) => (
-    <div className="w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg border-2" style={{ backgroundColor: color, borderColor: color === '#f8fafc' ? '#a1a1aa' : '#00000050' }}>
+    <div className="w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg" style={{ backgroundColor: color, border: `2px solid ${color === '#f8fafc' ? '#a1a1aa' : 'transparent'}` }}>
     </div>
 );
 
-const getPieceIcon = (type: string) => {
-    const style = { width: '100%', height: '100%', fill: 'currentColor', stroke: 'none' };
-    switch(type) {
-        case 'p': return <svg viewBox="0 0 100 100" style={style}><path d="M50 15A12 12 0 1 1 50 39A12 12 0 1 1 50 15M35 42L65 42L65 50L35 50ZM38 53L62 53L62 85L38 85Z"/></svg>;
-        case 'r': return <svg viewBox="0 0 100 100" style={style}><path d="M25 15L75 15L75 25L65 25L65 20L55 20L55 25L45 25L45 20L35 20L35 25L25 25ZM25 30L75 30L75 85L25 85Z" /></svg>;
-        case 'n': return <svg viewBox="0 0 100 100" style={style}><path d="M35 15L60 15L50 45L60 45L60 70L30 70L30 55L20 55L20 30L35 30ZM30 85L70 85L70 75L30 75Z"/></svg>;
-        case 'b': return <svg viewBox="0 0 100 100" style={style}><path d="M50 15L65 40L35 40ZM35 45L65 45L65 50L35 50ZM38 53L62 53L62 85L38 85Z"/></svg>;
-        case 'q': return <svg viewBox="0 0 100 100" style={style}><path d="M25 15L75 15L75 30L25 30ZM20 35L80 35L70 85L30 85Z"/></svg>;
-        case 'k': return <svg viewBox="0 0 100 100" style={style}><path d="M45 10L55 10L55 20L65 20L65 30L55 30L55 40L45 40L45 30L35 30L35 20L45 20ZM25 45L75 45L70 85L30 85Z" /></svg>;
+const getPieceIcon = (type: string, color: 'white' | 'black') => {
+    const style = { fill: 'none', stroke: color, strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }  as React.CSSProperties;
+    switch (type.toLowerCase()) {
+        case 'p': return <g style={style}><path d="M22.5 9c-1.108 0-2 .91-2 2.031v.938H20v3h1v1h-1v1h1v1h1v1.5H19v1.5h7v-1.5h-1.5V18h1v-1h-1v-1h1v-3h-.5v-.938C24.5 9.91 23.608 9 22.5 9z" /></g>;
+        case 'r': return <g style={style}><path d="M9 39h27v-3H9v3zM12 36v-4h21v4H12zM11 14V9h4v2h5V9h5v2h5V9h4v5H11z" /><path d="M34 14l-3 3H14l-3-3" /><path d="M31 17v12.5H14V17" /><path d="M31 29.5l1.5 2.5h-20l1.5-2.5" /><path d="M11 14h23" /></g>;
+        case 'n': return <g style={style}><path d="M22 10c10.5 0 9.5 8 9.5 8s-3.5 6-3.5 11H17c0-5-3.5-11-3.5-11s-1-8 9.5-8z" /><path d="M17 29v3h10v-3" /><path d="M14 32h16v7H14v-7z" /></g>;
+        case 'b': return <g style={style}><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2" /><path d="M15 32v-2.5C15 29.5 15 27 15 27s2.5-2.5 2.5-2.5h10s2.5 2.5 2.5 2.5c0 0 0 2.5 0 2.5V32" /><path d="M25 23s.5-3 .5-4.5c0-1.5-1-2.5-3-2.5s-3 1-3 2.5c0 1.5.5 4.5.5 4.5" /><path d="M22.5 12.5a2 2 0 110-4 2 2 0 010 4z" /></g>;
+        case 'q': return <g style={style}><path d="M8 12a2 2 0 11-4 0 2 2 0 014 0zM22.5 12.5a2 2 0 110-4 2 2 0 010 4zM37 12a2 2 0 114 0 2 2 0 01-4 0z" /><path d="M9 26c8.5-1.5 18.5-1.5 27 0l-2.5-13.5L31 25l-6-15-6 15-2.5-12.5L9 26z" /><path d="M9 26c0 2 1.5 3.5 1.5 3.5L12 35h21l1.5-5.5S36 28 36 26c-9 .5-18 .5-27 0z" /><path d="M12 35h21v4H12v-4z" /></g>;
+        case 'k': return <g style={style}><path d="M22.5 11.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z" /><path d="M22.5 25s4.5-7.5 3-10.5a5.5 5.5 0 00-3-3 5.5 5.5 0 00-3 3c-1.5 3 3 10.5 3 10.5" /><path d="M12 34.5h21v-3H12v3zM12 31.5h21v-3H12v3z" /><path d="M22.5 4.5v-3M20 3.5h5" /></g>;
         default: return null;
     }
 }
@@ -60,9 +60,9 @@ const ChessPiecePreview = () => {
                     return (
                         <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full flex items-center justify-center', isLight ? 'bg-[--board-light]' : 'bg-[--board-dark]')}>
                            {piece && (
-                                <div className="w-full h-full p-1 flex items-center justify-center" style={{ color: piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)'}}>
-                                    {getPieceIcon(piece.type)}
-                                </div>
+                                <svg viewBox="0 0 45 45" className="w-full h-full p-1" style={{ color: piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)'}}>
+                                    {getPieceIcon(piece.type, piece.color === 'w' ? 'white' : 'black')}
+                                </svg>
                            )}
                         </div>
                     )

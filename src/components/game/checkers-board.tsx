@@ -50,8 +50,8 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
     const pieceColor = piece.player === 'b' ? colors[0] : colors[1];
     const kingColor = piece.player === 'b' ? colors[1] : colors[0];
     return (
-        <div className={cn('w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg border-2')}
-             style={{ backgroundColor: pieceColor, borderColor: pieceColor === '#f8fafc' ? '#a1a1aa' : '#00000050'}}
+        <div className={cn('w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg')}
+             style={{ backgroundColor: pieceColor, border: `2px solid ${pieceColor === '#f8fafc' ? '#a1a1aa' : 'transparent'}`}}
         >
             {piece.type === 'king' && (
               <Crown className={cn('w-6 h-6')} style={{ color: kingColor }} />
