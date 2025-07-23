@@ -5,19 +5,20 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, deleteDoc, updateDoc, increment, getDoc, writeBatch, collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, Share, Clock, Users, Swords, Wallet, LogIn } from 'lucide-react';
+import { Loader2, Copy, Share, Clock, Users, Swords, Wallet, LogIn, AlertTriangle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 // Game Components
 import ChessBoard from '@/components/game/chess-board';
 import CheckersBoard from '@/components/game/checkers-board';
 import GameLayout from '@/components/game/game-layout';
-import { GameProvider } from '@/context/game-context';
+import { GameProvider, useGame } from '@/context/game-context';
 import { formatTime } from '@/lib/time';
 
 type GameRoom = {
@@ -45,11 +46,81 @@ type GameRoom = {
     turnStartTime: Timestamp;
 };
 
-export default function MultiplayerGamePage() {
+const NavigationGuard = () => {
+    const { handleResignConfirm, gameOver } = useGame();
+    const router = useRouter();
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [nextUrl, setNextUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const handlePopState = (e: PopStateEvent) => {
+          if (gameOver) return;
+          e.preventDefault();
+          setShowConfirm(true);
+        };
+    
+        const handleAnchorClick = (e: MouseEvent) => {
+          if (gameOver) return;
+    
+          const target = e.target as HTMLElement;
+          const anchor = target.closest('a');
+    
+          if (anchor && anchor.href && anchor.target !== '_blank') {
+            const url = new URL(anchor.href);
+            if(url.pathname.startsWith('/game/multiplayer')) return;
+
+            e.preventDefault();
+            setNextUrl(anchor.href);
+            setShowConfirm(true);
+          }
+        };
+    
+        window.addEventListener('popstate', handlePopState);
+        document.addEventListener('click', handleAnchorClick, true);
+    
+        // This is a failsafe for when a link is navigated programmatically
+        history.pushState(null, '', window.location.href);
+
+        return () => {
+          window.removeEventListener('popstate', handlePopState);
+          document.removeEventListener('click', handleAnchorClick, true);
+        };
+      }, [gameOver]);
+
+
+    const handleConfirm = () => {
+        handleResignConfirm();
+        if(nextUrl) {
+            router.push(nextUrl);
+        } else {
+            router.back();
+        }
+    }
+
+    return (
+        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2"><AlertTriangle/> Leave Game?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Leaving this page will forfeit the match. This is treated as a resignation. Are you sure you want to leave?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Stay in Game</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirm}>Leave & Resign</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    )
+}
+
+function MultiplayerGamePageContent() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
+    const { gameOver } = useGame();
     const [room, setRoom] = useState<GameRoom | null>(null);
     const [loading, setLoading] = useState(true);
     const [timeLeft, setTimeLeft] = useState('');
@@ -74,8 +145,11 @@ export default function MultiplayerGamePage() {
             if (docSnap.exists()) {
                 const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
                 
+                if (roomData.status === 'completed') {
+                    setRoom(roomData);
+                }
                 // If room is waiting, and we are not the creator, we might be a potential joiner
-                if (roomData.status === 'waiting' && roomData.createdBy.uid !== user.uid) {
+                else if (roomData.status === 'waiting' && roomData.createdBy.uid !== user.uid) {
                     setRoom(roomData);
                 } 
                 // If room is active, only players should be here
@@ -103,13 +177,12 @@ export default function MultiplayerGamePage() {
     }, [roomId, user, router, toast]);
 
     const handleCancelRoom = useCallback(async (isAutoCancel = false) => {
-        if (!roomId || !user || !room ) return;
+        if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const batch = writeBatch(db);
         const roomRef = doc(db, 'game_rooms', roomId as string);
         
         try {
-            // Re-fetch room data to ensure it's still waiting before cancelling
             const roomDoc = await getDoc(roomRef);
             if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
                 if (!isAutoCancel) router.push('/lobby');
@@ -124,13 +197,8 @@ export default function MultiplayerGamePage() {
                 
                 const transactionRef = doc(collection(db, 'transactions'));
                 batch.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'payout',
-                    amount: room.wager,
-                    status: 'completed',
-                    description: `Refund for cancelled ${room.gameType} game`,
-                    gameRoomId: roomId,
-                    createdAt: serverTimestamp()
+                    userId: user.uid, type: 'payout', amount: room.wager, status: 'completed',
+                    description: `Refund for cancelled ${room.gameType} game`, gameRoomId: roomId, createdAt: serverTimestamp()
                 });
             }
 
@@ -229,13 +297,9 @@ export default function MultiplayerGamePage() {
             if (room.wager > 0) {
                 const transactionRef = doc(collection(db, 'transactions'));
                 batch.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'wager',
-                    amount: room.wager,
-                    status: 'completed',
+                    userId: user.uid, type: 'wager', amount: room.wager, status: 'completed',
                     description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
-                    gameRoomId: room.id,
-                    createdAt: serverTimestamp()
+                    gameRoomId: room.id, createdAt: serverTimestamp()
                 });
             }
             
@@ -245,33 +309,17 @@ export default function MultiplayerGamePage() {
 
         } catch (error) {
             console.error("Failed to join game:", error);
-            toast({ variant: 'destructive', title: "Error", description: "Could not join the game. Your wager has been refunded."});
-            if(room.wager > 0) {
+            if (room.wager > 0) {
+                // Since the batch might have partially failed, we just try to refund.
+                const userRef = doc(db, 'users', user.uid);
                 await updateDoc(userRef, { balance: increment(room.wager) });
+                toast({ variant: 'destructive', title: "Error", description: "Could not join the game. Your wager has been refunded."});
+            } else {
+                 toast({ variant: 'destructive', title: "Error", description: "Could not join the game."});
             }
             setIsJoining(false);
         }
     }
-
-
-    // Effect to handle creator navigating away
-    useEffect(() => {
-        const creatorNavigatingAway = () => {
-             if (isCreator && roomStatusRef.current === 'waiting') {
-                 handleCancelRoom(true);
-            }
-        };
-    
-        window.addEventListener('beforeunload', creatorNavigatingAway);
-    
-        return () => {
-            window.removeEventListener('beforeunload', creatorNavigatingAway);
-            if (isCreator && roomStatusRef.current === 'waiting') {
-                handleCancelRoom(true);
-           }
-        };
-    }, [isCreator, handleCancelRoom]);
-
 
     const equipment = room?.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
@@ -384,14 +432,55 @@ export default function MultiplayerGamePage() {
 
 
     return (
-        <GameProvider gameType={room.gameType}>
-            <GameLayout gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}>
-                {room.gameType === 'chess' ? (
-                     <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
-                ) : (
-                    <CheckersBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
-                )}
-            </GameLayout>
-        </GameProvider>
+        <>
+        {!gameOver && <NavigationGuard />}
+        <GameLayout gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}>
+            {room.gameType === 'chess' ? (
+                 <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
+            ) : (
+                <CheckersBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
+            )}
+        </GameLayout>
+        </>
     );
 }
+
+export default function MultiplayerGamePage() {
+    const { id: roomId } = useParams();
+    const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
+
+    useEffect(() => {
+        const fetchGameType = async () => {
+            if (typeof roomId !== 'string') return;
+            try {
+                const roomRef = doc(db, 'game_rooms', roomId);
+                const roomSnap = await getDoc(roomRef);
+                if (roomSnap.exists()) {
+                    setGameType(roomSnap.data().gameType);
+                }
+            } catch (e) {
+                console.error("Could not fetch game type", e);
+            }
+        }
+        fetchGameType();
+    }, [roomId]);
+
+    if (!gameType) {
+         return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Loading Your Game...</p>
+                </div>
+            </div>
+        )
+    }
+    
+    return (
+         <GameProvider gameType={gameType}>
+            <MultiplayerGamePageContent />
+        </GameProvider>
+    )
+}
+
+    

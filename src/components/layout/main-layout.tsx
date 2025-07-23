@@ -61,10 +61,10 @@ export default function MainLayout({
                 <SidebarContent>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" ><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="My Rooms"><BarChart3 /><span>My Rooms</span></SidebarMenuButton>
+                            <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms"><BarChart3 /><span>My Rooms</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet"><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
@@ -140,3 +140,5 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
+    
