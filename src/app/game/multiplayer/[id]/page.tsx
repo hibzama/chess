@@ -53,7 +53,7 @@ const NavigationGuard = ({ gameOver }: { gameOver: boolean }) => {
     const [showConfirm, setShowConfirm] = useState(false);
     const [nextUrl, setNextUrl] = useState<string | null>(null);
 
-    useEffect(() => {
+     useEffect(() => {
         if (gameOver) {
             return;
         }
@@ -93,7 +93,7 @@ const NavigationGuard = ({ gameOver }: { gameOver: boolean }) => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener('click', handleAnchorClick, true);
         };
-      }, [gameOver, router, resign]); 
+      }, [gameOver]);
 
 
     const handleConfirm = () => {
