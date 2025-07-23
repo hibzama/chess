@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -61,16 +61,19 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     if (game.isGameOver()) {
         const fen = game.fen();
         if(game.isCheckmate()){
-            const winner = game.turn() === 'b' ? (playerColor === 'w' ? 'p1' : 'p2') : (playerColor === 'b' ? 'p1' : 'p2');
+            // The player whose turn it is has been checkmated
+            const winner = game.turn() === 'b' ? 'p1' : 'p2';
             setWinner(winner, { fen });
         } else {
             setWinner('draw', { fen });
         }
     }
-  }, [game, playerColor, setWinner]);
+  }, [game, setWinner]);
 
+
+  // Bot logic
   useEffect(() => {
-    if (!gameOver && currentPlayer !== playerColor && isMounted) {
+    if (!isMultiplayer && !gameOver && currentPlayer !== playerColor && isMounted) {
       const timer = setTimeout(() => {
         const moves = game.moves();
         if (moves.length > 0) {
@@ -85,7 +88,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       }, 1000); // 1-second delay for bot move
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver, isMounted]);
+  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver, isMounted, isMultiplayer]);
 
 
   const getSquareFromIndices = (row: number, col: number): Square => {
@@ -103,7 +106,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       const move = {
         from: selectedPiece,
         to: square,
-        promotion: 'q' // Always promote to queen for simplicity in practice mode
+        promotion: 'q' // Always promote to queen for simplicity in this app
       };
       
       const isLegal = game.moves({ square: selectedPiece, verbose: true }).some(m => m.to === square);

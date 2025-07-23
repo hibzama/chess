@@ -2,13 +2,13 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Crown } from 'lucide-react';
+import { ArrowLeft, History, Users, Settings, Crown, Flag } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
-import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import React from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
@@ -22,7 +22,7 @@ type GameLayoutProps = {
 };
 
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer, isMounted } = useGame();
+  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm } = useGame();
   const { userData } = useAuth();
   const router = useRouter();
 
@@ -31,7 +31,9 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
 
   const handleCloseDialog = () => {
     resetGame();
-    router.push('/practice');
+    // Redirect based on whether it's a practice or multiplayer game
+    const isPractice = !window.location.pathname.includes('multiplayer');
+    router.push(isPractice ? '/practice' : '/lobby');
   }
 
   const getWinnerMessage = () => {
@@ -47,6 +49,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
   const isP2Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w'));
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
+  const isMultiplayer = typeof window !== 'undefined' && window.location.pathname.includes('multiplayer');
 
   return (
     <>
@@ -55,7 +58,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         <Link href="/practice" passHref>
           <Button variant="ghost" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to Practice</span>
+            <span className="hidden sm:inline">Back to Lobby</span>
           </Button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>
@@ -74,7 +77,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="player avatar"
             />
-            <CapturedPieces pieceStyle={equipment?.pieceStyle} />
+             <MoveHistory />
         </aside>
 
         {/* Center Column */}
@@ -102,8 +105,19 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="gamer portrait"
             />
-            <GameInfo />
-            <MoveHistory />
+            <CapturedPieces pieceStyle={equipment?.pieceStyle} />
+             {isMultiplayer ? (
+                 <Card>
+                    <CardContent className="p-4">
+                        <Button variant="destructive" className="w-full" onClick={() => setShowResignModal(true)}>
+                            <Flag className="w-4 h-4 mr-2" />
+                            Resign
+                        </Button>
+                    </CardContent>
+                </Card>
+             ) : (
+                <GameInfo />
+             )}
         </aside>
       </main>
     </div>
@@ -120,7 +134,22 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-            <AlertDialogAction onClick={handleCloseDialog}>Play Again</AlertDialogAction>
+            <AlertDialogAction onClick={handleCloseDialog}>Close</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={showResignModal} onOpenChange={setShowResignModal}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to resign?</AlertDialogTitle>
+            <AlertDialogDescription>
+                If you resign, you will forfeit the match. You will receive a 75% refund of your wager, and your opponent will receive a 105% payout.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResignConfirm}>Confirm Resignation</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

@@ -7,7 +7,7 @@ import { Button } from '../ui/button';
 import { useEffect, useState } from 'react';
 
 export function GameInfo() {
-    const { playerColor, moveCount } = useGame();
+    const { playerColor, moveCount, resign } = useGame();
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
@@ -35,7 +35,7 @@ export function GameInfo() {
                     <span className="text-muted-foreground">Total Moves:</span>
                     <span className="font-medium">{isClient ? moveCount : 0}</span>
                 </div>
-                 <Button variant="destructive" className="w-full">
+                 <Button variant="destructive" className="w-full" onClick={resign}>
                     <Flag className="w-4 h-4 mr-2" />
                     Resign
                 </Button>

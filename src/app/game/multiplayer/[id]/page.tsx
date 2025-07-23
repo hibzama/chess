@@ -73,11 +73,13 @@ export default function MultiplayerGamePage() {
                 else if (roomData.players.includes(user.uid)) {
                     setRoom(roomData);
                 } 
-                // User is not authorized for this room
-                else {
+                // User is not authorized for this room unless it's a private room they are trying to join
+                else if (roomData.isPrivate || roomData.status !== 'waiting') {
                     toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
                     router.push('/lobby');
                     return;
+                } else {
+                    setRoom(roomData);
                 }
             } else {
                  if (!hasNavigatedAway.current) {
@@ -153,14 +155,22 @@ export default function MultiplayerGamePage() {
             // Deduct wager from joiner's balance
             await updateDoc(userRef, { balance: increment(-room.wager) });
 
+            const creatorColor = room.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+
             // Update room to start the game
             await updateDoc(roomRef, {
                 status: 'in-progress',
                 player2: {
                     uid: user.uid,
-                    name: `${userData.firstName} ${userData.lastName}`
+                    name: `${userData.firstName} ${userData.lastName}`,
+                    color: joinerColor,
                 },
-                players: [...room.players, user.uid]
+                players: [...room.players, user.uid],
+                capturedByP1: [],
+                capturedByP2: [],
+                moveHistory: [],
+                currentPlayer: 'w', // White always starts
             });
             
             toast({ title: "Game Joined!", description: "The match is starting now."});
@@ -317,4 +327,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     );
 }
-
