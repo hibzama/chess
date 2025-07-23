@@ -263,7 +263,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const unsubscribe = onSnapshot(roomRef, async (docSnap) => {
+        const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists() || !user) return;
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
@@ -271,26 +271,23 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
             if (roomData.status === 'completed') {
                 if (gameOverHandledRef.current) return;
-                
-                // Set isEnding to true to show loading/prevent actions while payout calculates
-                setGameState(prevState => ({ ...prevState, isEnding: true }));
-                stopTimer();
-                
-                const { myPayout } = await handlePayout(roomData);
-                
-                const winnerIsMe = roomData.winner?.uid === user.uid;
-
-                setGameState(prevState => ({
-                    ...prevState,
-                    boardState: roomData.boardState,
-                    gameOver: true,
-                    winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
-                    gameOverReason: roomData.draw ? 'draw' : roomData.winner?.method || null,
-                    payoutAmount: myPayout,
-                    isEnding: false
-                }));
-
                 gameOverHandledRef.current = true;
+                
+                stopTimer();
+
+                handlePayout(roomData).then(({ myPayout }) => {
+                    const winnerIsMe = roomData.winner?.uid === user.uid;
+                    setGameState(prevState => ({
+                        ...prevState,
+                        boardState: roomData.boardState,
+                        gameOver: true,
+                        winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
+                        gameOverReason: roomData.draw ? 'draw' : roomData.winner?.method || null,
+                        payoutAmount: myPayout,
+                        isEnding: false
+                    }));
+                });
+
                 return;
             }
 
