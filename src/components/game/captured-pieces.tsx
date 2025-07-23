@@ -7,7 +7,6 @@ import { getPieceIcon } from '@/lib/get-piece-icon';
 import { useEffect, useState } from 'react';
 
 type CapturedPiecesProps = {
-    player: 'p1' | 'p2';
     pieceStyle?: string;
 }
 
@@ -19,16 +18,27 @@ const pieceStyles = [
     { id: 'black_white', name: 'Black & White', colors: ['#0f172a', '#f8fafc'] },
 ];
 
-export function CapturedPieces({ player, pieceStyle = 'black_white' }: CapturedPiecesProps) {
-    const { capturedByPlayer, capturedByBot } = useGame();
-    const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
-
-    const pieces = player === 'p1' ? capturedByBot : capturedByPlayer;
+export function CapturedPieces({ pieceStyle = 'black_white' }: CapturedPiecesProps) {
+    const { capturedByPlayer, capturedByBot, isMounted } = useGame();
+    
     const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
+
+    const renderPieces = (pieces: any[]) => {
+        if (!isMounted || pieces.length === 0) {
+            return <div className="p-2 bg-secondary rounded-md text-muted-foreground text-center">None</div>;
+        }
+        return (
+            <div className="p-2 bg-secondary rounded-md min-h-[44px] grid grid-cols-8 gap-1">
+                {pieces.map((piece, index) => (
+                    <div key={index} className="w-8 h-8">
+                        <svg viewBox="0 0 45 45" className="w-full h-full">
+                            {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
+                        </svg>
+                    </div>
+                ))}
+            </div>
+        )
+    }
 
     return (
         <Card className="flex-1">
@@ -38,20 +48,15 @@ export function CapturedPieces({ player, pieceStyle = 'black_white' }: CapturedP
                     Captured Pieces
                 </CardTitle>
             </CardHeader>
-            <CardContent>
-                {isClient && pieces.length > 0 ? (
-                    <div className="grid grid-cols-8 gap-1">
-                        {pieces.map((piece, index) => (
-                            <div key={index} className="w-8 h-8">
-                                <svg viewBox="0 0 45 45" className="w-full h-full">
-                                    {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
-                                </svg>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <p className="text-muted-foreground text-sm">No pieces captured yet.</p>
-                )}
+            <CardContent className="space-y-4">
+                 <div>
+                    <p className="text-sm font-medium mb-1">You captured ({isMounted ? capturedByBot.length : 0}):</p>
+                    {renderPieces(capturedByBot)}
+                </div>
+                 <div>
+                    <p className="text-sm font-medium mb-1">Opponent captured ({isMounted ? capturedByPlayer.length : 0}):</p>
+                    {renderPieces(capturedByPlayer)}
+                </div>
             </CardContent>
         </Card>
     )

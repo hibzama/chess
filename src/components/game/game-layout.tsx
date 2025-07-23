@@ -44,7 +44,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   
   const isP1Turn = (playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b');
   const isP2Turn = (playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w');
-
+  const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
 
   return (
     <>
@@ -74,13 +74,16 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               isTurn={isP1Turn}
               timeRemaining={player1Time}
             />
-            <CapturedPieces player="p1" pieceStyle={equipment?.pieceStyle} />
+            <CapturedPieces pieceStyle={equipment?.pieceStyle} />
             <MoveHistory />
         </aside>
 
         {/* Center Column */}
-        <div className="flex items-center justify-center min-h-0">
+        <div className="flex flex-col items-center justify-center min-h-0 gap-4">
             {children}
+            <div className="text-center font-semibold text-lg p-2 rounded-md bg-card border">
+                Current Turn: <span className="text-primary">{turnText}</span>
+            </div>
         </div>
 
         {/* Right Column */}
@@ -92,7 +95,6 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               isTurn={isP2Turn}
               timeRemaining={player2Time}
             />
-            <CapturedPieces player="p2" pieceStyle={equipment?.pieceStyle} />
             <GameInfo />
         </aside>
       </main>
