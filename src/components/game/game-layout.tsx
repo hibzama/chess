@@ -32,41 +32,65 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleCloseDialog = () => {
+    router.push('/lobby');
     resetGame();
-    router.push(isMultiplayer ? '/lobby' : '/practice');
   };
 
   const getWinnerMessage = () => {
-    const opponentName = isMultiplayer ? "Your opponent" : "The bot";
     let title = "Game Over";
     let description = "The game has concluded.";
     
-    switch(gameOverReason) {
-        case 'draw':
-            title = "It's a Draw!";
-            description = "The game has ended in a draw by agreement or stalemate.";
-            break;
-        case 'checkmate':
-            title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
-            description = winner === 'p1' ? `You checkmated ${opponentName}. Well played!` : `${opponentName} has checkmated you.`;
-            break;
-        case 'timeout':
-            title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
-            description = winner === 'p1' ? `${opponentName} ran out of time.` : "You ran out of time.";
-            break;
-        case 'resign':
-             title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
-             description = winner === 'p1' ? `${opponentName} has resigned the game.` : "You have resigned the game.";
-             break;
-        default:
-             if (winner === 'p1') {
-                title = "🎉 You Won! 🎉";
-                description = "You have won the game.";
-             } else if (winner === 'p2') {
-                title = "😥 You Lost 😥";
-                description = "You have lost the game.";
-             }
-             break;
+    if (isMultiplayer) {
+         switch(gameOverReason) {
+            case 'draw':
+                title = "It's a Draw!";
+                description = "The game has ended in a draw by agreement or stalemate.";
+                break;
+            case 'checkmate':
+            case 'timeout':
+                 title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
+                 description = winner === 'p1' ? `You beat your opponent.` : `Your opponent has beaten you.`;
+                 break;
+            case 'resign':
+                 title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
+                 description = winner === 'p1' ? `Your opponent has resigned the game.` : "You have resigned the game.";
+                 break;
+            default:
+                 if (winner === 'p1') {
+                    title = "🎉 You Won! 🎉";
+                    description = "You have won the game.";
+                 } else if (winner === 'p2') {
+                    title = "😥 You Lost 😥";
+                    description = "You have lost the game.";
+                 }
+                 break;
+        }
+    } else { // Practice Mode messages
+        switch(gameOverReason) {
+            case 'draw':
+                title = "It's a Draw!";
+                description = "The game has ended in a draw by agreement or stalemate.";
+                break;
+            case 'checkmate':
+                title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
+                description = winner === 'p1' ? `You checkmated the bot. Well played!` : `The bot has checkmated you.`;
+                break;
+            case 'timeout':
+                title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
+                description = winner === 'p1' ? `The bot ran out of time.` : "You ran out of time.";
+                break;
+            case 'resign':
+                 title = "You Resigned";
+                 description = "You have resigned the game against the bot.";
+                 break;
+            default:
+                 if (winner === 'p1') {
+                    title = "🎉 You Won! 🎉";
+                 } else if (winner === 'p2') {
+                    title = "😥 You Lost 😥";
+                 }
+                 break;
+        }
     }
 
     return { title, description };
