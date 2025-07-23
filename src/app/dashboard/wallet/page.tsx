@@ -56,7 +56,7 @@ export default function WalletPage() {
   const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: '', branch: '', accountNumber: '', accountName: '' });
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   
-  const usdtAmount = (parseFloat(depositAmount) / USDT_RATE || 0).toFixed(2);
+  const usdtAmount = (parseFloat(depositAmount) || 0).toFixed(2);
   
   const copyToClipboard = (text: string, name: string) => {
     navigator.clipboard.writeText(text);
@@ -93,7 +93,7 @@ export default function WalletPage() {
     setIsConfirmRemarkOpen(false);
 
     try {
-      const amountInLKR = parseFloat(depositAmount);
+      const amountInLKR = parseFloat(depositAmount) * USDT_RATE;
 
       await addDoc(collection(db, 'transactions'), {
         userId: user.uid,
@@ -201,7 +201,14 @@ export default function WalletPage() {
           <CardTitle className="flex items-center gap-2"><DollarSign /> Current Balance</CardTitle>
         </CardHeader>
         <CardContent>
-            {authLoading || userData === null ? <Skeleton className="h-10 w-48" /> : <p className="text-4xl font-bold">{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>}
+            {authLoading || userData === null ? (
+                <Skeleton className="h-10 w-48" /> 
+            ) : (
+                <div>
+                    <p className="text-4xl font-bold">LKR {userData.balance.toFixed(2)}</p>
+                    <p className="text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                </div>
+            )}
         </CardContent>
       </Card>
 
@@ -246,12 +253,14 @@ export default function WalletPage() {
                         )}
                         
                         <div className="space-y-2">
-                            <Label htmlFor="deposit-amount">Amount (LKR)</Label>
-                            <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
+                            <Label htmlFor="deposit-amount">Amount (USDT)</Label>
+                            <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 10" required />
                         </div>
                         
                         <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground">
-                            Please send {usdtAmount} USDT to the PayID above.
+                            You will send: {usdtAmount} USDT
+                            <br/>
+                            Equivalent in LKR: {(parseFloat(depositAmount) * USDT_RATE || 0).toFixed(2)} LKR
                         </div>
 
                         <Card className="p-4 bg-card/50 space-y-2">
@@ -280,6 +289,9 @@ export default function WalletPage() {
                         <div className="space-y-2">
                             <Label htmlFor="withdrawal-amount">Amount (USDT)</Label>
                             <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 5" required />
+                        </div>
+                         <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground">
+                            You will receive: {(parseFloat(withdrawalAmount) * USDT_RATE || 0).toFixed(2)} LKR
                         </div>
                         <Separator />
                         <p className="font-medium text-sm">Bank Details</p>
@@ -317,7 +329,7 @@ export default function WalletPage() {
                             <TableHeader>
                             <TableRow>
                                 <TableHead>Type</TableHead>
-                                <TableHead>Amount (USDT)</TableHead>
+                                <TableHead>Amount</TableHead>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Status</TableHead>
                             </TableRow>
@@ -334,7 +346,10 @@ export default function WalletPage() {
                                             <span className="capitalize">{tx.type}</span>
                                         </div>
                                     </TableCell>
-                                    <TableCell>{(tx.amount / USDT_RATE).toFixed(2)}</TableCell>
+                                    <TableCell>
+                                        <div className="font-medium">LKR {tx.amount.toFixed(2)}</div>
+                                        <div className="text-xs text-muted-foreground">~{(tx.amount / USDT_RATE).toFixed(2)} USDT</div>
+                                    </TableCell>
                                     <TableCell>{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                                     <TableCell>
                                         <Badge variant={tx.status === 'approved' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">

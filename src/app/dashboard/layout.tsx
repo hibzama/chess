@@ -118,8 +118,8 @@ export default function DashboardLayout({
                                     <Skeleton className="h-5 w-20" />
                                     ) : (
                                     <>
-                                        <p className="text-sm font-bold text-primary">{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
-                                        <p className="text-xs text-muted-foreground">Your Balance</p>
+                                        <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
+                                        <p className="text-xs text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
                                     </>
                                 )}
                                 </div>
