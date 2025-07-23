@@ -2,7 +2,7 @@
 'use client'
 import { Chess } from 'chess.js';
 import { cn } from '@/lib/utils';
-import { getPieceIcon } from '@/lib/get-piece-icon.tsx';
+import { getPieceIcon } from '@/lib/get-piece-icon';
 
 type BoardTheme = { id: string; name: string; colors: string[] };
 type PieceStyle = { id: string; name: string; colors: string[] };
