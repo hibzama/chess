@@ -21,7 +21,6 @@ type GameLayoutProps = {
 
 const CapturedPieces = () => {
     const { capturedByPlayer, capturedByBot } = useGame();
-    const playerColor = capturedByPlayer.length > 0 ? capturedByPlayer[0].color : 'w';
 
     return (
         <Card className="w-full h-full bg-card/50 border-none shadow-none">
@@ -31,8 +30,8 @@ const CapturedPieces = () => {
             <CardContent className="space-y-4">
                 <div>
                     <h3 className="text-sm font-semibold mb-2">You captured ({capturedByPlayer.length}):</h3>
-                    <div className="flex flex-wrap gap-2 p-2 bg-black/20 rounded-md min-h-12">
-                        {capturedByPlayer.length === 0 ? <p className="text-xs text-muted-foreground">None</p> :
+                    <div className="flex flex-wrap gap-2 p-2 bg-black/20 rounded-md min-h-[50px]">
+                        {capturedByPlayer.length === 0 ? <p className="text-xs text-muted-foreground self-center px-2">None</p> :
                             capturedByPlayer.map((p, i) => (
                                 <svg key={i} viewBox="0 0 45 45" className="w-8 h-8">
                                     {getPieceIcon(p.type, p.color === 'w' ? '#f8fafc' : '#0f172a')}
@@ -43,8 +42,8 @@ const CapturedPieces = () => {
                 </div>
                  <div>
                     <h3 className="text-sm font-semibold mb-2">Opponent captured ({capturedByBot.length}):</h3>
-                    <div className="flex flex-wrap gap-2 p-2 bg-black/20 rounded-md min-h-12">
-                        {capturedByBot.length === 0 ? <p className="text-xs text-muted-foreground">None</p> :
+                    <div className="flex flex-wrap gap-2 p-2 bg-black/20 rounded-md min-h-[50px]">
+                        {capturedByBot.length === 0 ? <p className="text-xs text-muted-foreground self-center px-2">None</p> :
                             capturedByBot.map((p, i) => (
                                 <svg key={i} viewBox="0 0 45 45" className="w-8 h-8">
                                     {getPieceIcon(p.type, p.color === 'w' ? '#f8fafc' : '#0f172a')}
@@ -62,8 +61,9 @@ const CapturedPieces = () => {
 }
 
 const GameInfo = ({gameType}: {gameType: string}) => {
-    const { playerColor, moveHistory, gameOver, winner } = useGame();
+    const { moveHistory, gameOver, winner } = useGame();
     const router = useRouter();
+    const playerColor = useGame().playerColor;
 
     const getStatus = () => {
         if (gameOver) {
@@ -96,7 +96,7 @@ const GameInfo = ({gameType}: {gameType: string}) => {
                     <span className="font-medium">{getStatus()}</span>
                 </div>
 
-                <Button variant="destructive" className="w-full mt-4" onClick={() => router.push('/practice')}>
+                <Button variant="destructive" className="w-full mt-4 !bg-red-600 hover:!bg-red-700" onClick={() => router.push('/practice')}>
                     Resign
                 </Button>
             </CardContent>
@@ -106,7 +106,7 @@ const GameInfo = ({gameType}: {gameType: string}) => {
 
 
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer, timeLimit, moveHistory } = useGame();
+  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer, timeLimit } = useGame();
   const router = useRouter();
 
   const handleCloseDialog = () => {
@@ -125,10 +125,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   }
   
   const isP1Turn = (playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b');
-  const isP2Turn = (playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w');
-  const opponentColor = playerColor === 'w' ? 'Black' : 'White';
-
-
+  
   return (
     <>
     <div className="flex flex-col min-h-screen bg-background text-foreground p-4 md:p-6 lg:p-8">
@@ -146,11 +143,11 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
              {/* Timers */}
             <div className="w-full flex justify-between items-center max-w-[75vh] lg:max-w-lg">
-                <div className={cn("p-2 rounded-lg transition-all", !isP1Turn && "bg-primary/10")}>
+                <div className={cn("p-3 rounded-lg transition-all", !isP1Turn && "bg-primary/10")}>
                     <p className="text-sm font-semibold">Opponent</p>
                     <p className="text-2xl font-bold">{formatTime(player2Time)}</p>
                 </div>
-                 <div className={cn("p-2 rounded-lg transition-all text-right", isP1Turn && "bg-primary text-primary-foreground")}>
+                 <div className={cn("p-3 rounded-lg transition-all text-right", isP1Turn && "bg-primary text-primary-foreground")}>
                     <p className="text-sm font-semibold">You</p>
                     <p className="text-2xl font-bold">{formatTime(player1Time)}</p>
                 </div>

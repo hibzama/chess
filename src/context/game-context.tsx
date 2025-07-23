@@ -158,8 +158,8 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         let newP1Time = gameState.p1Time;
         let newP2Time = gameState.p2Time;
         let newMoveHistory = [...gameState.moveHistory];
-        let newCapturedByPlayer = [...gameState.capturedByPlayer];
-        let newCapturedByBot = [...gameState.capturedByBot];
+        let newCapturedByPlayer = gameState.capturedByPlayer ? [...gameState.capturedByPlayer] : [];
+        let newCapturedByBot = gameState.capturedByBot ? [...gameState.capturedByBot] : [];
 
         if (p1IsCurrent) {
             newP1Time -= elapsed;

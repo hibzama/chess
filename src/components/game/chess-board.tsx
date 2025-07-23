@@ -84,7 +84,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
           const result = game.move(move);
           setGame(new Chess(game.fen()));
           updateBoardState();
-          switchTurn({ fen: game.fen() }, result.san, result.captured ? {type: result.captured, color: result.color === 'w' ? 'b' : 'w'} : undefined);
+          const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
+          switchTurn({ fen: game.fen() }, result.san, captured);
           checkGameOver();
         }
       }, 1000); // 1-second delay for bot move
@@ -116,7 +117,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         if (result) {
             setGame(new Chess(game.fen()));
             updateBoardState();
-            switchTurn({ fen: game.fen() }, result.san, result.captured ? {type: result.captured, color: result.color === 'w' ? 'b' : 'w'} : undefined);
+            const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
+            switchTurn({ fen: game.fen() }, result.san, captured);
             checkGameOver();
         }
       } catch (e) {
