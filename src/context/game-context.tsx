@@ -227,7 +227,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                  updatePayload.winner = { method: 'draw' }; // ensure method is set for draw
             } else {
                 let winnerId;
-                 const player1Won = (winner === 'p1' && gameState.playerColor === room.createdBy.color) || (winner === 'p2' && gameState.playerColor !== room.createdBy.color);
                  if (winner === 'p1') {
                     winnerId = user?.uid;
                  } else {
@@ -526,5 +525,7 @@ export const useGame = () => {
     }
     return context;
 }
+
+    
 
     
