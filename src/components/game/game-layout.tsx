@@ -15,6 +15,7 @@ import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
 import { formatTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/card';
 
 type GameLayoutProps = {
   children: React.ReactNode;
