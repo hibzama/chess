@@ -1,8 +1,10 @@
+
 'use client';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 import { GitBranch } from 'lucide-react';
 import { useGame } from '@/context/game-context';
 import { getPieceIcon } from '@/lib/get-piece-icon';
+import { useEffect, useState } from 'react';
 
 type CapturedPiecesProps = {
     player: 'p1' | 'p2';
@@ -19,6 +21,12 @@ const pieceStyles = [
 
 export function CapturedPieces({ player, pieceStyle = 'black_white' }: CapturedPiecesProps) {
     const { capturedByPlayer, capturedByBot } = useGame();
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
     const pieces = player === 'p1' ? capturedByBot : capturedByPlayer;
     const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
 
@@ -31,7 +39,7 @@ export function CapturedPieces({ player, pieceStyle = 'black_white' }: CapturedP
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                {pieces.length > 0 ? (
+                {isClient && pieces.length > 0 ? (
                     <div className="grid grid-cols-8 gap-1">
                         {pieces.map((piece, index) => (
                             <div key={index} className="w-8 h-8">

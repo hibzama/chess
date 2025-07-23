@@ -1,11 +1,18 @@
+
 'use client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Gamepad2, Info, Flag } from 'lucide-react';
 import { useGame } from '@/context/game-context';
 import { Button } from '../ui/button';
+import { useEffect, useState } from 'react';
 
 export function GameInfo() {
     const { playerColor, moveCount } = useGame();
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     return (
         <Card>
@@ -26,7 +33,7 @@ export function GameInfo() {
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Total Moves:</span>
-                    <span className="font-medium">{moveCount}</span>
+                    <span className="font-medium">{isClient ? moveCount : 0}</span>
                 </div>
                  <Button variant="destructive" className="w-full">
                     <Flag className="w-4 h-4 mr-2" />
