@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,22 @@ type Board = SquareContent[][];
 type Position = { row: number; col: number };
 type Move = { from: Position; to: Position; isJump: boolean };
 
+type BoardTheme = { id: string; name: string; colors: string[] };
+type PieceStyle = { id: string; name: string; colors: string[] };
+
+const pieceStyles: PieceStyle[] = [
+    { id: 'orange_gold', name: 'Orange & Gold', colors: ['#f97316', '#ca8a04'] },
+    { id: 'pink_royal_blue', name: 'Pink & Royal Blue', colors: ['#ec4899', '#3b82f6'] },
+    { id: 'natural_purple', name: 'Natural & Purple', colors: ['#e2e8f0', '#8b5cf6'] },
+    { id: 'black_white', name: 'Black & White', colors: ['#0f172a', '#f8fafc'] },
+];
+
+const boardThemes: BoardTheme[] = [
+    { id: 'classic', name: 'Classic', colors: ['#f0d9b5', '#b58863'] },
+    { id: 'forest', name: 'Forest', colors: ['#ebecd0', '#779556'] },
+    { id: 'ocean', name: 'Ocean', colors: ['#c7d2fe', '#60a5fa'] },
+];
+
 const initialBoard: Board = Array(8).fill(null).map(() => Array(8).fill(null));
 
 // Setup initial pieces
@@ -24,19 +41,26 @@ for (let row = 0; row < 8; row++) {
     }
 }
 
-const PieceComponent = ({ piece }: { piece: Piece }) => {
+type CheckersBoardProps = {
+    boardTheme?: string;
+    pieceStyle?: string;
+}
+
+const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) => {
+    const pieceColor = piece.player === 'b' ? colors[0] : colors[1];
+    const kingColor = piece.player === 'b' ? colors[1] : colors[0];
     return (
-        <div className={cn('w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg border-2',
-            piece.player === 'b' ? 'bg-gray-900 border-gray-700' : 'bg-gray-200 border-gray-400'
-        )}>
+        <div className={cn('w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg border-2')}
+             style={{ backgroundColor: pieceColor, borderColor: pieceColor === '#f8fafc' ? '#a1a1aa' : '#00000050'}}
+        >
             {piece.type === 'king' && (
-              <Crown className={cn('w-6 h-6', piece.player === 'b' ? 'text-gray-200' : 'text-gray-900')} />
+              <Crown className={cn('w-6 h-6')} style={{ color: kingColor }} />
             )}
         </div>
     );
 };
 
-export default function CheckersBoard() {
+export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'black_white' }: CheckersBoardProps) {
     const [board, setBoard] = useState<Board>(initialBoard);
     const [currentPlayer, setCurrentPlayer] = useState<Player>('w');
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
@@ -44,6 +68,9 @@ export default function CheckersBoard() {
     const { toast } = useToast();
     const [mustJump, setMustJump] = useState(false);
     const [consecutiveJumpPiece, setConsecutiveJumpPiece] = useState<Position | null>(null);
+
+    const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
+    const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[3];
 
     const getPossibleMovesForPiece = (piece: Piece, pos: Position, currentBoard: Board): Move[] => {
         const moves: Move[] = [];
@@ -126,7 +153,13 @@ export default function CheckersBoard() {
             movePiece(clickedMove);
         } else if (board[row][col] && board[row][col]?.player === currentPlayer) {
             if (mustJump) {
-                toast({ title: "Mandatory Jump", description: "You must capture the opponent's piece.", variant: "destructive" });
+                const pieceMoves = getPossibleMovesForPiece(board[row][col]!, { row, col }, board);
+                if (pieceMoves.some(m => m.isJump)) {
+                    setSelectedPiece({ row, col });
+                    setPossibleMoves(pieceMoves.filter(m => m.isJump));
+                } else {
+                    toast({ title: "Mandatory Jump", description: "You must capture the opponent's piece with another piece.", variant: "destructive" });
+                }
                 return;
             }
             if (consecutiveJumpPiece) return;
@@ -190,16 +223,16 @@ export default function CheckersBoard() {
                             key={`${rowIndex}-${colIndex}`}
                             className={cn(
                                 'flex items-center justify-center relative aspect-square transition-colors',
-                                isDarkSquare ? 'bg-secondary' : 'bg-card',
                                 isDarkSquare && 'hover:bg-primary/20 cursor-pointer'
                             )}
+                            style={{ backgroundColor: isDarkSquare ? theme.colors[1] : theme.colors[0] }}
                             onClick={() => handleSquareClick(rowIndex, colIndex)}
                         >
                             {piece && (
                                 <div className={cn('w-full h-full flex items-center justify-center transition-transform duration-300 ease-in-out',
                                     isSelected ? 'scale-110 -translate-y-1' : ''
                                 )}>
-                                    <PieceComponent piece={piece} />
+                                    <PieceComponent piece={piece} colors={styles.colors} />
                                 </div>
                             )}
                              {isPossibleMove && (

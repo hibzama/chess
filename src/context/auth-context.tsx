@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -12,6 +13,17 @@ interface AuthContextType {
   logout: () => Promise<void>;
 }
 
+interface EquipmentSettings {
+    chess: {
+        pieceStyle: string;
+        boardTheme: string;
+    },
+    checkers: {
+        pieceStyle: string;
+        boardTheme: string;
+    }
+}
+
 interface UserData {
     uid: string;
     firstName: string;
@@ -20,6 +32,7 @@ interface UserData {
     phone: string;
     balance: number;
     role: 'user' | 'admin';
+    equipment?: EquipmentSettings;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

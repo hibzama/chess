@@ -75,7 +75,7 @@ export default function DashboardLayout({
                             <SidebarMenuButton tooltip="Rankings"><Trophy /><span>Rankings</span></SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="My Equipment"><Swords /><span>My Equipment</span></SidebarMenuButton>
+                            <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment"><Swords /><span>My Equipment</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Refer & Earn"><Megaphone /><span>Refer & Earn</span></SidebarMenuButton>
