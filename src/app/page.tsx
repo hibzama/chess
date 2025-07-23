@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Gift, Trophy, Download } from 'lucide-react';
+import { collection, getCountFromServer } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const Logo = () => (
     <svg
@@ -20,7 +22,19 @@ const Logo = () => (
   );
 
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const bonusLimit = 250;
+  let claimedBonuses = 0;
+  try {
+    const usersCollection = collection(db, "users");
+    const snapshot = await getCountFromServer(usersCollection);
+    claimedBonuses = snapshot.data().count;
+  } catch(e) {
+    console.error("Could not fetch user count for bonus", e)
+  }
+  const remainingBonuses = Math.max(0, bonusLimit - claimedBonuses);
+
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <main className="flex-1 flex flex-col items-center justify-center p-4 text-center">
@@ -41,11 +55,11 @@ export default function LandingPage() {
                 <Gift className="w-6 h-6 text-primary" />
                 <span>LKR 100 Registration Bonus!</span>
               </CardTitle>
-              <CardDescription>The next 250 users get a free bonus to start playing.</CardDescription>
+              <CardDescription>The next {bonusLimit} users get a free bonus to start playing.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Progress value={(42/250) * 100} className="mb-2" />
-              <p className="text-sm text-muted-foreground">42 / 250 bonuses claimed. 208 remaining in this batch!</p>
+              <Progress value={Math.min(100, (claimedBonuses / bonusLimit) * 100)} className="mb-2" />
+              <p className="text-sm text-muted-foreground">{Math.min(claimedBonuses, bonusLimit)} / {bonusLimit} bonuses claimed. {remainingBonuses} remaining in this batch!</p>
             </CardContent>
           </Card>
           
