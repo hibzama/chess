@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -29,24 +29,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user);
-        // We will set up a real-time listener for user data
-      } else {
-        setUser(null);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      if (!user) {
         setUserData(null);
         setLoading(false);
       }
     });
-
-    return () => authUnsubscribe();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     if (user) {
+      setLoading(true);
       const userDocRef = doc(db, 'users', user.uid);
-      const dataUnsubscribe = onSnapshot(userDocRef, (doc) => {
+      const unsubscribe = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
           setUserData(doc.data() as UserData);
         } else {
@@ -55,9 +52,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       }, (error) => {
         console.error("Error fetching user data:", error);
+        setUserData(null);
         setLoading(false);
       });
-      return () => dataUnsubscribe();
+
+      return () => unsubscribe();
     }
   }, [user]);
 
