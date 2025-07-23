@@ -68,8 +68,8 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
 };
 
 export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
-    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer } = useGame();
-    const [board, setBoard] = useState<Board>(createInitialBoard());
+    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState } = useGame();
+    const [board, setBoard] = useState<Board>(() => boardState?.board || createInitialBoard());
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
     const { toast } = useToast();
@@ -79,6 +79,12 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
     const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
     const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[0];
     const isFlipped = playerColor === 'b';
+    
+    useEffect(() => {
+        if (boardState && boardState.board) {
+            setBoard(boardState.board);
+        }
+    }, [boardState]);
     
     const getPossibleMovesForPiece = useCallback((piece: Piece, pos: Position, currentBoard: Board, forPlayer: Player): Move[] => {
         const moves: Move[] = [];
@@ -104,7 +110,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                 // Jump move
                 else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                     const jumpedPiece = currentBoard[newRow][newCol]!;
-                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true, jumpedPiece: { type: 'p', color: jumpedPiece.player } });
+                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true, jumpedPiece: { ...jumpedPiece, type: 'p', color: jumpedPiece.player } });
                 }
             }
         }
@@ -137,7 +143,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         else if (!hasMoves) winner = nextPlayer === playerColor ? 'p2' : 'p1';
 
         if(winner) {
-          setWinner(winner, { board });
+          setWinner(winner, { board: currentBoard });
         }
 
     }, [getPossibleMovesForPiece, playerColor, setWinner]);
@@ -180,9 +186,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         const legalMoves = calculateAllMoves(board, currentPlayer);
         setMustJump(legalMoves.some(m => m.isJump));
         
-        if (currentPlayer === playerColor) {
-            // Player's turn, no automatic move
-        } else {
+        if (currentPlayer !== playerColor) {
             // Bot's turn
             setTimeout(() => {
                 const botMoves = calculateAllMoves(board, currentPlayer);
@@ -252,9 +256,11 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         newBoard[move.to.row][move.to.col] = piece;
         newBoard[move.from.row][move.from.col] = null;
         
+        let captured;
         if (move.isJump) {
             const jumpedRow = move.from.row + (move.to.row - move.from.row) / 2;
             const jumpedCol = move.from.col + (move.to.col - move.from.col) / 2;
+            captured = newBoard[jumpedRow][jumpedCol];
             newBoard[jumpedRow][jumpedCol] = null;
         }
         
@@ -272,8 +278,8 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             setConsecutiveJumpPiece(null);
             setSelectedPiece(null);
             setPossibleMoves([]);
-            // Pass captured piece info to switchTurn
-            switchTurn({ board: newBoard }, moveNotation, move.jumpedPiece);
+            const finalCapturedPiece = captured ? { type: 'p', color: captured.player } : undefined;
+            switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
         }
         
         checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');

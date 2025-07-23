@@ -31,6 +31,7 @@ interface GameContextType extends GameState {
     resetGame: () => void;
     player1Time: number;
     player2Time: number;
+    loadGameState: (state: GameState) => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -59,10 +60,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const savedState = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
             if (savedState) {
                 const parsed = JSON.parse(savedState);
-                // Ensure times are numbers
                 parsed.p1Time = Number(parsed.p1Time) || defaultState.p1Time;
                 parsed.p2Time = Number(parsed.p2Time) || defaultState.p2Time;
-                return { ...defaultState, ...parsed };
+                return { ...defaultState, ...parsed, turnStartTime: Date.now() }; // Recalculate start time
             }
         } catch (error) {
             console.error("Failed to parse game state from localStorage", error);
@@ -125,13 +125,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const newTime = gameState.p1Time - elapsed;
                 setPlayer1Time(newTime > 0 ? newTime : 0);
                 if (newTime <= 0) {
-                    setWinner('p2'); // Player 1 runs out of time, Player 2 wins
+                    setWinner('p2', gameState.boardState); 
                 }
             } else {
                 const newTime = gameState.p2Time - elapsed;
                 setPlayer2Time(newTime > 0 ? newTime : 0);
                  if (newTime <= 0) {
-                    setWinner('p1'); // Player 2 runs out of time, Player 1 wins
+                    setWinner('p1', gameState.boardState); 
                 }
             }
         };
@@ -140,8 +140,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         return () => stopTimer();
 
-    }, [isMounted, gameState.currentPlayer, gameState.turnStartTime, gameState.gameOver, gameState.playerColor, gameState.p1Time, gameState.p2Time, stopTimer, setWinner]);
+    }, [isMounted, gameState.currentPlayer, gameState.turnStartTime, gameState.gameOver, gameState.playerColor, gameState.p1Time, gameState.p2Time, stopTimer, setWinner, gameState.boardState]);
 
+    const loadGameState = (state: GameState) => {
+        setGameState(state);
+        setPlayer1Time(state.p1Time);
+        setPlayer2Time(state.p2Time);
+    };
 
     const setupGame = (color: PlayerColor, time: number, diff: string) => {
         const newState: GameState = {
@@ -212,10 +217,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 moveCount: newMoveCount,
                 capturedByPlayer: newCapturedByPlayer,
                 capturedByBot: newCapturedByBot,
+                boardState, // always save the latest board state
             };
 
             if (typeof window !== 'undefined') {
-                localStorage.setItem(storageKey, JSON.stringify({ ...updatedState, boardState }));
+                localStorage.setItem(storageKey, JSON.stringify(updatedState));
             }
 
             return updatedState;
@@ -255,7 +261,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         setupGame,
         switchTurn,
         setWinner,
-        resetGame
+        resetGame,
+        loadGameState
     };
 
     return (

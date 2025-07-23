@@ -35,42 +35,34 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, moveHistory } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
   const isFlipped = playerColor === 'b';
 
-   const updateBoardState = useCallback(() => {
-        const boardState = {
-            fen: game.fen(),
-        };
-        // localStorage is handled by context now
-   },[game]);
 
    useEffect(() => {
-        try {
-            const savedState = localStorage.getItem('game_state_chess');
-            if(savedState) {
-                const { fen } = JSON.parse(savedState);
-                if (fen) {
-                    const newGame = new Chess(fen);
-                    setGame(newGame);
-                }
+        if (boardState && boardState.fen) {
+            try {
+                const newGame = new Chess(boardState.fen);
+                setGame(newGame);
+            } catch (e) {
+                console.error("Invalid FEN string in saved state:", e);
+                setGame(new Chess());
             }
-        } catch (e) {
-            console.error("Could not load saved game state", e);
         }
-   }, []);
+   }, [boardState]);
 
 
   const checkGameOver = useCallback(() => {
     if (game.isGameOver()) {
+        const fen = game.fen();
         if(game.isCheckmate()){
             const winner = game.turn() === 'b' ? (playerColor === 'w' ? 'p1' : 'p2') : (playerColor === 'b' ? 'p1' : 'p2');
-            setWinner(winner, { fen: game.fen() });
+            setWinner(winner, { fen });
         } else {
-            setWinner('draw', { fen: game.fen() });
+            setWinner('draw', { fen });
         }
     }
   }, [game, playerColor, setWinner]);
@@ -82,16 +74,16 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         if (moves.length > 0) {
           const move = moves[Math.floor(Math.random() * moves.length)];
           const result = game.move(move);
-          setGame(new Chess(game.fen()));
-          updateBoardState();
+          const newGame = new Chess(game.fen());
+          setGame(newGame);
           const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-          switchTurn({ fen: game.fen() }, result.san, captured);
+          switchTurn({ fen: newGame.fen() }, result.san, captured);
           checkGameOver();
         }
       }, 1000); // 1-second delay for bot move
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver, updateBoardState]);
+  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver]);
 
 
   const getSquareFromIndices = (row: number, col: number): Square => {
@@ -117,9 +109,10 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       if (isLegal) {
         const result = game.move(move);
         if (result) {
-            setGame(new Chess(game.fen()));
+            const newGame = new Chess(game.fen());
+            setGame(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            switchTurn({ fen: game.fen() }, result.san, captured);
+            switchTurn({ fen: newGame.fen() }, result.san, captured);
             checkGameOver();
         }
       }
