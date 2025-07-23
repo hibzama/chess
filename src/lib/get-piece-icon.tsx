@@ -8,9 +8,9 @@ export const getPieceIcon = (type: string, color: string) => {
 
     switch (type.toLowerCase()) {
         case 'p': // Pawn
-            return <g transform="translate(2.5, 2.5)"><path d="M22 9h-2.29C19.11 6.89 16.63 5.23 13.5 5.02V3h3V1h-8v2h3v2.02C8.37 5.23 5.89 6.89 5.29 9H3v2h1.22c.28 1.15.89 2.19 1.73 3.03C3.96 15.3 2 17.91 2 21v1h20v-1c0-3.09-1.96-5.7-4.95-6.97 1.25-1.12 1.95-2.69 1.95-4.34V9z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill} /></g>
+            return <g transform="translate(2.5, 2.5)"><path d="M12 12c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm0-6c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm-4 8h8v2H8v-2zm-2 2v2h12v-2H6z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill} /></g>
         case 'r': // Rook
-            return <g transform="translate(2.5, 2.5)"><path d="M19 2h-2v3h- hükümdar3v2h3v3h2v-3h3V5h-3V2zM5 24v-2h14v2H5zM4 8h2v11H4V8zm16 0h-2v11h2V8zM1 22h22v2H1v-2z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
+            return <g transform="translate(2.5, 2.5)"><path d="M5 24v-2h14v2H5zM4 8h2v11H4V8zm16 0h-2v11h2V8zM1 22h22v2H1v-2zM4 2v4h4V2H4zm12 0v4h4V2h-4z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
         case 'n': // Knight
             return <g transform="translate(2.5, 2.5)"><path d="M15 2l-3 3-3-3s-2 2-2 4c0 2 2 4 2 4l-2 2v2h12v-2l-2-2s2-2 2-4c0-2-2-4-2-4zM6 16v6h12v-6H6z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
         case 'b': // Bishop
