@@ -3,15 +3,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { Clock } from 'lucide-react';
+import { formatTime } from '@/lib/time';
+import { Skeleton } from '../ui/skeleton';
 
 type PlayerInfoProps = {
   playerName: string;
   avatarSrc: string;
   isTurn: boolean;
+  timeRemaining: number | null;
   'data-ai-hint': string;
 };
 
-export default function PlayerInfo({ playerName, avatarSrc, isTurn, ...props }: PlayerInfoProps) {
+export default function PlayerInfo({ playerName, avatarSrc, isTurn, timeRemaining, ...props }: PlayerInfoProps) {
   return (
     <Card className={cn(
       'transition-all',
@@ -26,7 +29,7 @@ export default function PlayerInfo({ playerName, avatarSrc, isTurn, ...props }: 
           <h3 className="font-semibold text-lg">{playerName}</h3>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="w-4 h-4" />
-            <span>04:32</span>
+            {timeRemaining !== null ? <span>{formatTime(timeRemaining)}</span> : <Skeleton className="w-16 h-4" />}
           </div>
         </div>
       </CardContent>

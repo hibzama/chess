@@ -10,7 +10,7 @@ export default function PracticeArenaPage() {
     const router = useRouter();
 
     const handleStartGame = (game: 'chess' | 'checkers') => {
-        router.push(`/game/${game}`);
+        router.push(`/practice/${game}/setup`);
     };
 
     const practiceOptions = [
