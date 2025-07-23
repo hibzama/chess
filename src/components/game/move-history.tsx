@@ -8,7 +8,7 @@ export default function MoveHistory() {
   const { moveHistory } = useGame();
   
   return (
-    <ScrollArea className="h-64 xl:h-96">
+    <ScrollArea className="h-full">
       <Table>
         <TableHeader className="sticky top-0 bg-card">
           <TableRow>
@@ -26,7 +26,7 @@ export default function MoveHistory() {
             </TableRow>
           )) : (
             <TableRow>
-                <TableCell colSpan={3} className="text-center text-muted-foreground">No moves yet.</TableCell>
+                <TableCell colSpan={3} className="text-center text-muted-foreground pt-8">No moves yet.</TableCell>
             </TableRow>
           )}
         </TableBody>

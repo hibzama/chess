@@ -47,8 +47,8 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
     <>
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-10 px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background/80 backdrop-blur-sm">
-        <Link href="/dashboard" passHref>
-          <Button variant="outline" className="flex items-center gap-2">
+        <Link href="/practice" passHref>
+          <Button variant="ghost" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back to Dashboard</span>
           </Button>
@@ -61,8 +61,9 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
             </Button>
         </div>
       </header>
-      <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[280px_1fr_280px] xl:grid-cols-[320px_1fr_320px] gap-6 p-4 md:p-6">
-        <aside className="hidden lg:flex flex-col gap-6">
+      <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
+        {/* Left Column */}
+        <aside className="flex flex-col gap-6">
             <PlayerInfo
               playerName={userData ? `${userData.firstName} (You)`: "Player 1 (You)"}
               avatarSrc="https://placehold.co/100x100.png"
@@ -70,24 +71,26 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               isTurn={isP1Turn}
               timeRemaining={player1Time}
             />
-             <Card className="flex-1">
+             <Card className="flex-1 flex flex-col">
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                         <History className="w-5 h-5"/>
                         Move History
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1">
                     <MoveHistory />
                 </CardContent>
             </Card>
         </aside>
 
+        {/* Center Column */}
         <div className="flex items-center justify-center min-h-0">
             {children}
         </div>
 
-        <aside className="hidden lg:flex flex-col gap-6">
+        {/* Right Column */}
+        <aside className="flex flex-col gap-6">
             <PlayerInfo
               playerName="Opponent (Bot)"
               avatarSrc="https://placehold.co/100x100.png"

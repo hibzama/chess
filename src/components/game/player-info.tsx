@@ -23,7 +23,7 @@ export default function PlayerInfo({ playerName, avatarSrc, isTurn, timeRemainin
       isTurn ? 'border-primary ring-2 ring-primary shadow-lg' : 'border-border'
     )}>
       <CardContent className="p-4 flex items-center gap-4">
-        <Avatar className="h-16 w-16 border-2 border-primary">
+        <Avatar className="h-16 w-16 border-2 border-primary/50">
           <AvatarImage src={avatarSrc} alt={playerName} {...props} />
           <AvatarFallback>{playerName.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
