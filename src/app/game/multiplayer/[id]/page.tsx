@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment } from 'firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -54,14 +54,12 @@ function NavigationGuard() {
     const [nextUrl, setNextUrl] = useState<string | null>(null);
 
     const handleConfirm = useCallback(() => {
+        if(nextUrl) {
+            router.push(nextUrl);
+        } else {
+            router.back();
+        }
         resign(); 
-        setTimeout(() => {
-            if(nextUrl) {
-                router.push(nextUrl);
-            } else {
-                router.back();
-            }
-        }, 100);
     }, [resign, nextUrl, router]);
 
     const handleCancel = useCallback(() => {
@@ -507,3 +505,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
