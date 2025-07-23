@@ -31,8 +31,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
-  const handleCloseDialog = () => {
-    resetGame();
+  const handleReturnToDashboard = () => {
     router.push('/dashboard');
   };
 
@@ -115,6 +114,13 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>
         <div className="flex items-center gap-2">
+             <Link href="/dashboard/wallet">
+                <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors lg:hidden">
+                    <CardContent className="p-2 flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-primary"/>
+                    </CardContent>
+                </Card>
+            </Link>
             <Button variant="ghost" size="icon">
                 <Settings className="h-5 w-5" />
                 <span className="sr-only">Game Settings</span>
@@ -192,7 +198,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </main>
     </div>
     
-    <AlertDialog open={gameOver} onOpenChange={(open) => {if (!open) handleCloseDialog()}}>
+    <AlertDialog open={gameOver} onOpenChange={(open) => {if (!open) resetGame()}}>
         <AlertDialogContent>
             <AlertDialogHeader className="items-center text-center">
                 <div className="p-4 rounded-full bg-primary/10 mb-2">
@@ -210,9 +216,9 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                     </div>
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
-                <Button className="w-full" onClick={handleCloseDialog}>Return to Dashboard</Button>
-            </AlertDialogFooter>
+            <AlertDialogAction onClick={handleReturnToDashboard} className="w-full">
+                Return to Dashboard
+            </AlertDialogAction>
         </AlertDialogContent>
     </AlertDialog>
 
