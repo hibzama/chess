@@ -32,7 +32,6 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleCloseDialog = () => {
-    resetGame();
     router.push('/dashboard');
   };
 
@@ -175,7 +174,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </main>
     </div>
     
-    <AlertDialog open={gameOver}>
+    <AlertDialog open={gameOver} onOpenChange={(open) => {if (!open) resetGame()}}>
         <AlertDialogContent>
             <AlertDialogHeader className="items-center text-center">
                 <div className="p-4 rounded-full bg-primary/10 mb-2">
