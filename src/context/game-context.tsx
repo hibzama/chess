@@ -37,8 +37,8 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const GameProvider = ({ children, gameType }: { children: React.ReactNode, gameType: 'chess' | 'checkers' }) => {
     const storageKey = `game_state_${gameType}`;
-
-    const getInitialState = (): GameState => {
+    
+    const getInitialState = useCallback((): GameState => {
         const defaultState: GameState = {
             playerColor: 'w',
             timeLimit: 900,
@@ -59,25 +59,39 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const savedState = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
             if (savedState) {
                 const parsed = JSON.parse(savedState);
+                // Ensure times are numbers
+                parsed.p1Time = Number(parsed.p1Time) || defaultState.p1Time;
+                parsed.p2Time = Number(parsed.p2Time) || defaultState.p2Time;
                 return { ...defaultState, ...parsed };
             }
         } catch (error) {
             console.error("Failed to parse game state from localStorage", error);
         }
         return defaultState;
-    }
+    }, [storageKey]);
 
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [player1Time, setPlayer1Time] = useState(gameState.p1Time);
     const [player2Time, setPlayer2Time] = useState(gameState.p2Time);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+        const savedState = getInitialState();
+        setGameState(savedState);
+        setPlayer1Time(savedState.p1Time);
+        setPlayer2Time(savedState.p2Time);
+    }, [getInitialState]);
 
 
     const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
         setGameState(prevState => {
             const updatedState = { ...prevState, ...newState };
-            const stateToSave = { ...updatedState, boardState: boardState || updatedState.boardState };
-            localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+            if (typeof window !== 'undefined') {
+                const stateToSave = { ...updatedState, boardState: boardState || updatedState.boardState };
+                localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+            }
             return updatedState;
         });
     }, [storageKey]);
@@ -96,10 +110,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
 
     useEffect(() => {
-        stopTimer();
-        if (gameState.gameOver || !gameState.turnStartTime) return;
+        if (!isMounted || gameState.gameOver || !gameState.turnStartTime) {
+            stopTimer();
+            return;
+        }
 
-        const p1IsCurrent = (gameState.playerColor === 'w' && gameState.currentPlayer === 'w') || (gameState.playerColor === 'b' && gameState.currentPlayer === 'b');
+        const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
 
         const tick = () => {
             const now = Date.now();
@@ -107,25 +123,24 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             
             if (p1IsCurrent) {
                 const newTime = gameState.p1Time - elapsed;
-                setPlayer1Time(newTime);
+                setPlayer1Time(newTime > 0 ? newTime : 0);
                 if (newTime <= 0) {
-                    setWinner(gameState.playerColor === 'w' ? 'p2' : 'p1');
+                    setWinner('p2'); // Player 1 runs out of time, Player 2 wins
                 }
             } else {
                 const newTime = gameState.p2Time - elapsed;
-                setPlayer2Time(newTime);
+                setPlayer2Time(newTime > 0 ? newTime : 0);
                  if (newTime <= 0) {
-                    setWinner(gameState.playerColor === 'b' ? 'p2' : 'p1');
+                    setWinner('p1'); // Player 2 runs out of time, Player 1 wins
                 }
             }
         };
         
-        tick(); 
         intervalRef.current = setInterval(tick, 1000);
 
         return () => stopTimer();
 
-    }, [gameState.currentPlayer, gameState.turnStartTime, gameState.gameOver, gameState.playerColor, gameState.p1Time, gameState.p2Time, stopTimer, setWinner]);
+    }, [isMounted, gameState.currentPlayer, gameState.turnStartTime, gameState.gameOver, gameState.playerColor, gameState.p1Time, gameState.p2Time, stopTimer, setWinner]);
 
 
     const setupGame = (color: PlayerColor, time: number, diff: string) => {
@@ -158,14 +173,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         
         const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
 
-        let newP1Time = gameState.p1Time;
-        let newP2Time = gameState.p2Time;
-        
-        if (p1IsCurrent) {
-            newP1Time -= elapsed;
-        } else {
-            newP2Time -= elapsed;
-        }
+        let newP1Time = p1IsCurrent ? gameState.p1Time - elapsed : gameState.p1Time;
+        let newP2Time = !p1IsCurrent ? gameState.p2Time - elapsed : gameState.p2Time;
         
         setPlayer1Time(newP1Time);
         setPlayer2Time(newP2Time);
@@ -203,7 +212,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     };
 
     const resetGame = () => {
-        localStorage.removeItem(storageKey);
+        if(typeof window !== 'undefined') {
+          localStorage.removeItem(storageKey);
+        }
         const defaultState: GameState = {
             playerColor: 'w',
             timeLimit: 900,
@@ -226,8 +237,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         stopTimer();
     };
 
+    const contextValue = {
+        ...gameState,
+        player1Time: isMounted ? player1Time : gameState.timeLimit,
+        player2Time: isMounted ? player2Time : gameState.timeLimit,
+        setupGame,
+        switchTurn,
+        setWinner,
+        resetGame
+    };
+
     return (
-        <GameContext.Provider value={{ ...gameState, player1Time, player2Time, setupGame, switchTurn, setWinner, resetGame }}>
+        <GameContext.Provider value={contextValue}>
             {children}
         </GameContext.Provider>
     );
