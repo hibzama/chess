@@ -33,7 +33,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
 
   const handleCloseDialog = () => {
     resetGame();
-    router.push('/lobby');
+    router.push('/dashboard');
   };
 
   const getWinnerMessage = () => {
@@ -194,7 +194,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <Button className="w-full" onClick={handleCloseDialog}>Close</Button>
+                <Button className="w-full" onClick={handleCloseDialog}>Return to Dashboard</Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
