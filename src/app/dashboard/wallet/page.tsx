@@ -27,6 +27,8 @@ type Transaction = {
     withdrawalDetails?: any;
 };
 
+const USDT_RATE = 310;
+
 export default function WalletPage() {
   const { user, userData } = useAuth();
   const { toast } = useToast();
@@ -77,10 +79,12 @@ export default function WalletPage() {
       await uploadBytes(storageRef, depositSlip);
       const slipUrl = await getDownloadURL(storageRef);
 
+      const amountInLKR = parseFloat(depositAmount) * USDT_RATE;
+
       await addDoc(collection(db, 'transactions'), {
         userId: user.uid,
         type: 'deposit',
-        amount: parseFloat(depositAmount),
+        amount: amountInLKR,
         status: 'pending',
         slipUrl,
         depositMethod,
@@ -106,8 +110,10 @@ export default function WalletPage() {
       toast({ variant: 'destructive', title: 'Error', description: 'Please fill all fields.' });
       return;
     }
-    const amount = parseFloat(withdrawalAmount);
-    if(userData && userData.balance < amount) {
+    const amountInUSDT = parseFloat(withdrawalAmount);
+    const amountInLKR = amountInUSDT * USDT_RATE;
+
+    if(userData && userData.balance < amountInLKR) {
         toast({ variant: 'destructive', title: 'Error', description: 'Insufficient balance.' });
         return;
     }
@@ -117,13 +123,13 @@ export default function WalletPage() {
         const userRef = doc(db, 'users', user.uid);
         // Immediately deduct balance
         await updateDoc(userRef, {
-            balance: increment(-amount)
+            balance: increment(-amountInLKR)
         });
 
       await addDoc(collection(db, 'transactions'), {
         userId: user.uid,
         type: 'withdrawal',
-        amount: amount,
+        amount: amountInLKR,
         status: 'pending',
         withdrawalMethod,
         withdrawalDetails,
@@ -141,7 +147,7 @@ export default function WalletPage() {
         // Revert balance deduction if firestore update fails
         const userRef = doc(db, 'users', user.uid);
         await updateDoc(userRef, {
-            balance: increment(amount)
+            balance: increment(amountInLKR)
         });
 
     } finally {
@@ -169,7 +175,7 @@ export default function WalletPage() {
           <CardTitle className="flex items-center gap-2"><DollarSign /> Current Balance</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-4xl font-bold">LKR {userData?.balance?.toFixed(2) || '0.00'}</p>
+          <p className="text-4xl font-bold">{userData ? (userData.balance / USDT_RATE).toFixed(2) : '0.00'} USDT</p>
         </CardContent>
       </Card>
 
@@ -199,8 +205,8 @@ export default function WalletPage() {
               </Tabs>
               
               <div className="space-y-2">
-                <Label htmlFor="deposit-amount">Amount (LKR)</Label>
-                <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 1000" required />
+                <Label htmlFor="deposit-amount">Amount (USDT)</Label>
+                <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 10" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="deposit-slip">Payment Slip Screenshot</Label>
@@ -221,8 +227,8 @@ export default function WalletPage() {
           <form onSubmit={handleWithdrawalSubmit}>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <Label htmlFor="withdrawal-amount">Amount (LKR)</Label>
-                    <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 500" required />
+                    <Label htmlFor="withdrawal-amount">Amount (USDT)</Label>
+                    <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 5" required />
                 </div>
                 <Separator />
                 <p className="font-medium text-sm">Bank Details</p>
@@ -277,7 +283,7 @@ export default function WalletPage() {
                                     <span className="capitalize">{tx.type}</span>
                                 </div>
                             </TableCell>
-                            <TableCell>LKR {tx.amount.toFixed(2)}</TableCell>
+                            <TableCell>{(tx.amount / USDT_RATE).toFixed(2)} USDT</TableCell>
                             <TableCell>{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                             <TableCell>
                                 <Badge variant={tx.status === 'approved' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">

@@ -33,6 +33,9 @@ export default async function LandingPage() {
     console.error("Could not fetch user count for bonus", e)
   }
   const remainingBonuses = Math.max(0, bonusLimit - claimedBonuses);
+  const LKR_BONUS = 100;
+  const USDT_RATE = 310;
+  const USDT_BONUS = (LKR_BONUS / USDT_RATE).toFixed(2);
 
 
   return (
@@ -53,7 +56,7 @@ export default async function LandingPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-center gap-2">
                 <Gift className="w-6 h-6 text-yellow-300" />
-                <span className="text-yellow-300">LKR 100 Registration Bonus!</span>
+                <span className="text-yellow-300">{USDT_BONUS} USDT Registration Bonus!</span>
               </CardTitle>
               <CardDescription>The next {bonusLimit} users get a free bonus to start playing.</CardDescription>
             </CardHeader>

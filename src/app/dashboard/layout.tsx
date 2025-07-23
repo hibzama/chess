@@ -44,6 +44,8 @@ export default function DashboardLayout({
         return '...';
     }
 
+    const USDT_RATE = 310;
+
 
     return (
         <SidebarProvider>
@@ -57,13 +59,13 @@ export default function DashboardLayout({
                 <SidebarContent>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/dashboard" passHref><SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="My Rooms"><BarChart3 /><span>My Rooms</span></SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <Link href="/dashboard/wallet" passHref><SidebarMenuButton tooltip="Wallet"><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet"><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Friends & Community"><Users /><span>Friends & Community</span></SidebarMenuButton>
@@ -111,7 +113,7 @@ export default function DashboardLayout({
                             <CardContent className="p-2 flex items-center gap-2">
                                 <Wallet className="w-5 h-5 text-primary"/>
                                 <div>
-                                    <p className="text-sm font-bold text-primary">LKR {userData?.balance?.toFixed(2) || '0.00'}</p>
+                                    <p className="text-sm font-bold text-primary">{userData ? (userData.balance / USDT_RATE).toFixed(2) : '0.00'} USDT</p>
                                     <p className="text-xs text-muted-foreground">Your Balance</p>
                                 </div>
                             </CardContent>

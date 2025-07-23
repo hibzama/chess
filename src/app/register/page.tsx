@@ -56,7 +56,7 @@ export default function RegisterPage() {
             const userCount = snapshot.data().count;
             
             let initialBalance = 0;
-            if (userCount < 250) {
+            if (userCount <= 250) { // <= because the current user is not yet in the count
                 initialBalance = 100;
             }
 
@@ -68,10 +68,14 @@ export default function RegisterPage() {
                 email,
                 balance: initialBalance,
             });
+            
+            const LKR_BONUS = 100;
+            const USDT_RATE = 310;
+            const USDT_BONUS = (LKR_BONUS / USDT_RATE).toFixed(2);
 
             toast({
                 title: "Success!",
-                description: `Your account has been created.${initialBalance > 0 ? ' A LKR 100 bonus has been added to your account!' : ''}`,
+                description: `Your account has been created.${initialBalance > 0 ? ` A ${USDT_BONUS} USDT bonus has been added to your account!` : ''}`,
             });
             router.push('/dashboard');
 
