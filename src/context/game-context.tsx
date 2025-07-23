@@ -74,6 +74,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const { user } = useAuth();
     
     const storageKey = `game_state_${gameType}`;
+    const gameOverRef = useRef(false);
     
     const getInitialState = useCallback((): GameState => {
         const defaultState: GameState = {
@@ -97,7 +98,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const savedState = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
             if (savedState) {
                 const parsed = JSON.parse(savedState);
-                return { ...defaultState, ...parsed };
+                return { ...defaultState, ...parsed, gameOver: false, winner: null };
             }
         } catch (error) {
             console.error("Failed to parse game state from localStorage", error);
@@ -111,6 +112,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const [payoutAmount, setPayoutAmount] = useState<number | null>(null);
     
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+     useEffect(() => {
+        gameOverRef.current = gameState.gameOver;
+    }, [gameState.gameOver]);
 
     const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
         setGameState(prevState => {
@@ -184,7 +189,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         const winnerPayoutAmount = wager * 1.8;
                         creatorPayout = winnerIsCreator ? winnerPayoutAmount : 0;
                         joinerPayout = winnerIsCreator ? 0 : winnerPayoutAmount;
-                        const reason = currentRoom.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win by time';
+                        const reason = currentRoom.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win on time';
                         creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
                         joinerDesc = winnerIsCreator ? `Loss vs ${winnerName}` : `${reason} vs ${loserName}`;
                     }
@@ -218,11 +223,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
 
     const setWinner = useCallback(async (winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate') => {
-        if (gameState.gameOver) return;
+        if (gameOverRef.current) return;
+        gameOverRef.current = true;
         stopTimer();
         
-        if (isMultiplayer && room) {
-            const roomRef = doc(db, 'game_rooms', room.id);
+        if (isMultiplayer && roomId) {
+            const roomRef = doc(db, 'game_rooms', roomId);
             const currentRoomDoc = await getDoc(roomRef);
             if(!currentRoomDoc.exists() || currentRoomDoc.data().status === 'completed') return;
             
@@ -240,7 +246,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const winner = winnerId === 'bot' ? 'p2' : (winnerId ? 'p1' : 'draw');
             updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method }, boardState);
         }
-    }, [stopTimer, updateAndSaveState, isMultiplayer, user, gameState, room]);
+    }, [stopTimer, updateAndSaveState, isMultiplayer, roomId]);
 
 
     // Multiplayer state sync
@@ -252,7 +258,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists()) return;
+            if (!docSnap.exists() || gameOverRef.current) return;
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
 
@@ -260,7 +266,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 return;
             }
     
-            if (roomData.status === 'completed' && !gameState.gameOver) {
+            if (roomData.status === 'completed') {
+                gameOverRef.current = true;
                 stopTimer();
                 const winnerIsMe = roomData.winner ? roomData.winner.uid === user.uid : false;
                 
@@ -313,7 +320,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             stopTimer();
         };
     
-    }, [isMultiplayer, roomId, user, isMounted, stopTimer, handlePayout, gameState.gameOver, gameType]);
+    }, [isMultiplayer, roomId, user, isMounted, stopTimer, handlePayout, gameType]);
 
 
      // Timer countdown logic
@@ -327,6 +334,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         
         if(!isMultiplayer) { // Practice mode timer
             intervalRef.current = setInterval(() => {
+                if(gameOverRef.current) { stopTimer(); return; }
                 if (isMyTurn) {
                     const newTime = gameState.p1Time - 1;
                     if (newTime <= 0) {
@@ -345,6 +353,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }, 1000);
         } else if (room && room.status === 'in-progress') { // Multiplayer mode timer
              intervalRef.current = setInterval(() => {
+                if(gameOverRef.current) { stopTimer(); return; }
                 const elapsed = room.turnStartTime ? (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
                 const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
 
@@ -376,6 +385,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     };
 
     const setupGame = (color: PlayerColor, time: number, diff: string) => {
+        gameOverRef.current = false;
         const newState: GameState = {
             playerColor: color,
             timeLimit: time,
@@ -396,7 +406,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     };
 
     const switchTurn = async (boardState: any, move?: string, capturedPiece?: Piece) => {
-        if (gameState.gameOver || (!room && isMultiplayer)) return;
+        if (gameOverRef.current || (!room && isMultiplayer)) return;
 
         if (isMultiplayer && room) {
             const roomRef = doc(db, 'game_rooms', room.id);
@@ -481,7 +491,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     };
 
     const resign = () => {
-        if (gameState.gameOver || !user) return;
+        if (gameOverRef.current || !user) return;
         if(isMultiplayer && room) {
              const winnerId = room.players.find(p => p !== user.uid) || null;
              setWinner(winnerId, gameState.boardState, 'resign');
@@ -492,6 +502,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
 
     const resetGame = () => {
+        gameOverRef.current = false;
         if(typeof window !== 'undefined' && !isMultiplayer) {
           localStorage.removeItem(storageKey);
         }

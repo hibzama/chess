@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
@@ -29,6 +29,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
+  const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
   
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
@@ -45,6 +46,11 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const handleReturnToDashboard = () => {
     router.push('/dashboard');
   };
+
+  const handleResign = () => {
+    setIsResignConfirmOpen(false);
+    resign();
+  }
 
   const getWinnerMessage = () => {
     let title = "Game Over";
@@ -185,7 +191,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                         <CapturedPieces pieceStyle={equipment?.pieceStyle} />
                         <Card>
                             <CardContent className="p-4">
-                                <Button variant="destructive" className="w-full" onClick={resign}>
+                                <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)}>
                                     <Flag className="w-4 h-4 mr-2" />
                                     Resign
                                 </Button>
@@ -209,7 +215,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
              {isMultiplayer ? (
                  <Card>
                     <CardContent className="p-4">
-                        <Button variant="destructive" className="w-full" onClick={resign}>
+                        <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)}>
                             <Flag className="w-4 h-4 mr-2" />
                             Resign
                         </Button>
@@ -222,7 +228,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </main>
     </div>
     
-    <AlertDialog open={gameOver} onOpenChange={(open) => !open && resetGame()}>
+    <AlertDialog open={gameOver}>
       <AlertDialogContent>
         <AlertDialogHeader className="items-center text-center">
           <div className="p-4 rounded-full bg-primary/10 mb-2">
@@ -244,6 +250,21 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             Return to Dashboard
         </AlertDialogAction>
       </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={isResignConfirmOpen} onOpenChange={setIsResignConfirmOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure you want to resign?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    If you resign, you will forfeit the match and lose your wager.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleResign}>Resign</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
     </AlertDialog>
     </>
   );
