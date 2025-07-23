@@ -7,6 +7,7 @@ import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import React, { useEffect } from "react";
 
 
 const Logo = () => (
@@ -29,15 +30,24 @@ export default function AdminLayout({
   }: {
     children: React.ReactNode
   }) {
-    const { user, loading, logout } = useAuth();
+    const { user, userData, loading, logout } = useAuth();
     const router = useRouter();
+
+    useEffect(() => {
+        if (!loading) {
+            if (!user || (userData && userData.role !== 'admin')) {
+                router.push('/admin/login');
+            }
+        }
+    }, [user, userData, loading, router]);
+
 
     const handleLogout = async () => {
         await logout();
         router.push('/admin/login');
     }
 
-    if(loading) {
+    if(loading || !user || (userData && userData.role !== 'admin')) {
         return (
             <div className="flex h-screen">
                 <div className="w-64 bg-card p-4">
@@ -56,14 +66,6 @@ export default function AdminLayout({
             </div>
         )
     }
-
-    if (!user) {
-        router.push('/admin/login');
-        return null; // Don't render anything while redirecting
-    }
-
-    // You might want to add a check here to ensure the user is an admin.
-    // e.g., if (userData && !userData.isAdmin) router.push('/dashboard');
 
     return (
         <SidebarProvider>
