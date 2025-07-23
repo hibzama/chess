@@ -157,7 +157,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
             </div>
             <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-                <p>{getWinnerMessage().description}</p>
+                {getWinnerMessage().description}
                 {isMultiplayer && payoutAmount !== null && (
                     <div className="p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
                        <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)}
