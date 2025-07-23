@@ -142,18 +142,18 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
     <AlertDialog open={gameOver}>
         <AlertDialogContent>
             <AlertDialogHeader className="items-center text-center">
-            <div className="p-4 rounded-full bg-primary/10 mb-2">
-                <Crown className="w-12 h-12 text-primary" />
-            </div>
-            <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
-            <AlertDialogDescription>
-                {getWinnerMessage().description}
+                <div className="p-4 rounded-full bg-primary/10 mb-2">
+                    <Crown className="w-12 h-12 text-primary" />
+                </div>
+                <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
+                <AlertDialogDescription>
+                    {getWinnerMessage().description}
+                </AlertDialogDescription>
                 {isMultiplayer && payoutAmount !== null && payoutAmount > 0 && (
-                    <div className="mt-4 p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
+                    <div className="mt-4 p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 text-sm">
                        <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)} (~{(payoutAmount / USDT_RATE).toFixed(2)} USDT)
                     </div>
                 )}
-            </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
             <AlertDialogAction onClick={handleCloseDialog}>Close</AlertDialogAction>
