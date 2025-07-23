@@ -1,15 +1,24 @@
-
 import React from 'react';
 
 export const getPieceIcon = (type: string, color: string) => {
-    const style = { fill: color, stroke: color === '#0f172a' || color === '#18181b' ? '#f8fafc' : '#0f172a' , strokeWidth: 1.5, strokeLinejoin: 'round' } as React.CSSProperties;
+    // The explicit fill and stroke on the path elements will override this, but it's good for fallback.
+    const style = { fill: color, stroke: 'none', strokeWidth: 1.5, strokeLinejoin: 'round' } as React.CSSProperties;
+    const pieceFill = color;
+    const pieceStroke = color === '#f8fafc' ? '#0f172a' : '#f8fafc'; // White or near-white pieces get black stroke, others get white stroke
+
     switch (type.toLowerCase()) {
-        case 'p': return <g {...style}><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.58 16 21v-1h13v1c0-2.42-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4zM12 31h21v-3H12v3z" /></g>;
-        case 'r': return <g {...style}><path d="M13 31h19v-3H13v3zm1-4h17v-8H14v8zM11 9h23v5h-3v2h-3v-2h-5v2h-3v-2h-3V9z" /></g>;
-        case 'n': return <g {...style}><path d="M22.5 31h-9V29.5h9V31zm-3-1.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zm-1.5-12c-3.44.64-6.44 3.69-7.5 7.5-1.5 5.5 2 9.5 7.5 9.5h3V15.5H18c-2.5 0-2.5-2.5-2.5-2.5s3-1.5 6-1.5c3.5 0 5.5 2.5 5.5 2.5v14h1.5v-13c0-4.67-3.33-8-8-8z" /></g>;
-        case 'b': return <g {...style}><path d="M18.5 31h8v-1.5h-8V31zM15 28.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0zM12 28.5c0-4.67 3.33-8 8-8s8 3.33 8 8c0 1.15-.22 2.25-.62 3.25H12.62c-.4-1-.62-2.1-.62-3.25zM19.5 9a3 3 0 1 1 6 0 3 3 0 0 1-6 0z" /></g>;
-        case 'q': return <g {...style}><path d="M12.5 31h20v-3h-20v3zM10.5 12c0-3.31 2.69-6 6-6s6 2.69 6 6c0 1.54-.58 2.94-1.5 4h-9c-.92-1.06-1.5-2.46-1.5-4zM10 28h25v-3H10v3z" /></g>;
-        case 'k': return <g {...style}><path d="M22.5 31h-9V29.5h9V31zm-4.5-1.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0zM12 28.5c0-4.67 3.33-8 8-8s8 3.33 8 8v3h-16v-3zM22.5 6h-3v3h-3v3h3v-3h3V6z" /></g>;
+        case 'p': // Pawn
+            return <g transform="translate(2.5, 2.5)"><path d="M22 9h-2.29C19.11 6.89 16.63 5.23 13.5 5.02V3h3V1h-8v2h3v2.02C8.37 5.23 5.89 6.89 5.29 9H3v2h1.22c.28 1.15.89 2.19 1.73 3.03C3.96 15.3 2 17.91 2 21v1h20v-1c0-3.09-1.96-5.7-4.95-6.97 1.25-1.12 1.95-2.69 1.95-4.34V9z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill} /></g>
+        case 'r': // Rook
+            return <g transform="translate(2.5, 2.5)"><path d="M19 2h-2v3h- hükümdar3v2h3v3h2v-3h3V5h-3V2zM5 24v-2h14v2H5zM4 8h2v11H4V8zm16 0h-2v11h2V8zM1 22h22v2H1v-2z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
+        case 'n': // Knight
+            return <g transform="translate(2.5, 2.5)"><path d="M15 2l-3 3-3-3s-2 2-2 4c0 2 2 4 2 4l-2 2v2h12v-2l-2-2s2-2 2-4c0-2-2-4-2-4zM6 16v6h12v-6H6z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
+        case 'b': // Bishop
+            return <g transform="translate(2.5, 2.5)"><path d="M12 2C7.58 2 4 5.58 4 10c0 2.21.89 4.21 2.34 5.66L4 23h16l-2.34-7.34C19.11 14.21 20 12.21 20 10c0-4.42-3.58-8-8-8zm0 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
+        case 'q': // Queen
+            return <g transform="translate(2.5, 2.5)"><path d="M3 5l2 12h14l2-12-3 4-4-4-3 4-3-4-4 4zM18 4a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM4 19v2h16v-2H4z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
+        case 'k': // King
+             return <g transform="translate(2.5, 2.5)"><path d="M12 2l-2 4h4l-2-4zM6 7v2h12V7H6zm-2 4v2h2v2h-2v2h2v3h12v-3h2v-2h-2v-2h2V11H4z" stroke={pieceStroke} strokeWidth="1.5" fill={pieceFill}/></g>
         default: return null;
     }
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Chess, Square } from 'chess.js';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { getPieceIcon } from '@/lib/get-piece-icon';
+import { getPieceIcon } from '@/lib/get-piece-icon.tsx';
 import { useGame } from '@/context/game-context';
 
 type BoardTheme = { id: string; name: string; colors: string[] };
@@ -130,7 +130,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
                   'w-full h-full flex items-center justify-center transition-transform duration-300 ease-in-out',
                   isSelected ? 'scale-110 -translate-y-1' : ''
                 )}>
-                  <svg viewBox="0 0 45 45" className="w-full h-full p-1">
+                  <svg viewBox="0 0 28 28" className="w-full h-full p-1">
                     {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
                   </svg>
                 </div>

@@ -39,9 +39,9 @@ export function ChessPiecePreview({ boardTheme = 'ocean', pieceStyle = 'black_wh
                 row.map((piece, colIndex) => {
                     const isLight = (rowIndex + colIndex) % 2 !== 0;
                     return (
-                        <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full flex items-center justify-center', isLight ? 'bg-white/90' : 'bg-blue-300/80')} style={{backgroundColor: isLight ? theme.colors[0] : theme.colors[1]}}>
+                        <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full flex items-center justify-center')} style={{backgroundColor: isLight ? theme.colors[0] : theme.colors[1]}}>
                            {piece && (
-                                <svg viewBox="0 0 45 45" className="w-full h-full p-1">
+                                <svg viewBox="0 0 28 28" className="w-full h-full p-1">
                                     {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
                                 </svg>
                            )}
