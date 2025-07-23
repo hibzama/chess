@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
@@ -31,21 +31,17 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
 
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
-  const handleCloseDialog = () => {
-    router.push(isMultiplayer ? '/lobby' : '/practice');
-    resetGame();
-  };
-
   useEffect(() => {
     if (gameOver && !hasRedirected) {
-      setHasRedirected(true);
       const timer = setTimeout(() => {
-        handleCloseDialog();
+        setHasRedirected(true);
+        router.push(isMultiplayer ? '/lobby' : '/practice');
+        resetGame();
       }, 5000);
 
       return () => clearTimeout(timer);
     }
-  }, [gameOver, hasRedirected, handleCloseDialog]);
+  }, [gameOver, hasRedirected, isMultiplayer, resetGame, router]);
 
 
   const getWinnerMessage = () => {
@@ -69,6 +65,15 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         case 'resign':
              title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
              description = winner === 'p1' ? `${opponentName} has resigned the game.` : "You have resigned the game.";
+             break;
+        default:
+             if (winner === 'p1') {
+                title = "🎉 You Won! 🎉";
+                description = "You have won the game.";
+             } else if (winner === 'p2') {
+                title = "😥 You Lost 😥";
+                description = "You have lost the game.";
+             }
              break;
     }
 
@@ -157,7 +162,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                     <Crown className="w-12 h-12 text-primary" />
                 </div>
                 <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
-                <AlertDialogDescription>{getWinnerMessage().description}</AlertDialogDescription>
+                <div className="text-sm text-muted-foreground">{getWinnerMessage().description}</div>
                 
                 {isMultiplayer && payoutAmount !== null && payoutAmount > 0 && (
                      <div className="!mt-4 p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 text-sm">
