@@ -37,14 +37,14 @@ const CheckersPieceComponent = ({ color }: { color: string }) => (
 );
 
 const getPieceIcon = (type: string) => {
-    const style = { width: '100%', height: '100%', fill: 'currentColor' };
+    const style = { width: '100%', height: '100%', fill: 'currentColor', stroke: 'black', strokeWidth: 0.5 };
     switch(type) {
-        case 'p': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 9C19.5 9 19 10.5 19 10.5L19 13C19 13 20.5 13 22.5 13C24.5 13 26 13 26 13L26 10.5C26 10.5 25.5 9 22.5 9Z M17.5 14L17.5 26L27.5 26L27.5 14L17.5 14Z M14.5 27.5L14.5 30L30.5 30L30.5 27.5L14.5 27.5Z" /></svg>;
-        case 'r': return <svg viewBox="0 0 45 45" style={style}><path d="M9 13L9 16L12 16L12 13L9 13ZM15 13L15 16L18 16L18 13L15 13ZM21 13L21 16L24 16L24 13L21 13ZM27 13L27 16L30 16L30 13L27 13ZM33 13L33 16L36 16L36 13L33 13ZM9 19L9 30L36 30L36 19L9 19ZM9 33L9 36L36 36L36 33L9 33Z" /></svg>;
-        case 'n': return <svg viewBox="0 0 45 45" style={style}><path d="M22,10C32.5,10,31.5,18.5,31.5,18.5C31.5,24,28,29,28,29L15.5,29C15.5,29,13.5,24.5,13.5,24.5C13.5,24.5,13.5,19.5,13.5,19.5C13.5,19.5,14,16.5,14,16.5C14,16.5,11.5,14.5,11.5,14.5C11.5,14.5,10.5,12,10.5,12C10.5,12,12.5,10,12.5,10C12.5,10,15,11.5,15,11.5C15,11.5,16,10,22,10ZM12.5,32L31.5,32L31.5,39L12.5,39L12.5,32Z" /></svg>;
-        case 'b': return <svg viewBox="0 0 45 45" style={style}><path d="M15 14L15 17L18 17L18 14L15 14ZM21 14L21 17L24 17L24 14L21 14ZM27 14L27 17L30 17L30 14L27 14ZM9 19L9 22L12 22L12 19L9 19ZM33 19L33 22L36 22L36 19L33 19ZM15 25L15 33L30 33L30 25L15 25ZM9 36L9 39L36 39L36 36L9 36Z" /></svg>;
-        case 'q': return <svg viewBox="0 0 45 45" style={style}><path d="M8 12L14 4.5L22.5 7L31 4.5L37 12L8 12ZM8 15L37 15L37 26L8 26L8 15ZM14 29.5L31 29.5L31 31.5L14 31.5L14 29.5ZM11 34L34 34L34 36L11 36L11 34ZM12.5 38L32.5 38L32.5 40L12.5 40L12.5 38Z" /></svg>;
-        case 'k': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 6L20 11L25 11L22.5 6ZM21 11.5L21 14.5L24 14.5L24 11.5L21 11.5ZM12 14.5L12 21.5L33 21.5L33 14.5L12 14.5ZM12 23.5L12 25.5L33 25.5L33 23.5L12 23.5ZM14 27.5L14 36.5L31 36.5L31 27.5L14 27.5ZM16 38.5L16 40.5L29 40.5L29 38.5L16 38.5Z" /></svg>;
+        case 'p': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38-1.98 1.48-3.28 3.89-3.28 6.62 0 4.42 3.58 8 8 8s8-3.58 8-8c0-2.73-1.3-5.14-3.28-6.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z"/></svg>;
+        case 'r': return <svg viewBox="0 0 45 45" style={style}><path d="M9 14h27v5h-27zM12 19h21v12h-21zM9 31h27v5h-27zM11 11h23v3h-23zM14 8h17v3h-17z"/></svg>;
+        case 'n': return <svg viewBox="0 0 45 45" style={style}><path d="M22 10c-3 0-5.5 2-6 4H14c-1 0-2 .5-2 1.5 0 .5.5 1 1 1h1.5c-.5 1-1 2-1 3.5 0 2.5 1.5 5 4 5h3c.5 0 1 0 1.5-.5.5-.5.5-1 0-1.5-1-.5-1.5-1-1.5-2.5 0-1 .5-2 1.5-2.5.5-.5.5-1 0-1.5-1-.5-1.5-1-1.5-2.5 0-1 .5-2 1.5-2.5.5-.5.5-1 0-1.5C25 12 24 10 22 10zm-1.5 12c-1.5 0-2.5 1-2.5 2.5s1 2.5 2.5 2.5 2.5-1 2.5-2.5-1-2.5-2.5-2.5z"/></svg>;
+        case 'b': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.3 16.86 16 19.27 16 22c0 4.42 3.58 8 8 8s8-3.58 8-8c0-2.73-1.3-5.14-3.28-6.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4zm0 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/></svg>;
+        case 'q': return <svg viewBox="0 0 45 45" style={style}><path d="M8 12h29l-3.5 14h-22zm-2 16h33v5h-33zM22.5 6l-6 6h12z"/></svg>;
+        case 'k': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 6L19.5 12h6zM15 13h15v18h-15zM12 31h21v5h-21z"/></svg>;
         default: return null;
     }
 }
@@ -58,9 +58,9 @@ const ChessPiecePreview = () => {
                 row.map((piece, colIndex) => {
                     const isLight = (rowIndex + colIndex) % 2 !== 0;
                     return (
-                        <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full', isLight ? 'bg-[--board-light]' : 'bg-[--board-dark]')}>
+                        <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full flex items-center justify-center', isLight ? 'bg-[--board-light]' : 'bg-[--board-dark]')}>
                            {piece && (
-                                <div className="w-full h-full p-1" style={{ color: piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)' }}>
+                                <div className="w-full h-full p-1" style={{ color: piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)', stroke: piece.color === 'w' ? 'var(--piece-p2)' : 'var(--piece-p1)' }}>
                                     {getPieceIcon(piece.type)}
                                 </div>
                            )}
