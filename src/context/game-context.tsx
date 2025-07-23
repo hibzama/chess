@@ -28,7 +28,6 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     const [timeLimit, setTimeLimit] = useState(900); // in seconds
     const [difficulty, setDifficulty] = useState('intermediate');
 
-    const [gameStartTime, setGameStartTime] = useState<number | null>(null);
     const [player1Time, setPlayer1Time] = useState<number | null>(null);
     const [player2Time, setPlayer2Time] = useState<number | null>(null);
 
@@ -45,14 +44,16 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     }, []);
 
     const setWinner = useCallback((newWinner: Winner) => {
+        if (gameOver) return;
         setGameOver(true);
         setWinnerState(newWinner);
         stopTimers();
-    }, [stopTimers]);
+    }, [gameOver, stopTimers]);
     
     const startTimer = useCallback((player: 'p1' | 'p2') => {
         const intervalRef = player === 'p1' ? p1IntervalRef : p2IntervalRef;
         const setTime = player === 'p1' ? setPlayer1Time : setPlayer2Time;
+        const opponent = player === 'p1' ? 'p2' : 'p1';
         
         if (intervalRef.current) clearInterval(intervalRef.current);
 
@@ -60,7 +61,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
             setTime(prevTime => {
                 if (prevTime === null || prevTime <= 1) {
                     clearInterval(intervalRef.current!);
-                    setWinner(player === 'p1' ? 'p2' : 'p1');
+                    setWinner(opponent);
                     return 0;
                 }
                 return prevTime - 1;
@@ -72,17 +73,24 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     const switchTurn = useCallback(() => {
         const nextPlayer = currentPlayer === 'w' ? 'b' : 'w';
         setCurrentPlayer(nextPlayer);
+    }, [currentPlayer]);
+
+    useEffect(() => {
+        if (gameOver) {
+            stopTimers();
+            return;
+        }
 
         stopTimers();
         const p1IsWhite = playerColor === 'w';
-        
-        if ((nextPlayer === 'w' && p1IsWhite) || (nextPlayer === 'b' && !p1IsWhite)) {
-             startTimer('p1');
+
+        if ((currentPlayer === 'w' && p1IsWhite) || (currentPlayer === 'b' && !p1IsWhite)) {
+            startTimer('p1');
         } else {
-             startTimer('p2');
+            startTimer('p2');
         }
 
-    }, [currentPlayer, playerColor, stopTimers, startTimer]);
+    }, [currentPlayer, gameOver, playerColor, startTimer, stopTimers]);
 
 
     const setupGame = (color: PlayerColor, time: number, diff: string) => {
@@ -94,14 +102,6 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         setCurrentPlayer('w');
         setGameOver(false);
         setWinnerState(null);
-        setGameStartTime(Date.now());
-
-        stopTimers();
-        if (color === 'w') {
-            startTimer('p1');
-        } else {
-            startTimer('p2');
-        }
     };
     
     const resetGame = () => {
@@ -113,7 +113,6 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         setCurrentPlayer('w');
         setGameOver(false);
         setWinnerState(null);
-        setGameStartTime(null);
         stopTimers();
     }
 

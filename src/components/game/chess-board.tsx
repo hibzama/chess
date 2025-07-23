@@ -36,7 +36,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -51,13 +51,28 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     }
   }, [game, setWinner]);
 
+  useEffect(() => {
+    if (!gameOver && currentPlayer !== playerColor) {
+      const timer = setTimeout(() => {
+        const moves = game.moves();
+        if (moves.length > 0) {
+          const move = moves[Math.floor(Math.random() * moves.length)];
+          game.move(move);
+          setBoard(game.board());
+          switchTurn();
+        }
+      }, 1000); // 1-second delay for bot move
+      return () => clearTimeout(timer);
+    }
+  }, [currentPlayer, game, gameOver, playerColor, switchTurn]);
+
 
   const getSquareFromIndices = (row: number, col: number): Square => {
     return `${String.fromCharCode('a'.charCodeAt(0) + col)}${8 - row}` as Square;
   }
 
   const handleSquareClick = (row: number, col: number) => {
-    if (gameOver) return;
+    if (gameOver || currentPlayer !== playerColor) return;
     const square = getSquareFromIndices(row, col);
 
     if (selectedPiece) {
