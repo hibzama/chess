@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 
 const Logo = () => (
@@ -56,13 +57,13 @@ export default function DashboardLayout({
                 <SidebarContent>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton>
+                            <Link href="/dashboard" passHref legacyBehavior><SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="My Rooms"><BarChart3 /><span>My Rooms</span></SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Earning"><Wallet /><span>Earning</span></SidebarMenuButton>
+                            <Link href="/dashboard/wallet" passHref legacyBehavior><SidebarMenuButton tooltip="Wallet"><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Friends & Community"><Users /><span>Friends & Community</span></SidebarMenuButton>
@@ -110,8 +111,8 @@ export default function DashboardLayout({
                             <CardContent className="p-2 flex items-center gap-2">
                                 <Wallet className="w-5 h-5 text-primary"/>
                                 <div>
-                                    <p className="text-sm font-bold text-primary">LKR 121698.80</p>
-                                    <p className="text-xs text-muted-foreground">$392.58 USDT</p>
+                                    <p className="text-sm font-bold text-primary">LKR {userData?.balance?.toFixed(2) || '0.00'}</p>
+                                    <p className="text-xs text-muted-foreground">Your Balance</p>
                                 </div>
                             </CardContent>
                         </Card>

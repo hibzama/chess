@@ -2,9 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
 interface AuthContextType {
   user: User | null;
@@ -19,6 +18,7 @@ interface UserData {
     lastName: string;
     email: string;
     phone: string;
+    balance: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -29,24 +29,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const authUnsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-            setUserData(userDoc.data() as UserData);
-        } else {
-            setUserData(null);
-        }
+        // We will set up a real-time listener for user data
       } else {
         setUser(null);
         setUserData(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => authUnsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      const dataUnsubscribe = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          setUserData(doc.data() as UserData);
+        } else {
+          setUserData(null);
+        }
+        setLoading(false);
+      }, (error) => {
+        console.error("Error fetching user data:", error);
+        setLoading(false);
+      });
+      return () => dataUnsubscribe();
+    }
+  }, [user]);
+
 
   const logout = async () => {
     await auth.signOut();

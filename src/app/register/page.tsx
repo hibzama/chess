@@ -8,7 +8,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getCountFromServer, collection } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -50,17 +50,28 @@ export default function RegisterPage() {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
+            // Check if user is within the first 250
+            const usersCollection = collection(db, "users");
+            const snapshot = await getCountFromServer(usersCollection);
+            const userCount = snapshot.data().count;
+            
+            let initialBalance = 0;
+            if (userCount < 250) {
+                initialBalance = 100;
+            }
+
             await setDoc(doc(db, "users", user.uid), {
                 uid: user.uid,
                 firstName,
                 lastName,
                 phone,
                 email,
+                balance: initialBalance,
             });
 
             toast({
                 title: "Success!",
-                description: "Your account has been created.",
+                description: `Your account has been created.${initialBalance > 0 ? ' A LKR 100 bonus has been added to your account!' : ''}`,
             });
             router.push('/dashboard');
 
