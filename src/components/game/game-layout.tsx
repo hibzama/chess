@@ -25,7 +25,7 @@ type GameLayoutProps = {
 };
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, payoutAmount, isMultiplayer } = useGame();
+  const { isMultiplayer, p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, payoutAmount, roomWager } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
@@ -257,12 +257,22 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure you want to resign?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    If you resign, you will forfeit the match and lose your wager.
+                    {isMultiplayer && roomWager > 0 ? (
+                        <div className="space-y-2 text-left pt-4">
+                            <p>Resigning will forfeit the match.</p>
+                            <ul className="list-disc pl-5 text-sm">
+                                <li><span className="font-bold text-destructive">You will receive a 75% refund</span> of your wager (LKR {(roomWager * 0.75).toFixed(2)}).</li>
+                                <li><span className="font-bold text-green-500">Your opponent will receive a 105% payout</span> of their wager (LKR {(roomWager * 1.05).toFixed(2)}).</li>
+                            </ul>
+                        </div>
+                    ) : (
+                        "This is a practice match, so no funds will be lost."
+                    )}
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleResign}>Resign</AlertDialogAction>
+                <AlertDialogAction onClick={handleResign}>Confirm Resignation</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
