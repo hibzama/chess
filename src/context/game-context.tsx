@@ -168,47 +168,58 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const switchTurn = (boardState: any, move?: string, capturedPiece?: Piece) => {
         if (gameState.gameOver) return;
 
-        const now = Date.now();
-        const elapsed = gameState.turnStartTime ? Math.floor((now - gameState.turnStartTime) / 1000) : 0;
-        
-        const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
-
-        let newP1Time = p1IsCurrent ? gameState.p1Time - elapsed : gameState.p1Time;
-        let newP2Time = !p1IsCurrent ? gameState.p2Time - elapsed : gameState.p2Time;
-        
-        setPlayer1Time(newP1Time);
-        setPlayer2Time(newP2Time);
-
-        let newMoveHistory = [...gameState.moveHistory];
-        let newMoveCount = gameState.moveCount + 1;
-        
-        if (move) {
-            if (gameState.currentPlayer === 'w') {
-                newMoveHistory.push({ turn: Math.floor(newMoveCount / 2) + 1, white: move });
-            } else {
-                const lastMove = newMoveHistory[newMoveHistory.length - 1];
-                if (lastMove && !lastMove.black) {
-                    lastMove.black = move;
+        setGameState(prevState => {
+            const now = Date.now();
+            const elapsed = prevState.turnStartTime ? Math.floor((now - prevState.turnStartTime) / 1000) : 0;
+            
+            const p1IsCurrent = (prevState.playerColor === prevState.currentPlayer);
+    
+            let newP1Time = p1IsCurrent ? prevState.p1Time - elapsed : prevState.p1Time;
+            let newP2Time = !p1IsCurrent ? prevState.p2Time - elapsed : prevState.p2Time;
+            
+            setPlayer1Time(newP1Time);
+            setPlayer2Time(newP2Time);
+    
+            let newMoveHistory = [...prevState.moveHistory];
+            let newMoveCount = prevState.moveCount + 1;
+            
+            if (move) {
+                if (prevState.currentPlayer === 'w') {
+                    newMoveHistory.push({ turn: Math.floor(newMoveCount / 2) + 1, white: move });
                 } else {
-                    newMoveHistory.push({ turn: Math.floor(newMoveCount / 2) + 1, black: move });
+                    const lastMove = newMoveHistory[newMoveHistory.length - 1];
+                    if (lastMove && !lastMove.black) {
+                        lastMove.black = move;
+                    } else {
+                        // This case should ideally not happen in a normal game flow
+                        newMoveHistory.push({ turn: Math.floor(newMoveCount / 2), black: move });
+                    }
                 }
             }
-        }
+    
+            const newCapturedByPlayer = capturedPiece && !p1IsCurrent ? [...prevState.capturedByPlayer, capturedPiece] : prevState.capturedByPlayer;
+            const newCapturedByBot = capturedPiece && p1IsCurrent ? [...prevState.capturedByBot, capturedPiece] : prevState.capturedByBot;
+    
+            const nextPlayer = prevState.currentPlayer === 'w' ? 'b' : 'w';
+            
+            const updatedState = { 
+                ...prevState,
+                currentPlayer: nextPlayer,
+                turnStartTime: now,
+                p1Time: newP1Time,
+                p2Time: newP2Time,
+                moveHistory: newMoveHistory,
+                moveCount: newMoveCount,
+                capturedByPlayer: newCapturedByPlayer,
+                capturedByBot: newCapturedByBot,
+            };
 
-        const newCapturedByPlayer = capturedPiece && !p1IsCurrent ? [...gameState.capturedByPlayer, capturedPiece] : gameState.capturedByPlayer;
-        const newCapturedByBot = capturedPiece && p1IsCurrent ? [...gameState.capturedByBot, capturedPiece] : gameState.capturedByBot;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(storageKey, JSON.stringify({ ...updatedState, boardState }));
+            }
 
-        const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
-        updateAndSaveState({
-            currentPlayer: nextPlayer,
-            turnStartTime: now,
-            p1Time: newP1Time,
-            p2Time: newP2Time,
-            moveHistory: newMoveHistory,
-            moveCount: newMoveCount,
-            capturedByPlayer: newCapturedByPlayer,
-            capturedByBot: newCapturedByBot,
-        }, boardState);
+            return updatedState;
+        });
     };
 
     const resetGame = () => {

@@ -112,22 +112,19 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         promotion: 'q' // Always promote to queen for simplicity in practice mode
       };
       
-      try {
+      const isLegal = game.moves({ square: selectedPiece, verbose: true }).some(m => m.to === square);
+
+      if (isLegal) {
         const result = game.move(move);
         if (result) {
             setGame(new Chess(game.fen()));
-            updateBoardState();
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
             switchTurn({ fen: game.fen() }, result.san, captured);
             checkGameOver();
         }
-      } catch (e) {
-        // Invalid move, maybe deselect or show feedback
-      } finally {
-        setSelectedPiece(null);
-        setLegalMoves([]);
       }
-
+      setSelectedPiece(null);
+      setLegalMoves([]);
     } else {
       const pieceOnSquare = game.get(square);
       if (pieceOnSquare && pieceOnSquare.color === game.turn() && pieceOnSquare.color === playerColor) {

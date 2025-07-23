@@ -12,7 +12,7 @@ type Piece = { player: Player; type: PieceType };
 type SquareContent = Piece | null;
 type Board = SquareContent[][];
 type Position = { row: number; col: number };
-type Move = { from: Position; to: Position; isJump: boolean };
+type Move = { from: Position; to: Position; isJump: boolean; jumpedPiece?: Piece };
 
 type BoardTheme = { id: string; name: string; colors: string[] };
 type PieceStyle = { id: string; name: string; colors: string[] };
@@ -103,7 +103,8 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                 }
                 // Jump move
                 else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
-                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
+                    const jumpedPiece = currentBoard[newRow][newCol]!;
+                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true, jumpedPiece: { type: 'p', color: jumpedPiece.player } });
                 }
             }
         }
@@ -180,12 +181,13 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         setMustJump(legalMoves.some(m => m.isJump));
         
         if (currentPlayer === playerColor) {
-            setPossibleMoves(legalMoves);
+            // Player's turn, no automatic move
         } else {
             // Bot's turn
             setTimeout(() => {
-                if (legalMoves.length > 0) {
-                    const randomMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+                const botMoves = calculateAllMoves(board, currentPlayer);
+                if (botMoves.length > 0) {
+                    const randomMove = botMoves[Math.floor(Math.random() * botMoves.length)];
                     movePiece(randomMove);
                 }
             }, 1000);
@@ -199,12 +201,21 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
         const actualRow = isFlipped ? 7 - row : row;
         const actualCol = isFlipped ? 7 - col : col;
-
-        const clickedMove = possibleMoves.find(m => m.to.row === actualRow && m.to.col === actualCol);
         
-        if (clickedMove) {
-            movePiece(clickedMove);
-        } else if (board[actualRow][actualCol] && board[actualRow][actualCol]?.player === currentPlayer) {
+        const clickedPiece = board[actualRow][actualCol];
+
+        if (selectedPiece) {
+            const move = possibleMoves.find(m => m.to.row === actualRow && m.to.col === actualCol && m.from.row === selectedPiece.row && m.from.col === selectedPiece.col);
+            if(move) {
+                movePiece(move);
+                return;
+            }
+        }
+
+        if (clickedPiece && clickedPiece.player === currentPlayer) {
+             if (consecutiveJumpPiece) { // If in a multi-jump, can't select another piece
+                return;
+            }
             const pieceMoves = calculateAllMoves(board, currentPlayer).filter(m => m.from.row === actualRow && m.from.col === actualCol);
             
             if (mustJump && !pieceMoves.some(m => m.isJump)) {
@@ -212,13 +223,12 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                 return;
             }
 
-            if (consecutiveJumpPiece) return;
-
             setSelectedPiece({ row: actualRow, col: actualCol });
             setPossibleMoves(pieceMoves);
 
         } else {
             setSelectedPiece(null);
+            setPossibleMoves([]);
         }
     };
     
@@ -228,6 +238,12 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         
         if (!piece) return;
 
+        // Create move notation
+        const fromSquare = `${String.fromCharCode(97 + move.from.col)}${8 - move.from.row}`;
+        const toSquare = `${String.fromCharCode(97 + move.to.col)}${8 - move.to.row}`;
+        const moveNotation = `${fromSquare}${move.isJump ? 'x' : '-'}${toSquare}`;
+
+
         // Promote to king
         if (piece.type === 'pawn' && ( (piece.player === 'w' && move.to.row === 0) || (piece.player === 'b' && move.to.row === 7) )) {
             piece.type = 'king';
@@ -235,10 +251,8 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
         newBoard[move.to.row][move.to.col] = piece;
         newBoard[move.from.row][move.from.col] = null;
-
-        let wasJump = false;
+        
         if (move.isJump) {
-            wasJump = true;
             const jumpedRow = move.from.row + (move.to.row - move.from.row) / 2;
             const jumpedCol = move.from.col + (move.to.col - move.from.col) / 2;
             newBoard[jumpedRow][jumpedCol] = null;
@@ -246,7 +260,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         
         setBoard(newBoard);
 
-        const moreJumps = wasJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
+        const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
 
         if (moreJumps.length > 0) {
             setConsecutiveJumpPiece(move.to);
@@ -258,7 +272,8 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             setConsecutiveJumpPiece(null);
             setSelectedPiece(null);
             setPossibleMoves([]);
-            switchTurn({ board: newBoard });
+            // Pass captured piece info to switchTurn
+            switchTurn({ board: newBoard }, moveNotation, move.jumpedPiece);
         }
         
         checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');
@@ -276,7 +291,9 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                     
                     const isDarkSquare = (actualRow + actualCol) % 2 !== 0;
                     const isSelected = selectedPiece && selectedPiece.row === actualRow && selectedPiece.col === actualCol;
-                    const isPossibleMove = possibleMoves.some(m => m.to.row === actualRow && m.to.col === actualCol);
+                    
+                    const isPossibleMoveForSelected = selectedPiece ? possibleMoves.some(m => m.from.row === selectedPiece.row && m.from.col === selectedPiece.col && m.to.row === actualRow && m.to.col === actualCol) : false;
+
 
                     return (
                         <div
@@ -295,7 +312,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                                     <PieceComponent piece={piece} colors={styles.colors} />
                                 </div>
                             )}
-                             {isPossibleMove && (
+                             {isPossibleMoveForSelected && (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <div className="w-1/3 h-1/3 bg-primary/50 rounded-full" />
                                 </div>
@@ -310,4 +327,3 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         </div>
     );
 }
-
