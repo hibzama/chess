@@ -4,15 +4,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-
-// For this example, we'll hardcode the admin credentials.
-// In a real app, you'd use a more secure method like custom claims in Firebase Auth.
-const ADMIN_EMAIL = "admin@janitha.com";
-const ADMIN_PASSWORD = "Jda@#12345";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -31,23 +27,28 @@ export default function AdminLoginPage() {
     const email = target.email.value;
     const password = target.password.value;
 
-    if (email !== ADMIN_EMAIL) {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      const userDocRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists() && userDoc.data().role === 'admin') {
+          toast({
+            title: "Admin Login Successful!",
+            description: "Welcome back.",
+          });
+          router.push('/admin');
+      } else {
+        await auth.signOut();
         toast({
             variant: "destructive",
             title: "Login failed",
             description: "You are not authorized to access this page.",
         });
-        setIsLoading(false);
-        return;
-    }
+      }
 
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: "Admin Login Successful!",
-        description: "Welcome back.",
-      });
-      router.push('/admin');
     } catch (error: any) {
         console.error("Error signing in:", error);
         toast({

@@ -67,6 +67,7 @@ export default function RegisterPage() {
                 phone,
                 email,
                 balance: initialBalance,
+                role: 'user', // Default role for new users
             });
             
             const LKR_BONUS = 100;

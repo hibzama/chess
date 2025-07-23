@@ -19,6 +19,7 @@ interface UserData {
     email: string;
     phone: string;
     balance: number;
+    role: 'user' | 'admin';
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
