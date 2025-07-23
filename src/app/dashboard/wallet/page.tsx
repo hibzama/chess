@@ -202,7 +202,10 @@ export default function WalletPage() {
         </CardHeader>
         <CardContent>
             {authLoading || !userData || typeof userData.balance === 'undefined' ? (
-                <Skeleton className="h-10 w-48" /> 
+                <div className="space-y-2">
+                    <Skeleton className="h-10 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                </div>
             ) : (
                 <div>
                     <p className="text-4xl font-bold">LKR {userData.balance.toFixed(2)}</p>
