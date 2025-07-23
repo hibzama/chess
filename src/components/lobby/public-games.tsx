@@ -32,13 +32,17 @@ export default function PublicGames({ gameType }: { gameType: string }) {
             collection(db, 'game_rooms'), 
             where('gameType', '==', gameType),
             where('isPrivate', '==', false),
-            where('status', '==', 'waiting'),
-            orderBy('createdAt', 'desc')
+            where('status', '==', 'waiting')
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedRooms = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as GameRoom));
-            setRooms(fetchedRooms);
+            // Sort client-side since we removed orderBy
+            const sortedRooms = fetchedRooms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
+            setRooms(sortedRooms);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching public games:", error);
             setLoading(false);
         });
 
