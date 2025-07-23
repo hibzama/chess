@@ -18,40 +18,38 @@ export default function MoveHistory() {
   }, [moveHistory]);
   
   return (
-    <Card className="flex-1 flex flex-col min-h-0">
+    <Card>
         <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
                 <History className="w-5 h-5"/>
                 Move History
             </CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 relative p-0">
-          <div className="absolute inset-0">
-            <ScrollArea className="h-full w-full" viewportRef={scrollViewportRef}>
-              <Table>
-                <TableHeader className="sticky top-0 bg-card z-10">
-                  <TableRow>
-                    <TableHead className="w-1/4">#</TableHead>
-                    <TableHead>White</TableHead>
-                    <TableHead>Black</TableHead>
+        <CardContent className="p-0">
+          <ScrollArea className="h-96 w-full" viewportRef={scrollViewportRef}>
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
+                  <TableHead className="w-1/4">#</TableHead>
+                  <TableHead>White</TableHead>
+                  <TableHead>Black</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isMounted && moveHistory.length > 0 ? moveHistory.map((move, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{move.turn}</TableCell>
+                    <TableCell>{move.white}</TableCell>
+                    <TableCell>{move.black}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isMounted && moveHistory.length > 0 ? moveHistory.map((move, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{move.turn}</TableCell>
-                      <TableCell>{move.white}</TableCell>
-                      <TableCell>{move.black}</TableCell>
-                    </TableRow>
-                  )) : (
-                    <TableRow>
-                        <TableCell colSpan={3} className="text-center text-muted-foreground pt-8">No moves yet.</TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </div>
+                )) : (
+                  <TableRow>
+                      <TableCell colSpan={3} className="text-center text-muted-foreground pt-8">No moves yet.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </CardContent>
     </Card>
   );
