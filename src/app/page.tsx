@@ -52,8 +52,8 @@ export default async function LandingPage() {
           <Card className="bg-card/50 border-primary/20">
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-center gap-2">
-                <Gift className="w-6 h-6 text-primary" />
-                <span>LKR 100 Registration Bonus!</span>
+                <Gift className="w-6 h-6 text-yellow-300" />
+                <span className="text-yellow-300">LKR 100 Registration Bonus!</span>
               </CardTitle>
               <CardDescription>The next {bonusLimit} users get a free bonus to start playing.</CardDescription>
             </CardHeader>
