@@ -130,13 +130,14 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
           </Button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>
-        <div className="flex items-center gap-2">
-             <Link href="/dashboard/wallet">
-                <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
-                    <CardContent className="p-2 flex items-center gap-2">
-                        <Wallet className="w-5 h-5 text-primary"/>
-                        <div className="hidden lg:block">
-                            {userData?.balance ? (
+        <div className="flex items-center gap-4">
+            <div className="hidden sm:block">
+                <Link href="/dashboard/wallet">
+                    <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
+                        <CardContent className="p-2 flex items-center gap-2">
+                            <Wallet className="w-5 h-5 text-primary"/>
+                            <div>
+                            {userData?.balance !== undefined ? (
                                 <>
                                  <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
                                  <p className="text-xs text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
@@ -147,14 +148,17 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                                     <Skeleton className="h-3 w-12"/>
                                 </div>
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
-            </Link>
-            <Button variant="ghost" size="icon">
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Game Settings</span>
-            </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </Link>
+            </div>
+            <Button variant="ghost" size="icon"><Bell /></Button>
+            <Button variant="ghost" size="icon"><Settings /></Button>
+            <Avatar>
+                <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
+                <AvatarFallback>{userData ? `${userData.firstName.charAt(0)}${userData.lastName.charAt(0)}` : '...'}</AvatarFallback>
+            </Avatar>
         </div>
       </header>
       <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
@@ -246,9 +250,11 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <AlertDialogAction onClick={handleReturnToDashboard} className="w-full">
-            Return to Dashboard
-        </AlertDialogAction>
+        <AlertDialogFooter>
+             <AlertDialogAction onClick={handleReturnToDashboard} className="w-full">
+                Return to Dashboard
+            </AlertDialogAction>
+        </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
 
@@ -256,18 +262,20 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you sure you want to resign?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    {isMultiplayer && roomWager > 0 ? (
-                        <div className="space-y-2 text-left pt-4">
-                            <p>Resigning will forfeit the match.</p>
-                            <ul className="list-disc pl-5 text-sm">
-                                <li><span className="font-bold text-destructive">You will receive a 75% refund</span> of your wager (LKR {(roomWager * 0.75).toFixed(2)}).</li>
-                                <li><span className="font-bold text-green-500">Your opponent will receive a 105% payout</span> of their wager (LKR {(roomWager * 1.05).toFixed(2)}).</li>
-                            </ul>
-                        </div>
-                    ) : (
-                        "This is a practice match, so no funds will be lost."
-                    )}
+                <AlertDialogDescription asChild>
+                    <div>
+                        {isMultiplayer && roomWager > 0 ? (
+                            <div className="space-y-2 text-left pt-4">
+                                <div>Resigning will forfeit the match.</div>
+                                <ul className="list-disc pl-5 text-sm">
+                                    <li><span className="font-bold text-destructive">You will receive a 75% refund</span> of your wager (LKR {(roomWager * 0.75).toFixed(2)}).</li>
+                                    <li><span className="font-bold text-green-500">Your opponent will receive a 105% payout</span> of their wager (LKR {(roomWager * 1.05).toFixed(2)}).</li>
+                                </ul>
+                            </div>
+                        ) : (
+                            "This is a practice match, so no funds will be lost."
+                        )}
+                    </div>
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
