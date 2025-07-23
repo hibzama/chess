@@ -61,17 +61,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
              break;
     }
 
-    let payoutInfo = '';
-    if (isMultiplayer && payoutAmount !== null) {
-        const usdtAmount = (payoutAmount / USDT_RATE).toFixed(2);
-        if (payoutAmount > 0) {
-            payoutInfo = ` LKR ${payoutAmount.toFixed(2)} (~${usdtAmount} USDT) has been added to your wallet.`;
-        } else {
-            payoutInfo = ` No funds were returned to your wallet.`;
-        }
-    }
-
-    return { title, description: description + payoutInfo };
+    return { title, description };
   }
   
   const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
@@ -157,10 +147,10 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
             </div>
             <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-                {getWinnerMessage().description}
-                {isMultiplayer && payoutAmount !== null && (
+                <div>{getWinnerMessage().description}</div>
+                {isMultiplayer && payoutAmount !== null && payoutAmount > 0 && (
                     <div className="p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
-                       <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)}
+                       <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)} (~{(payoutAmount / USDT_RATE).toFixed(2)} USDT)
                     </div>
                 )}
             </AlertDialogDescription>
