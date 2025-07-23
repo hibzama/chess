@@ -69,7 +69,7 @@ export default function GameLobbyPage() {
             title: 'My Rooms',
             description: 'Check the status of your active and past games.',
             icon: Swords,
-            action: () => { /* Placeholder for future implementation */ }
+            action: () => router.push('/dashboard/my-rooms')
         }
     ];
 

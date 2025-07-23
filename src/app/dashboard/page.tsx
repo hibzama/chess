@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const mainActions = [
     { title: "Practice Games", description: "Play for free against the bot", icon: Sword, href: "/practice" },
     { title: "Start Earning", description: "Play against others to win", icon: DollarSign, href: "/lobby" },
-    { title: "My Rooms", description: "Check on your active games", icon: List, href: "#" },
+    { title: "My Rooms", description: "Check on your active games", icon: List, href: "/dashboard/my-rooms" },
     { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "/dashboard/wallet" },
   ];
 
