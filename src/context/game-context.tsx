@@ -301,11 +301,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const p2ServerTime = !currentIsCreator ? Math.max(0, roomData.p2Time - elapsed) : roomData.p2Time;
             
             let currentBoardState = roomData.boardState;
-            if (gameType === 'checkers' && typeof currentBoardState?.board === 'string') {
+            // FIX: Check if game is checkers and boardState is a string, then parse it.
+            if (gameType === 'checkers' && typeof currentBoardState === 'string') {
                 try {
-                    currentBoardState = { board: JSON.parse(currentBoardState.board) };
+                    currentBoardState = { board: JSON.parse(currentBoardState) };
                 } catch (e) {
-                    console.error("Failed to parse checkers board state", e);
+                    console.error("Failed to parse checkers board state from string", e);
                     currentBoardState = { board: [] }; // Set a default to avoid crash
                 }
             }
@@ -440,8 +441,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const newP2Time = !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time;
 
             let finalBoardState = boardState;
+            // FIX: Stringify the board state for checkers before sending to Firestore.
             if(gameType === 'checkers' && boardState.board) {
-                finalBoardState = {board: JSON.stringify(boardState.board)};
+                finalBoardState = JSON.stringify(boardState.board);
             }
 
 
