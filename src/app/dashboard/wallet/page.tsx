@@ -39,7 +39,7 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 )
 
 export default function WalletPage() {
-  const { user, userData } = useAuth();
+  const { user, userData, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -201,7 +201,7 @@ export default function WalletPage() {
           <CardTitle className="flex items-center gap-2"><DollarSign /> Current Balance</CardTitle>
         </CardHeader>
         <CardContent>
-            {loading ? <Skeleton className="h-10 w-48" /> : <p className="text-4xl font-bold">{userData ? (userData.balance / USDT_RATE).toFixed(2) : '0.00'} USDT</p>}
+            {authLoading || userData === null ? <Skeleton className="h-10 w-48" /> : <p className="text-4xl font-bold">{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>}
         </CardContent>
       </Card>
 

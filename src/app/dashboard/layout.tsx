@@ -7,6 +7,7 @@ import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageS
 import { useAuth } from "@/context/auth-context";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 const Logo = () => (
@@ -29,7 +30,7 @@ export default function DashboardLayout({
   }: {
     children: React.ReactNode
   }) {
-    const { logout, userData } = useAuth();
+    const { logout, userData, loading } = useAuth();
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -113,8 +114,14 @@ export default function DashboardLayout({
                             <CardContent className="p-2 flex items-center gap-2">
                                 <Wallet className="w-5 h-5 text-primary"/>
                                 <div>
-                                    <p className="text-sm font-bold text-primary">{userData ? (userData.balance / USDT_RATE).toFixed(2) : '0.00'} USDT</p>
-                                    <p className="text-xs text-muted-foreground">Your Balance</p>
+                                {loading || userData === null ? (
+                                    <Skeleton className="h-5 w-20" />
+                                    ) : (
+                                    <>
+                                        <p className="text-sm font-bold text-primary">{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                                        <p className="text-xs text-muted-foreground">Your Balance</p>
+                                    </>
+                                )}
                                 </div>
                             </CardContent>
                         </Card>
@@ -122,7 +129,7 @@ export default function DashboardLayout({
                         <Button variant="ghost" size="icon"><Settings /></Button>
                         <Avatar>
                             <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
-                            <AvatarFallback>{getInitials()}</AvatarFallback>
+                            <AvatarFallback>{loading ? '..' : getInitials()}</AvatarFallback>
                         </Avatar>
                     </div>
                 </header>
