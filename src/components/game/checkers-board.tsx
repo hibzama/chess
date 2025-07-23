@@ -68,7 +68,7 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
 };
 
 export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
-    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted } = useGame();
+    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted, isMultiplayer } = useGame();
     const [board, setBoard] = useState<Board>(() => boardState?.board || createInitialBoard());
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
@@ -81,7 +81,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
     const isFlipped = playerColor === 'b';
     
     useEffect(() => {
-        if (boardState && boardState.board) {
+        if (boardState?.board) {
             setBoard(boardState.board);
         } else {
             setBoard(createInitialBoard());
@@ -112,7 +112,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                 // Jump move
                 else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                     const jumpedPiece = currentBoard[newRow][newCol]!;
-                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true, jumpedPiece: { ...jumpedPiece, type: 'p', color: jumpedPiece.player } });
+                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true, jumpedPiece: { type: 'p', color: jumpedPiece.player } as Piece });
                 }
             }
         }
@@ -170,7 +170,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
     
     useEffect(() => {
-        if(gameOver || !isMounted) return;
+        if(gameOver || !isMounted || isMultiplayer) return;
 
         if (consecutiveJumpPiece) {
              const jumps = getPossibleMovesForPiece(board[consecutiveJumpPiece.row][consecutiveJumpPiece.col]!, consecutiveJumpPiece, board, currentPlayer).filter(m => m.isJump);
@@ -199,7 +199,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             }, 1000);
         }
         
-    }, [board, currentPlayer, consecutiveJumpPiece, getPossibleMovesForPiece, playerColor, switchTurn, calculateAllMoves, gameOver, isMounted]);
+    }, [board, currentPlayer, consecutiveJumpPiece, getPossibleMovesForPiece, playerColor, switchTurn, calculateAllMoves, gameOver, isMounted, isMultiplayer]);
 
 
     const handleSquareClick = (row: number, col: number) => {
@@ -270,7 +270,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
         const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
 
-        if (moreJumps.length > 0) {
+        if (moreJumps.length > 0 && (isMultiplayer ? currentPlayer === playerColor : true) ) {
             setConsecutiveJumpPiece(move.to);
             if (piece.player === playerColor) { // If it's the player's turn, update their possible moves
                 setSelectedPiece(move.to);

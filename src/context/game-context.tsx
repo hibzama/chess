@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -300,10 +300,19 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const p1ServerTime = currentIsCreator ? Math.max(0, roomData.p1Time - elapsed) : roomData.p1Time;
             const p2ServerTime = !currentIsCreator ? Math.max(0, roomData.p2Time - elapsed) : roomData.p2Time;
             
+            let currentBoardState = roomData.boardState;
+            if (gameType === 'checkers' && typeof currentBoardState === 'string') {
+                try {
+                    currentBoardState = JSON.parse(currentBoardState);
+                } catch (e) {
+                    console.error("Failed to parse checkers board state", e);
+                }
+            }
+
             setGameState(prevState => ({
                 ...prevState,
                 playerColor: pColor,
-                boardState: roomData.boardState,
+                boardState: currentBoardState,
                 moveHistory: roomData.moveHistory || [],
                 currentPlayer: roomData.currentPlayer,
                 capturedByPlayer: isCreator ? roomData.capturedByP2 || [] : roomData.capturedByP1 || [],
@@ -320,7 +329,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             stopTimer();
         };
     
-    }, [isMultiplayer, roomId, user, isMounted, stopTimer, handlePayout, gameState.gameOver]);
+    }, [isMultiplayer, roomId, user, isMounted, stopTimer, handlePayout, gameState.gameOver, gameType]);
 
 
      // Timer countdown logic
@@ -403,9 +412,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     };
 
     const switchTurn = async (boardState: any, move?: string, capturedPiece?: Piece) => {
-        if (gameState.gameOver || !room) return;
+        if (gameState.gameOver || (!room && isMultiplayer)) return;
 
-        if (isMultiplayer) {
+        if (isMultiplayer && room) {
             const roomRef = doc(db, 'game_rooms', room.id);
             
             let newMoveHistory = [...(room.moveHistory || [])];
@@ -429,8 +438,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const newP1Time = creatorIsCurrent ? room.p1Time - elapsedSeconds : room.p1Time;
             const newP2Time = !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time;
 
+            let finalBoardState = boardState;
+            if(gameType === 'checkers' && boardState.board) {
+                finalBoardState = {board: JSON.stringify(boardState.board)};
+            }
+
+
             const updatePayload: any = {
-                boardState,
+                boardState: finalBoardState,
                 currentPlayer: room.currentPlayer === 'w' ? 'b' : 'w',
                 moveHistory: newMoveHistory,
                 turnStartTime: now,
@@ -543,3 +558,4 @@ export const useGame = () => {
     
 
     
+

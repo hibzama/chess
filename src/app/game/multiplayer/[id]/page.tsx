@@ -433,7 +433,7 @@ function MultiplayerGamePageContent() {
 
     return (
         <>
-        <NavigationGuard />
+        {!gameOver && <NavigationGuard />}
          <GameLayout
             gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
             headerContent={
