@@ -29,10 +29,12 @@ type GameRoom = {
     createdBy: {
         uid: string;
         name: string;
+        color: 'w' | 'b';
     };
     player2?: {
         uid: string;
         name: string;
+        color: 'w' | 'b';
     };
     players: string[];
     createdAt: any;
@@ -209,8 +211,8 @@ export default function MultiplayerGamePage() {
 
     const copyGameId = () => {
         if(!roomId) return;
-        navigator.clipboard.writeText(window.location.href);
-        toast({ title: 'Copied!', description: 'Invite link copied to clipboard. Share it with your friend!' });
+        navigator.clipboard.writeText(roomId as string);
+        toast({ title: 'Copied!', description: 'Room ID copied to clipboard. Share it with your friend!' });
     }
 
     if (loading || !room || !user || !userData) {
@@ -232,19 +234,19 @@ export default function MultiplayerGamePage() {
                         <CardContent className="space-y-6">
                              <div className="space-y-2">
                                  <h2 className="text-3xl font-bold">Waiting for Opponent</h2>
-                                 <p className="text-muted-foreground">Your game room is ready. Share the link with a friend to start.</p>
+                                 <p className="text-muted-foreground">Your game room is ready. Share the Room ID with a friend to start.</p>
                              </div>
                             
                             <div className="p-4 rounded-lg bg-background space-y-2">
-                                <p className="text-sm text-muted-foreground">Share this link to invite someone</p>
+                                <p className="text-sm text-muted-foreground">Share this Room ID to invite someone</p>
                                 <div className="flex items-center justify-center gap-4">
-                                    <p className="font-mono text-lg text-primary truncate">{window.location.href}</p>
+                                    <p className="font-mono text-lg text-primary truncate">{roomId}</p>
                                     <Button size="icon" variant="ghost" onClick={copyGameId}><Copy className="w-5 h-5"/></Button>
                                 </div>
                             </div>
 
                              <div className="grid grid-cols-2 gap-4">
-                                <Button size="lg" variant="outline" onClick={copyGameId}><Share className="mr-2"/>Share Invite Link</Button>
+                                <Button size="lg" variant="outline" onClick={copyGameId}><Share className="mr-2"/>Share Room ID</Button>
                                 <Button size="lg" variant="destructive" onClick={() => handleCancelRoom(false)}>Cancel Game & Refund</Button>
                             </div>
                             
