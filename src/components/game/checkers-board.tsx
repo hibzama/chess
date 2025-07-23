@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -130,9 +130,14 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             }
         }
         
-        if (whitePieces === 0) setWinner(playerColor === 'b' ? 'p1' : 'p2');
-        else if (blackPieces === 0) setWinner(playerColor === 'w' ? 'p1' : 'p2');
-        else if (!hasMoves) setWinner(nextPlayer === playerColor ? 'p2' : 'p1');
+        let winner: 'p1' | 'p2' | null = null;
+        if (whitePieces === 0) winner = playerColor === 'b' ? 'p1' : 'p2';
+        else if (blackPieces === 0) winner = playerColor === 'w' ? 'p1' : 'p2';
+        else if (!hasMoves) winner = nextPlayer === playerColor ? 'p2' : 'p1';
+
+        if(winner) {
+          setWinner(winner, { board });
+        }
 
     }, [getPossibleMovesForPiece, playerColor, setWinner]);
 
@@ -167,7 +172,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                  return;
              } else {
                 setConsecutiveJumpPiece(null);
-                switchTurn();
+                switchTurn({ board });
              }
         }
 
@@ -253,7 +258,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             setConsecutiveJumpPiece(null);
             setSelectedPiece(null);
             setPossibleMoves([]);
-            switchTurn();
+            switchTurn({ board: newBoard });
         }
         
         checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');

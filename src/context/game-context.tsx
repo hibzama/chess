@@ -3,122 +3,178 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 
 type PlayerColor = 'w' | 'b';
-type GameStatus = 'playing' | 'gameover';
 type Winner = 'p1' | 'p2' | 'draw' | null;
 
-interface GameContextType {
+interface GameState {
     playerColor: PlayerColor;
     timeLimit: number;
     difficulty: string;
-    player1Time: number | null;
-    player2Time: number | null;
+    p1Time: number;
+    p2Time: number;
     currentPlayer: PlayerColor;
+    turnStartTime: number | null;
     gameOver: boolean;
     winner: Winner;
+}
+
+interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
-    switchTurn: () => void;
-    setWinner: (winner: Winner) => void;
+    switchTurn: (boardState: any) => void;
+    setWinner: (winner: Winner, boardState: any) => void;
     resetGame: () => void;
+    player1Time: number;
+    player2Time: number;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
+const initialGameState: GameState = {
+    playerColor: 'w',
+    timeLimit: 900,
+    difficulty: 'intermediate',
+    p1Time: 900,
+    p2Time: 900,
+    currentPlayer: 'w',
+    turnStartTime: null,
+    gameOver: false,
+    winner: null,
+};
+
+const getLocalStorageKey = (gameType: 'chess' | 'checkers') => `game_state_${gameType}`;
+
 export const GameProvider = ({ children }: { children: React.ReactNode }) => {
-    const [playerColor, setPlayerColor] = useState<PlayerColor>('w');
-    const [timeLimit, setTimeLimit] = useState(900); // in seconds
-    const [difficulty, setDifficulty] = useState('intermediate');
+    const [gameState, setGameState] = useState<GameState>(initialGameState);
+    const [player1Time, setPlayer1Time] = useState(gameState.p1Time);
+    const [player2Time, setPlayer2Time] = useState(gameState.p2Time);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-    const [player1Time, setPlayer1Time] = useState<number | null>(null);
-    const [player2Time, setPlayer2Time] = useState<number | null>(null);
-
-    const [currentPlayer, setCurrentPlayer] = useState<PlayerColor>('w');
-    const [gameOver, setGameOver] = useState(false);
-    const [winner, setWinnerState] = useState<Winner>(null);
-    
-    const p1IntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const p2IntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-    const stopTimers = useCallback(() => {
-        if (p1IntervalRef.current) clearInterval(p1IntervalRef.current);
-        if (p2IntervalRef.current) clearInterval(p2IntervalRef.current);
-    }, []);
-
-    const setWinner = useCallback((newWinner: Winner) => {
-        if (gameOver) return;
-        setGameOver(true);
-        setWinnerState(newWinner);
-        stopTimers();
-    }, [gameOver, stopTimers]);
-    
-    const startTimer = useCallback((player: 'p1' | 'p2') => {
-        const intervalRef = player === 'p1' ? p1IntervalRef : p2IntervalRef;
-        const setTime = player === 'p1' ? setPlayer1Time : setPlayer2Time;
-        const opponent = player === 'p1' ? 'p2' : 'p1';
-        
-        if (intervalRef.current) clearInterval(intervalRef.current);
-
-        intervalRef.current = setInterval(() => {
-            setTime(prevTime => {
-                if (prevTime === null || prevTime <= 1) {
-                    clearInterval(intervalRef.current!);
-                    setWinner(opponent);
-                    return 0;
-                }
-                return prevTime - 1;
-            });
-        }, 1000);
-    }, [setWinner]);
-
-
-    const switchTurn = useCallback(() => {
-        const nextPlayer = currentPlayer === 'w' ? 'b' : 'w';
-        setCurrentPlayer(nextPlayer);
-    }, [currentPlayer]);
+    // This is a placeholder. In a real app, you'd know which game is active.
+    // For now, we'll assume a single game type for storage. This would need to be
+    // enhanced if both games could be active in different tabs.
+    const activeGameType = 'chess'; 
+    const storageKey = getLocalStorageKey(activeGameType);
 
     useEffect(() => {
-        if (gameOver) {
-            stopTimers();
-            return;
+        try {
+            const savedState = localStorage.getItem(storageKey);
+            if (savedState) {
+                const parsedState: GameState = JSON.parse(savedState);
+                setGameState(parsedState);
+                setPlayer1Time(parsedState.p1Time);
+                setPlayer2Time(parsedState.p2Time);
+            }
+        } catch (error) {
+            console.error("Failed to parse game state from localStorage", error);
         }
+    }, [storageKey]);
 
-        stopTimers();
-        const p1IsWhite = playerColor === 'w';
+    const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
+        setGameState(prevState => {
+            const updatedState = { ...prevState, ...newState };
+            const stateToSave = { ...updatedState, board: boardState };
+            localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+            return updatedState;
+        });
+    }, [storageKey]);
 
-        if ((currentPlayer === 'w' && p1IsWhite) || (currentPlayer === 'b' && !p1IsWhite)) {
-            startTimer('p1');
-        } else {
-            startTimer('p2');
+    const stopTimer = useCallback(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
         }
+    }, []);
 
-    }, [currentPlayer, gameOver, playerColor, startTimer, stopTimers]);
+    const setWinner = useCallback((winner: Winner, boardState?: any) => {
+        stopTimer();
+        updateAndSaveState({ winner, gameOver: true }, boardState);
+    }, [stopTimer, updateAndSaveState]);
+
+
+    useEffect(() => {
+        stopTimer();
+        if (gameState.gameOver || !gameState.turnStartTime) return;
+
+        const p1IsCurrent = (gameState.playerColor === 'w' && gameState.currentPlayer === 'w') || (gameState.playerColor === 'b' && gameState.currentPlayer === 'b');
+
+        const tick = () => {
+            const now = Date.now();
+            const elapsed = Math.floor((now - (gameState.turnStartTime || now)) / 1000);
+            
+            if (p1IsCurrent) {
+                const newTime = gameState.p1Time - elapsed;
+                setPlayer1Time(newTime);
+                if (newTime <= 0) {
+                    setWinner(gameState.playerColor === 'w' ? 'p2' : 'p1');
+                }
+            } else {
+                const newTime = gameState.p2Time - elapsed;
+                setPlayer2Time(newTime);
+                 if (newTime <= 0) {
+                    setWinner(gameState.playerColor === 'b' ? 'p2' : 'p1');
+                }
+            }
+        };
+        
+        tick(); // Initial tick to update immediately
+        intervalRef.current = setInterval(tick, 1000);
+
+        return () => stopTimer();
+
+    }, [gameState.currentPlayer, gameState.turnStartTime, gameState.gameOver, gameState.playerColor, gameState.p1Time, gameState.p2Time, stopTimer, setWinner]);
 
 
     const setupGame = (color: PlayerColor, time: number, diff: string) => {
-        setPlayerColor(color);
-        setTimeLimit(time);
-        setDifficulty(diff);
+        const newState: GameState = {
+            playerColor: color,
+            timeLimit: time,
+            difficulty: diff,
+            p1Time: time,
+            p2Time: time,
+            currentPlayer: 'w',
+            turnStartTime: Date.now(),
+            gameOver: false,
+            winner: null
+        };
         setPlayer1Time(time);
         setPlayer2Time(time);
-        setCurrentPlayer('w');
-        setGameOver(false);
-        setWinnerState(null);
+        updateAndSaveState(newState);
     };
-    
-    const resetGame = () => {
-        setPlayerColor('w');
-        setTimeLimit(900);
-        setDifficulty('intermediate');
-        setPlayer1Time(null);
-        setPlayer2Time(null);
-        setCurrentPlayer('w');
-        setGameOver(false);
-        setWinnerState(null);
-        stopTimers();
-    }
 
+    const switchTurn = (boardState: any) => {
+        if (gameState.gameOver) return;
+
+        const now = Date.now();
+        const elapsed = Math.floor((now - (gameState.turnStartTime || now)) / 1000);
+        const p1IsCurrent = (gameState.playerColor === 'w' && gameState.currentPlayer === 'w') || (gameState.playerColor === 'b' && gameState.currentPlayer === 'b');
+        
+        let newP1Time = gameState.p1Time;
+        let newP2Time = gameState.p2Time;
+
+        if (p1IsCurrent) {
+            newP1Time -= elapsed;
+        } else {
+            newP2Time -= elapsed;
+        }
+
+        const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
+        updateAndSaveState({
+            currentPlayer: nextPlayer,
+            turnStartTime: now,
+            p1Time: newP1Time,
+            p2Time: newP2Time
+        }, boardState);
+    };
+
+    const resetGame = () => {
+        localStorage.removeItem(storageKey);
+        setGameState(initialGameState);
+        setPlayer1Time(initialGameState.p1Time);
+        setPlayer2Time(initialGameState.p2Time);
+        stopTimer();
+    };
 
     return (
-        <GameContext.Provider value={{ playerColor, timeLimit, difficulty, player1Time, player2Time, currentPlayer, gameOver, winner, setupGame, switchTurn, setWinner, resetGame }}>
+        <GameContext.Provider value={{ ...gameState, player1Time, player2Time, setupGame, switchTurn, setWinner, resetGame }}>
             {children}
         </GameContext.Provider>
     );

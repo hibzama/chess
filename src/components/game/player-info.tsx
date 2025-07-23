@@ -11,7 +11,7 @@ type PlayerInfoProps = {
   playerName: string;
   avatarSrc: string;
   isTurn: boolean;
-  timeRemaining: number | null;
+  timeRemaining: number;
   'data-ai-hint': string;
 };
 
@@ -30,7 +30,7 @@ export default function PlayerInfo({ playerName, avatarSrc, isTurn, timeRemainin
           <h3 className="font-semibold text-lg">{playerName}</h3>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Clock className="w-4 h-4" />
-            {timeRemaining !== null ? <span>{formatTime(timeRemaining)}</span> : <Skeleton className="w-16 h-4" />}
+            {typeof timeRemaining === 'number' ? <span>{formatTime(timeRemaining)}</span> : <Skeleton className="w-16 h-4" />}
           </div>
         </div>
       </CardContent>

@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Chess, Square } from 'chess.js';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +32,6 @@ type ChessBoardProps = {
 
 export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_white' }: ChessBoardProps) {
   const [game, setGame] = useState(new Chess());
-  const [board, setBoard] = useState(game.board());
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
@@ -42,19 +41,37 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
   const isFlipped = playerColor === 'b';
 
-  useEffect(() => {
+   const updateBoardState = useCallback(() => {
+        const boardState = {
+            fen: game.fen(),
+        };
+        localStorage.setItem('game_state_chess', JSON.stringify(boardState));
+   },[game]);
+
+   useEffect(() => {
+        try {
+            const savedState = localStorage.getItem('game_state_chess');
+            if(savedState) {
+                const { fen } = JSON.parse(savedState);
+                const newGame = new Chess(fen);
+                setGame(newGame);
+            }
+        } catch (e) {
+            console.error("Could not load saved game state", e);
+        }
+   }, []);
+
+
+  const checkGameOver = useCallback(() => {
     if (game.isGameOver()) {
         if(game.isCheckmate()){
-            setWinner(game.turn() === 'b' ? 'p1' : 'p2');
+            const winner = game.turn() === 'b' ? (playerColor === 'w' ? 'p1' : 'p2') : (playerColor === 'b' ? 'p1' : 'p2');
+            setWinner(winner, { fen: game.fen() });
         } else {
-            setWinner('draw');
+            setWinner('draw', { fen: game.fen() });
         }
     }
-  }, [game, setWinner]);
-
-  useEffect(() => {
-    setBoard(game.board());
-  }, [game]);
+  }, [game, playerColor, setWinner]);
 
   useEffect(() => {
     if (!gameOver && currentPlayer !== playerColor) {
@@ -63,13 +80,14 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         if (moves.length > 0) {
           const move = moves[Math.floor(Math.random() * moves.length)];
           game.move(move);
-          setBoard(game.board());
-          switchTurn();
+          updateBoardState();
+          switchTurn({ fen: game.fen() });
+          checkGameOver();
         }
       }, 1000); // 1-second delay for bot move
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer, game, gameOver, playerColor, switchTurn]);
+  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver, updateBoardState]);
 
 
   const getSquareFromIndices = (row: number, col: number): Square => {
@@ -93,8 +111,9 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       try {
         const result = game.move(move);
         if (result) {
-            setBoard(game.board());
-            switchTurn();
+            updateBoardState();
+            switchTurn({ fen: game.fen() });
+            checkGameOver();
         }
       } catch (e) {
         // Invalid move, maybe deselect or show feedback
@@ -113,7 +132,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     }
   };
   
-  const displayedBoard = isFlipped ? [...board].reverse().map(row => [...row].reverse()) : board;
+  const displayedBoard = isFlipped ? [...game.board()].reverse().map(row => [...row].reverse()) : game.board();
 
   return (
     <div className="grid grid-cols-8 aspect-square w-full max-w-[75vh] lg:max-w-lg shadow-2xl border-2 border-border rounded-lg overflow-hidden">

@@ -18,7 +18,7 @@ type GameLayoutProps = {
 };
 
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { player1Time, player2Time, winner, gameOver, resetGame } = useGame();
+  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer } = useGame();
   const router = useRouter();
 
   const handleCloseDialog = () => {
@@ -27,11 +27,17 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   }
 
   const getWinnerMessage = () => {
-    if (!winner) return { title: "Game Over", description: "The game has ended in a draw."};
-    return winner === 'p1' 
+    if (winner === 'draw') return { title: "Game Over", description: "The game has ended in a draw."};
+
+    const player1Won = winner === 'p1';
+
+    return player1Won 
         ? { title: "🎉 Congratulations! You Win! 🎉", description: "Your brilliant strategy paid off. Well played!" }
         : { title: "😥 Better Luck Next Time 😥", description: "The bot has won this time. Keep practicing!" };
   }
+  
+  const isP1Turn = (playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b');
+  const isP2Turn = (playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w');
 
 
   return (
@@ -58,7 +64,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               playerName="Player 1 (You)"
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="player avatar"
-              isTurn={true}
+              isTurn={isP1Turn}
               timeRemaining={player1Time}
             />
              <Card className="flex-1">
@@ -83,7 +89,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               playerName="Opponent (Bot)"
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="gamer portrait"
-              isTurn={false}
+              isTurn={isP2Turn}
               timeRemaining={player2Time}
             />
             <Card className="flex-1">
@@ -121,3 +127,4 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
     </>
   );
 }
+
