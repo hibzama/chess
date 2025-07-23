@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Crown, Flag } from 'lucide-react';
+import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
@@ -23,9 +23,10 @@ type GameLayoutProps = {
 };
 
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { p1Time, p2Time, winner, gameOver, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm, isMultiplayer } = useGame();
+  const { p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm, isMultiplayer, payoutAmount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
+  const USDT_RATE = 310;
 
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
@@ -37,14 +38,40 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   }
 
   const getWinnerMessage = () => {
-    if (winner === 'draw') return { title: "Game Over", description: "The game has ended in a draw."};
-
-    const player1Won = winner === 'p1';
     const opponentName = isMultiplayer ? "Your opponent" : "The bot";
+    let title = "Game Over";
+    let description = "The game has concluded.";
+    
+    switch(gameOverReason) {
+        case 'draw':
+            title = "It's a Draw!";
+            description = "The game has ended in a draw by agreement or stalemate.";
+            break;
+        case 'checkmate':
+            title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
+            description = winner === 'p1' ? `You checkmated ${opponentName}. Well played!` : `${opponentName} has checkmated you.`;
+            break;
+        case 'timeout':
+            title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
+            description = winner === 'p1' ? `${opponentName} ran out of time.` : "You ran out of time.";
+            break;
+        case 'resign':
+             title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
+             description = winner === 'p1' ? `${opponentName} has resigned the game.` : "You have resigned the game.";
+             break;
+    }
 
-    return player1Won 
-        ? { title: "🎉 Congratulations! You Win! 🎉", description: "Your brilliant strategy paid off. Well played!" }
-        : { title: `😥 Better Luck Next Time 😥`, description: `${opponentName} has won this time. Keep practicing!` };
+    let payoutInfo = '';
+    if (isMultiplayer && payoutAmount !== null) {
+        const usdtAmount = (payoutAmount / USDT_RATE).toFixed(2);
+        if (payoutAmount > 0) {
+            payoutInfo = ` LKR ${payoutAmount.toFixed(2)} (~${usdtAmount} USDT) has been added to your wallet.`;
+        } else {
+            payoutInfo = ` No funds were returned to your wallet.`;
+        }
+    }
+
+    return { title, description: description + payoutInfo };
   }
   
   const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
@@ -85,11 +112,11 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
              <div className="w-full flex justify-between items-center px-2">
                 <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
                     <p className="font-semibold">Opponent</p>
-                    <p className="text-2xl font-bold">{formatTime(p2Time)}</p>
+                    <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p>
                 </div>
                  <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
                     <p className="font-semibold">You</p>
-                    <p className="text-2xl font-bold">{formatTime(p1Time)}</p>
+                    <p className="text-2xl font-bold">{formatTime(Math.ceil(p1Time))}</p>
                 </div>
             </div>
             {children}
@@ -129,8 +156,13 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                 <Crown className="w-12 h-12 text-primary" />
             </div>
             <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
-            <AlertDialogDescription>
-                {getWinnerMessage().description}
+            <AlertDialogDescription className="space-y-2">
+                <p>{getWinnerMessage().description}</p>
+                {isMultiplayer && payoutAmount !== null && (
+                    <div className="p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
+                       <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)}
+                    </div>
+                )}
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

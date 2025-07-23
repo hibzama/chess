@@ -10,6 +10,7 @@ type PlayerColor = 'w' | 'b';
 type Winner = 'p1' | 'p2' | 'draw' | null;
 type Piece = { type: string; color: 'w' | 'b' };
 type Move = { turn: number; white?: string; black?: string };
+type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | null;
 
 interface GameRoom {
     id: string;
@@ -44,17 +45,18 @@ interface GameState {
     turnStartTime: number | null; // as JS timestamp
     gameOver: boolean;
     winner: Winner;
-    capturedByPlayer: Piece[];
-    capturedByBot: Piece[];
+    gameOverReason: GameOverReason;
     moveHistory: Move[];
     moveCount: number;
     boardState: any | null;
+    capturedByPlayer: Piece[];
+    capturedByBot: Piece[];
 }
 
 interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
     switchTurn: (boardState: any, move?: string, capturedPiece?: Piece) => void;
-    setWinner: (winner: Winner, boardState: any) => void;
+    setWinner: (winner: Winner, boardState: any, method?: GameOverReason) => void;
     resetGame: () => void;
     loadGameState: (state: GameState) => void;
     isMounted: boolean;
@@ -63,6 +65,7 @@ interface GameContextType extends GameState {
     showResignModal: boolean;
     setShowResignModal: (show: boolean) => void;
     handleResignConfirm: () => void;
+    payoutAmount: number | null;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -85,11 +88,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             turnStartTime: null,
             gameOver: false,
             winner: null,
-            capturedByPlayer: [],
-            capturedByBot: [],
+            gameOverReason: null,
             moveHistory: [],
             moveCount: 0,
             boardState: null,
+            capturedByPlayer: [],
+            capturedByBot: [],
         };
         if(isMultiplayer) return defaultState; // Multiplayer uses firestore state
         try {
@@ -107,6 +111,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [isMounted, setIsMounted] = useState(false);
     const [showResignModal, setShowResignModal] = useState(false);
+    const [payoutAmount, setPayoutAmount] = useState<number | null>(null);
     
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -129,75 +134,72 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, []);
 
     const handlePayout = useCallback(async (room: GameRoom) => {
+        if (!room.player2) return;
+    
         const creatorRef = doc(db, 'users', room.createdBy.uid);
-        const joinerRef = doc(db, 'users', room.player2!.uid);
+        const joinerRef = doc(db, 'users', room.player2.uid);
         const batch = writeBatch(db);
         const wager = room.wager;
         const now = serverTimestamp();
     
+        let creatorPayout = 0;
+        let joinerPayout = 0;
+        let creatorDesc = '';
+        let joinerDesc = '';
+    
         if (room.draw) {
-            const payoutAmount = wager * 0.9;
-            batch.update(creatorRef, { balance: increment(payoutAmount) });
-            batch.update(joinerRef, { balance: increment(payoutAmount) });
-            
-            // Log transactions for both players
-            batch.set(doc(collection(db, 'transactions')), {
-                userId: room.createdBy.uid, type: 'payout', amount: payoutAmount, status: 'completed',
-                description: `Draw refund for ${room.gameType} game vs ${room.player2?.name}`, gameRoomId: room.id, createdAt: now
-            });
-            batch.set(doc(collection(db, 'transactions')), {
-                userId: room.player2!.uid, type: 'payout', amount: payoutAmount, status: 'completed',
-                description: `Draw refund for ${room.gameType} game vs ${room.createdBy.name}`, gameRoomId: room.id, createdAt: now
-            });
-
+            creatorPayout = wager * 0.9;
+            joinerPayout = wager * 0.9;
+            creatorDesc = `Draw refund for ${room.gameType} game vs ${room.player2.name}`;
+            joinerDesc = `Draw refund for ${room.gameType} game vs ${room.createdBy.name}`;
         } else if (room.winner) {
             const winnerIsCreator = room.winner.uid === room.createdBy.uid;
-            const winnerRef = winnerIsCreator ? creatorRef : joinerRef;
-            const loserRef = winnerIsCreator ? joinerRef : creatorRef;
-            const winnerId = room.winner.uid;
-            const loserId = room.players.find(p => p !== winnerId)!;
-            const winnerName = winnerIsCreator ? room.createdBy.name : room.player2!.name;
-            const loserName = winnerIsCreator ? room.player2!.name : room.createdBy.name;
-
-            let winnerPayout: number;
-            let loserPayout = 0;
-            let winnerDesc: string;
-            let loserDesc = `Loss for ${room.gameType} game vs ${winnerName}`;
-
-            if(room.winner.method === 'resign' || room.winner.method === 'timeout') {
-                winnerPayout = wager * (room.winner.method === 'resign' ? 1.05 : 1.8);
-                loserPayout = wager * (room.winner.method === 'resign' ? 0.75 : 0);
-                winnerDesc = room.winner.method === 'resign' ? `Forfeit win for ${room.gameType} game vs ${loserName}` : `Win by time for ${room.gameType} game vs ${loserName}`;
-                if (room.winner.method === 'resign') {
-                    loserDesc = `Forfeit refund for ${room.gameType} game vs ${winnerName}`;
-                }
-            } else { // 'checkmate'
-                 winnerPayout = wager * 1.8;
-            	 winnerDesc = `Winnings for ${room.gameType} game vs ${loserName}`;
-            }
-            
-            batch.update(winnerRef, { balance: increment(winnerPayout) });
-            batch.set(doc(collection(db, 'transactions')), {
-                userId: winnerId, type: 'payout', amount: winnerPayout, status: 'completed',
-                description: winnerDesc, gameRoomId: room.id, createdAt: now
-            });
-
-            if (loserPayout > 0) {
-                 batch.update(loserRef, { balance: increment(loserPayout) });
-                 batch.set(doc(collection(db, 'transactions')), {
-                    userId: loserId, type: 'payout', amount: loserPayout, status: 'completed',
-                    description: loserDesc, gameRoomId: room.id, createdAt: now
-                });
+            const winnerName = winnerIsCreator ? room.createdBy.name : room.player2.name;
+            const loserName = winnerIsCreator ? room.player2.name : room.createdBy.name;
+    
+            if (room.winner.method === 'resign') {
+                const winnerPayoutAmount = wager * 1.05;
+                const loserPayoutAmount = wager * 0.75;
+                creatorPayout = winnerIsCreator ? winnerPayoutAmount : loserPayoutAmount;
+                joinerPayout = winnerIsCreator ? loserPayoutAmount : winnerPayoutAmount;
+                creatorDesc = winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
+                joinerDesc = winnerIsCreator ? `Forfeit refund vs ${winnerName}` : `Forfeit win vs ${loserName}`;
+            } else { // 'checkmate' or 'timeout'
+                const winnerPayoutAmount = wager * 1.8;
+                creatorPayout = winnerIsCreator ? winnerPayoutAmount : 0;
+                joinerPayout = winnerIsCreator ? 0 : winnerPayoutAmount;
+                const reason = room.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win by time';
+                creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
+                joinerDesc = winnerIsCreator ? `Loss vs ${winnerName}` : `${reason} vs ${loserName}`;
             }
         }
+    
+        if (user?.uid === room.createdBy.uid) setPayoutAmount(creatorPayout);
+        if (user?.uid === room.player2.uid) setPayoutAmount(joinerPayout);
+    
+        if (creatorPayout > 0) {
+            batch.update(creatorRef, { balance: increment(creatorPayout) });
+            batch.set(doc(collection(db, 'transactions')), {
+                userId: room.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed',
+                description: creatorDesc, gameRoomId: room.id, createdAt: now
+            });
+        }
+        if (joinerPayout > 0) {
+            batch.update(joinerRef, { balance: increment(joinerPayout) });
+            batch.set(doc(collection(db, 'transactions')), {
+                userId: room.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed',
+                description: joinerDesc, gameRoomId: room.id, createdAt: now
+            });
+        }
+    
         await batch.commit();
-    }, [gameType]);
+    }, [gameType, user]);
 
 
-    const setWinner = useCallback(async (winner: Winner, boardState?: any, method: 'checkmate' | 'timeout' | 'resign' = 'checkmate') => {
+    const setWinner = useCallback(async (winner: Winner, boardState?: any, method: GameOverReason = 'checkmate') => {
         if (gameState.gameOver) return;
         stopTimer();
-        updateAndSaveState({ winner, gameOver: true }, boardState);
+        updateAndSaveState({ winner, gameOver: true, gameOverReason: method }, boardState);
 
         if (isMultiplayer && roomId && user) {
             const roomRef = doc(db, 'game_rooms', roomId as string);
@@ -214,7 +216,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     ? user.uid 
                     : roomData.players.find(p => p !== user.uid);
                 
-                if (winnerId) {
+                if (winnerId && method !== 'draw') {
                     updatePayload.winner = { uid: winnerId, method };
                 }
             }
@@ -248,6 +250,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     ...prevState,
                     gameOver: true,
                     winner: roomData.draw ? 'draw' : (winnerIsP1 ? 'p1' : 'p2'),
+                    gameOverReason: roomData.draw ? 'draw' : roomData.winner?.method || null,
                 }));
                 return;
             }
@@ -293,24 +296,31 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
             let myTime, opponentTime;
              if (isMultiplayer) {
-                // In multiplayer, p1Time is always "my" time from the state
-                myTime = gameState.p1Time - (isMyTurn ? elapsed : 0);
-                opponentTime = gameState.p2Time - (!isMyTurn ? elapsed : 0);
-             } else {
-                 // Practice mode timer updates every second regardless of whose turn
-                myTime = gameState.playerColor === gameState.currentPlayer ? gameState.p1Time - 1 : gameState.p1Time;
-                opponentTime = gameState.playerColor !== gameState.currentPlayer ? gameState.p2Time - 1 : gameState.p2Time;
-             }
+                // In multiplayer, p1Time is "my" time, p2Time is opponent's time
+                const p1Time = isMyTurn ? gameState.p1Time - 1 : gameState.p1Time;
+                const p2Time = !isMyTurn ? gameState.p2Time - 1 : gameState.p2Time;
+                
+                setGameState(p => ({...p, p1Time, p2Time }));
 
-            if (myTime <= 0) {
-                setWinner('p2', gameState.boardState, 'timeout');
-            } else if (opponentTime <= 0) {
-                setWinner('p1', gameState.boardState, 'timeout');
-            }
+                if(p1Time <= 0) {
+                    setWinner('p2', gameState.boardState, 'timeout');
+                } else if (p2Time <= 0) {
+                    setWinner('p1', gameState.boardState, 'timeout');
+                }
+
+             } else {
+                 // Practice mode timer
+                const p1Time = gameState.playerColor === gameState.currentPlayer ? gameState.p1Time - 1 : gameState.p1Time;
+                const p2Time = gameState.playerColor !== gameState.currentPlayer ? gameState.p2Time - 1 : gameState.p2Time;
+             
+                if (p1Time <= 0) {
+                    setWinner('p2', gameState.boardState, 'timeout');
+                } else if (p2Time <= 0) {
+                    setWinner('p1', gameState.boardState, 'timeout');
+                }
             
-            if(!isMultiplayer) {
-                updateAndSaveState({ p1Time: myTime, p2Time: opponentTime });
-            }
+                updateAndSaveState({ p1Time, p2Time });
+             }
 
         }, 1000);
     
@@ -334,6 +344,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             turnStartTime: Date.now(),
             gameOver: false,
             winner: null,
+            gameOverReason: null,
             capturedByPlayer: [],
             capturedByBot: [],
             moveHistory: [],
@@ -370,17 +381,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
              
             const now = Date.now();
             const elapsedSeconds = roomData.turnStartTime ? (now - roomData.turnStartTime.toMillis()) / 1000 : 0;
-
-            let timeToUpdate: 'p1Time' | 'p2Time';
+            
             const creatorIsCurrent = roomData.currentPlayer === roomData.createdBy.color;
 
-            if (isCreator) {
-                timeToUpdate = creatorIsCurrent ? 'p1Time' : 'p2Time';
-            } else {
-                timeToUpdate = creatorIsCurrent ? 'p2Time' : 'p1Time';
-            }
-
-            const newTime = roomData[timeToUpdate] - elapsedSeconds;
+            const newP1Time = creatorIsCurrent ? roomData.p1Time - elapsedSeconds : roomData.p1Time;
+            const newP2Time = !creatorIsCurrent ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
 
 
             const updatePayload: any = {
@@ -388,13 +393,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 currentPlayer: roomData.currentPlayer === 'w' ? 'b' : 'w',
                 moveHistory: newMoveHistory,
                 turnStartTime: serverTimestamp(),
-                [timeToUpdate]: newTime,
+                p1Time: newP1Time,
+                p2Time: newP2Time,
             };
             
             if (capturedPiece) {
-                const myColor = isCreator ? roomData.createdBy.color : roomData.player2?.color;
-                const capturedField = myColor === roomData.currentPlayer ? 'capturedByP1' : 'capturedByP2';
-                updatePayload[capturedField] = [...(roomData[capturedField] || []), capturedPiece];
+                if (roomData.currentPlayer === roomData.createdBy.color) { // Creator captured a piece
+                    updatePayload.capturedByP1 = [...(roomData.capturedByP1 || []), capturedPiece];
+                } else { // Joiner captured a piece
+                    updatePayload.capturedByP2 = [...(roomData.capturedByP2 || []), capturedPiece];
+                }
             }
 
             await updateDoc(roomRef, updatePayload);
@@ -456,6 +464,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
         const defaultState: GameState = getInitialState();
         setGameState(defaultState);
+        setPayoutAmount(null);
         stopTimer();
     };
 
@@ -472,6 +481,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         showResignModal,
         setShowResignModal,
         handleResignConfirm,
+        payoutAmount
     };
 
     return (
