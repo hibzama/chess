@@ -1,8 +1,12 @@
+'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
+import { useRouter } from "next/navigation";
+
 
 const Logo = () => (
     <svg
@@ -24,6 +28,22 @@ export default function DashboardLayout({
   }: {
     children: React.ReactNode
   }) {
+    const { logout, userData } = useAuth();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        await logout();
+        router.push('/login');
+    }
+
+    const getInitials = () => {
+        if (userData) {
+            return `${userData.firstName.charAt(0)}${userData.lastName.charAt(0)}`.toUpperCase();
+        }
+        return '...';
+    }
+
+
     return (
         <SidebarProvider>
             <Sidebar>
@@ -75,6 +95,9 @@ export default function DashboardLayout({
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Support"><LifeBuoy /><span>Support</span></SidebarMenuButton>
                         </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton tooltip="Logout" onClick={handleLogout}><LogOut /><span>Logout</span></SidebarMenuButton>
+                        </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarFooter>
             </Sidebar>
@@ -96,7 +119,7 @@ export default function DashboardLayout({
                         <Button variant="ghost" size="icon"><Settings /></Button>
                         <Avatar>
                             <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
-                            <AvatarFallback>JD</AvatarFallback>
+                            <AvatarFallback>{getInitials()}</AvatarFallback>
                         </Avatar>
                     </div>
                 </header>
@@ -107,4 +130,3 @@ export default function DashboardLayout({
         </SidebarProvider>
     )
   }
-    

@@ -14,10 +14,10 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-10 px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background/80 backdrop-blur-sm">
-        <Link href="/" passHref>
+        <Link href="/dashboard" passHref>
           <Button variant="outline" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to Lobby</span>
+            <span className="hidden sm:inline">Back to Dashboard</span>
           </Button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>

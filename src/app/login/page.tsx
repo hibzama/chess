@@ -5,15 +5,51 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { auth } from "@/lib/firebase";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you would have actual login logic here.
-    // For now, we'll just redirect to the dashboard.
-    router.push('/dashboard');
+    setIsLoading(true);
+
+    const target = e.target as typeof e.target & {
+        email: { value: string };
+        password: { value: string };
+    };
+    
+    const email = target.email.value;
+    const password = target.password.value;
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      toast({
+        title: "Login Successful!",
+        description: "Welcome back.",
+      });
+      router.push('/dashboard');
+    } catch (error: any) {
+        console.error("Error signing in:", error);
+        let errorMessage = "An unknown error occurred.";
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            errorMessage = "Invalid email or password. Please try again.";
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        toast({
+            variant: "destructive",
+            title: "Login failed",
+            description: errorMessage,
+        });
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -37,7 +73,7 @@ export default function LoginPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full">Sign in</Button>
+            <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Signing In...' : 'Sign in'}</Button>
             <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
               <Link href="/register" className="underline">

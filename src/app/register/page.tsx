@@ -5,16 +5,83 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { auth, db } from "@/lib/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { useToast } from "@/hooks/use-toast";
 
 
 export default function RegisterPage() {
     const router = useRouter();
+    const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleRegister = (e: React.FormEvent) => {
+    const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
-        // In a real app, you would have actual registration logic here.
-        // For now, we'll just redirect to the dashboard.
-        router.push('/dashboard');
+        setIsLoading(true);
+        const target = e.target as typeof e.target & {
+            'first-name': { value: string };
+            'last-name': { value: string };
+            phone: { value: string };
+            email: { value: string };
+            password: { value: string };
+            'confirm-password': { value: string };
+        };
+
+        const firstName = target['first-name'].value;
+        const lastName = target['last-name'].value;
+        const phone = target.phone.value;
+        const email = target.email.value;
+        const password = target.password.value;
+        const confirmPassword = target['confirm-password'].value;
+
+        if (password !== confirmPassword) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Passwords do not match.",
+            });
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            await setDoc(doc(db, "users", user.uid), {
+                uid: user.uid,
+                firstName,
+                lastName,
+                phone,
+                email,
+            });
+
+            toast({
+                title: "Success!",
+                description: "Your account has been created.",
+            });
+            router.push('/dashboard');
+
+        } catch (error: any) {
+            console.error("Error signing up:", error);
+            let errorMessage = "An unknown error occurred.";
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage = "This email address is already in use.";
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage = "The password is too weak. Please choose a stronger password.";
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            toast({
+                variant: "destructive",
+                title: "Registration failed",
+                description: errorMessage,
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
   return (
@@ -61,7 +128,7 @@ export default function RegisterPage() {
             </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-                <Button type="submit" className="w-full">Create an account</Button>
+                <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Creating Account...' : 'Create an account'}</Button>
                 <div className="text-center text-sm">
                     Already have an account?{" "}
                     <Link href="/login" className="underline">
@@ -74,5 +141,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-    
