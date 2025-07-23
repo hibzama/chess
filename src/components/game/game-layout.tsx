@@ -31,6 +31,16 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
+  useEffect(() => {
+    // This effect runs when the component unmounts.
+    // If a game is over, we reset the state when leaving the page.
+    return () => {
+      if (gameOver) {
+        resetGame();
+      }
+    };
+  }, [gameOver, resetGame]);
+
   const handleReturnToDashboard = () => {
     router.push('/dashboard');
   };
@@ -115,9 +125,22 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>
         <div className="flex items-center gap-2">
              <Link href="/dashboard/wallet">
-                <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors lg:hidden">
+                <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
                     <CardContent className="p-2 flex items-center gap-2">
                         <Wallet className="w-5 h-5 text-primary"/>
+                        <div className="hidden lg:block">
+                            {userData?.balance ? (
+                                <>
+                                 <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
+                                 <p className="text-xs text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                                </>
+                            ) : (
+                                <div className="space-y-1">
+                                    <Skeleton className="h-4 w-16"/>
+                                    <Skeleton className="h-3 w-12"/>
+                                </div>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             </Link>
@@ -198,7 +221,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </main>
     </div>
     
-    <AlertDialog open={gameOver} onOpenChange={(open) => {if (!open) resetGame()}}>
+    <AlertDialog open={gameOver}>
         <AlertDialogContent>
             <AlertDialogHeader className="items-center text-center">
                 <div className="p-4 rounded-full bg-primary/10 mb-2">
