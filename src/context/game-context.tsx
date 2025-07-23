@@ -140,7 +140,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         try {
             await runTransaction(db, async (transaction) => {
-                const roomRef = doc(db, 'game_rooms', roomId);
+                const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomDoc = await transaction.get(roomRef);
     
                 if (!roomDoc.exists()) {
@@ -245,7 +245,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             
             await updateDoc(roomRef, updatePayload);
         } else { // Practice mode
-            const winner = winnerId === user?.uid ? 'p1' : 'p2';
+            const winner = winnerId === 'bot' ? 'p2' : 'p1';
             updateAndSaveState({ winner, gameOver: true, gameOverReason: method }, boardState);
         }
     }, [stopTimer, updateAndSaveState, isMultiplayer, user, gameState, room]);
@@ -299,6 +299,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 } catch (e) {
                     console.error("Failed to parse checkers board state from string", e);
                     currentBoardState = { board: [] }; // Set a default to avoid crash
+                }
+            } else if (gameType === 'checkers' && typeof currentBoardState?.board === 'string') {
+                 try {
+                    currentBoardState = { board: JSON.parse(currentBoardState.board) };
+                } catch (e) {
+                    console.error("Failed to parse checkers board state from string", e);
+                    currentBoardState = { board: [] };
                 }
             }
 
@@ -357,29 +364,22 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
              intervalRef.current = setInterval(() => {
                 const elapsed = room.turnStartTime ? (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
                 const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
-                const opponentUid = room.players.find(p => p !== user?.uid);
 
-                if (creatorIsCurrent) { // Creator's turn
-                    const timeRemaining = room.p1Time - elapsed;
-                    if (timeRemaining <= 0) {
-                        setWinner(opponentUid || null, gameState.boardState, 'timeout');
-                    }
-                } else { // Joiner's turn
-                    const timeRemaining = room.p2Time - elapsed;
-                    if (timeRemaining <= 0) {
-                        setWinner(room.createdBy.uid, gameState.boardState, 'timeout');
-                    }
+                const creatorTimeRemaining = room.p1Time - (creatorIsCurrent ? elapsed : 0);
+                const joinerTimeRemaining = room.p2Time - (!creatorIsCurrent ? elapsed : 0);
+                
+                if (creatorTimeRemaining <= 0) {
+                    setWinner(room.player2?.uid || null, room.boardState, 'timeout');
+                } else if (joinerTimeRemaining <= 0) {
+                     setWinner(room.createdBy.uid, room.boardState, 'timeout');
                 }
 
                 // Update local time for display purposes
-                const p1ServerTime = creatorIsCurrent ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
-                const p2ServerTime = !creatorIsCurrent ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
                 const isCreator = room.createdBy.uid === user?.uid;
-
                 setGameState(p => ({
                     ...p, 
-                    p1Time: isCreator ? p1ServerTime : p2ServerTime, 
-                    p2Time: !isCreator ? p1ServerTime : p2ServerTime
+                    p1Time: isCreator ? creatorTimeRemaining : joinerTimeRemaining, 
+                    p2Time: !isCreator ? creatorTimeRemaining : joinerTimeRemaining
                 }));
              }, 1000)
         }
