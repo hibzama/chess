@@ -15,7 +15,7 @@ import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
 import { formatTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 
@@ -25,8 +25,103 @@ type GameLayoutProps = {
   headerContent?: React.ReactNode;
 };
 
+const GameOverDisplay = () => {
+    const { winner, gameOverReason, isMultiplayer, payoutAmount } = useGame();
+    const router = useRouter();
+    const USDT_RATE = 310;
+
+    const getWinnerMessage = () => {
+        let title = "Game Over";
+        let description = "The game has concluded.";
+        
+        if (isMultiplayer) {
+             switch(gameOverReason) {
+                case 'draw':
+                    title = "It's a Draw!";
+                    description = "The game has ended in a draw by agreement or stalemate.";
+                    break;
+                case 'checkmate':
+                     title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
+                     description = winner === 'p1' ? `You beat your opponent by checkmate.` : `Your opponent has checkmated you.`;
+                     break;
+                case 'timeout':
+                     title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
+                     description = winner === 'p1' ? `Your opponent ran out of time.` : "You ran out of time.";
+                     break;
+                case 'resign':
+                     title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
+                     description = winner === 'p1' ? `Your opponent has resigned the game.` : "You have resigned the game.";
+                     break;
+                default:
+                     if (winner === 'p1') {
+                        title = "🎉 You Won! 🎉";
+                        description = "You have won the game.";
+                     } else if (winner === 'p2') {
+                        title = "😥 You Lost 😥";
+                        description = "You have lost the game.";
+                     }
+                     break;
+            }
+        } else { // Practice Mode messages
+            switch(gameOverReason) {
+                case 'draw':
+                    title = "It's a Draw!";
+                    description = "The game has ended in a draw by agreement or stalemate.";
+                    break;
+                case 'checkmate':
+                    title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
+                    description = winner === 'p1' ? `You checkmated the bot. Well played!` : `The bot has checkmated you.`;
+                    break;
+                case 'timeout':
+                    title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost 😥`;
+                    description = winner === 'p1' ? `The bot ran out of time.` : "You ran out of time.";
+                    break;
+                case 'resign':
+                     title = "You Resigned";
+                     description = "You have resigned the game against the bot.";
+                     break;
+                default:
+                     if (winner === 'p1') {
+                        title = "🎉 You Won! 🎉";
+                     } else if (winner === 'p2') {
+                        title = "😥 You Lost 😥";
+                     }
+                     break;
+            }
+        }
+
+        return { title, description };
+    }
+
+    const { title, description } = getWinnerMessage();
+
+    return (
+        <Card className="w-full max-w-lg text-center p-8 bg-card/70 backdrop-blur-sm animate-in fade-in zoom-in-95">
+            <CardHeader className="items-center">
+                 <div className="p-4 rounded-full bg-primary/10 mb-2">
+                    <Crown className="w-12 h-12 text-primary" />
+                </div>
+                <CardTitle className="text-2xl">{title}</CardTitle>
+                <CardDescription>
+                   {description}
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                {isMultiplayer && payoutAmount !== null && payoutAmount >= 0 && (
+                    <div className="p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
+                        <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)} (~{(payoutAmount / USDT_RATE).toFixed(2)} USDT)
+                    </div>
+                )}
+            </CardContent>
+            <CardContent>
+                <Button className="w-full" onClick={() => router.push('/dashboard')}>Return to Dashboard</Button>
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { isMultiplayer, p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, payoutAmount, roomWager } = useGame();
+  const { isMultiplayer, p1Time, p2Time, gameOver, resetGame, playerColor, currentPlayer, isMounted, resign, roomWager } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
@@ -44,78 +139,11 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     };
   }, [gameOver, resetGame]);
 
-  const handleReturnToDashboard = () => {
-    router.push('/dashboard');
-  };
-
   const handleResign = () => {
     setIsResignConfirmOpen(false);
     resign();
   }
 
-  const getWinnerMessage = () => {
-    let title = "Game Over";
-    let description = "The game has concluded.";
-    
-    if (isMultiplayer) {
-         switch(gameOverReason) {
-            case 'draw':
-                title = "It's a Draw!";
-                description = "The game has ended in a draw by agreement or stalemate.";
-                break;
-            case 'checkmate':
-                 title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
-                 description = winner === 'p1' ? `You beat your opponent by checkmate.` : `Your opponent has checkmated you.`;
-                 break;
-            case 'timeout':
-                 title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
-                 description = winner === 'p1' ? `Your opponent ran out of time.` : "You ran out of time.";
-                 break;
-            case 'resign':
-                 title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
-                 description = winner === 'p1' ? `Your opponent has resigned the game.` : "You have resigned the game.";
-                 break;
-            default:
-                 if (winner === 'p1') {
-                    title = "🎉 You Won! 🎉";
-                    description = "You have won the game.";
-                 } else if (winner === 'p2') {
-                    title = "😥 You Lost 😥";
-                    description = "You have lost the game.";
-                 }
-                 break;
-        }
-    } else { // Practice Mode messages
-        switch(gameOverReason) {
-            case 'draw':
-                title = "It's a Draw!";
-                description = "The game has ended in a draw by agreement or stalemate.";
-                break;
-            case 'checkmate':
-                title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
-                description = winner === 'p1' ? `You checkmated the bot. Well played!` : `The bot has checkmated you.`;
-                break;
-            case 'timeout':
-                title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
-                description = winner === 'p1' ? `The bot ran out of time.` : "You ran out of time.";
-                break;
-            case 'resign':
-                 title = "You Resigned";
-                 description = "You have resigned the game against the bot.";
-                 break;
-            default:
-                 if (winner === 'p1') {
-                    title = "🎉 You Won! 🎉";
-                 } else if (winner === 'p2') {
-                    title = "😥 You Lost 😥";
-                 }
-                 break;
-        }
-    }
-
-    return { title, description };
-  }
-  
   const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
   
@@ -176,27 +204,34 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         {/* Center Column */}
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
             {headerContent}
-             <div className="w-full flex justify-between items-center px-2">
-                <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
-                    <p className="font-semibold">Opponent</p>
-                    <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p>
-                </div>
-                 <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
-                    <p className="font-semibold">You</p>
-                    <p className="text-2xl font-bold">{formatTime(Math.ceil(p1Time))}</p>
-                </div>
-            </div>
-            {children}
-            <div className="text-center font-semibold text-lg p-2 rounded-md bg-card border">
-                Current Turn: <span className="text-primary">{turnText}</span>
-            </div>
+            {gameOver ? (
+                <GameOverDisplay />
+            ) : (
+                <>
+                    <div className="w-full flex justify-between items-center px-2">
+                        <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
+                            <p className="font-semibold">Opponent</p>
+                            <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p>
+                        </div>
+                        <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
+                            <p className="font-semibold">You</p>
+                            <p className="text-2xl font-bold">{formatTime(Math.ceil(p1Time))}</p>
+                        </div>
+                    </div>
+                    {children}
+                    <div className="text-center font-semibold text-lg p-2 rounded-md bg-card border">
+                        Current Turn: <span className="text-primary">{turnText}</span>
+                    </div>
+                </>
+            )}
+
             <div className="lg:hidden w-full space-y-4 mt-4">
                  {isMultiplayer ? (
                     <>
                         <CapturedPieces pieceStyle={equipment?.pieceStyle} />
                         <Card>
                             <CardContent className="p-4">
-                                <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)}>
+                                <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
                                     <Flag className="w-4 h-4 mr-2" />
                                     Resign
                                 </Button>
@@ -220,7 +255,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
              {isMultiplayer ? (
                  <Card>
                     <CardContent className="p-4">
-                        <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)}>
+                        <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
                             <Flag className="w-4 h-4 mr-2" />
                             Resign
                         </Button>
@@ -233,32 +268,6 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </main>
     </div>
     
-    <AlertDialog open={gameOver}>
-      <AlertDialogContent>
-        <AlertDialogHeader className="items-center text-center">
-          <div className="p-4 rounded-full bg-primary/10 mb-2">
-            <Crown className="w-12 h-12 text-primary" />
-          </div>
-          <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="text-sm text-muted-foreground space-y-2">
-              <div>{getWinnerMessage().description}</div>
-              {isMultiplayer && payoutAmount !== null && payoutAmount >= 0 && (
-                <div className="p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
-                  <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)} (~{(payoutAmount / USDT_RATE).toFixed(2)} USDT)
-                </div>
-              )}
-            </div>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-             <AlertDialogAction onClick={handleReturnToDashboard} className="w-full">
-                Return to Dashboard
-            </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-
     <AlertDialog open={isResignConfirmOpen} onOpenChange={setIsResignConfirmOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
