@@ -47,8 +47,8 @@ type GameRoom = {
     turnStartTime: Timestamp;
 };
 
-const NavigationGuard = () => {
-    const { resign } = useGame();
+function NavigationGuard() {
+    const { resign, gameOver } = useGame();
     const router = useRouter();
     const [showConfirm, setShowConfirm] = useState(false);
     const [nextUrl, setNextUrl] = useState<string | null>(null);
@@ -84,6 +84,8 @@ const NavigationGuard = () => {
     }, []);
 
      useEffect(() => {
+        if(gameOver) return;
+
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
             e.returnValue = '';
@@ -105,7 +107,7 @@ const NavigationGuard = () => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener('click', handleAnchorClick, true);
         };
-      }, [handleAnchorClick]);
+      }, [gameOver, handleAnchorClick]);
 
 
     return (

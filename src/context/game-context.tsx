@@ -136,13 +136,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
     }, []);
 
-    const handlePayout = useCallback(async () => {
+    const handlePayout = useCallback(async (currentRoom: GameRoom) => {
         if (!roomId || !user) return { creatorPayout: 0, joinerPayout: 0 };
     
-        try {
-            let creatorPayout = 0;
-            let joinerPayout = 0;
+        let creatorPayout = 0;
+        let joinerPayout = 0;
             
+        try {
             await runTransaction(db, async (transaction) => {
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomDoc = await transaction.get(roomRef);
@@ -151,36 +151,36 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     throw "Room does not exist!";
                 }
     
-                const currentRoom = roomDoc.data() as GameRoom;
+                const roomData = roomDoc.data() as GameRoom;
     
-                if (currentRoom.payoutTransactionId) {
+                if (roomData.payoutTransactionId) {
                     return;
                 }
-                 if (!currentRoom.player2) {
+                 if (!roomData.player2) {
                     return;
                 }
     
-                const creatorRef = doc(db, 'users', currentRoom.createdBy.uid);
-                const joinerRef = doc(db, 'users', currentRoom.player2.uid);
+                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
+                const joinerRef = doc(db, 'users', roomData.player2.uid);
                 
-                const wager = currentRoom.wager;
+                const wager = roomData.wager;
                 const now = serverTimestamp();
                 const payoutTxId = doc(collection(db, 'transactions')).id; 
 
                 let creatorDesc = '';
                 let joinerDesc = '';
 
-                if (currentRoom.draw) {
+                if (roomData.draw) {
                     creatorPayout = wager * 0.9;
                     joinerPayout = wager * 0.9;
-                    creatorDesc = `Draw refund for ${currentRoom.gameType} game vs ${currentRoom.player2.name}`;
-                    joinerDesc = `Draw refund for ${currentRoom.gameType} game vs ${currentRoom.createdBy.name}`;
-                } else if (currentRoom.winner) {
-                    const winnerIsCreator = currentRoom.winner.uid === currentRoom.createdBy.uid;
-                    const winnerName = winnerIsCreator ? currentRoom.createdBy.name : currentRoom.player2.name;
-                    const loserName = winnerIsCreator ? currentRoom.player2.name : currentRoom.createdBy.name;
+                    creatorDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.player2.name}`;
+                    joinerDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.createdBy.name}`;
+                } else if (roomData.winner) {
+                    const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
+                    const winnerName = winnerIsCreator ? roomData.createdBy.name : roomData.player2.name;
+                    const loserName = winnerIsCreator ? roomData.player2.name : roomData.createdBy.name;
     
-                    if (currentRoom.winner.method === 'resign') {
+                    if (roomData.winner.method === 'resign') {
                         const winnerPayoutAmount = wager * 1.05;
                         const loserPayoutAmount = wager * 0.75;
                         creatorPayout = winnerIsCreator ? winnerPayoutAmount : loserPayoutAmount;
@@ -191,7 +191,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         const winnerPayoutAmount = wager * 1.8;
                         creatorPayout = winnerIsCreator ? winnerPayoutAmount : 0;
                         joinerPayout = winnerIsCreator ? 0 : winnerPayoutAmount;
-                        const reason = currentRoom.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win on time';
+                        const reason = roomData.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win on time';
                         creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
                         joinerDesc = winnerIsCreator ? `Loss vs ${winnerName}` : `${reason} vs ${loserName}`;
                     }
@@ -200,14 +200,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (creatorPayout > 0) {
                     transaction.update(creatorRef, { balance: increment(creatorPayout) });
                     transaction.set(doc(collection(db, 'transactions')), {
-                        userId: currentRoom.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed',
+                        userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed',
                         description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
                     });
                 }
                 if (joinerPayout > 0) {
                     transaction.update(joinerRef, { balance: increment(joinerPayout) });
                     transaction.set(doc(collection(db, 'transactions')), {
-                        userId: currentRoom.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed',
+                        userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed',
                         description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
                     });
                 }
@@ -221,7 +221,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             console.error("Payout Transaction failed:", error);
             return { creatorPayout: 0, joinerPayout: 0 };
         }
-    }, [user, roomId, gameType]);
+    }, [user, roomId]);
 
 
     const setWinner = useCallback(async (winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate') => {
@@ -245,12 +245,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
             
             await updateDoc(roomRef, updatePayload);
-            const { creatorPayout, joinerPayout } = await handlePayout();
+            const updatedRoomData = { ...currentRoom, ...updatePayload };
+            const { creatorPayout, joinerPayout } = await handlePayout(updatedRoomData);
             
             const isCreator = currentRoom.createdBy.uid === user.uid;
             const myPayout = isCreator ? creatorPayout : joinerPayout;
-
             const winnerIsMe = winnerId === user.uid;
+
             setGameState(prevState => ({
                 ...prevState,
                 boardState: boardState,
@@ -328,7 +329,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             stopTimer();
         };
     
-    }, [isMultiplayer, roomId, user, isMounted, stopTimer, handlePayout, gameType, setWinner]);
+    }, [isMultiplayer, roomId, user, isMounted, stopTimer, gameType, setWinner]);
 
 
      // Timer countdown logic
