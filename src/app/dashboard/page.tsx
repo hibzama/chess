@@ -50,10 +50,10 @@ export default function DashboardPage() {
     }
 
   const mainActions = [
-    { title: "Practice Games", description: "Play for free against the bot", icon: Sword, href: "#" },
+    { title: "Practice Games", description: "Play for free against the bot", icon: Sword, href: "/practice" },
     { title: "Start Earning", description: "Play against others to win", icon: DollarSign, href: "#" },
     { title: "My Rooms", description: "Check on your active games", icon: List, href: "#" },
-    { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "#" },
+    { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "/dashboard/wallet" },
   ];
 
   const secondaryActions = [
@@ -77,13 +77,15 @@ export default function DashboardPage() {
       <div className="grid gap-6">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {mainActions.map((action) => (
-            <Card key={action.title} className="hover:bg-primary/5 transition-all cursor-pointer">
-              <CardHeader>
-                <action.icon className="w-8 h-8 text-primary mb-2" />
-                <CardTitle>{action.title}</CardTitle>
-                <CardDescription>{action.description}</CardDescription>
-              </CardHeader>
-            </Card>
+            <Link href={action.href} key={action.title}>
+                <Card className="hover:bg-primary/5 transition-all cursor-pointer h-full">
+                <CardHeader>
+                    <action.icon className="w-8 h-8 text-primary mb-2" />
+                    <CardTitle>{action.title}</CardTitle>
+                    <CardDescription>{action.description}</CardDescription>
+                </CardHeader>
+                </Card>
+            </Link>
           ))}
         </div>
         <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
