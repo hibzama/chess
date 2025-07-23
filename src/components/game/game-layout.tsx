@@ -32,8 +32,8 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleCloseDialog = () => {
-    router.push(isMultiplayer ? '/lobby' : '/practice');
     resetGame();
+    router.push(isMultiplayer ? '/lobby' : '/practice');
   };
 
   const getWinnerMessage = () => {
@@ -96,7 +96,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </header>
       <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
         {/* Left Column */}
-        <div className="hidden lg:flex flex-col gap-6">
+        <div className="hidden lg:grid grid-rows-[auto,1fr] gap-6">
             <PlayerInfo
               playerName={userData ? `${userData.firstName} (You)`: "Player 1 (You)"}
               avatarSrc="https://placehold.co/100x100.png"
@@ -125,7 +125,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         </div>
 
         {/* Right Column */}
-        <aside className="hidden lg:flex flex-col gap-6">
+        <aside className="hidden lg:grid grid-rows-[auto,auto,1fr] gap-6">
             <PlayerInfo
               playerName="Opponent"
               avatarSrc="https://placehold.co/100x100.png"
