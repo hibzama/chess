@@ -271,8 +271,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
             if (roomData.status === 'completed') {
                 if (gameOverHandledRef.current) return;
+                
+                // Set isEnding to true to show loading/prevent actions while payout calculates
+                setGameState(prevState => ({ ...prevState, isEnding: true }));
                 stopTimer();
+                
                 const { myPayout } = await handlePayout(roomData);
+                
                 const winnerIsMe = roomData.winner?.uid === user.uid;
 
                 setGameState(prevState => ({
@@ -284,6 +289,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     payoutAmount: myPayout,
                     isEnding: false
                 }));
+
                 gameOverHandledRef.current = true;
                 return;
             }
