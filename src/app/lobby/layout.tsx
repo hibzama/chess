@@ -1,7 +1,7 @@
 'use client'
 import MainLayout from "@/components/layout/main-layout";
 
-export default function DashboardLayout({
+export default function LobbyLayout({
     children,
   }: {
     children: React.ReactNode
