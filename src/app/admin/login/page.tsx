@@ -11,8 +11,8 @@ import { useState } from "react";
 
 // For this example, we'll hardcode the admin credentials.
 // In a real app, you'd use a more secure method like custom claims in Firebase Auth.
-const ADMIN_EMAIL = "admin@nexbattle.com";
-const ADMIN_PASSWORD = "adminpassword";
+const ADMIN_EMAIL = "admin@janitha.com";
+const ADMIN_PASSWORD = "Jda@#12345";
 
 export default function AdminLoginPage() {
   const router = useRouter();
