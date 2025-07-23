@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -33,6 +33,7 @@ export default function MainLayout({
   }) {
     const { logout, userData, loading } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
 
     const handleLogout = async () => {
         await logout();
@@ -61,13 +62,13 @@ export default function MainLayout({
                 <SidebarContent>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" ><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms"><BarChart3 /><span>My Rooms</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={pathname === '/dashboard/my-rooms'}><BarChart3 /><span>My Rooms</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet"><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Friends & Community"><Users /><span>Friends & Community</span></SidebarMenuButton>
@@ -76,7 +77,7 @@ export default function MainLayout({
                             <SidebarMenuButton tooltip="Rankings"><Trophy /><span>Rankings</span></SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment"><Swords /><span>My Equipment</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={pathname === '/dashboard/equipment'}><Swords /><span>My Equipment</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Refer & Earn"><Megaphone /><span>Refer & Earn</span></SidebarMenuButton>
