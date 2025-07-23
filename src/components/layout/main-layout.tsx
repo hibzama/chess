@@ -119,14 +119,16 @@ export default function MainLayout({
                     <SidebarTrigger className="md:hidden"/>
                     <div className="ml-auto flex items-center gap-4">
                        <div className="hidden sm:block">
-                         {isMounted && (
                            <Link href="/dashboard/wallet">
                               <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
                                   <CardContent className="p-2 flex items-center gap-2">
                                       <Wallet className="w-5 h-5 text-primary"/>
                                       <div>
-                                      {loading || !userData || typeof userData.balance === 'undefined' ? (
-                                          <Skeleton className="h-5 w-20" />
+                                      {!isMounted || loading || !userData || typeof userData.balance === 'undefined' ? (
+                                          <div className="space-y-1">
+                                            <Skeleton className="h-4 w-16"/>
+                                            <Skeleton className="h-3 w-12"/>
+                                          </div>
                                           ) : (
                                           <>
                                               <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
@@ -137,13 +139,12 @@ export default function MainLayout({
                                   </CardContent>
                               </Card>
                           </Link>
-                         )}
                        </div>
                         <Button variant="ghost" size="icon"><Bell /></Button>
                         <Button variant="ghost" size="icon"><Settings /></Button>
                         <Avatar>
                             <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
-                            <AvatarFallback>{loading ? '..' : getInitials()}</AvatarFallback>
+                            <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
                         </Avatar>
                     </div>
                 </header>
@@ -154,3 +155,4 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
