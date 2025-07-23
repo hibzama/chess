@@ -122,7 +122,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
             >
               {piece && (
                 <div className={cn(
-                  'w-full h-full p-2 transition-transform duration-300 ease-in-out',
+                  'w-full h-full transition-transform duration-300 ease-in-out',
                   isSelected ? 'scale-110 -translate-y-1' : ''
                 )} style={{ color: piece.color === 'w' ? styles.colors[1] : styles.colors[0]}}>
                   {getPieceIcon(piece.type)}
