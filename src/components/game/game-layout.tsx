@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
@@ -30,12 +30,16 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
 
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
-
   const handleCloseDialog = () => {
-    resetGame();
-    // Redirect based on whether it's a practice or multiplayer game
     router.push(isMultiplayer ? '/lobby' : '/practice');
-  }
+  };
+
+  useEffect(() => {
+    // When the component unmounts (e.g., user navigates away), reset the game state.
+    return () => {
+      resetGame();
+    };
+  }, [resetGame]);
 
   const getWinnerMessage = () => {
     const opponentName = isMultiplayer ? "Your opponent" : "The bot";
@@ -147,7 +151,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                 </div>
                 <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
                 <AlertDialogDescription>
-                    {getWinnerMessage().description}
+                  {getWinnerMessage().description}
                 </AlertDialogDescription>
                 {isMultiplayer && payoutAmount !== null && payoutAmount > 0 && (
                     <div className="mt-4 p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2 text-sm">
