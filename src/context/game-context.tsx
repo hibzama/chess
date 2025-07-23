@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp } from 'firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams } from 'next/navigation';
 
@@ -369,17 +369,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
              
             const now = Date.now();
-            const elapsedSeconds = (now - roomData.turnStartTime.toMillis()) / 1000;
+            const elapsedSeconds = roomData.turnStartTime ? (now - roomData.turnStartTime.toMillis()) / 1000 : 0;
 
-            let timeToUpdate, otherTimeField;
+            let timeToUpdate: 'p1Time' | 'p2Time';
+            const creatorIsCurrent = roomData.currentPlayer === roomData.createdBy.color;
+
             if (isCreator) {
-                timeToUpdate = roomData.currentPlayer === roomData.createdBy.color ? 'p1Time' : 'p2Time';
-                otherTimeField = timeToUpdate === 'p1Time' ? 'p2Time' : 'p1Time';
+                timeToUpdate = creatorIsCurrent ? 'p1Time' : 'p2Time';
             } else {
-                timeToUpdate = roomData.currentPlayer === roomData.player2!.color ? 'p2Time' : 'p1Time';
-                otherTimeField = timeToUpdate === 'p2Time' ? 'p1Time' : 'p2Time';
+                timeToUpdate = creatorIsCurrent ? 'p2Time' : 'p1Time';
             }
-            const newTime = roomData[timeToUpdate as keyof GameRoom] as number - elapsedSeconds;
+
+            const newTime = roomData[timeToUpdate] - elapsedSeconds;
 
 
             const updatePayload: any = {
@@ -391,7 +392,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             };
             
             if (capturedPiece) {
-                // if I am creator and my color is current player color, I captured a piece for p1
                 const myColor = isCreator ? roomData.createdBy.color : roomData.player2?.color;
                 const capturedField = myColor === roomData.currentPlayer ? 'capturedByP1' : 'capturedByP2';
                 updatePayload[capturedField] = [...(roomData[capturedField] || []), capturedPiece];
