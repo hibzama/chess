@@ -303,9 +303,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             let currentBoardState = roomData.boardState;
             if (gameType === 'checkers' && typeof currentBoardState?.board === 'string') {
                 try {
-                    currentBoardState.board = JSON.parse(currentBoardState.board);
+                    currentBoardState = { board: JSON.parse(currentBoardState.board) };
                 } catch (e) {
                     console.error("Failed to parse checkers board state", e);
+                    currentBoardState = { board: [] }; // Set a default to avoid crash
                 }
             }
 
