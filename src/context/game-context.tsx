@@ -33,6 +33,7 @@ interface GameRoom {
         method: GameOverReason
     };
     draw?: boolean;
+    payoutProcessed?: boolean;
 }
 
 interface GameState {
@@ -135,10 +136,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, []);
 
     const handlePayout = useCallback(async (currentRoom: GameRoom) => {
-        if (!currentRoom.player2) return;
+        if (!currentRoom.player2 || currentRoom.payoutProcessed) return;
     
         const creatorRef = doc(db, 'users', currentRoom.createdBy.uid);
         const joinerRef = doc(db, 'users', currentRoom.player2.uid);
+        const roomRef = doc(db, 'game_rooms', currentRoom.id);
         const batch = writeBatch(db);
         const wager = currentRoom.wager;
         const now = serverTimestamp();
@@ -192,6 +194,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 description: joinerDesc, gameRoomId: currentRoom.id, createdAt: now
             });
         }
+        
+        batch.update(roomRef, { payoutProcessed: true });
     
         await batch.commit();
     }, [user]);
@@ -266,6 +270,19 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const isCreator = roomData.createdBy.uid === user.uid;
             const pColor = isCreator ? roomData.createdBy.color : roomData.player2!.color;
             
+            const elapsed = roomData.turnStartTime ? (Timestamp.now().toMillis() - roomData.turnStartTime.toMillis()) / 1000 : 0;
+            const creatorIsCurrent = roomData.currentPlayer === roomData.createdBy.color;
+
+            let p1Time = isCreator ? roomData.p1Time : roomData.p2Time;
+            let p2Time = isCreator ? roomData.p2Time : roomData.p1Time;
+
+            if (roomData.currentPlayer === pColor) {
+                 p1Time -= elapsed;
+            } else {
+                 p2Time -= elapsed;
+            }
+
+
             setGameState(prevState => ({
                 ...prevState,
                 playerColor: pColor,
@@ -300,9 +317,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         intervalRef.current = setInterval(() => {
             const isMyTurn = gameState.currentPlayer === gameState.playerColor;
             const elapsed = (Date.now() - gameState.turnStartTime!) / 1000;
-
+            
+            const currentP1Time = isMultiplayer && room ? (room.createdBy.uid === user?.uid ? room.p1Time : room.p2Time) : gameState.timeLimit;
+            const currentP2Time = isMultiplayer && room ? (room.createdBy.uid === user?.uid ? room.p2Time : room.p1Time) : gameState.timeLimit;
+            
             if (isMyTurn) {
-                const newTime = (isMultiplayer ? room!.p1Time : gameState.timeLimit) - elapsed;
+                const newTime = currentP1Time - elapsed;
                  if (newTime <= 0) {
                      setGameState(p => ({...p, p1Time: 0}));
                      setWinner('p2', gameState.boardState, 'timeout');
@@ -311,7 +331,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     setGameState(p => ({...p, p1Time: newTime}));
                 }
             } else {
-                const newTime = (isMultiplayer ? room!.p2Time : gameState.timeLimit) - elapsed;
+                const newTime = currentP2Time - elapsed;
                 if (newTime <= 0) {
                     setGameState(p => ({...p, p2Time: 0}));
                     setWinner('p1', gameState.boardState, 'timeout');
@@ -324,7 +344,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         return () => stopTimer();
     
-    }, [isMounted, gameState.gameOver, gameState.turnStartTime, gameState.currentPlayer, gameState.playerColor, stopTimer, setWinner, gameState.boardState, isMultiplayer, room, gameState.timeLimit]);
+    }, [isMounted, gameState.gameOver, gameState.turnStartTime, gameState.currentPlayer, gameState.playerColor, stopTimer, setWinner, gameState.boardState, isMultiplayer, room, user, gameState.timeLimit]);
 
 
     const loadGameState = (state: GameState) => {
