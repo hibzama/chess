@@ -9,7 +9,7 @@ import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Times
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, Share, Clock, Users, Swords, Wallet, LogIn, AlertTriangle } from 'lucide-react';
+import { Loader2, Copy, Share, Clock, Users, Swords, Wallet, LogIn, AlertTriangle, Bell } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Alert, AlertTitle } from '@/components/ui/alert';
@@ -47,17 +47,43 @@ type GameRoom = {
     turnStartTime: Timestamp;
 };
 
-const NavigationGuard = ({ gameOver }: { gameOver: boolean }) => {
+const NavigationGuard = () => {
     const { resign } = useGame();
     const router = useRouter();
     const [showConfirm, setShowConfirm] = useState(false);
     const [nextUrl, setNextUrl] = useState<string | null>(null);
 
-     useEffect(() => {
-        if (gameOver) {
-            return;
-        }
+    const handleConfirm = useCallback(() => {
+        resign(); 
+        setTimeout(() => {
+            if(nextUrl) {
+                router.push(nextUrl);
+            } else {
+                router.back();
+            }
+        }, 100);
+    }, [resign, nextUrl, router]);
 
+    const handleCancel = useCallback(() => {
+        setNextUrl(null);
+        setShowConfirm(false);
+    }, []);
+
+    const handleAnchorClick = useCallback((e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+
+      if (anchor && anchor.href && anchor.target !== '_blank') {
+        const url = new URL(anchor.href);
+        if(url.pathname.startsWith('/game/multiplayer')) return;
+
+        e.preventDefault();
+        setNextUrl(anchor.href);
+        setShowConfirm(true);
+      }
+    }, []);
+
+     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
             e.returnValue = '';
@@ -67,20 +93,6 @@ const NavigationGuard = ({ gameOver }: { gameOver: boolean }) => {
             e.preventDefault();
             history.pushState(null, '', window.location.href); 
             setShowConfirm(true);
-        };
-    
-        const handleAnchorClick = (e: MouseEvent) => {
-          const target = e.target as HTMLElement;
-          const anchor = target.closest('a');
-    
-          if (anchor && anchor.href && anchor.target !== '_blank') {
-            const url = new URL(anchor.href);
-            if(url.pathname.startsWith('/game/multiplayer')) return;
-
-            e.preventDefault();
-            setNextUrl(anchor.href);
-            setShowConfirm(true);
-          }
         };
     
         history.pushState(null, '', window.location.href);
@@ -93,24 +105,8 @@ const NavigationGuard = ({ gameOver }: { gameOver: boolean }) => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener('click', handleAnchorClick, true);
         };
-      }, [gameOver]);
+      }, [handleAnchorClick]);
 
-
-    const handleConfirm = () => {
-        resign(); 
-        setTimeout(() => {
-            if(nextUrl) {
-                router.push(nextUrl);
-            } else {
-                router.back();
-            }
-        }, 100);
-    }
-
-    const handleCancel = () => {
-        setNextUrl(null);
-        setShowConfirm(false);
-    }
 
     return (
         <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
@@ -448,7 +444,7 @@ function MultiplayerGamePageContent() {
 
     return (
         <>
-        <NavigationGuard gameOver={gameOver} />
+        {!gameOver && <NavigationGuard />}
          <GameLayout
             gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
             headerContent={
