@@ -10,8 +10,10 @@ export default function ChessPage() {
   const equipment = userData?.equipment?.chess;
 
   return (
-    <GameLayout gameType="Chess">
-      <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
-    </GameLayout>
+    <GameProvider gameType="chess">
+        <GameLayout gameType="Chess">
+            <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
+        </GameLayout>
+    </GameProvider>
   );
 }

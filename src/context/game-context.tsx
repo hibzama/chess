@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 type PlayerColor = 'w' | 'b';
 type Winner = 'p1' | 'p2' | 'draw' | null;
 type Piece = { type: string; color: 'w' | 'b' };
+type Move = { turn: number; white?: string; black?: string };
 
 interface GameState {
     playerColor: PlayerColor;
@@ -18,12 +19,14 @@ interface GameState {
     winner: Winner;
     capturedByPlayer: Piece[];
     capturedByBot: Piece[];
-    moveHistory: any[];
+    moveHistory: Move[];
+    moveCount: number;
+    boardState: any | null;
 }
 
 interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
-    switchTurn: (boardState: any, move?: any, capturedPiece?: Piece) => void;
+    switchTurn: (boardState: any, move?: string, capturedPiece?: Piece) => void;
     setWinner: (winner: Winner, boardState: any) => void;
     resetGame: () => void;
     player1Time: number;
@@ -32,51 +35,48 @@ interface GameContextType extends GameState {
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
-const initialGameState: GameState = {
-    playerColor: 'w',
-    timeLimit: 900,
-    difficulty: 'intermediate',
-    p1Time: 900,
-    p2Time: 900,
-    currentPlayer: 'w',
-    turnStartTime: null,
-    gameOver: false,
-    winner: null,
-    capturedByPlayer: [],
-    capturedByBot: [],
-    moveHistory: [],
-};
+export const GameProvider = ({ children, gameType }: { children: React.ReactNode, gameType: 'chess' | 'checkers' }) => {
+    const storageKey = `game_state_${gameType}`;
 
-const getLocalStorageKey = (gameType: 'chess' | 'checkers') => `game_state_${gameType}`;
-
-export const GameProvider = ({ children }: { children: React.ReactNode }) => {
-    const [gameState, setGameState] = useState<GameState>(initialGameState);
-    const [player1Time, setPlayer1Time] = useState(gameState.p1Time);
-    const [player2Time, setPlayer2Time] = useState(gameState.p2Time);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-    // This is a placeholder. In a real app, you'd know which game is active.
-    const activeGameType = typeof window !== 'undefined' && window.location.pathname.includes('checkers') ? 'checkers' : 'chess';
-    const storageKey = getLocalStorageKey(activeGameType);
-
-    useEffect(() => {
+    const getInitialState = (): GameState => {
+        const defaultState: GameState = {
+            playerColor: 'w',
+            timeLimit: 900,
+            difficulty: 'intermediate',
+            p1Time: 900,
+            p2Time: 900,
+            currentPlayer: 'w',
+            turnStartTime: null,
+            gameOver: false,
+            winner: null,
+            capturedByPlayer: [],
+            capturedByBot: [],
+            moveHistory: [],
+            moveCount: 0,
+            boardState: null,
+        };
         try {
-            const savedState = localStorage.getItem(storageKey);
+            const savedState = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
             if (savedState) {
-                const parsedState: GameState = JSON.parse(savedState);
-                setGameState(parsedState);
-                setPlayer1Time(parsedState.p1Time);
-                setPlayer2Time(parsedState.p2Time);
+                const parsed = JSON.parse(savedState);
+                return { ...defaultState, ...parsed };
             }
         } catch (error) {
             console.error("Failed to parse game state from localStorage", error);
         }
-    }, [storageKey]);
+        return defaultState;
+    }
+
+    const [gameState, setGameState] = useState<GameState>(getInitialState());
+    const [player1Time, setPlayer1Time] = useState(gameState.p1Time);
+    const [player2Time, setPlayer2Time] = useState(gameState.p2Time);
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
 
     const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
         setGameState(prevState => {
             const updatedState = { ...prevState, ...newState };
-            const stateToSave = { ...updatedState, board: boardState };
+            const stateToSave = { ...updatedState, boardState: boardState || updatedState.boardState };
             localStorage.setItem(storageKey, JSON.stringify(stateToSave));
             return updatedState;
         });
@@ -120,7 +120,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
             }
         };
         
-        tick(); // Initial tick to update immediately
+        tick(); 
         intervalRef.current = setInterval(tick, 1000);
 
         return () => stopTimer();
@@ -142,47 +142,52 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
             capturedByPlayer: [],
             capturedByBot: [],
             moveHistory: [],
+            moveCount: 0,
+            boardState: null,
         };
         setPlayer1Time(time);
         setPlayer2Time(time);
         updateAndSaveState(newState);
     };
 
-    const switchTurn = (boardState: any, move?: any, capturedPiece?: Piece) => {
+    const switchTurn = (boardState: any, move?: string, capturedPiece?: Piece) => {
         if (gameState.gameOver) return;
 
         const now = Date.now();
-        const elapsed = Math.floor((now - (gameState.turnStartTime || now)) / 1000);
-        const p1IsCurrent = (gameState.playerColor === 'w' && gameState.currentPlayer === 'w') || (gameState.playerColor === 'b' && gameState.currentPlayer === 'b');
+        const elapsed = gameState.turnStartTime ? Math.floor((now - gameState.turnStartTime) / 1000) : 0;
         
+        const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
+
         let newP1Time = gameState.p1Time;
         let newP2Time = gameState.p2Time;
-        let newMoveHistory = [...gameState.moveHistory];
-        let newCapturedByPlayer = gameState.capturedByPlayer ? [...gameState.capturedByPlayer] : [];
-        let newCapturedByBot = gameState.capturedByBot ? [...gameState.capturedByBot] : [];
-
+        
         if (p1IsCurrent) {
             newP1Time -= elapsed;
-            if (move) {
-                if(newMoveHistory.length === 0 || newMoveHistory[newMoveHistory.length-1].black) {
-                     newMoveHistory.push({turn: newMoveHistory.length + 1, white: move});
-                } else {
-                    newMoveHistory[newMoveHistory.length - 1].white = move;
-                }
-            }
-            if(capturedPiece) newCapturedByPlayer.push(capturedPiece);
-
-        } else { // Bot's turn
+        } else {
             newP2Time -= elapsed;
-             if (move) {
-                if(newMoveHistory.length === 0 || newMoveHistory[newMoveHistory.length-1].black) {
-                     newMoveHistory.push({turn: newMoveHistory.length + 1, black: move});
+        }
+        
+        setPlayer1Time(newP1Time);
+        setPlayer2Time(newP2Time);
+
+        let newMoveHistory = [...gameState.moveHistory];
+        let newMoveCount = gameState.moveCount + 1;
+        
+        if (move) {
+            if (gameState.currentPlayer === 'w') {
+                newMoveHistory.push({ turn: Math.floor(newMoveCount / 2) + 1, white: move });
+            } else {
+                const lastMove = newMoveHistory[newMoveHistory.length - 1];
+                if (lastMove && !lastMove.black) {
+                    lastMove.black = move;
                 } else {
-                    newMoveHistory[newMoveHistory.length - 1].black = move;
+                    newMoveHistory.push({ turn: Math.floor(newMoveCount / 2) + 1, black: move });
                 }
             }
-            if(capturedPiece) newCapturedByBot.push(capturedPiece);
         }
+
+        const newCapturedByPlayer = capturedPiece && !p1IsCurrent ? [...gameState.capturedByPlayer, capturedPiece] : gameState.capturedByPlayer;
+        const newCapturedByBot = capturedPiece && p1IsCurrent ? [...gameState.capturedByBot, capturedPiece] : gameState.capturedByBot;
 
         const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
         updateAndSaveState({
@@ -191,6 +196,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
             p1Time: newP1Time,
             p2Time: newP2Time,
             moveHistory: newMoveHistory,
+            moveCount: newMoveCount,
             capturedByPlayer: newCapturedByPlayer,
             capturedByBot: newCapturedByBot,
         }, boardState);
@@ -198,9 +204,25 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
     const resetGame = () => {
         localStorage.removeItem(storageKey);
-        setGameState(initialGameState);
-        setPlayer1Time(initialGameState.p1Time);
-        setPlayer2Time(initialGameState.p2Time);
+        const defaultState: GameState = {
+            playerColor: 'w',
+            timeLimit: 900,
+            difficulty: 'intermediate',
+            p1Time: 900,
+            p2Time: 900,
+            currentPlayer: 'w',
+            turnStartTime: null,
+            gameOver: false,
+            winner: null,
+            capturedByPlayer: [],
+            capturedByBot: [],
+            moveHistory: [],
+            moveCount: 0,
+            boardState: null,
+        };
+        setGameState(defaultState);
+        setPlayer1Time(defaultState.p1Time);
+        setPlayer2Time(defaultState.p2Time);
         stopTimer();
     };
 

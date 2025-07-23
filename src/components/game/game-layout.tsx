@@ -6,13 +6,13 @@ import { ArrowLeft, History, Users, Settings, Crown } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import React from 'react';
-import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
+import { CapturedPieces } from './captured-pieces';
+import { GameInfo } from './game-info';
 
 type GameLayoutProps = {
   children: React.ReactNode;
@@ -23,6 +23,9 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer } = useGame();
   const { userData } = useAuth();
   const router = useRouter();
+
+  const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
+
 
   const handleCloseDialog = () => {
     resetGame();
@@ -50,7 +53,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         <Link href="/practice" passHref>
           <Button variant="ghost" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back to Dashboard</span>
+            <span className="hidden sm:inline">Back to Practice</span>
           </Button>
         </Link>
         <h1 className="text-xl font-bold tracking-tight text-primary">{gameType} Match</h1>
@@ -71,17 +74,8 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               isTurn={isP1Turn}
               timeRemaining={player1Time}
             />
-             <Card className="flex-1 flex flex-col">
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <History className="w-5 h-5"/>
-                        Move History
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="flex-1">
-                    <MoveHistory />
-                </CardContent>
-            </Card>
+            <CapturedPieces player="p1" pieceStyle={equipment?.pieceStyle} />
+            <MoveHistory />
         </aside>
 
         {/* Center Column */}
@@ -98,18 +92,8 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               isTurn={isP2Turn}
               timeRemaining={player2Time}
             />
-            <Card className="flex-1">
-                <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <Users className="w-5 h-5" />
-                        Spectators
-                    </CardTitle>
-                    <CardDescription>0 online</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground text-sm">No spectators have joined yet.</p>
-                </CardContent>
-            </Card>
+            <CapturedPieces player="p2" pieceStyle={equipment?.pieceStyle} />
+            <GameInfo />
         </aside>
       </main>
     </div>
