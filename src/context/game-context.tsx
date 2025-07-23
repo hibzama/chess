@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -34,6 +34,7 @@ interface GameRoom {
     };
     draw?: boolean;
     payoutProcessed?: boolean;
+    payoutTransactionId?: string; // To ensure idempotency
 }
 
 interface GameState {
@@ -135,78 +136,91 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, []);
 
     const handlePayout = useCallback(async () => {
-        if(!roomId) return;
-        const roomRef = doc(db, 'game_rooms', roomId);
-        
-        const roomDoc = await getDoc(roomRef);
-        if (!roomDoc.exists()) return;
-
-        const currentRoom = roomDoc.data() as GameRoom;
-        
-        if (!currentRoom || !currentRoom.player2 || currentRoom.payoutProcessed) return;
-
-        const creatorRef = doc(db, 'users', currentRoom.createdBy.uid);
-        const joinerRef = doc(db, 'users', currentRoom.player2.uid);
-        const batch = writeBatch(db);
-        const wager = currentRoom.wager;
-        const now = serverTimestamp();
-    
-        let creatorPayout = 0;
-        let joinerPayout = 0;
-        let creatorDesc = '';
-        let joinerDesc = '';
-    
-        if (currentRoom.draw) {
-            creatorPayout = wager * 0.9;
-            joinerPayout = wager * 0.9;
-            creatorDesc = `Draw refund for ${currentRoom.gameType} game vs ${currentRoom.player2.name}`;
-            joinerDesc = `Draw refund for ${currentRoom.gameType} game vs ${currentRoom.createdBy.name}`;
-        } else if (currentRoom.winner) {
-            const winnerIsCreator = currentRoom.winner.uid === currentRoom.createdBy.uid;
-            const winnerName = winnerIsCreator ? currentRoom.createdBy.name : currentRoom.player2.name;
-            const loserName = winnerIsCreator ? currentRoom.player2.name : currentRoom.createdBy.name;
-    
-            if (currentRoom.winner.method === 'resign') {
-                const winnerPayoutAmount = wager * 1.05;
-                const loserPayoutAmount = wager * 0.75;
-                creatorPayout = winnerIsCreator ? winnerPayoutAmount : loserPayoutAmount;
-                joinerPayout = winnerIsCreator ? loserPayoutAmount : winnerPayoutAmount;
-                creatorDesc = winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
-                joinerDesc = winnerIsCreator ? `Forfeit refund vs ${winnerName}` : `Forfeit win vs ${loserName}`;
-            } else { // 'checkmate' or 'timeout'
-                const winnerPayoutAmount = wager * 1.8;
-                creatorPayout = winnerIsCreator ? winnerPayoutAmount : 0;
-                joinerPayout = winnerIsCreator ? 0 : winnerPayoutAmount;
-                const reason = currentRoom.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win by time';
-                creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
-                joinerDesc = winnerIsCreator ? `Loss vs ${winnerName}` : `${reason} vs ${loserName}`;
-            }
-        }
-    
-        if (user?.uid === currentRoom.createdBy.uid) setPayoutAmount(creatorPayout);
-        if (user?.uid === currentRoom.player2?.uid) setPayoutAmount(joinerPayout);
-    
-        if (creatorPayout > 0) {
-            batch.update(creatorRef, { balance: increment(creatorPayout) });
-            batch.set(doc(collection(db, 'transactions')), {
-                userId: currentRoom.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed',
-                description: creatorDesc, gameRoomId: roomId, createdAt: now
-            });
-        }
-        if (joinerPayout > 0) {
-            batch.update(joinerRef, { balance: increment(joinerPayout) });
-            batch.set(doc(collection(db, 'transactions')), {
-                userId: currentRoom.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed',
-                description: joinerDesc, gameRoomId: roomId, createdAt: now
-            });
-        }
-        
-        batch.update(roomRef, { payoutProcessed: true });
+        if (!roomId || !user) return;
     
         try {
-            await batch.commit();
+            await runTransaction(db, async (transaction) => {
+                const roomRef = doc(db, 'game_rooms', roomId);
+                const roomDoc = await transaction.get(roomRef);
+    
+                if (!roomDoc.exists()) {
+                    throw "Room does not exist!";
+                }
+    
+                const currentRoom = roomDoc.data() as GameRoom;
+    
+                // Idempotency check: If payout is already processed, do nothing.
+                if (currentRoom.payoutProcessed || currentRoom.payoutTransactionId) {
+                    return;
+                }
+                 if (!currentRoom.player2) {
+                    // This can happen in a race condition if a room is cancelled.
+                    return;
+                }
+    
+                const creatorRef = doc(db, 'users', currentRoom.createdBy.uid);
+                const joinerRef = doc(db, 'users', currentRoom.player2.uid);
+                
+                const wager = currentRoom.wager;
+                const now = serverTimestamp();
+                const payoutTxId = doc(collection(db, 'transactions')).id; // Generate a unique ID for this payout operation
+
+                let creatorPayout = 0;
+                let joinerPayout = 0;
+                let creatorDesc = '';
+                let joinerDesc = '';
+
+                if (currentRoom.draw) {
+                    creatorPayout = wager * 0.9;
+                    joinerPayout = wager * 0.9;
+                    creatorDesc = `Draw refund for ${currentRoom.gameType} game vs ${currentRoom.player2.name}`;
+                    joinerDesc = `Draw refund for ${currentRoom.gameType} game vs ${currentRoom.createdBy.name}`;
+                } else if (currentRoom.winner) {
+                    const winnerIsCreator = currentRoom.winner.uid === currentRoom.createdBy.uid;
+                    const winnerName = winnerIsCreator ? currentRoom.createdBy.name : currentRoom.player2.name;
+                    const loserName = winnerIsCreator ? currentRoom.player2.name : currentRoom.createdBy.name;
+    
+                    if (currentRoom.winner.method === 'resign') {
+                        const winnerPayoutAmount = wager * 1.05;
+                        const loserPayoutAmount = wager * 0.75;
+                        creatorPayout = winnerIsCreator ? winnerPayoutAmount : loserPayoutAmount;
+                        joinerPayout = winnerIsCreator ? loserPayoutAmount : winnerPayoutAmount;
+                        creatorDesc = winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
+                        joinerDesc = winnerIsCreator ? `Forfeit refund vs ${winnerName}` : `Forfeit win vs ${loserName}`;
+                    } else { // 'checkmate' or 'timeout'
+                        const winnerPayoutAmount = wager * 1.8;
+                        creatorPayout = winnerIsCreator ? winnerPayoutAmount : 0;
+                        joinerPayout = winnerIsCreator ? 0 : winnerPayoutAmount;
+                        const reason = currentRoom.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win by time';
+                        creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
+                        joinerDesc = winnerIsCreator ? `Loss vs ${winnerName}` : `${reason} vs ${loserName}`;
+                    }
+                }
+    
+                if (user.uid === currentRoom.createdBy.uid) setPayoutAmount(creatorPayout);
+                if (user.uid === currentRoom.player2?.uid) setPayoutAmount(joinerPayout);
+    
+                if (creatorPayout > 0) {
+                    transaction.update(creatorRef, { balance: increment(creatorPayout) });
+                    transaction.set(doc(collection(db, 'transactions')), {
+                        userId: currentRoom.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed',
+                        description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
+                    });
+                }
+                if (joinerPayout > 0) {
+                    transaction.update(joinerRef, { balance: increment(joinerPayout) });
+                    transaction.set(doc(collection(db, 'transactions')), {
+                        userId: currentRoom.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed',
+                        description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
+                    });
+                }
+                
+                // Mark payout as processed
+                transaction.update(roomRef, { payoutProcessed: true, payoutTransactionId: payoutTxId });
+            });
+    
         } catch (error) {
-            console.error("Payout failed:", error)
+            console.error("Payout Transaction failed:", error);
         }
     }, [user, roomId]);
 
