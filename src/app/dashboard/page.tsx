@@ -51,7 +51,7 @@ export default function DashboardPage() {
 
   const mainActions = [
     { title: "Practice Games", description: "Play for free against the bot", icon: Sword, href: "/practice" },
-    { title: "Start Earning", description: "Play against others to win", icon: DollarSign, href: "#" },
+    { title: "Start Earning", description: "Play against others to win", icon: DollarSign, href: "/lobby" },
     { title: "My Rooms", description: "Check on your active games", icon: List, href: "#" },
     { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "/dashboard/wallet" },
   ];
@@ -59,10 +59,10 @@ export default function DashboardPage() {
   const secondaryActions = [
     { title: "Friends", icon: Users, href: "#" },
     { title: "Ranking", icon: BarChart3, href: "#" },
-    { title: "Start Earning", icon: DollarSign, href: "#" },
+    { title: "Start Earning", icon: DollarSign, href: "/lobby" },
     { title: "Chat", icon: MessageSquare, href: "#" },
     { title: "Refer & Earn", icon: Gift, href: "#" },
-    { title: "Equipment", icon: Gamepad2, href: "#" },
+    { title: "Equipment", icon: Gamepad2, href: "/dashboard/equipment" },
   ];
 
   return (
@@ -90,12 +90,14 @@ export default function DashboardPage() {
         </div>
         <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
           {secondaryActions.map((action) => (
-             <Card key={action.title} className="hover:bg-primary/5 transition-all cursor-pointer">
-              <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-                <action.icon className="w-7 h-7 text-primary" />
-                <span className="font-semibold text-center text-sm">{action.title}</span>
-              </CardContent>
-            </Card>
+             <Link href={action.href} key={action.title} className="block">
+                <Card className="hover:bg-primary/5 transition-all cursor-pointer h-full">
+                <CardContent className="p-4 flex flex-col items-center justify-center gap-2 h-full">
+                    <action.icon className="w-7 h-7 text-primary" />
+                    <span className="font-semibold text-center text-sm">{action.title}</span>
+                </CardContent>
+                </Card>
+            </Link>
           ))}
         </div>
       </div>
