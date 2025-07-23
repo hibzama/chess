@@ -10,6 +10,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import React from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 const Logo = () => (
@@ -36,6 +37,7 @@ export default function MainLayout({
     const router = useRouter();
     const pathname = usePathname();
     const [isMounted, setIsMounted] = React.useState(false);
+    const isMobile = useIsMobile();
 
     React.useEffect(() => {
         setIsMounted(true);
@@ -117,7 +119,8 @@ export default function MainLayout({
                 <header className="px-4 lg:px-6 h-16 flex items-center border-b">
                     <SidebarTrigger className="md:hidden"/>
                     <div className="ml-auto flex items-center gap-4">
-                        <Link href="/dashboard/wallet">
+                       {isMounted && !isMobile && (
+                         <Link href="/dashboard/wallet">
                             <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
                                 <CardContent className="p-2 flex items-center gap-2">
                                     <Wallet className="w-5 h-5 text-primary"/>
@@ -134,6 +137,7 @@ export default function MainLayout({
                                 </CardContent>
                             </Card>
                         </Link>
+                       )}
                         <Button variant="ghost" size="icon"><Bell /></Button>
                         <Button variant="ghost" size="icon"><Settings /></Button>
                         <Avatar>
