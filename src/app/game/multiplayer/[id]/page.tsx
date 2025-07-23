@@ -47,13 +47,17 @@ type GameRoom = {
     turnStartTime: Timestamp;
 };
 
-const NavigationGuard = () => {
+const NavigationGuard = ({ gameOver }: { gameOver: boolean }) => {
     const { resign } = useGame();
     const router = useRouter();
     const [showConfirm, setShowConfirm] = useState(false);
     const [nextUrl, setNextUrl] = useState<string | null>(null);
 
     useEffect(() => {
+        if (gameOver) {
+            return;
+        }
+
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
             e.returnValue = '';
@@ -89,7 +93,7 @@ const NavigationGuard = () => {
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener('click', handleAnchorClick, true);
         };
-      }, []); 
+      }, [gameOver, router, resign]); 
 
 
     const handleConfirm = () => {
@@ -444,7 +448,7 @@ function MultiplayerGamePageContent() {
 
     return (
         <>
-        {!gameOver && <NavigationGuard />}
+        <NavigationGuard gameOver={gameOver} />
          <GameLayout
             gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
             headerContent={
