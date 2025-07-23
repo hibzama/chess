@@ -123,6 +123,10 @@ export default function WalletPage() {
         toast({ variant: 'destructive', title: 'Error', description: 'Please enter an amount.' });
         return;
     }
+    if (parseFloat(depositAmount) < 100) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Minimum deposit amount is LKR 100.' });
+        return;
+    }
     setIsConfirmRemarkOpen(true);
   }
 
@@ -132,8 +136,12 @@ export default function WalletPage() {
       toast({ variant: 'destructive', title: 'Error', description: 'Please fill all fields.' });
       return;
     }
-    const amountInUSDT = parseFloat(withdrawalAmount);
-    const amountInLKR = amountInUSDT * USDT_RATE;
+    const amountInLKR = parseFloat(withdrawalAmount);
+
+    if (amountInLKR < 500) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Minimum withdrawal amount is LKR 500.' });
+        return;
+    }
 
     if(userData && userData.balance < amountInLKR) {
         toast({ variant: 'destructive', title: 'Error', description: 'Insufficient balance.' });
@@ -258,6 +266,7 @@ export default function WalletPage() {
                         <div className="space-y-2">
                             <Label htmlFor="deposit-amount">Amount (LKR)</Label>
                             <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
+                            <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: 100 LKR</p>
                         </div>
                         
                         <div className="p-3 bg-yellow-900/20 rounded-md text-sm text-yellow-300">
@@ -288,11 +297,12 @@ export default function WalletPage() {
                 <form onSubmit={handleWithdrawalSubmit}>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="withdrawal-amount">Amount (USDT)</Label>
-                            <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 5" required />
+                            <Label htmlFor="withdrawal-amount">Amount (LKR)</Label>
+                            <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 1550" required />
+                             <p className="text-xs text-muted-foreground pt-1">Minimum withdrawal amount: 500 LKR</p>
                         </div>
                          <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground">
-                            You will receive: {(parseFloat(withdrawalAmount) * USDT_RATE || 0).toFixed(2)} LKR
+                            Equivalent in USDT: {(parseFloat(withdrawalAmount) / USDT_RATE || 0).toFixed(2)} USDT
                         </div>
                         <Separator />
                         <p className="font-medium text-sm">Bank Details</p>
@@ -415,3 +425,5 @@ export default function WalletPage() {
     </>
   );
 }
+
+    
