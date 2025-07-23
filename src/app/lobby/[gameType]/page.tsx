@@ -13,6 +13,7 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import PublicGames from '@/components/lobby/public-games';
 
 export default function GameLobbyPage() {
     const params = useParams();
@@ -59,12 +60,6 @@ export default function GameLobbyPage() {
             action: () => router.push(`/lobby/${gameType}/create`)
         },
         {
-            title: 'Find Room',
-            description: 'Browse existing rooms and challenge a player.',
-            icon: Search,
-            action: () => { /* Placeholder for future implementation */ }
-        },
-        {
             title: 'Join Room',
             description: 'Enter a room code to join a specific game.',
             icon: LogIn,
@@ -93,7 +88,7 @@ export default function GameLobbyPage() {
                 <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">Ready your strategy. The next battle awaits.</p>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-5xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
                 {lobbyOptions.map(option => (
                     <Card key={option.title} className="bg-card/50 hover:border-primary/50 transition-all flex flex-col text-center">
                         <CardHeader className="items-center">
@@ -110,6 +105,10 @@ export default function GameLobbyPage() {
                         </div>
                     </Card>
                 ))}
+            </div>
+
+            <div className="w-full max-w-5xl mt-12">
+                <PublicGames gameType={gameType as string} />
             </div>
         </div>
 
