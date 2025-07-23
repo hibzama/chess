@@ -31,8 +31,8 @@ const GameOverDisplay = () => {
     const USDT_RATE = 310;
 
     const handleReturn = () => {
-        resetGame();
         router.push('/dashboard');
+        resetGame();
     }
 
     const getWinnerMessage = () => {
