@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet } from 'lucide-react';
+import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet, Bell } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { formatTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '../ui/skeleton';
+import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 
 type GameLayoutProps = {
   children: React.ReactNode;
@@ -273,7 +274,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                                 </ul>
                             </div>
                         ) : (
-                            "This is a practice match, so no funds will be lost."
+                            <div>This is a practice match, so no funds will be lost.</div>
                         )}
                     </div>
                 </AlertDialogDescription>
