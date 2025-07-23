@@ -49,16 +49,15 @@ type CheckersBoardProps = {
 
 const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) => {
     const pieceColor = piece.player === 'b' ? colors[0] : colors[1];
-    const kingColor = piece.player === 'b' ? colors[1] : colors[0];
     
     return (
-        <div className="w-10/12 h-3/4 relative flex items-center justify-center">
+        <div className="w-5/6 h-5/6 relative flex items-center justify-center">
             <div 
-                className={cn('w-full h-1/2 rounded-md shadow-lg')}
+                className={cn('w-full h-full rounded-full shadow-lg border-2 border-black/50')}
                 style={{ backgroundColor: pieceColor }}
             />
             {piece.type === 'king' && (
-              <Crown className={cn('w-4 h-4 absolute')} style={{ color: kingColor }} />
+              <Crown className="w-1/2 h-1/2 absolute text-yellow-400" />
             )}
         </div>
     );
