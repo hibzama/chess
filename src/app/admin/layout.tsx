@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import React, { useEffect } from "react";
@@ -32,19 +32,26 @@ export default function AdminLayout({
   }) {
     const { user, userData, loading, logout } = useAuth();
     const router = useRouter();
+    const pathname = usePathname();
+
+    const isLoginPage = pathname === '/admin/login';
 
     useEffect(() => {
-        if (!loading) {
+        if (!loading && !isLoginPage) {
             if (!user || (userData && userData.role !== 'admin')) {
                 router.push('/admin/login');
             }
         }
-    }, [user, userData, loading, router]);
+    }, [user, userData, loading, router, isLoginPage]);
 
 
     const handleLogout = async () => {
         await logout();
         router.push('/admin/login');
+    }
+    
+    if (isLoginPage) {
+        return <>{children}</>;
     }
 
     if(loading || !user || (userData && userData.role !== 'admin')) {
