@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -150,7 +150,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const currentRoom = roomDoc.data() as GameRoom;
     
                 // Idempotency check: If payout is already processed, do nothing.
-                if (currentRoom.payoutProcessed || currentRoom.payoutTransactionId) {
+                if (currentRoom.payoutTransactionId) {
                     return;
                 }
                  if (!currentRoom.player2) {
@@ -216,7 +216,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 }
                 
                 // Mark payout as processed
-                transaction.update(roomRef, { payoutProcessed: true, payoutTransactionId: payoutTxId });
+                transaction.update(roomRef, { payoutTransactionId: payoutTxId });
             });
     
         } catch (error) {
@@ -301,9 +301,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const p2ServerTime = !currentIsCreator ? Math.max(0, roomData.p2Time - elapsed) : roomData.p2Time;
             
             let currentBoardState = roomData.boardState;
-            if (gameType === 'checkers' && typeof currentBoardState === 'string') {
+            if (gameType === 'checkers' && typeof currentBoardState?.board === 'string') {
                 try {
-                    currentBoardState = JSON.parse(currentBoardState);
+                    currentBoardState.board = JSON.parse(currentBoardState.board);
                 } catch (e) {
                     console.error("Failed to parse checkers board state", e);
                 }
@@ -556,6 +556,3 @@ export const useGame = () => {
 }
 
     
-
-    
-
