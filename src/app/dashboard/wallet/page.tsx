@@ -10,13 +10,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 type Transaction = {
     id: string;
@@ -30,6 +31,13 @@ type Transaction = {
 
 const USDT_RATE = 310;
 
+const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M22 2L11 13" />
+        <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+    </svg>
+)
+
 export default function WalletPage() {
   const { user, userData } = useAuth();
   const { toast } = useToast();
@@ -37,10 +45,11 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
 
   const [depositAmount, setDepositAmount] = useState('');
-  const [depositSlip, setDepositSlip] = useState<File | null>(null);
   const [depositMethod, setDepositMethod] = useState<'binance' | 'bank'>('binance');
   const [submittingDeposit, setSubmittingDeposit] = useState(false);
-  const depositFileRef = useRef<HTMLInputElement>(null);
+  
+  const [isConfirmRemarkOpen, setIsConfirmRemarkOpen] = useState(false);
+  const [isPostSubmitInfoOpen, setIsPostSubmitInfoOpen] = useState(false);
 
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [withdrawalMethod, setWithdrawalMethod] = useState('bank');
@@ -75,18 +84,15 @@ export default function WalletPage() {
   }, [user, toast]);
   
 
-  const handleDepositSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !depositSlip || !depositAmount) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all fields and select a slip.' });
+  const handleDepositSubmit = async () => {
+    if (!user || !depositAmount) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a deposit amount.' });
       return;
     }
     setSubmittingDeposit(true);
-    try {
-      const storageRef = ref(storage, `slips/${user.uid}/${Date.now()}_${depositSlip.name}`);
-      await uploadBytes(storageRef, depositSlip);
-      const slipUrl = await getDownloadURL(storageRef);
+    setIsConfirmRemarkOpen(false);
 
+    try {
       const amountInLKR = parseFloat(depositAmount);
 
       await addDoc(collection(db, 'transactions'), {
@@ -94,15 +100,14 @@ export default function WalletPage() {
         type: 'deposit',
         amount: amountInLKR,
         status: 'pending',
-        slipUrl,
+        slipUrl: '', // No slip URL anymore
         depositMethod,
         createdAt: serverTimestamp()
       });
 
       toast({ title: 'Success', description: 'Deposit request submitted for review.' });
       setDepositAmount('');
-      setDepositSlip(null);
-      if(depositFileRef.current) depositFileRef.current.value = "";
+      setIsPostSubmitInfoOpen(true);
 
     } catch (error) {
       console.error("Error submitting deposit:", error);
@@ -111,6 +116,15 @@ export default function WalletPage() {
       setSubmittingDeposit(false);
     }
   };
+
+  const handleInitiateDeposit = (e: React.FormEvent) => {
+    e.preventDefault();
+     if (!depositAmount) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Please enter an amount.' });
+        return;
+    }
+    setIsConfirmRemarkOpen(true);
+  }
 
   const handleWithdrawalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,6 +189,7 @@ export default function WalletPage() {
 
 
   return (
+    <>
     <div className="space-y-8">
        <div>
         <h1 className="text-4xl font-bold tracking-tight text-center">Your Wallet</h1>
@@ -202,7 +217,7 @@ export default function WalletPage() {
                     <CardTitle>Manual Deposit</CardTitle>
                     <CardDescription>Your deposit will be marked as pending until approved by an admin.</CardDescription>
                 </CardHeader>
-                <form onSubmit={handleDepositSubmit}>
+                <form onSubmit={handleInitiateDeposit}>
                     <CardContent className="space-y-6">
                         <Tabs value={depositMethod} onValueChange={(v) => setDepositMethod(v as any)} className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
@@ -247,11 +262,6 @@ export default function WalletPage() {
                                 <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard(username, 'Username')}><Copy/></Button>
                             </div>
                         </Card>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="deposit-slip">Payment Screenshot / Slip</Label>
-                            <Input id="deposit-slip" ref={depositFileRef} type="file" accept="image/*" onChange={e => setDepositSlip(e.target.files ? e.target.files[0] : null)} required />
-                        </div>
                     </CardContent>
                     <CardFooter>
                     <Button type="submit" className="w-full" disabled={submittingDeposit}>{submittingDeposit ? "Submitting..." : "Submit Deposit"}</Button>
@@ -344,9 +354,48 @@ export default function WalletPage() {
             </Card>
         </TabsContent>
       </Tabs>
-
     </div>
+
+    <AlertDialog open={isConfirmRemarkOpen} onOpenChange={setIsConfirmRemarkOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Deposit</AlertDialogTitle>
+            <AlertDialogDescription>
+                Have you added your username (<span className="font-bold text-primary">{username}</span>) as the payment remark/reference? This is crucial for us to verify your transaction.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>No, I'll add it</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDepositSubmit} disabled={submittingDeposit}>
+                {submittingDeposit ? "Submitting..." : "Yes, I have"}
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={isPostSubmitInfoOpen} onOpenChange={setIsPostSubmitInfoOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Deposit Submitted!</AlertDialogTitle>
+            <AlertDialogDescription>
+                For faster approval, or if you forgot to add your username as a remark, please send your payment slip/screenshot to our support team on WhatsApp or Telegram.
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex-col sm:flex-col sm:space-x-0 gap-2">
+                <Button asChild className="w-full bg-green-600 hover:bg-green-700">
+                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="mr-2 h-4 w-4" /> Send to WhatsApp
+                    </a>
+                </Button>
+                <Button asChild className="w-full bg-blue-500 hover:bg-blue-600">
+                     <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">
+                        <TelegramIcon className="mr-2 h-4 w-4" /> Send to Telegram
+                    </a>
+                </Button>
+                 <AlertDialogCancel className="m-0" onClick={() => setIsPostSubmitInfoOpen(false)}>Close</AlertDialogCancel>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
-
-    
