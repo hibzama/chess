@@ -48,17 +48,12 @@ type GameRoom = {
 };
 
 const NavigationGuard = () => {
-    const { resign, gameOver } = useGame();
+    const { resign } = useGame();
     const router = useRouter();
     const [showConfirm, setShowConfirm] = useState(false);
     const [nextUrl, setNextUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        if (gameOver) {
-            // If the game is over, we don't want any of this logic.
-            return;
-        }
-
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             e.preventDefault();
             e.returnValue = '';
@@ -66,21 +61,17 @@ const NavigationGuard = () => {
 
         const handlePopState = (e: PopStateEvent) => {
             e.preventDefault();
-            // This is a bit of a hack to prevent the URL from changing.
-            // When the user clicks "back", we show our confirmation.
             history.pushState(null, '', window.location.href); 
             setShowConfirm(true);
         };
     
         const handleAnchorClick = (e: MouseEvent) => {
           const target = e.target as HTMLElement;
-          // Find the closest anchor tag, as the click might be on a child element.
           const anchor = target.closest('a');
     
-          // Check if it's a valid, internal link.
           if (anchor && anchor.href && anchor.target !== '_blank') {
             const url = new URL(anchor.href);
-            if(url.pathname.startsWith('/game/multiplayer')) return; // Allow navigation within the game itself
+            if(url.pathname.startsWith('/game/multiplayer')) return;
 
             e.preventDefault();
             setNextUrl(anchor.href);
@@ -88,25 +79,21 @@ const NavigationGuard = () => {
           }
         };
     
-        // We push a state to the history stack so the popstate event will fire on back button.
         history.pushState(null, '', window.location.href);
         window.addEventListener('popstate', handlePopState);
         window.addEventListener('beforeunload', handleBeforeUnload);
-        // We capture clicks on the document to intercept navigations.
         document.addEventListener('click', handleAnchorClick, true);
     
-        // Cleanup function to remove listeners when the component unmounts or gameOver becomes true.
         return () => {
           window.removeEventListener('popstate', handlePopState);
           window.removeEventListener('beforeunload', handleBeforeUnload);
           document.removeEventListener('click', handleAnchorClick, true);
         };
-      }, [gameOver, router]); // Dependency array ensures this effect re-runs if gameOver changes.
+      }, []); 
 
 
     const handleConfirm = () => {
-        resign(); // Forfeit the match
-        // We need a small timeout to allow the state update to propagate before navigating.
+        resign(); 
         setTimeout(() => {
             if(nextUrl) {
                 router.push(nextUrl);
