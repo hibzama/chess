@@ -5,13 +5,14 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Copy, Share, Clock, Users, Swords, Wallet, LogIn, AlertTriangle } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Alert, AlertTitle } from '@/components/ui/alert';
 
 
 // Game Components
@@ -434,7 +435,19 @@ function MultiplayerGamePageContent() {
     return (
         <>
         {!gameOver && <NavigationGuard />}
-        <GameLayout gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}>
+         <GameLayout
+            gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
+            headerContent={
+                <div className="text-center w-full max-w-lg mx-auto">
+                    <h1 className="text-3xl font-bold">Multiplayer Match</h1>
+                    <p className="text-muted-foreground">LKR {room.wager.toFixed(2)} Stakes • {room.timeControl / 60} minutes per player</p>
+                    <Alert className="mt-4 text-left border-yellow-300/50 bg-yellow-300/10 text-yellow-300">
+                        <Clock className="w-4 h-4 !text-yellow-300"/>
+                        <AlertTitle className="text-yellow-300">The first player whose timer runs out loses the game. Play quick, manage your time, and win!</AlertTitle>
+                    </Alert>
+                </div>
+            }
+        >
             {room.gameType === 'chess' ? (
                  <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
             ) : (
@@ -482,5 +495,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    

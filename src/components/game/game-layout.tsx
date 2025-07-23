@@ -20,19 +20,32 @@ import { Card, CardContent } from '@/components/ui/card';
 type GameLayoutProps = {
   children: React.ReactNode;
   gameType: 'Chess' | 'Checkers';
+  headerContent?: React.ReactNode;
 };
 
-export default function GameLayout({ children, gameType }: GameLayoutProps) {
+export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
   const { p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm, isMultiplayer, payoutAmount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
+  
+  const [showCloseButton, setShowCloseButton] = useState(false);
+
+  useEffect(() => {
+    if (gameOver) {
+      const timer = setTimeout(() => {
+        setShowCloseButton(true);
+      }, 1000); 
+      return () => clearTimeout(timer);
+    }
+  }, [gameOver]);
+
 
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleCloseDialog = () => {
-    router.push(isMultiplayer ? '/lobby' : '/practice');
     resetGame();
+    router.push(isMultiplayer ? '/lobby' : '/practice');
   };
 
   const getWinnerMessage = () => {
@@ -106,6 +119,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
 
         {/* Center Column */}
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
+            {headerContent}
              <div className="w-full flex justify-between items-center px-2">
                 <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
                     <p className="font-semibold">Opponent</p>
@@ -154,7 +168,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                 </div>
                 <AlertDialogTitle className="text-2xl">{getWinnerMessage().title}</AlertDialogTitle>
                 <div className="text-sm text-muted-foreground space-y-2">
-                  <div>{getWinnerMessage().description}</div>
+                  <p>{getWinnerMessage().description}</p>
                   {isMultiplayer && payoutAmount !== null && payoutAmount > 0 && (
                       <div className="p-3 rounded-md bg-secondary text-secondary-foreground font-semibold flex items-center justify-center gap-2">
                          <Wallet className="w-5 h-5"/> Wallet Return: LKR {payoutAmount.toFixed(2)} (~{(payoutAmount / USDT_RATE).toFixed(2)} USDT)
@@ -163,7 +177,9 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                 </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <Button className="w-full" onClick={handleCloseDialog}>Close</Button>
+                {showCloseButton && (
+                    <Button className="w-full" onClick={handleCloseDialog}>Close</Button>
+                )}
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
