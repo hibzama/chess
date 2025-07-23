@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, deleteDoc, updateDoc, increment, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, deleteDoc, updateDoc, increment, getDoc, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,8 +77,10 @@ export default function MultiplayerGamePage() {
                 } 
                 // User is not authorized for this room unless it's a private room they are trying to join
                 else if (roomData.isPrivate || roomData.status !== 'waiting') {
-                    toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
-                    router.push('/lobby');
+                    if (!hasNavigatedAway.current) {
+                        toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
+                        router.push('/lobby');
+                    }
                     return;
                 } else {
                     setRoom(roomData);
@@ -95,9 +97,42 @@ export default function MultiplayerGamePage() {
         return () => unsubscribe();
     }, [roomId, user, router, toast]);
 
+    const handleCancelRoom = async (isAutoCancel = false) => {
+        if (!roomId || !user || !room || room.createdBy.uid !== user.uid) return;
+    
+        hasNavigatedAway.current = true;
+        const batch = writeBatch(db);
+        const roomRef = doc(db, 'game_rooms', roomId as string);
+        const userRef = doc(db, 'users', user.uid);
+    
+        try {
+            // Check if room still exists before trying to delete/refund
+            const roomDoc = await getDoc(roomRef);
+            if (!roomDoc.exists()) {
+                if (!isAutoCancel) router.push('/lobby');
+                return; 
+            }
+    
+            batch.delete(roomRef);
+            batch.update(userRef, { balance: increment(room.wager) });
+            await batch.commit();
+    
+            if (isAutoCancel) {
+                toast({ title: 'Room Expired', description: 'Your wager has been refunded.' });
+            } else {
+                toast({ title: 'Room Cancelled', description: 'Your wager has been refunded.' });
+            }
+            router.push(`/lobby/${room.gameType}`);
+        } catch (error) {
+            console.error('Failed to cancel room:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel the room.' });
+        }
+    };
+    
+
     // Timer for room expiration
     useEffect(() => {
-        if (room?.status !== 'waiting' || !room.expiresAt) {
+        if (room?.status !== 'waiting' || !room.expiresAt || !isCreator) {
             return;
         }
 
@@ -108,9 +143,7 @@ export default function MultiplayerGamePage() {
             if (diff <= 0) {
                 setTimeLeft('00:00');
                 clearInterval(interval);
-                 if (isCreator) {
-                     handleCancelRoom(true); // Auto-cancel if expired
-                 }
+                handleCancelRoom(true); // Auto-cancel if expired
             } else {
                 setTimeLeft(formatTime(Math.floor(diff / 1000)));
             }
@@ -121,25 +154,6 @@ export default function MultiplayerGamePage() {
     }, [room, isCreator]);
 
 
-    const handleCancelRoom = async (isAutoCancel = false) => {
-        if (!roomId || !user || !room || room.createdBy.uid !== user.uid) return;
-
-        hasNavigatedAway.current = true;
-        const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
-        
-        try {
-            await deleteDoc(roomRef);
-            await updateDoc(userRef, { balance: increment(room.wager) });
-            if (!isAutoCancel) {
-                toast({ title: 'Room Cancelled', description: 'Your wager has been refunded.' });
-                router.push('/lobby');
-            }
-        } catch (error) {
-            console.error('Failed to cancel room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel the room.' });
-        }
-    };
     
     const handleJoinGame = async () => {
         if (!user || !userData || !room || isCreator) return;
@@ -152,16 +166,26 @@ export default function MultiplayerGamePage() {
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
         const userRef = doc(db, 'users', user.uid);
+        const batch = writeBatch(db);
 
         try {
+             // Re-fetch room data to ensure it's still available before joining
+            const currentRoomDoc = await getDoc(roomRef);
+            if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
+                toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
+                setIsJoining(false);
+                router.push(`/lobby/${room.gameType}`);
+                return;
+            }
+
             // Deduct wager from joiner's balance
-            await updateDoc(userRef, { balance: increment(-room.wager) });
+            batch.update(userRef, { balance: increment(-room.wager) });
 
             const creatorColor = room.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
 
             // Update room to start the game
-            await updateDoc(roomRef, {
+            batch.update(roomRef, {
                 status: 'in-progress',
                 player2: {
                     uid: user.uid,
@@ -174,6 +198,8 @@ export default function MultiplayerGamePage() {
                 moveHistory: [],
                 currentPlayer: 'w', // White always starts
             });
+            
+            await batch.commit();
             
             toast({ title: "Game Joined!", description: "The match is starting now."});
             // The onSnapshot listener will automatically update the UI to the game board
@@ -191,20 +217,31 @@ export default function MultiplayerGamePage() {
     // Effect to handle creator navigating away
     useEffect(() => {
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (isCreator && room?.status === 'waiting') {
+            if (isCreator && room?.status === 'waiting' && !hasNavigatedAway.current) {
+                // This is synchronous and limited, so we can't do async operations here.
+                // The main purpose is to set a flag.
+            }
+        };
+    
+        const handleUnload = () => {
+            if (isCreator && room?.status === 'waiting' && !hasNavigatedAway.current) {
+                 handleCancelRoom(true);
+            }
+        };
+    
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        // Use 'pagehide' for better mobile support
+        window.addEventListener('pagehide', handleUnload);
+    
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('pagehide', handleUnload);
+            // This is the fallback for component unmount (e.g., router navigation)
+            if (isCreator && room?.status === 'waiting' && !hasNavigatedAway.current) {
                 handleCancelRoom(true);
             }
         };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
-        return () => {
-             window.removeEventListener('beforeunload', handleBeforeUnload);
-             if (isCreator && room?.status === 'waiting' && !hasNavigatedAway.current) {
-                 handleCancelRoom(true);
-             }
-        };
-    }, [isCreator, room]);
+    }, [isCreator, room?.status]);
 
 
     const equipment = room?.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
@@ -329,3 +366,4 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     );
 }
+
