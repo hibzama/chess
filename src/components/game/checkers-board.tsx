@@ -52,17 +52,13 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
     const kingColor = piece.player === 'b' ? colors[1] : colors[0];
     
     return (
-        <div className={cn('w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg')}
-             style={{ 
-                backgroundColor: pieceColor,
-                border: `3px solid ${pieceColor === '#f8fafc' || pieceColor === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}`
-             }}
-        >
-             <div className={cn('w-[calc(100%-6px)] h-[calc(100%-6px)] rounded-full', kingColor)}
-                  style={{ border: `1px solid ${pieceColor === '#f8fafc' || pieceColor === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}`}}
-             />
+        <div className="w-10/12 h-3/4 relative flex items-center justify-center">
+            <div 
+                className={cn('w-full h-1/2 rounded-md shadow-lg')}
+                style={{ backgroundColor: pieceColor }}
+            />
             {piece.type === 'king' && (
-              <Crown className={cn('w-6 h-6 absolute')} style={{ color: kingColor }} />
+              <Crown className={cn('w-4 h-4 absolute')} style={{ color: kingColor }} />
             )}
         </div>
     );

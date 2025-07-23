@@ -32,17 +32,18 @@ const boardThemes: BoardTheme[] = [
 ];
 
 
-const CheckersPieceComponent = ({ color }: { color: string }) => (
-    <div className="w-10/12 h-10/12 rounded-full flex items-center justify-center shadow-lg" 
-         style={{ 
-            backgroundColor: color, 
-            border: `3px solid ${color === '#f8fafc' || color === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}` 
-         }}>
-         <div className="w-[calc(100%-6px)] h-[calc(100%-6px)] rounded-full"
-              style={{ border: `1px solid ${color === '#f8fafc' || color === '#e2e8f0' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)'}`}}
-         />
+const CheckersPieceComponent = ({ color, isKing }: { color: string, isKing?: boolean }) => (
+    <div className="w-10/12 h-3/4 relative flex items-center justify-center">
+        <div 
+            className="w-full h-1/2 rounded-md shadow-lg"
+            style={{ backgroundColor: color }}
+        />
+        {isKing && (
+          <Crown className="w-4 h-4 absolute" style={{ color: color === '#18181b' || color === '#0f172a' ? '#fff' : '#000' }} />
+        )}
     </div>
 );
+
 
 const getPieceIcon = (type: string, color: 'white' | 'black') => {
     const style = { fill: 'none', stroke: color, strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }  as React.CSSProperties;
@@ -216,8 +217,8 @@ export default function EquipmentPage() {
                                             const isDark = (r + c) % 2 !== 0;
                                             let piece = null;
                                             if (isDark) {
-                                                if (r < 3) piece = <CheckersPieceComponent color={currentPieceColors[0]} />
-                                                if (r > 4) piece = <CheckersPieceComponent color={currentPieceColors[1]} />
+                                                if (r < 3) piece = <CheckersPieceComponent color={currentPieceColors[0]} isKing={r===0} />
+                                                if (r > 4) piece = <CheckersPieceComponent color={currentPieceColors[1]} isKing={r===7} />
                                             }
                                             return <div key={`${r}-${c}`} className="flex items-center justify-center" style={{backgroundColor: isDark ? currentBoardColors[1] : currentBoardColors[0]}}>{piece}</div>
                                         }))}
