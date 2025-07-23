@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import React, from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
@@ -26,6 +26,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   const { p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm, isMultiplayer, payoutAmount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
   const USDT_RATE = 310;
 
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
@@ -34,6 +35,18 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
     router.push(isMultiplayer ? '/lobby' : '/practice');
     resetGame();
   };
+
+  useEffect(() => {
+    if (gameOver && !hasRedirected) {
+      setHasRedirected(true);
+      const timer = setTimeout(() => {
+        handleCloseDialog();
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [gameOver, hasRedirected, handleCloseDialog]);
+
 
   const getWinnerMessage = () => {
     const opponentName = isMultiplayer ? "Your opponent" : "The bot";
@@ -86,7 +99,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
       </header>
       <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
         {/* Left Column */}
-        <aside className="flex flex-col gap-6">
+        <aside className="hidden lg:flex flex-col gap-6">
             <PlayerInfo
               playerName={userData ? `${userData.firstName} (You)`: "Player 1 (You)"}
               avatarSrc="https://placehold.co/100x100.png"
@@ -114,7 +127,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         </div>
 
         {/* Right Column */}
-        <aside className="flex flex-col gap-6">
+        <aside className="hidden lg:flex flex-col gap-6">
             <PlayerInfo
               playerName="Opponent"
               avatarSrc="https://placehold.co/100x100.png"
@@ -153,7 +166,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                 )}
             </AlertDialogHeader>
             <AlertDialogFooter>
-                <AlertDialogAction onClick={handleCloseDialog}>Close</AlertDialogAction>
+                <p className="text-xs text-muted-foreground w-full text-center">Redirecting automatically in 5 seconds...</p>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
