@@ -85,8 +85,10 @@ const NavigationGuard = () => {
         return () => {
           window.removeEventListener('popstate', handlePopState);
           document.removeEventListener('click', handleAnchorClick, true);
+          // This clears the added history state, allowing back/forward to work again.
+          history.go(1);
         };
-      }, [gameOver]);
+      }, [gameOver, router]);
 
 
     const handleConfirm = () => {
