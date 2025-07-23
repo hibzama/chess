@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, Timestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -66,7 +66,7 @@ export default function CreateGamePage() {
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
-
+            
             // 2. Create the game room document
             const roomData = {
                 gameType,
@@ -80,7 +80,8 @@ export default function CreateGamePage() {
                     color: finalPieceColor,
                 },
                 players: [user.uid],
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
+                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
 
             const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
