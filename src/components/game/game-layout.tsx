@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import React, { useEffect, useState, useCallback } from 'react';
+import React, from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
 import { formatTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '../ui/skeleton';
 
 type GameLayoutProps = {
   children: React.ReactNode;
@@ -31,7 +32,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
-  useEffect(() => {
+  React.useEffect(() => {
     // This effect runs when the component unmounts.
     // If a game is over, we reset the state when leaving the page.
     return () => {
@@ -221,7 +222,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
       </main>
     </div>
     
-    <AlertDialog open={gameOver}>
+    <AlertDialog open={gameOver} onOpenChange={(open) => !open && resetGame()}>
         <AlertDialogContent>
             <AlertDialogHeader className="items-center text-center">
                 <div className="p-4 rounded-full bg-primary/10 mb-2">
