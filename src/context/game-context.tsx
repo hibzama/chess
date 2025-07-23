@@ -33,7 +33,6 @@ interface GameRoom {
         method: GameOverReason
     };
     draw?: boolean;
-    payoutProcessed?: boolean;
     payoutTransactionId?: string; // To ensure idempotency
 }
 
@@ -63,9 +62,6 @@ interface GameContextType extends GameState {
     isMounted: boolean;
     isMultiplayer: boolean;
     resign: () => void;
-    showResignModal: boolean;
-    setShowResignModal: (show: boolean) => void;
-    handleResignConfirm: () => void;
     payoutAmount: number | null;
 }
 
@@ -112,7 +108,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [room, setRoom] = useState<GameRoom | null>(null);
     const [isMounted, setIsMounted] = useState(false);
-    const [showResignModal, setShowResignModal] = useState(false);
     const [payoutAmount, setPayoutAmount] = useState<number | null>(null);
     
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -149,12 +144,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 const currentRoom = roomDoc.data() as GameRoom;
     
-                // Idempotency check: If payout is already processed, do nothing.
                 if (currentRoom.payoutTransactionId) {
                     return;
                 }
                  if (!currentRoom.player2) {
-                    // This can happen in a race condition if a room is cancelled.
                     return;
                 }
     
@@ -163,7 +156,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 
                 const wager = currentRoom.wager;
                 const now = serverTimestamp();
-                const payoutTxId = doc(collection(db, 'transactions')).id; // Generate a unique ID for this payout operation
+                const payoutTxId = doc(collection(db, 'transactions')).id; 
 
                 let creatorPayout = 0;
                 let joinerPayout = 0;
@@ -215,7 +208,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     });
                 }
                 
-                // Mark payout as processed
                 transaction.update(roomRef, { payoutTransactionId: payoutTxId });
             });
     
@@ -238,15 +230,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
             if(winnerId === 'draw') {
                 updatePayload.draw = true;
-                updatePayload.winner = { method: 'draw' }; // ensure method is set for draw
+                updatePayload.winner = { method: 'draw' };
             } else if (winnerId) {
                 updatePayload.winner = { uid: winnerId, method };
             }
             
             await updateDoc(roomRef, updatePayload);
         } else { // Practice mode
-            const winner = winnerId === 'bot' ? 'p2' : 'p1';
-            updateAndSaveState({ winner, gameOver: true, gameOverReason: method }, boardState);
+            const winner = winnerId === 'bot' ? 'p2' : (winnerId ? 'p1' : 'draw');
+            updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method }, boardState);
         }
     }, [stopTimer, updateAndSaveState, isMultiplayer, user, gameState, room]);
 
@@ -297,15 +289,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 try {
                     currentBoardState = { board: JSON.parse(currentBoardState) };
                 } catch (e) {
-                    console.error("Failed to parse checkers board state from string", e);
-                    currentBoardState = { board: [] }; // Set a default to avoid crash
-                }
-            } else if (gameType === 'checkers' && typeof currentBoardState?.board === 'string') {
-                 try {
-                    currentBoardState = { board: JSON.parse(currentBoardState.board) };
-                } catch (e) {
-                    console.error("Failed to parse checkers board state from string", e);
-                    currentBoardState = { board: [] };
+                    currentBoardState = { board: [] }; 
                 }
             }
 
@@ -341,8 +325,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         const isMyTurn = gameState.currentPlayer === gameState.playerColor;
         
-        // Timer for practice mode
-        if(!isMultiplayer) {
+        if(!isMultiplayer) { // Practice mode timer
             intervalRef.current = setInterval(() => {
                 if (isMyTurn) {
                     const newTime = gameState.p1Time - 1;
@@ -360,7 +343,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     }
                 }
             }, 1000);
-        } else if (room && room.status === 'in-progress') { // Timer for multiplayer mode
+        } else if (room && room.status === 'in-progress') { // Multiplayer mode timer
              intervalRef.current = setInterval(() => {
                 const elapsed = room.turnStartTime ? (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
                 const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
@@ -374,7 +357,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                      setWinner(room.createdBy.uid, room.boardState, 'timeout');
                 }
 
-                // Update local time for display purposes
                 const isCreator = room.createdBy.uid === user?.uid;
                 setGameState(p => ({
                     ...p, 
@@ -467,7 +449,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             return;
         }
 
-        // Practice mode logic
         const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
         let newMoveHistory = [...gameState.moveHistory];
         let newMoveCount = gameState.moveCount + 1;
@@ -499,19 +480,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }, boardState);
     };
 
-    const handleResignConfirm = async () => {
-        setShowResignModal(false);
-        if (gameState.gameOver || !room || !user) return;
-        const winnerId = room.players.find(p => p !== user.uid) || null;
-        setWinner(winnerId, gameState.boardState, 'resign');
-    };
-    
     const resign = () => {
-        if(isMultiplayer) {
-            setShowResignModal(true);
+        if (gameState.gameOver || !user) return;
+        if(isMultiplayer && room) {
+             const winnerId = room.players.find(p => p !== user.uid) || null;
+             setWinner(winnerId, gameState.boardState, 'resign');
         } else {
-            // Practice mode resign
-            setWinner('bot', gameState.boardState, 'checkmate');
+            setWinner('bot', gameState.boardState, 'resign');
         }
     }
 
@@ -537,9 +512,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         loadGameState,
         isMultiplayer,
         resign,
-        showResignModal,
-        setShowResignModal,
-        handleResignConfirm,
         payoutAmount
     };
 
@@ -557,5 +529,3 @@ export const useGame = () => {
     }
     return context;
 }
-
-    

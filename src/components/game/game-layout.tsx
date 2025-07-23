@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGame } from '@/context/game-context';
 import { useRouter } from 'next/navigation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import React, from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
@@ -25,14 +25,14 @@ type GameLayoutProps = {
 };
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm, isMultiplayer, payoutAmount } = useGame();
+  const { p1Time, p2Time, winner, gameOver, gameOverReason, resetGame, playerColor, currentPlayer, isMounted, resign, payoutAmount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
   
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
-  React.useEffect(() => {
+  useEffect(() => {
     // This effect runs when the component unmounts.
     // If a game is over, we reset the state when leaving the page.
     return () => {
@@ -185,7 +185,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                         <CapturedPieces pieceStyle={equipment?.pieceStyle} />
                         <Card>
                             <CardContent className="p-4">
-                                <Button variant="destructive" className="w-full" onClick={() => setShowResignModal(true)}>
+                                <Button variant="destructive" className="w-full" onClick={resign}>
                                     <Flag className="w-4 h-4 mr-2" />
                                     Resign
                                 </Button>
@@ -209,7 +209,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
              {isMultiplayer ? (
                  <Card>
                     <CardContent className="p-4">
-                        <Button variant="destructive" className="w-full" onClick={() => setShowResignModal(true)}>
+                        <Button variant="destructive" className="w-full" onClick={resign}>
                             <Flag className="w-4 h-4 mr-2" />
                             Resign
                         </Button>
@@ -243,21 +243,6 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             <AlertDialogAction onClick={handleReturnToDashboard} className="w-full">
                 Return to Dashboard
             </AlertDialogAction>
-        </AlertDialogContent>
-    </AlertDialog>
-
-    <AlertDialog open={showResignModal} onOpenChange={setShowResignModal}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to resign?</AlertDialogTitle>
-            <AlertDialogDescription>
-                If you resign, you will forfeit the match. You will receive a 75% refund of your wager, and your opponent will receive a 105% payout.
-            </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleResignConfirm}>Confirm Resignation</AlertDialogAction>
-            </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
     </>
