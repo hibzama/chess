@@ -1,117 +1,89 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { Users, Sword } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Gift, Trophy, Download } from 'lucide-react';
 
-export default function LobbyPage() {
-  const openGames = [
-    { id: '1', type: 'Chess', player: 'Magnus', skill: 'Expert' },
-    { id: '2', type: 'Checkers', player: 'CheckerKing', skill: 'Intermediate' },
-    { id: '3', type: 'Chess', player: 'RookieRook', skill: 'Beginner' },
-  ];
+const Logo = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    className="w-16 h-16 text-primary"
+  >
+    <path
+      fillRule="evenodd"
+      d="M12.96 2.544a3 3 0 00-1.92 0L8.14 4.167a1.5 1.5 0 01-1.39.07l-3.03-1.684a1.5 1.5 0 00-1.74 2.29l1.684 3.03a1.5 1.5 0 01-.07 1.39L3.02 12.86a3 3 0 000 1.92l1.623 2.9a1.5 1.5 0 01.07 1.39l-1.684 3.03a1.5 1.5 0 002.29 1.74l3.03-1.684a1.5 1.5 0 011.39.07l2.9 1.623a3 3 0 001.92 0l2.9-1.623a1.5 1.5 0 011.39-.07l3.03 1.684a1.5 1.5 0 001.74-2.29l-1.684-3.03a1.5 1.5 0 01.07-1.39l1.623-2.9a3 3 0 000-1.92l-1.623-2.9a1.5 1.5 0 01-.07-1.39l1.684-3.03a1.5 1.5 0 00-2.29-1.74l-3.03 1.684a1.5 1.5 0 01-1.39-.07l-2.9-1.623zM12 7.5a4.5 4.5 0 100 9 4.5 4.5 0 000-9z"
+      clipRule="evenodd"
+    />
+    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
+  </svg>
+);
 
-  const CheckersIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5">
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="6" />
-      <circle cx="12" cy="12" r="2" />
-    </svg>
-  );
 
-  const ChessIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 h-5 w-5">
-      <path d="M18 8a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2Z"/>
-      <path d="M18 14v2a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-2"/>
-      <path d="M12 18v2"/>
-      <path d="M12 6V4"/>
-      <path d="M12 2v2"/>
-    </svg>
-  );
-
+export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
-      <header className="px-4 lg:px-6 h-16 flex items-center border-b">
-        <h1 className="text-2xl font-bold tracking-tight text-primary">Nexbattle</h1>
-      </header>
-      <main className="flex-1 container mx-auto p-4 md:p-8">
-        <div className="text-center mb-12">
-          <h2 className="text-4xl md:text-5xl font-bold tracking-tighter mb-4">Welcome to the Arena</h2>
-          <p className="max-w-2xl mx-auto text-muted-foreground md:text-lg">
-            Challenge players from around the world in classic games of strategy.
-            Choose your game and find an opponent.
-          </p>
+      <main className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+        <div className="mb-8">
+          <Logo />
         </div>
+        <h1 className="text-5xl md:text-6xl font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-4">
+          Nexbattle
+        </h1>
+        <p className="max-w-2xl mx-auto text-muted-foreground md:text-lg mb-12">
+          Welcome to the ultimate strategy gaming experience. Where your skill meets your investment. Log in or register to continue your journey.
+        </p>
 
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+        <div className="w-full max-w-md mx-auto space-y-8">
+          <Card className="bg-card/50 border-primary/20">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sword className="w-6 h-6 text-primary" />
-                Quick Match
+              <CardTitle className="text-lg flex items-center justify-center gap-2">
+                <Gift className="w-6 h-6 text-primary" />
+                <span>LKR 100 Registration Bonus!</span>
               </CardTitle>
-              <CardDescription>Start a new game against a random opponent.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <Link href="/game/chess" passHref>
-                <Button size="lg" className="w-full">
-                  <ChessIcon /> Play Chess
-                </Button>
-              </Link>
-              <Link href="/game/checkers" passHref>
-                <Button size="lg" variant="secondary" className="w-full">
-                  <CheckersIcon />
-                  Play Checkers
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-6 h-6 text-primary" />
-                Open Games
-              </CardTitle>
-              <CardDescription>Join a game created by another player.</CardDescription>
+              <CardDescription>The next 250 users get a free bonus to start playing.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Game</TableHead>
-                    <TableHead>Player</TableHead>
-                    <TableHead>Skill Level</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {openGames.map((game) => (
-                    <TableRow key={game.id}>
-                      <TableCell className="font-medium">{game.type}</TableCell>
-                      <TableCell>{game.player}</TableCell>
-                      <TableCell>{game.skill}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm">Join</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <Progress value={42/250 * 100} className="mb-2" />
+              <p className="text-sm text-muted-foreground">42 / 250 bonuses claimed. 208 remaining in this batch!</p>
             </CardContent>
           </Card>
           
-          <Card className="lg:col-span-3">
-             <CardHeader>
-                <CardTitle>Challenge a Friend</CardTitle>
-                <CardDescription>Enter your friend's game ID to challenge them directly.</CardDescription>
+          <div className="flex items-center justify-center gap-4">
+            <Link href="/login" passHref>
+              <Button size="lg" className="px-12 bg-gradient-to-r from-primary to-purple-600">Login</Button>
+            </Link>
+            <Link href="/register" passHref>
+              <Button size="lg" variant="outline" className="px-12">Register</Button>
+            </Link>
+          </div>
+          
+
+          <Card className="bg-card/50 border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center justify-center gap-2">
+                <Trophy className="w-6 h-6 text-primary" />
+                Join the Marketing Team
+              </CardTitle>
+              <CardDescription>Are you an influencer? Apply to join our exclusive marketing team.</CardDescription>
             </CardHeader>
             <CardContent>
-                 <div className="flex w-full items-center space-x-2">
-                    <Input type="text" placeholder="Friend's Game ID" />
-                    <Button type="submit">Challenge</Button>
-                </div>
+              <Button variant="outline" className="w-full">Apply Now</Button>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-card/50 border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center justify-center gap-2">
+                <Download className="w-6 h-6 text-accent" />
+                Download for Android
+              </CardTitle>
+              <CardDescription>Get the best experience with our dedicated mobile app.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button className="w-full bg-accent hover:bg-accent/90">Download APK</Button>
+              <p className="text-xs text-muted-foreground mt-2">You may need to "Allow from this source" in your phone's settings to install the app.</p>
             </CardContent>
           </Card>
         </div>
