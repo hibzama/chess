@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Crown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useGame } from '@/context/game-context';
 
 type Player = 'w' | 'b';
 type PieceType = 'pawn' | 'king';
@@ -30,17 +31,20 @@ const boardThemes: BoardTheme[] = [
     { id: 'ocean', name: 'Ocean', colors: ['#c7d2fe', '#60a5fa'] },
 ];
 
-const initialBoard: Board = Array(8).fill(null).map(() => Array(8).fill(null));
 
-// Setup initial pieces
-for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-        if ((row + col) % 2 !== 0) { // only on dark squares
-            if (row < 3) initialBoard[row][col] = { player: 'b', type: 'pawn' };
-            if (row > 4) initialBoard[row][col] = { player: 'w', type: 'pawn' };
+const createInitialBoard = (): Board => {
+    const board: Board = Array(8).fill(null).map(() => Array(8).fill(null));
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            if ((row + col) % 2 !== 0) { // only on dark squares
+                if (row < 3) board[row][col] = { player: 'b', type: 'pawn' };
+                if (row > 4) board[row][col] = { player: 'w', type: 'pawn' };
+            }
         }
     }
+    return board;
 }
+
 
 type CheckersBoardProps = {
     boardTheme?: string;
@@ -64,8 +68,8 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
 };
 
 export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
-    const [board, setBoard] = useState<Board>(initialBoard);
-    const [currentPlayer, setCurrentPlayer] = useState<Player>('w');
+    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer } = useGame();
+    const [board, setBoard] = useState<Board>(createInitialBoard());
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
     const { toast } = useToast();
@@ -74,8 +78,9 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
     const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
     const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[0];
-
-    const getPossibleMovesForPiece = (piece: Piece, pos: Position, currentBoard: Board): Move[] => {
+    const isFlipped = playerColor === 'b';
+    
+    const getPossibleMovesForPiece = useCallback((piece: Piece, pos: Position, currentBoard: Board, forPlayer: Player): Move[] => {
         const moves: Move[] = [];
         const jumps: Move[] = [];
         const { row, col } = pos;
@@ -97,82 +102,118 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                     moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
                 }
                 // Jump move
-                else if (currentBoard[newRow][newCol]?.player !== currentPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                     jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
                 }
             }
         }
         return jumps.length > 0 ? jumps : moves;
-    };
+    }, []);
+
+    const checkForWinner = useCallback((currentBoard: Board, nextPlayer: Player) => {
+        let whitePieces = 0;
+        let blackPieces = 0;
+        let hasMoves = false;
+
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = currentBoard[r][c];
+                if (piece) {
+                    if (piece.player === 'w') whitePieces++;
+                    else blackPieces++;
+                    if (piece.player === nextPlayer) {
+                        if (getPossibleMovesForPiece(piece, {row: r, col: c}, currentBoard, nextPlayer).length > 0) {
+                            hasMoves = true;
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (whitePieces === 0) setWinner(playerColor === 'b' ? 'p1' : 'p2');
+        else if (blackPieces === 0) setWinner(playerColor === 'w' ? 'p1' : 'p2');
+        else if (!hasMoves) setWinner(nextPlayer === playerColor ? 'p2' : 'p1');
+
+    }, [getPossibleMovesForPiece, playerColor, setWinner]);
+
     
-    useEffect(() => {
+    const calculateAllMoves = useCallback((currentBoard: Board, forPlayer: Player) => {
         const allPossibleMoves: Move[] = [];
         let canJump = false;
 
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = currentBoard[r][c];
+                if (piece && piece.player === forPlayer) {
+                    const moves = getPossibleMovesForPiece(piece, { row: r, col: c }, currentBoard, forPlayer);
+                    if (moves.some(m => m.isJump)) canJump = true;
+                    allPossibleMoves.push(...moves);
+                }
+            }
+        }
+        return canJump ? allPossibleMoves.filter(m => m.isJump) : allPossibleMoves;
+    }, [getPossibleMovesForPiece]);
+
+    
+    useEffect(() => {
+        if(gameOver) return;
+
         if (consecutiveJumpPiece) {
-             const jumps = getPossibleMovesForPiece(board[consecutiveJumpPiece.row][consecutiveJumpPiece.col]!, consecutiveJumpPiece, board).filter(m => m.isJump);
-             if(jumps.length > 0) {
+             const jumps = getPossibleMovesForPiece(board[consecutiveJumpPiece.row][consecutiveJumpPiece.col]!, consecutiveJumpPiece, board, currentPlayer).filter(m => m.isJump);
+             if(jumps.length > 0 && currentPlayer === playerColor) {
                  setPossibleMoves(jumps);
                  setSelectedPiece(consecutiveJumpPiece);
                  setMustJump(true);
                  return;
              } else {
                 setConsecutiveJumpPiece(null);
-                switchPlayer();
+                switchTurn();
              }
         }
+
+        const legalMoves = calculateAllMoves(board, currentPlayer);
+        setMustJump(legalMoves.some(m => m.isJump));
         
-        for (let r = 0; r < 8; r++) {
-            for (let c = 0; c < 8; c++) {
-                const piece = board[r][c];
-                if (piece && piece.player === currentPlayer) {
-                    const moves = getPossibleMovesForPiece(piece, { row: r, col: c }, board);
-                    if (moves.some(m => m.isJump)) canJump = true;
-                    allPossibleMoves.push(...moves);
+        if (currentPlayer === playerColor) {
+            setPossibleMoves(legalMoves);
+        } else {
+            // Bot's turn
+            setTimeout(() => {
+                if (legalMoves.length > 0) {
+                    const randomMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+                    movePiece(randomMove);
                 }
-            }
+            }, 1000);
         }
+        
+    }, [board, currentPlayer, consecutiveJumpPiece, getPossibleMovesForPiece, playerColor, switchTurn, calculateAllMoves, gameOver]);
 
-        const legalMoves = canJump ? allPossibleMoves.filter(m => m.isJump) : allPossibleMoves;
-        setMustJump(canJump);
-
-        if (legalMoves.length === 0) {
-            toast({ title: "Game Over!", description: `${currentPlayer === 'w' ? 'Black' : 'White'} wins!` });
-        }
-
-    }, [board, currentPlayer, consecutiveJumpPiece]);
-
-
-    const switchPlayer = () => {
-        setCurrentPlayer(p => p === 'w' ? 'b' : 'w');
-        setSelectedPiece(null);
-        setPossibleMoves([]);
-    }
 
     const handleSquareClick = (row: number, col: number) => {
-        const clickedMove = possibleMoves.find(m => m.to.row === row && m.to.col === col);
+        if (currentPlayer !== playerColor || gameOver) return;
+
+        const actualRow = isFlipped ? 7 - row : row;
+        const actualCol = isFlipped ? 7 - col : col;
+
+        const clickedMove = possibleMoves.find(m => m.to.row === actualRow && m.to.col === actualCol);
         
-        if (clickedMove) { // If the click is a valid move for the selected piece
+        if (clickedMove) {
             movePiece(clickedMove);
-        } else if (board[row][col] && board[row][col]?.player === currentPlayer) {
-            if (mustJump) {
-                const pieceMoves = getPossibleMovesForPiece(board[row][col]!, { row, col }, board);
-                if (pieceMoves.some(m => m.isJump)) {
-                    setSelectedPiece({ row, col });
-                    setPossibleMoves(pieceMoves.filter(m => m.isJump));
-                } else {
-                    toast({ title: "Mandatory Jump", description: "You must capture the opponent's piece with another piece.", variant: "destructive" });
-                }
+        } else if (board[actualRow][actualCol] && board[actualRow][actualCol]?.player === currentPlayer) {
+            const pieceMoves = calculateAllMoves(board, currentPlayer).filter(m => m.from.row === actualRow && m.from.col === actualCol);
+            
+            if (mustJump && !pieceMoves.some(m => m.isJump)) {
+                toast({ title: "Mandatory Jump", description: "You must capture an opponent's piece.", variant: "destructive" });
                 return;
             }
+
             if (consecutiveJumpPiece) return;
 
-            const pieceMoves = getPossibleMovesForPiece(board[row][col]!, { row, col }, board);
-            setSelectedPiece({ row, col });
+            setSelectedPiece({ row: actualRow, col: actualCol });
             setPossibleMoves(pieceMoves);
+
         } else {
             setSelectedPiece(null);
-            setPossibleMoves([]);
         }
     };
     
@@ -190,36 +231,47 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         newBoard[move.to.row][move.to.col] = piece;
         newBoard[move.from.row][move.from.col] = null;
 
+        let wasJump = false;
         if (move.isJump) {
+            wasJump = true;
             const jumpedRow = move.from.row + (move.to.row - move.from.row) / 2;
             const jumpedCol = move.from.col + (move.to.col - move.from.col) / 2;
             newBoard[jumpedRow][jumpedCol] = null;
-            
-            setBoard(newBoard); // Update board immediately to check for more jumps
+        }
+        
+        setBoard(newBoard);
 
-            const moreJumps = getPossibleMovesForPiece(piece, move.to, newBoard).filter(m => m.isJump);
-            if (moreJumps.length > 0) {
-                setConsecutiveJumpPiece(move.to);
+        const moreJumps = wasJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
+
+        if (moreJumps.length > 0) {
+            setConsecutiveJumpPiece(move.to);
+            if (piece.player === playerColor) { // If it's the player's turn, update their possible moves
                 setSelectedPiece(move.to);
                 setPossibleMoves(moreJumps);
-            } else {
-                setConsecutiveJumpPiece(null);
-                switchPlayer();
             }
-
         } else {
-            setBoard(newBoard);
-            switchPlayer();
+            setConsecutiveJumpPiece(null);
+            setSelectedPiece(null);
+            setPossibleMoves([]);
+            switchTurn();
         }
+        
+        checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');
     };
+
+    const displayedBoard = isFlipped ? [...board].reverse().map(row => [...row].reverse()) : board;
+
 
     return (
         <div className="grid grid-cols-8 aspect-square w-full max-w-[75vh] lg:max-w-lg shadow-2xl border-2 border-border rounded-lg overflow-hidden">
-            {board.map((rowItem, rowIndex) =>
+            {displayedBoard.map((rowItem, rowIndex) =>
                 rowItem.map((piece, colIndex) => {
-                    const isDarkSquare = (rowIndex + colIndex) % 2 !== 0;
-                    const isSelected = selectedPiece && selectedPiece.row === rowIndex && selectedPiece.col === colIndex;
-                    const isPossibleMove = possibleMoves.some(m => m.to.row === rowIndex && m.to.col === colIndex);
+                    const actualRow = isFlipped ? 7 - rowIndex : rowIndex;
+                    const actualCol = isFlipped ? 7 - colIndex : colIndex;
+                    
+                    const isDarkSquare = (actualRow + actualCol) % 2 !== 0;
+                    const isSelected = selectedPiece && selectedPiece.row === actualRow && selectedPiece.col === actualCol;
+                    const isPossibleMove = possibleMoves.some(m => m.to.row === actualRow && m.to.col === actualCol);
 
                     return (
                         <div
@@ -253,3 +305,4 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         </div>
     );
 }
+

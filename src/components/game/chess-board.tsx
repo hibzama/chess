@@ -40,6 +40,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
+  const isFlipped = playerColor === 'b';
 
   useEffect(() => {
     if (game.isGameOver()) {
@@ -50,6 +51,10 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         }
     }
   }, [game, setWinner]);
+
+  useEffect(() => {
+    setBoard(game.board());
+  }, [game]);
 
   useEffect(() => {
     if (!gameOver && currentPlayer !== playerColor) {
@@ -68,6 +73,9 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
 
 
   const getSquareFromIndices = (row: number, col: number): Square => {
+    if (isFlipped) {
+      return `${String.fromCharCode('a'.charCodeAt(0) + (7 - col))}${row + 1}` as Square;
+    }
     return `${String.fromCharCode('a'.charCodeAt(0) + col)}${8 - row}` as Square;
   }
 
@@ -104,10 +112,12 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       }
     }
   };
+  
+  const displayedBoard = isFlipped ? [...board].reverse().map(row => [...row].reverse()) : board;
 
   return (
     <div className="grid grid-cols-8 aspect-square w-full max-w-[75vh] lg:max-w-lg shadow-2xl border-2 border-border rounded-lg overflow-hidden">
-      {board.map((rowArr, rowIndex) =>
+      {displayedBoard.map((rowArr, rowIndex) =>
         rowArr.map((piece, colIndex) => {
           const square = getSquareFromIndices(rowIndex, colIndex);
           
