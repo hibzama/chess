@@ -23,8 +23,8 @@ type GameLayoutProps = {
 };
 
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm } = useGame();
-  const { userData } = useAuth();
+  const { p1Time, p2Time, winner, gameOver, resetGame, playerColor, currentPlayer, isMounted, resign, showResignModal, setShowResignModal, handleResignConfirm, isMultiplayer } = useGame();
+  const { user, userData } = useAuth();
   const router = useRouter();
 
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
@@ -33,30 +33,29 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
   const handleCloseDialog = () => {
     resetGame();
     // Redirect based on whether it's a practice or multiplayer game
-    const isPractice = !window.location.pathname.includes('multiplayer');
-    router.push(isPractice ? '/practice' : '/lobby');
+    router.push(isMultiplayer ? '/lobby' : '/practice');
   }
 
   const getWinnerMessage = () => {
     if (winner === 'draw') return { title: "Game Over", description: "The game has ended in a draw."};
 
     const player1Won = winner === 'p1';
+    const opponentName = isMultiplayer ? "Your opponent" : "The bot";
 
     return player1Won 
         ? { title: "🎉 Congratulations! You Win! 🎉", description: "Your brilliant strategy paid off. Well played!" }
-        : { title: "😥 Better Luck Next Time 😥", description: "The bot has won this time. Keep practicing!" };
+        : { title: `😥 Better Luck Next Time 😥`, description: `${opponentName} has won this time. Keep practicing!` };
   }
   
   const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
-  const isP2Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w'));
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
-  const isMultiplayer = typeof window !== 'undefined' && window.location.pathname.includes('multiplayer');
+  
 
   return (
     <>
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-10 px-4 lg:px-6 h-16 flex items-center justify-between border-b bg-background/80 backdrop-blur-sm">
-        <Link href="/practice" passHref>
+        <Link href={isMultiplayer ? "/lobby" : "/practice"} passHref>
           <Button variant="ghost" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back to Lobby</span>
@@ -86,11 +85,11 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
              <div className="w-full flex justify-between items-center px-2">
                 <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
                     <p className="font-semibold">Opponent</p>
-                    <p className="text-2xl font-bold">{formatTime(player2Time)}</p>
+                    <p className="text-2xl font-bold">{formatTime(p2Time)}</p>
                 </div>
                  <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
                     <p className="font-semibold">You</p>
-                    <p className="text-2xl font-bold">{formatTime(player1Time)}</p>
+                    <p className="text-2xl font-bold">{formatTime(p1Time)}</p>
                 </div>
             </div>
             {children}
@@ -102,7 +101,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         {/* Right Column */}
         <aside className="flex flex-col gap-6">
             <PlayerInfo
-              playerName="Opponent (Bot)"
+              playerName="Opponent"
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="gamer portrait"
             />

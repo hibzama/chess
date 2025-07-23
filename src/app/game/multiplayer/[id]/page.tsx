@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, deleteDoc, updateDoc, increment, getDoc, writeBatch, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, deleteDoc, updateDoc, increment, getDoc, writeBatch, collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,8 +38,11 @@ type GameRoom = {
     };
     players: string[];
     createdAt: any;
-    expiresAt: any;
+    expiresAt: Timestamp;
     isPrivate: boolean;
+    p1Time: number;
+    p2Time: number;
+    turnStartTime: Timestamp;
 };
 
 export default function MultiplayerGamePage() {
@@ -88,7 +91,9 @@ export default function MultiplayerGamePage() {
                     setRoom(roomData);
                 }
             } else {
-                toast({ title: 'Room Closed', description: "This game room no longer exists." });
+                if (roomStatusRef.current !== 'completed') {
+                    toast({ title: 'Room Closed', description: "This game room no longer exists." });
+                }
                 router.push('/lobby');
             }
             setLoading(false);
@@ -107,19 +112,16 @@ export default function MultiplayerGamePage() {
             // Re-fetch room data to ensure it's still waiting before cancelling
             const roomDoc = await getDoc(roomRef);
             if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
-                // The room has been joined or doesn't exist anymore, so do nothing.
                 if (!isAutoCancel) router.push('/lobby');
                 return; 
             }
     
             batch.delete(roomRef);
 
-            // Only refund if there is a wager
             if (room.wager > 0) {
                 const userRef = doc(db, 'users', user.uid);
                 batch.update(userRef, { balance: increment(room.wager) });
                 
-                // Create a refund transaction
                 const transactionRef = doc(collection(db, 'transactions'));
                 batch.set(transactionRef, {
                     userId: user.uid,
@@ -198,7 +200,9 @@ export default function MultiplayerGamePage() {
             }
 
             // Deduct wager from joiner's balance
-            batch.update(userRef, { balance: increment(-room.wager) });
+            if (room.wager > 0) {
+                batch.update(userRef, { balance: increment(-room.wager) });
+            }
 
             const creatorColor = room.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
@@ -215,31 +219,36 @@ export default function MultiplayerGamePage() {
                 capturedByP1: [],
                 capturedByP2: [],
                 moveHistory: [],
-                currentPlayer: 'w', // White always starts
+                currentPlayer: 'w',
+                p1Time: room.timeControl,
+                p2Time: room.timeControl,
+                turnStartTime: serverTimestamp(),
             });
 
             // Log wager transaction for joiner
-            const transactionRef = doc(collection(db, 'transactions'));
-            batch.set(transactionRef, {
-                userId: user.uid,
-                type: 'wager',
-                amount: room.wager,
-                status: 'completed',
-                description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
-                gameRoomId: room.id,
-                createdAt: serverTimestamp()
-            });
+            if (room.wager > 0) {
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'wager',
+                    amount: room.wager,
+                    status: 'completed',
+                    description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
+                    gameRoomId: room.id,
+                    createdAt: serverTimestamp()
+                });
+            }
             
             await batch.commit();
             
             toast({ title: "Game Joined!", description: "The match is starting now."});
-            // The onSnapshot listener will automatically update the UI to the game board
 
         } catch (error) {
             console.error("Failed to join game:", error);
             toast({ variant: 'destructive', title: "Error", description: "Could not join the game. Your wager has been refunded."});
-            // Refund the user if updating the room fails
-            await updateDoc(userRef, { balance: increment(room.wager) });
+            if(room.wager > 0) {
+                await updateDoc(userRef, { balance: increment(room.wager) });
+            }
             setIsJoining(false);
         }
     }
@@ -257,7 +266,9 @@ export default function MultiplayerGamePage() {
     
         return () => {
             window.removeEventListener('beforeunload', creatorNavigatingAway);
-            creatorNavigatingAway();
+            if (isCreator && roomStatusRef.current === 'waiting') {
+                handleCancelRoom(true);
+           }
         };
     }, [isCreator, handleCancelRoom]);
 
@@ -384,7 +395,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     );
 }
-
-    
-
-    
