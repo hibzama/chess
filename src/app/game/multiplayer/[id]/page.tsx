@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, deleteDoc, updateDoc, increment, getDoc, writeBatch } from 'firebase/firestore';
+import { doc, onSnapshot, deleteDoc, updateDoc, increment, getDoc, writeBatch, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -115,6 +115,19 @@ export default function MultiplayerGamePage() {
     
             batch.delete(roomRef);
             batch.update(userRef, { balance: increment(room.wager) });
+            
+            // Create a refund transaction
+            const transactionRef = doc(collection(db, 'transactions'));
+            batch.set(transactionRef, {
+                userId: user.uid,
+                type: 'payout',
+                amount: room.wager,
+                status: 'completed',
+                description: `Refund for cancelled ${room.gameType} game`,
+                gameRoomId: roomId,
+                createdAt: serverTimestamp()
+            });
+
             await batch.commit();
     
             if (isAutoCancel) {
@@ -197,6 +210,18 @@ export default function MultiplayerGamePage() {
                 capturedByP2: [],
                 moveHistory: [],
                 currentPlayer: 'w', // White always starts
+            });
+
+            // Log wager transaction for joiner
+            const transactionRef = doc(collection(db, 'transactions'));
+            batch.set(transactionRef, {
+                userId: user.uid,
+                type: 'wager',
+                amount: room.wager,
+                status: 'completed',
+                description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
+                gameRoomId: room.id,
+                createdAt: serverTimestamp()
             });
             
             await batch.commit();
@@ -366,4 +391,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     );
 }
-

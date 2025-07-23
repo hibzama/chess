@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams } from 'next/navigation';
 
@@ -20,8 +20,8 @@ interface GameRoom {
     capturedByP1: Piece[]; // player who created the room
     capturedByP2: Piece[]; // player who joined
     currentPlayer: PlayerColor;
-    createdBy: { uid: string; color: PlayerColor };
-    player2?: { uid: string; color: PlayerColor };
+    createdBy: { uid: string; color: PlayerColor; name: string; };
+    player2?: { uid: string; color: PlayerColor, name: string; };
     players: string[];
     status: 'waiting' | 'in-progress' | 'completed';
     winner?: {
@@ -172,24 +172,61 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const handlePayout = useCallback(async (room: GameRoom) => {
         const creatorRef = doc(db, 'users', room.createdBy.uid);
         const joinerRef = doc(db, 'users', room.player2!.uid);
+        const batch = writeBatch(db);
         const wager = room.wager;
+        const now = serverTimestamp();
     
         if (room.draw) {
-            await updateDoc(creatorRef, { balance: increment(wager * 0.9) });
-            await updateDoc(joinerRef, { balance: increment(wager * 0.9) });
+            const payoutAmount = wager * 0.9;
+            batch.update(creatorRef, { balance: increment(payoutAmount) });
+            batch.update(joinerRef, { balance: increment(payoutAmount) });
+            
+            // Log transactions for both players
+            batch.set(doc(collection(db, 'transactions')), {
+                userId: room.createdBy.uid, type: 'payout', amount: payoutAmount, status: 'completed',
+                description: `Draw refund for ${room.gameType} game vs ${room.player2?.name}`, gameRoomId: room.id, createdAt: now
+            });
+            batch.set(doc(collection(db, 'transactions')), {
+                userId: room.player2!.uid, type: 'payout', amount: payoutAmount, status: 'completed',
+                description: `Draw refund for ${room.gameType} game vs ${room.createdBy.name}`, gameRoomId: room.id, createdAt: now
+            });
+
         } else if (room.winner) {
             const winnerIsCreator = room.winner.uid === room.createdBy.uid;
             const winnerRef = winnerIsCreator ? creatorRef : joinerRef;
             const loserRef = winnerIsCreator ? joinerRef : creatorRef;
+            const winnerId = room.winner.uid;
+            const loserId = room.players.find(p => p !== winnerId)!;
+            const winnerName = winnerIsCreator ? room.createdBy.name : room.player2!.name;
+            const loserName = winnerIsCreator ? room.player2!.name : room.createdBy.name;
+
+            let winnerPayout = wager * 1.8;
+            let loserPayout = 0;
+            let winnerDesc = `Winnings for ${room.gameType} game vs ${loserName}`;
+            let loserDesc = `Loss for ${room.gameType} game vs ${winnerName}`;
 
             if(room.winner.method === 'resign') {
-                await updateDoc(winnerRef, { balance: increment(wager * 1.05) });
-                await updateDoc(loserRef, { balance: increment(wager * 0.75) });
-            } else {
-                await updateDoc(winnerRef, { balance: increment(wager * 1.8) });
-                // Loser gets 0, so no increment.
+                winnerPayout = wager * 1.05;
+                loserPayout = wager * 0.75;
+                winnerDesc = `Forfeit win for ${room.gameType} game vs ${loserName}`;
+                loserDesc = `Forfeit refund for ${room.gameType} game vs ${winnerName}`;
+            }
+            
+            batch.update(winnerRef, { balance: increment(winnerPayout) });
+            batch.set(doc(collection(db, 'transactions')), {
+                userId: winnerId, type: 'payout', amount: winnerPayout, status: 'completed',
+                description: winnerDesc, gameRoomId: room.id, createdAt: now
+            });
+
+            if (loserPayout > 0) {
+                 batch.update(loserRef, { balance: increment(loserPayout) });
+                 batch.set(doc(collection(db, 'transactions')), {
+                    userId: loserId, type: 'payout', amount: loserPayout, status: 'completed',
+                    description: loserDesc, gameRoomId: room.id, createdAt: now
+                });
             }
         }
+        await batch.commit();
     }, []);
 
 

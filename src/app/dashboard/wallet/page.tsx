@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -10,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle, Swords, Trophy } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,12 +22,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 type Transaction = {
     id: string;
-    type: 'deposit' | 'withdrawal';
+    type: 'deposit' | 'withdrawal' | 'wager' | 'payout';
     amount: number;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'pending' | 'approved' | 'rejected' | 'completed';
     createdAt: any;
     slipUrl?: string;
     withdrawalDetails?: any;
+    description?: string;
 };
 
 const USDT_RATE = 310;
@@ -100,7 +102,7 @@ export default function WalletPage() {
         type: 'deposit',
         amount: amountInLKR,
         status: 'pending',
-        slipUrl: '', // No slip URL anymore
+        description: `${depositMethod === 'binance' ? 'Binance' : 'Bank'} Deposit`,
         depositMethod,
         createdAt: serverTimestamp()
       });
@@ -161,6 +163,7 @@ export default function WalletPage() {
         type: 'withdrawal',
         amount: amountInLKR,
         status: 'pending',
+        description: `Withdrawal to ${withdrawalDetails.bankName}`,
         withdrawalMethod,
         withdrawalDetails,
         createdAt: serverTimestamp()
@@ -190,8 +193,19 @@ export default function WalletPage() {
       case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'approved': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'rejected': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'completed': return <CheckCircle2 className="w-4 h-4 text-blue-500" />;
     }
   };
+
+  const getTransactionIcon = (type: Transaction['type']) => {
+    switch(type) {
+        case 'deposit': return <ArrowUpCircle className="w-5 h-5 text-green-500" />;
+        case 'withdrawal': return <ArrowDownCircle className="w-5 h-5 text-red-500" />;
+        case 'wager': return <Swords className="w-5 h-5 text-orange-500" />;
+        case 'payout': return <Trophy className="w-5 h-5 text-yellow-500" />;
+        default: return <DollarSign className="w-5 h-5 text-gray-500" />;
+    }
+  }
   
   const username = userData ? `${userData.firstName}${userData.lastName}`.toLowerCase() : '...';
 
@@ -353,8 +367,11 @@ export default function WalletPage() {
                                 <TableRow key={tx.id}>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            {tx.type === 'deposit' ? <ArrowUpCircle className="w-5 h-5 text-green-500" /> : <ArrowDownCircle className="w-5 h-5 text-red-500" />}
-                                            <span className="capitalize">{tx.type}</span>
+                                            {getTransactionIcon(tx.type)}
+                                            <div>
+                                                <span className="capitalize font-medium">{tx.type}</span>
+                                                {tx.description && <p className="text-xs text-muted-foreground">{tx.description}</p>}
+                                            </div>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -363,7 +380,7 @@ export default function WalletPage() {
                                     </TableCell>
                                     <TableCell>{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                                     <TableCell>
-                                        <Badge variant={tx.status === 'approved' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">
+                                        <Badge variant={tx.status === 'approved' || tx.status === 'completed' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">
                                             {getStatusIcon(tx.status)}
                                             <span className="capitalize">{tx.status}</span>
                                         </Badge>
@@ -425,5 +442,3 @@ export default function WalletPage() {
     </>
   );
 }
-
-    
