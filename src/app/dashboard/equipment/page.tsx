@@ -37,14 +37,14 @@ const CheckersPieceComponent = ({ color }: { color: string }) => (
 );
 
 const getPieceIcon = (type: string) => {
-    const style = { width: '100%', height: '100%', fill: 'currentColor', stroke: 'black', strokeWidth: 0.5 };
+    const style = { width: '100%', height: '100%', fill: 'currentColor', stroke: 'none' };
     switch(type) {
-        case 'p': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38-1.98 1.48-3.28 3.89-3.28 6.62 0 4.42 3.58 8 8 8s8-3.58 8-8c0-2.73-1.3-5.14-3.28-6.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z"/></svg>;
-        case 'r': return <svg viewBox="0 0 45 45" style={style}><path d="M9 14h27v5h-27zM12 19h21v12h-21zM9 31h27v5h-27zM11 11h23v3h-23zM14 8h17v3h-17z"/></svg>;
-        case 'n': return <svg viewBox="0 0 45 45" style={style}><path d="M22 10c-3 0-5.5 2-6 4H14c-1 0-2 .5-2 1.5 0 .5.5 1 1 1h1.5c-.5 1-1 2-1 3.5 0 2.5 1.5 5 4 5h3c.5 0 1 0 1.5-.5.5-.5.5-1 0-1.5-1-.5-1.5-1-1.5-2.5 0-1 .5-2 1.5-2.5.5-.5.5-1 0-1.5-1-.5-1.5-1-1.5-2.5 0-1 .5-2 1.5-2.5.5-.5.5-1 0-1.5C25 12 24 10 22 10zm-1.5 12c-1.5 0-2.5 1-2.5 2.5s1 2.5 2.5 2.5 2.5-1 2.5-2.5-1-2.5-2.5-2.5z"/></svg>;
-        case 'b': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.3 16.86 16 19.27 16 22c0 4.42 3.58 8 8 8s8-3.58 8-8c0-2.73-1.3-5.14-3.28-6.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4zm0 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2z"/></svg>;
-        case 'q': return <svg viewBox="0 0 45 45" style={style}><path d="M8 12h29l-3.5 14h-22zm-2 16h33v5h-33zM22.5 6l-6 6h12z"/></svg>;
-        case 'k': return <svg viewBox="0 0 45 45" style={style}><path d="M22.5 6L19.5 12h6zM15 13h15v18h-15zM12 31h21v5h-21z"/></svg>;
+        case 'p': return <svg viewBox="0 0 100 100" style={style}><path d="M50 15A12 12 0 1 1 50 39A12 12 0 1 1 50 15M35 42L65 42L65 50L35 50ZM38 53L62 53L62 85L38 85Z"/></svg>;
+        case 'r': return <svg viewBox="0 0 100 100" style={style}><path d="M25 15L75 15L75 25L65 25L65 20L55 20L55 25L45 25L45 20L35 20L35 25L25 25ZM25 30L75 30L75 85L25 85Z" /></svg>;
+        case 'n': return <svg viewBox="0 0 100 100" style={style}><path d="M35 15L60 15L50 45L60 45L60 70L30 70L30 55L20 55L20 30L35 30ZM30 85L70 85L70 75L30 75Z"/></svg>;
+        case 'b': return <svg viewBox="0 0 100 100" style={style}><path d="M50 15L65 40L35 40ZM35 45L65 45L65 50L35 50ZM38 53L62 53L62 85L38 85Z"/></svg>;
+        case 'q': return <svg viewBox="0 0 100 100" style={style}><path d="M25 15L75 15L75 30L25 30ZM20 35L80 35L70 85L30 85Z"/></svg>;
+        case 'k': return <svg viewBox="0 0 100 100" style={style}><path d="M45 10L55 10L55 20L65 20L65 30L55 30L55 40L45 40L45 30L35 30L35 20L45 20ZM25 45L75 45L70 85L30 85Z" /></svg>;
         default: return null;
     }
 }
@@ -60,7 +60,7 @@ const ChessPiecePreview = () => {
                     return (
                         <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full flex items-center justify-center', isLight ? 'bg-[--board-light]' : 'bg-[--board-dark]')}>
                            {piece && (
-                                <div className="w-full h-full p-1" style={{ color: piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)', stroke: piece.color === 'w' ? 'var(--piece-p2)' : 'var(--piece-p1)' }}>
+                                <div className="w-full h-full p-1 flex items-center justify-center" style={{ color: piece.color === 'w' ? 'var(--piece-p1)' : 'var(--piece-p2)'}}>
                                     {getPieceIcon(piece.type)}
                                 </div>
                            )}
