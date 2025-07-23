@@ -2,9 +2,7 @@
 import React from 'react';
 
 export const getPieceIcon = (type: string, color: string) => {
-    // The explicit fill and stroke on the path elements will override this, but it's good for fallback.
     const pieceFill = color;
-    // Black pieces get a white stroke, all other pieces get a black stroke.
     const pieceStroke = color === '#0f172a' || color === '#18181b' ? '#f8fafc' : '#0f172a';
 
     const style: React.CSSProperties = {
@@ -19,15 +17,15 @@ export const getPieceIcon = (type: string, color: string) => {
         case 'p': // Pawn
             return <g style={style}><path d="M22.5 9.5c-1.8 0-3.25 1.45-3.25 3.25s1.45 3.25 3.25 3.25 3.25-1.45 3.25-3.25S24.3 9.5 22.5 9.5zM19 20h7c0 2-1 4-3.5 4S19 22 19 20zM17 26h11v4H17z" /></g>;
         case 'r': // Rook
-            return <g style={style}><path d="M14 10h17l-2.5 4h-12L14 10zM14 16h17v4h-17zM12 22h21v11h-21zM9 35h27v4h-27z" /></g>;
+            return <g style={style}><path d="M9 39h27v-3H9v3zM12.5 36v-4h20v4h-20zM12.5 32V14h20v18h-20zM14 14V9h5v2h7V9h5v5H14z" /></g>;
         case 'n': // Knight
-            return <g style={style}><path d="M24 10c-3.5 0-5.5 2-5.5 4.5 0 2.5 1.5 4 1.5 4l-2 2.5c-0.5 0.5-1 1-1 2 0 1 0.5 1.5 0.5 1.5l-1.5 1.5c-1 1-1.5 2.5-1.5 4v1h19v-1c0-1.5-0.5-3-1.5-4l-1.5-1.5c0 0 0.5-0.5 0.5-1.5 0-1-0.5-1.5-1-2l-2-2.5c0 0 1.5-1.5 1.5-4C30.5 12 27.5 10 24 10zM24 28.5c-1.5 0-3 1-3.5 2.5h7C27 29.5 25.5 28.5 24 28.5z" /></g>;
+            return <g style={style}><path d="M22 10c-3 0-5.5 2.5-5.5 6 0 2.5 2 4.5 2 4.5l-3 3s-1 1-1 2.5 1 2.5 1 2.5l-2 3h19v-4.5l-2-2.5s1-1.5 1-2.5-2.5-6-5-6zm-4 13.5s1.5-1.5 1.5-2.5 0-2-1.5-2.5l-1-1v3l.5 3z" /></g>;
         case 'b': // Bishop
-            return <g style={style}><path d="M22.5 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm-3.5 10c-1.5 0-3 2-3 4s1.5 4 3 4h7c1.5 0 3-2 3-4s-1.5-4-3-4h-7zm-1.5 12h10v3h-10z" /></g>;
+            return <g style={style}><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 3 2H6c1.35-1.46 3-2 3-2z M15 32V29.5s0-2.5 2.5-5l5-5c1.5-1.5 2.5-1.5 2.5-1.5s1 0 2.5 1.5l5 5c2.5 2.5 2.5 5 2.5 5V32H15z M22.5 8.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" /></g>;
         case 'q': // Queen
-            return <g style={style}><path d="M12 13l3.5-3 7 10 7-10 3.5 3-10.5 14h-7L12 13z m-2 18h25v4H10z m2 4h21v4H12z" /></g>;
+            return <g style={style}><path d="M8 12l3-9h23l3 9-12.5 13.5L8 12z M8 12h30 M11.5 39.5h22v-4h-22v4z m2-4h18v-3h-18v3z m-1-3h20v-3h-20v3z" /></g>;
         case 'k': // King
-            return <g style={style}><path d="M22.5,11.5c4,0,6,2.5,6,6.5c0,4-2.5,7.5-5.5,9.5c-2,1-4.5,1-4.5,1s-2.5,0-4.5-1 c-3-2-5.5-5.5-5.5-9.5c0-4,2-6.5,6-6.5 M22.5,6h-3v3h-3v3h3v-3h3V6z M12,32h21v-3H12v3z M15,35h15v-2H15v2z" /></g>;
+            return <g style={style}><path d="M22.5 6h-3v3h-3v3h3v-3h3V6zm-9 23.5h21v-4h-21v4z m2-4h17v-3h-17v3z m-1-3h19v-4h-19v4z m-1-4h21v-3h-21v3zM12 11.5s2-5 10.5-5 10.5 5 10.5 5C33 18 28.5 24.5 22.5 24.5S12 18 12 11.5z" /></g>;
         default: return null;
     }
 }
