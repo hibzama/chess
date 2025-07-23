@@ -32,7 +32,7 @@ type Transaction = {
 const USDT_RATE = 310;
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
         <path d="M22 2L11 13" />
         <path d="M22 2L15 22L11 13L2 9L22 2Z" />
     </svg>
@@ -56,7 +56,7 @@ export default function WalletPage() {
   const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: '', branch: '', accountNumber: '', accountName: '' });
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   
-  const usdtAmount = (parseFloat(depositAmount) || 0).toFixed(2);
+  const usdtAmount = (parseFloat(depositAmount) / USDT_RATE || 0).toFixed(2);
   
   const copyToClipboard = (text: string, name: string) => {
     navigator.clipboard.writeText(text);
@@ -93,7 +93,7 @@ export default function WalletPage() {
     setIsConfirmRemarkOpen(false);
 
     try {
-      const amountInLKR = parseFloat(depositAmount) * USDT_RATE;
+      const amountInLKR = parseFloat(depositAmount);
 
       await addDoc(collection(db, 'transactions'), {
         userId: user.uid,
@@ -253,14 +253,12 @@ export default function WalletPage() {
                         )}
                         
                         <div className="space-y-2">
-                            <Label htmlFor="deposit-amount">Amount (USDT)</Label>
-                            <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 10" required />
+                            <Label htmlFor="deposit-amount">Amount (LKR)</Label>
+                            <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
                         </div>
                         
-                        <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground">
-                            You will send: {usdtAmount} USDT
-                            <br/>
-                            Equivalent in LKR: {(parseFloat(depositAmount) * USDT_RATE || 0).toFixed(2)} LKR
+                        <div className="p-3 bg-yellow-900/20 rounded-md text-sm text-yellow-300">
+                            Equivalent in USDT: {usdtAmount} USDT
                         </div>
 
                         <Card className="p-4 bg-card/50 space-y-2">
