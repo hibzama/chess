@@ -201,7 +201,7 @@ export default function WalletPage() {
           <CardTitle className="flex items-center gap-2"><DollarSign /> Current Balance</CardTitle>
         </CardHeader>
         <CardContent>
-            {authLoading || userData === null ? (
+            {authLoading || !userData || typeof userData.balance === 'undefined' ? (
                 <Skeleton className="h-10 w-48" /> 
             ) : (
                 <div>
