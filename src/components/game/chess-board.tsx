@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Chess, Square } from 'chess.js';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { getPieceIcon } from '@/lib/get-piece-icon.tsx';
+import { getPieceIcon } from '@/lib/get-piece-icon';
 import { useGame } from '@/context/game-context';
 
 type BoardTheme = { id: string; name: string; colors: string[] };
