@@ -8,12 +8,7 @@ import { History } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function MoveHistory() {
-  const { moveHistory } = useGame();
-  const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
+  const { moveHistory, isMounted } = useGame();
   
   return (
     <Card className="flex-1 flex flex-col">
@@ -34,7 +29,7 @@ export default function MoveHistory() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isClient && moveHistory.length > 0 ? moveHistory.map((move, index) => (
+                  {isMounted && moveHistory.length > 0 ? moveHistory.map((move, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{move.turn}</TableCell>
                       <TableCell>{move.white}</TableCell>
