@@ -13,6 +13,8 @@ import React from 'react';
 import { useAuth } from '@/context/auth-context';
 import { CapturedPieces } from './captured-pieces';
 import { GameInfo } from './game-info';
+import { formatTime } from '@/lib/time';
+import { cn } from '@/lib/utils';
 
 type GameLayoutProps = {
   children: React.ReactNode;
@@ -20,7 +22,7 @@ type GameLayoutProps = {
 };
 
 export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer } = useGame();
+  const { player1Time, player2Time, winner, gameOver, resetGame, playerColor, currentPlayer, isMounted } = useGame();
   const { userData } = useAuth();
   const router = useRouter();
 
@@ -42,8 +44,8 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         : { title: "😥 Better Luck Next Time 😥", description: "The bot has won this time. Keep practicing!" };
   }
   
-  const isP1Turn = (playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b');
-  const isP2Turn = (playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w');
+  const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
+  const isP2Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'b') || (playerColor === 'b' && currentPlayer === 'w'));
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
 
   return (
@@ -71,15 +73,22 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               playerName={userData ? `${userData.firstName} (You)`: "Player 1 (You)"}
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="player avatar"
-              isTurn={isP1Turn}
-              timeRemaining={player1Time}
             />
             <CapturedPieces pieceStyle={equipment?.pieceStyle} />
-            <MoveHistory />
         </aside>
 
         {/* Center Column */}
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
+             <div className="w-full flex justify-between items-center px-2">
+                <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
+                    <p className="font-semibold">Opponent</p>
+                    <p className="text-2xl font-bold">{formatTime(player2Time)}</p>
+                </div>
+                 <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
+                    <p className="font-semibold">You</p>
+                    <p className="text-2xl font-bold">{formatTime(player1Time)}</p>
+                </div>
+            </div>
             {children}
             <div className="text-center font-semibold text-lg p-2 rounded-md bg-card border">
                 Current Turn: <span className="text-primary">{turnText}</span>
@@ -92,10 +101,9 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
               playerName="Opponent (Bot)"
               avatarSrc="https://placehold.co/100x100.png"
               data-ai-hint="gamer portrait"
-              isTurn={isP2Turn}
-              timeRemaining={player2Time}
             />
             <GameInfo />
+            <MoveHistory />
         </aside>
       </main>
     </div>

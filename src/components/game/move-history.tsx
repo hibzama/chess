@@ -19,7 +19,7 @@ export default function MoveHistory() {
             </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-48">
+            <ScrollArea className="h-full max-h-96">
               <Table>
                 <TableHeader className="sticky top-0 bg-card">
                   <TableRow>

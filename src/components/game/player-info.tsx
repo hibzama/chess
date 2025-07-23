@@ -11,17 +11,12 @@ import { Skeleton } from '../ui/skeleton';
 type PlayerInfoProps = {
   playerName: string;
   avatarSrc: string;
-  isTurn: boolean;
-  timeRemaining: number;
   'data-ai-hint': string;
 };
 
-export default function PlayerInfo({ playerName, avatarSrc, isTurn, timeRemaining, ...props }: PlayerInfoProps) {
+export default function PlayerInfo({ playerName, avatarSrc, ...props }: PlayerInfoProps) {
   return (
-    <Card className={cn(
-      'transition-all',
-      isTurn ? 'border-primary ring-2 ring-primary shadow-lg' : 'border-border'
-    )}>
+    <Card>
       <CardContent className="p-4 flex items-center gap-4">
         <Avatar className="h-16 w-16 border-2 border-primary/50">
           <AvatarImage src={avatarSrc} alt={playerName} {...props} />
@@ -29,10 +24,6 @@ export default function PlayerInfo({ playerName, avatarSrc, isTurn, timeRemainin
         </Avatar>
         <div className="flex-1">
           <h3 className="font-semibold text-lg">{playerName}</h3>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="w-4 h-4" />
-            <span>{formatTime(timeRemaining)}</span>
-          </div>
         </div>
       </CardContent>
     </Card>
