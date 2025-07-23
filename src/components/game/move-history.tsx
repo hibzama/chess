@@ -5,23 +5,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useGame } from '@/context/game-context';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { History } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 export default function MoveHistory() {
   const { moveHistory, isMounted } = useGame();
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+        scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  }, [moveHistory]);
   
   return (
-    <Card className="flex-1 flex flex-col">
+    <Card className="flex-1 flex flex-col min-h-0">
         <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
                 <History className="w-5 h-5"/>
                 Move History
             </CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-full max-h-96">
+        <CardContent className="flex-1 p-0 overflow-y-hidden">
+            <ScrollArea className="h-full" ref={scrollAreaRef}>
               <Table>
-                <TableHeader className="sticky top-0 bg-card">
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="w-1/4">#</TableHead>
                     <TableHead>White</TableHead>
