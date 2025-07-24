@@ -108,8 +108,9 @@ export default function MarketingRegisterPage() {
                         <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Submitting...' : 'Submit Application'}</Button>
                         <p className="text-xs text-muted-foreground text-center">By applying, you agree to our marketing partner terms and conditions.</p>
                         <div className="text-center text-sm">
-                            <Link href="/" className="underline">
-                                Back to Home
+                            Already a partner?{" "}
+                            <Link href="/marketing/login" className="underline">
+                                Sign In
                             </Link>
                         </div>
                     </CardFooter>
@@ -118,5 +119,3 @@ export default function MarketingRegisterPage() {
         </div>
     );
 }
-
-    

@@ -15,17 +15,17 @@ export default function MarketingLayout({
     const router = useRouter();
     const pathname = usePathname();
 
-    const isRegisterPage = pathname === '/marketing/register';
+    const isAuthPage = pathname === '/marketing/register' || pathname === '/marketing/login';
 
      useEffect(() => {
-        if (!loading && !isRegisterPage) {
+        if (!loading && !isAuthPage) {
             if (!user || userData?.role !== 'marketer') {
-                router.push('/marketing/register');
+                router.push('/marketing/login');
             }
         }
-    }, [user, userData, loading, router, isRegisterPage, pathname]);
+    }, [user, userData, loading, router, isAuthPage, pathname]);
 
-    if (isRegisterPage) {
+    if (isAuthPage) {
         return <>{children}</>;
     }
 
