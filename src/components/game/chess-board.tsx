@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -62,13 +62,15 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         const fen = game.fen();
         if(game.isCheckmate()){
             // The player whose turn it is has been checkmated
-            const winner = game.turn() === 'b' ? 'p1' : 'p2';
-            setWinner(winner, { fen });
+            const loserColor = game.turn();
+            const winner = loserColor === playerColor ? 'p2' : 'p1';
+            const winnerId = winner === 'p1' ? user?.uid ?? 'p1' : 'bot';
+            setWinner(winnerId, { fen });
         } else {
             setWinner('draw', { fen });
         }
     }
-  }, [game, setWinner]);
+  }, [game, setWinner, playerColor, user]);
 
 
   // Bot logic
