@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getCountFromServer, collection } from "firebase/firestore";
+import { doc, setDoc, getCountFromServer, collection, getDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -38,6 +38,7 @@ export default function RegisterPage() {
         const password = target.password.value;
         const confirmPassword = target['confirm-password'].value;
         const ref = searchParams.get('ref');
+        const mref = searchParams.get('mref');
 
         if (password !== confirmPassword) {
             toast({
@@ -76,7 +77,14 @@ export default function RegisterPage() {
 
             if(ref) {
                 userData.referredBy = ref;
+            } else if (mref) {
+                const marketerDoc = await getDoc(doc(db, 'users', mref));
+                if (marketerDoc.exists() && marketerDoc.data().role === 'marketer') {
+                    userData.mref = mref; // This is the top-level marketer
+                    userData.referralChain = [mref]; // Start the chain
+                }
             }
+
 
             await setDoc(doc(db, "users", user.uid), userData);
             
@@ -167,3 +175,5 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+    

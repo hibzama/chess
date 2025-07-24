@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,7 +83,9 @@ export default async function LandingPage() {
               <CardDescription>Are you an influencer? Apply to join our exclusive marketing team.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full">Apply Now</Button>
+              <Button variant="outline" className="w-full" asChild>
+                <Link href="/marketing/register">Apply Now</Link>
+              </Button>
             </CardContent>
           </Card>
           
@@ -104,3 +107,5 @@ export default async function LandingPage() {
     </div>
   );
 }
+
+    

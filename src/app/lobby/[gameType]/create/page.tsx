@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, getDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, getDoc, getDocs, query, where } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -20,9 +20,8 @@ import { cn } from '@/lib/utils';
 
 // Commission Ranks
 const referralRanks = [
-    { rank: 1, min: 0, max: 10, l1Rate: 0.03, l2Rate: 0.02 },
-    { rank: 2, min: 11, max: 29, l1Rate: 0.04, l2Rate: 0.03 },
-    { rank: 3, min: 30, max: Infinity, l1Rate: 0.05, l2Rate: 0.04 },
+    { rank: 1, min: 0, max: 20, l1Rate: 0.03, l2Rate: 0.02 },
+    { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
 ];
 
 const getReferralRank = async (userId: string) => {
@@ -181,12 +180,7 @@ export default function CreateGamePage() {
             
             // Revert balance deduction if room creation fails
              const userRef = doc(db, 'users', user.uid);
-             const transactionRef = doc(collection(db, "transactions"));
-             const revertBatch = writeBatch(db);
-             revertBatch.update(userRef, { balance: increment(wagerAmount) });
-             revertBatch.delete(transactionRef); // Attempt to delete the wager transaction if it was created
-             await revertBatch.commit();
-
+             await updateDoc(userRef, { balance: increment(wagerAmount) });
 
         } finally {
             setIsCreating(false);
@@ -282,3 +276,5 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
+    

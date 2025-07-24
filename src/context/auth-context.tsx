@@ -31,9 +31,11 @@ interface UserData {
     email: string;
     phone: string;
     balance: number;
-    role: 'user' | 'admin';
+    role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
     referredBy?: string;
+    mref?: string;
+    referralChain?: string[];
     createdAt: any;
 }
 
@@ -95,3 +97,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    

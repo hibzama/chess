@@ -1,8 +1,9 @@
+
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -103,6 +104,9 @@ export default function AdminLayout({
                         <SidebarMenuItem>
                              <Link href="/admin/users"><SidebarMenuButton tooltip="Users"><Users /><span>Users</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
+                        <SidebarMenuItem>
+                             <Link href="/admin/marketing/applications"><SidebarMenuButton tooltip="Marketing Applications"><Megaphone /><span>Marketing Apps</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>
                 <SidebarFooter>
@@ -130,3 +134,5 @@ export default function AdminLayout({
         </SidebarProvider>
     )
   }
+
+    

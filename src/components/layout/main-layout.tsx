@@ -96,6 +96,9 @@ export default function MainLayout({
                             <SidebarMenuButton tooltip="Direct Messages"><MessageSquare /><span>Direct Messages</span></SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
+                             <Link href="/marketing/dashboard"><SidebarMenuButton tooltip="Marketing" isActive={isMounted && pathname.startsWith('/marketing')}><Megaphone /><span>Marketing</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
                             <SidebarMenuButton tooltip="About Us"><Info /><span>About Us</span></SidebarMenuButton>
                         </SidebarMenuItem>
                     </SidebarMenu>
@@ -155,3 +158,5 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
+    

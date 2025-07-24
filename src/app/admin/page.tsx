@@ -1,6 +1,7 @@
+
 'use client'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Clock, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Users, Clock, ArrowUpCircle, ArrowDownCircle, Megaphone } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminDashboardPage() {
@@ -10,6 +11,7 @@ export default function AdminDashboardPage() {
     { title: "Pending Withdrawals", description: "Process new withdrawal requests.", icon: Clock, href: "/admin/withdrawals/pending" },
     { title: "User Management", description: "View and manage all registered users.", icon: Users, href: "/admin/users" },
     { title: "Transaction Histories", description: "View all deposit and withdrawal records.", icon: ArrowUpCircle, href: "/admin/deposits/history" },
+    { title: "Marketing Apps", description: "Review new marketing applications.", icon: Megaphone, href: "/admin/marketing/applications" },
   ];
 
   return (
@@ -37,3 +39,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
