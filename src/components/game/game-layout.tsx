@@ -45,23 +45,23 @@ const GameOverDisplay = () => {
                     description = "The game has ended in a draw by agreement or stalemate.";
                     break;
                 case 'checkmate':
-                     title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
+                     title = winner === 'p1' ? "Congratulations You Win!" : `Bad Luck, You Lost`;
                      description = winner === 'p1' ? `You beat your opponent by checkmate.` : `Your opponent has checkmated you.`;
                      break;
                 case 'timeout':
-                     title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost on Time 😥`;
+                     title = winner === 'p1' ? "Congratulations You Win!" : `Bad Luck, You Lost`;
                      description = winner === 'p1' ? `Your opponent ran out of time.` : "You ran out of time.";
                      break;
                 case 'resign':
-                     title = winner === 'p1' ? "🎉 Opponent Resigned! 🎉" : `😥 You Resigned 😥`;
+                     title = winner === 'p1' ? "Congratulations You Win!" : `Bad Luck, You Lost`;
                      description = winner === 'p1' ? `Your opponent has resigned the game.` : "You have resigned the game.";
                      break;
                 default:
                      if (winner === 'p1') {
-                        title = "🎉 You Won! 🎉";
+                        title = "Congratulations You Win!";
                         description = "You have won the game.";
                      } else if (winner === 'p2') {
-                        title = "😥 You Lost 😥";
+                        title = "Bad Luck, You Lost";
                         description = "You have lost the game.";
                      }
                      break;
@@ -73,11 +73,11 @@ const GameOverDisplay = () => {
                     description = "The game has ended in a draw by agreement or stalemate.";
                     break;
                 case 'checkmate':
-                    title = winner === 'p1' ? "🎉 You Won! 🎉" : `😥 You Lost 😥`;
+                    title = winner === 'p1' ? `Congratulations You Win!` : `Bad Luck, You Lost`;
                     description = winner === 'p1' ? `You checkmated the bot. Well played!` : `The bot has checkmated you.`;
                     break;
                 case 'timeout':
-                    title = winner === 'p1' ? "🎉 You Won on Time! 🎉" : `😥 You Lost 😥`;
+                    title = winner === 'p1' ? `Congratulations You Win!` : `Bad Luck, You Lost`;
                     description = winner === 'p1' ? `The bot ran out of time.` : "You ran out of time.";
                     break;
                 case 'resign':
@@ -86,9 +86,9 @@ const GameOverDisplay = () => {
                      break;
                 default:
                      if (winner === 'p1') {
-                        title = "🎉 You Won! 🎉";
+                        title = `Congratulations You Win!`;
                      } else if (winner === 'p2') {
-                        title = "😥 You Lost 😥";
+                        title = `Bad Luck, You Lost`;
                      }
                      break;
             }
@@ -129,8 +129,9 @@ const GameOverDisplay = () => {
 }
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager } = useGame();
+  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame } = useGame();
   const { user, userData } = useAuth();
+  const router = useRouter();
   const USDT_RATE = 310;
   const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
   
