@@ -372,17 +372,17 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
              intervalRef.current = setInterval(() => {
                 if(gameState.isEnding || gameOverHandledRef.current) { stopTimer(); return; }
                 const elapsed = room.turnStartTime ? (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
+                
                 const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
+                const isCreator = room.createdBy.uid === user?.uid;
 
                 const creatorTimeRemaining = room.p1Time - (creatorIsCurrent ? elapsed : 0);
                 const joinerTimeRemaining = room.p2Time - (!creatorIsCurrent ? elapsed : 0);
                 
-                const isCreator = room.createdBy.uid === user?.uid;
-                setGameState(p => ({
-                    ...p, 
-                    p1Time: isCreator ? creatorTimeRemaining : joinerTimeRemaining, 
-                    p2Time: !isCreator ? creatorTimeRemaining : joinerTimeRemaining
-                }));
+                const p1Time = isCreator ? creatorTimeRemaining : joinerTimeRemaining;
+                const p2Time = !isCreator ? creatorTimeRemaining : joinerTimeRemaining;
+
+                setGameState(p => ({ ...p, p1Time, p2Time }));
 
                 if (creatorTimeRemaining <= 0 && room.player2?.uid) {
                     setWinner(room.player2.uid, room.boardState, 'timeout');
