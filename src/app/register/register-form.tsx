@@ -76,22 +76,29 @@ export default function RegisterForm() {
                 createdAt: serverTimestamp(),
             };
 
-            if (mref) {
-                const marketerDoc = await getDoc(doc(db, 'users', mref));
-                if (marketerDoc.exists() && marketerDoc.data().role === 'marketer') {
-                    userData.referralChain = [mref];
-                }
-            } else if (ref) {
-                const referrerDoc = await getDoc(doc(db, 'users', ref));
+            const referrerId = mref || ref;
+
+            if (referrerId) {
+                const referrerDoc = await getDoc(doc(db, 'users', referrerId));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    if (referrerData.referralChain && referrerData.referralChain.length < 20) {
-                        // This user is part of a marketing chain, so we extend it.
-                        userData.referralChain = [...referrerData.referralChain, ref];
-                    } else {
-                        // This is a standard referral.
-                        userData.referredBy = ref;
+                    
+                    // Case 1: The referrer is a marketer (direct link or via chain)
+                    if (mref && referrerData.role === 'marketer') {
+                         userData.referralChain = [mref];
+                    } 
+                    // Case 2: The referrer is part of an existing marketing chain
+                    else if (ref && referrerData.referralChain) {
+                         if (referrerData.referralChain.length < 20) {
+                            userData.referralChain = [...referrerData.referralChain, ref];
+                        }
                     }
+                    
+                    // ALWAYS set the direct referrer for L1 tracking
+                    if(ref) {
+                       userData.referredBy = ref;
+                    }
+
                 }
             }
 
