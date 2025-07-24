@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet, Bell, Trophy, Frown, Handshake } from 'lucide-react';
+import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet, Bell, Trophy, Frown, Handshake, Sword } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
@@ -47,9 +47,10 @@ const GameOverDisplay = () => {
             title = "Congratulations, You Win!";
             icon = <Trophy className="w-12 h-12 text-yellow-400" />;
             switch (gameOverReason) {
-                case 'checkmate': description = isMultiplayer ? "You beat your opponent by checkmate." : "You checkmated the bot. Well played!"; break;
+                case 'checkmate': description = isMultiplayer ? "You won by checkmate. Well played!" : "You checkmated the bot. Well played!"; break;
                 case 'timeout': description = isMultiplayer ? "You won on time as your opponent ran out." : "The bot ran out of time."; break;
                 case 'resign': description = isMultiplayer ? "Your opponent has resigned the game." : "The bot has resigned."; break;
+                case 'piece-capture': description = isMultiplayer ? "You captured all your opponent's pieces!" : "You captured all the bot's pieces!"; break;
                 default: description = "You have won the game!";
             }
         } else {
@@ -59,6 +60,7 @@ const GameOverDisplay = () => {
                 case 'checkmate': description = isMultiplayer ? "Your opponent has checkmated you." : "The bot has checkmated you."; break;
                 case 'timeout': description = isMultiplayer ? "You lost because you ran out of time." : "You ran out of time."; break;
                 case 'resign': description = isMultiplayer ? "You have resigned the game." : "You have resigned the game against the bot."; break;
+                case 'piece-capture': description = isMultiplayer ? "Your opponent captured all your pieces." : "The bot captured all your pieces."; break;
                 default: description = "You have lost the game.";
             }
         }

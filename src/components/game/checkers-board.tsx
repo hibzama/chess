@@ -146,15 +146,13 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         else if (!hasMoves) winnerColor = nextPlayer === 'w' ? 'b' : 'w';
     
         if (winnerColor) {
-            let winnerId: string | null = null;
+             let winnerId: string | null = null;
             if (isMultiplayer) {
-                // If local player's color matches the winner color, they are the winner.
-                // Otherwise, the opponent is the winner.
-                winnerId = playerColor === winnerColor ? user?.uid ?? null : roomOpponentId;
+                winnerId = (playerColor === winnerColor) ? user?.uid ?? null : roomOpponentId;
             } else {
-                 winnerId = playerColor === winnerColor ? user?.uid ?? 'p1' : 'bot';
+                winnerId = (playerColor === winnerColor) ? 'p1' : 'bot';
             }
-            setWinner(winnerId || null, { board: currentBoard });
+            setWinner(winnerId, { board: currentBoard }, 'piece-capture');
         }
     }, [getPossibleMovesForPiece, playerColor, setWinner, user, roomOpponentId, isMultiplayer]);
 
@@ -207,7 +205,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             }, 1000);
         }
         
-    }, [board, currentPlayer, consecutiveJumpPiece, getPossibleMovesForPiece, playerColor, switchTurn, calculateAllMoves, gameOver, isMounted, isMultiplayer]);
+    }, [board, currentPlayer, consecutiveJumpPiece, getPossibleMovesForPiece, playerColor, switchTurn, calculateAllMoves, gameOver, isMounted, isMultiplayer, movePiece]);
 
 
     const handleSquareClick = (row: number, col: number) => {
@@ -246,7 +244,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         }
     };
     
-    const movePiece = (move: Move) => {
+    const movePiece = useCallback((move: Move) => {
         const newBoard = board.map(r => [...r]);
         const piece = newBoard[move.from.row][move.from.col];
         
@@ -275,6 +273,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         }
         
         setBoard(newBoard);
+        checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');
 
         const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
 
@@ -292,8 +291,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
         }
         
-        checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');
-    };
+    }, [board, switchTurn, checkForWinner, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer]);
 
     const displayedBoard = isFlipped ? [...board].reverse().map(row => [...row].reverse()) : board;
 

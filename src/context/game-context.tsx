@@ -10,7 +10,7 @@ type PlayerColor = 'w' | 'b';
 type Winner = 'p1' | 'p2' | 'draw' | null;
 type Piece = { type: string; color: 'w' | 'b' };
 type Move = { turn: number; white?: string; black?: string };
-type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | null;
+type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | 'piece-capture' | null;
 
 interface GameRoom {
     id: string;
@@ -150,11 +150,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const isCreator = currentRoom.createdBy.uid === user.uid;
                 if(roomData.draw) return { myPayout: roomData.wager * 0.9 };
                 if(!roomData.winner) return { myPayout: 0 };
-                const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
+                const winnerIsMe = roomData.winner.uid === user.uid;
+
                 if(roomData.winner.method === 'resign') {
-                    return { myPayout: isCreator === winnerIsCreator ? roomData.wager * 1.05 : roomData.wager * 0.75 }
-                } else { // checkmate or timeout
-                    return { myPayout: isCreator === winnerIsCreator ? roomData.wager * 1.8 : 0 }
+                    return { myPayout: winnerIsMe ? roomData.wager * 1.05 : roomData.wager * 0.75 }
+                } else { // checkmate or timeout or piece-capture
+                    return { myPayout: winnerIsMe ? roomData.wager * 1.8 : 0 }
                 }
             }
             if (!roomData.player2) return { myPayout: 0 };
@@ -186,10 +187,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     joinerPayout = !winnerIsCreator ? wager * 1.05 : wager * 0.75;
                     creatorDesc = winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
                     joinerDesc = !winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
-                } else { // 'checkmate' or 'timeout'
+                } else { // 'checkmate', 'timeout', or 'piece-capture'
                     creatorPayout = winnerIsCreator ? wager * 1.8 : 0;
                     joinerPayout = !winnerIsCreator ? wager * 1.8 : 0;
-                    const reason = roomData.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win on time';
+                    const reason = roomData.winner.method === 'checkmate' ? 'Win by checkmate' : (roomData.winner.method === 'timeout' ? 'Win on time' : 'Win by capture');
                     creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
                     joinerDesc = !winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
                 }

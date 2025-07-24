@@ -61,13 +61,13 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     if (game.isGameOver()) {
         const fen = game.fen();
         if (game.isCheckmate()) {
-            const winnerId = playerColor === game.turn() ? roomOpponentId : user?.uid;
+            const winnerId = currentPlayer === playerColor ? user?.uid : roomOpponentId;
             setWinner(winnerId || null, { fen }, 'checkmate');
         } else {
             setWinner('draw', { fen }, 'draw');
         }
     }
-}, [game, setWinner, user, playerColor, roomOpponentId]);
+}, [game, setWinner, user, playerColor, roomOpponentId, currentPlayer]);
 
 
   // Bot logic
@@ -116,8 +116,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
             const newGame = new Chess(game.fen());
             setGame(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            switchTurn({ fen: newGame.fen() }, result.san, captured);
             checkGameOver();
+            switchTurn({ fen: newGame.fen() }, result.san, captured);
         }
       }
       setSelectedPiece(null);
