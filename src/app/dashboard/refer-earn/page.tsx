@@ -37,8 +37,8 @@ type Commission = {
 };
 
 const referralRanks = [
-    { rank: 1, name: "Rank 1", min: 0, max: 20, l1Rate: 3, l2Rate: 2 },
-    { rank: 2, name: "Rank 2", min: 21, max: Infinity, l1Rate: 4, l2Rate: 3 },
+    { rank: 1, name: "Rank 1", min: 0, max: 20, l1Rate: 3 },
+    { rank: 2, name: "Rank 2", min: 21, max: Infinity, l1Rate: 5 },
 ];
 
 export default function ReferAndEarnPage() {
@@ -57,14 +57,13 @@ export default function ReferAndEarnPage() {
         return '';
     }, [user]);
 
-    const { rank, l1Rate, l2Rate, totalCommission } = useMemo(() => {
+    const { rank, l1Rate, totalCommission } = useMemo(() => {
         const l1Count = level1.length;
         const currentRank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
         const total = commissions.reduce((acc, curr) => acc + curr.amount, 0);
         return {
             rank: currentRank.name,
             l1Rate: `${currentRank.l1Rate}%`,
-            l2Rate: `${currentRank.l2Rate}%`,
             totalCommission: total,
         };
     }, [level1.length, commissions]);
@@ -166,8 +165,8 @@ export default function ReferAndEarnPage() {
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
                         <p><strong>1. Invite Players:</strong> Share your unique referral link. When a new player signs up using your link, they become your <span className="text-primary font-semibold">Level 1</span> referral.</p>
-                        <p><strong>2. Earn from Two Levels:</strong> You earn a commission every time your Level 1 referrals play a game. When they invite others (your <span className="text-primary font-semibold">Level 2</span> referrals), you also earn a smaller, smaller commission from them!</p>
-                        <p><strong>3. Rank Up for Higher Commissions:</strong> The more players you directly refer (Level 1), the higher your Referral Rank becomes, unlocking better commission rates for both levels.</p>
+                        <p><strong>2. Earn from Level 1:</strong> You earn a commission every time your Level 1 referrals play a game. </p>
+                        <p><strong>3. Rank Up for Higher Commissions:</strong> The more players you directly refer (Level 1), the higher your Referral Rank becomes, unlocking better commission rates.</p>
                     </div>
                     <Table>
                         <TableHeader>
@@ -175,7 +174,6 @@ export default function ReferAndEarnPage() {
                                 <TableHead>Referral Rank</TableHead>
                                 <TableHead>Required Direct Referrals (L1)</TableHead>
                                 <TableHead>Level 1 Commission</TableHead>
-                                <TableHead>Level 2 Commission</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -184,7 +182,6 @@ export default function ReferAndEarnPage() {
                                     <TableCell><Badge variant={rank === r.name ? "default" : "secondary"}>{r.name}</Badge></TableCell>
                                     <TableCell>{r.rank === 2 ? `${r.min}+` : `${r.min} - ${r.max}`}</TableCell>
                                     <TableCell className="text-green-400 font-bold">{r.l1Rate}%</TableCell>
-                                    <TableCell className="text-green-400 font-bold">{r.l2Rate}%</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -195,7 +192,7 @@ export default function ReferAndEarnPage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card>
                     <CardHeader><CardTitle className="text-sm font-medium">Your Rank</CardTitle></CardHeader>
-                    <CardContent>{loading ? <Skeleton className="h-8 w-24"/> : <p className="text-2xl font-bold">{rank}</p>}<p className="text-xs text-muted-foreground">{l1Rate} L1 / {l2Rate} L2 Commission</p></CardContent>
+                    <CardContent>{loading ? <Skeleton className="h-8 w-24"/> : <p className="text-2xl font-bold">{rank}</p>}<p className="text-xs text-muted-foreground">{l1Rate} L1 Commission</p></CardContent>
                 </Card>
                  <Card>
                     <CardHeader><CardTitle className="text-sm font-medium">Level 1 Referrals</CardTitle></CardHeader>

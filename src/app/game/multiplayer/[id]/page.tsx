@@ -325,50 +325,31 @@ function MultiplayerGamePageContent() {
                                 }
                             }
                         }
-                        // 2. Regular 2-Level Commissions (Only if not in a marketing chain)
+                        // 2. Regular 1-Level Commissions (Only if not in a marketing chain)
                         else if (player.data.referredBy) {
                             const l1ReferrerRef = doc(db, 'users', player.data.referredBy);
                             const l1ReferrerDoc = await transaction.get(l1ReferrerRef);
 
-                            if (l1ReferrerDoc.exists()) {
-                                const l1ReferrerData = l1ReferrerDoc.data();
+                            if (l1ReferrerDoc.exists() && !l1ReferrerDoc.data().referralChain) { // Check L1 is not a marketer
                                 const referralRanks = [
-                                    { rank: 1, min: 0, max: 20, l1Rate: 0.03, l2Rate: 0.02 },
-                                    { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
+                                    { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
+                                    { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
                                 ];
         
-                                // We need to fetch the count outside the main transaction if possible, but for consistency we do it here.
                                 // This is a limitation, for high traffic this should be a denormalized count on the user object.
                                 const l1CountSnapshot = await getDocs(query(collection(db, 'users'), where('referredBy', '==', l1ReferrerDoc.id)));
                                 const l1Count = l1CountSnapshot.size;
                                 const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
         
-                                // L1 Commission
+                                // L1 Commission only
                                 const l1Commission = wagerAmount * rank.l1Rate;
                                 if (l1Commission > 0) {
                                      transaction.update(l1ReferrerRef, { balance: increment(l1Commission) });
                                      transaction.set(doc(collection(db, 'transactions')), {
                                         userId: l1ReferrerDoc.id, type: 'commission', amount: l1Commission, status: 'completed',
-                                        description: `Commission from ${player.name}`, fromUserId: player.id,
+                                        description: `L1 Commission from ${player.name}`, fromUserId: player.id,
                                         level: 1, gameRoomId: room.id, createdAt: serverTimestamp()
                                     });
-                                }
-        
-                                // L2 Commission (Strictly check L1's referrer and stop)
-                                if (l1ReferrerData.referredBy) {
-                                    const l2ReferrerRef = doc(db, 'users', l1ReferrerData.referredBy);
-                                    const l2ReferrerDoc = await transaction.get(l2ReferrerRef);
-                                    if (l2ReferrerDoc.exists() && !l2ReferrerDoc.data().referralChain) { // Ensure L2 is not a marketer
-                                        const l2Commission = wagerAmount * rank.l2Rate;
-                                        if (l2Commission > 0) {
-                                            transaction.update(l2ReferrerRef, { balance: increment(l2Commission) });
-                                            transaction.set(doc(collection(db, 'transactions')), {
-                                                userId: l2ReferrerDoc.id, type: 'commission', amount: l2Commission, status: 'completed',
-                                                description: `Commission from ${player.name}`, fromUserId: player.id,
-                                                level: 2, gameRoomId: room.id, createdAt: serverTimestamp()
-                                            });
-                                        }
-                                    }
                                 }
                             }
                         }
