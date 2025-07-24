@@ -1,5 +1,4 @@
 
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -68,7 +67,9 @@ export default function ReferAndEarnPage() {
         };
     }, [level1.length]);
 
-    const totalCommission = useMemo(() => commissions.reduce((acc, curr) => acc + curr.amount, 0), [commissions]);
+    const totalCommission = useMemo(() => {
+      return commissions.reduce((acc, curr) => acc + curr.amount, 0)
+    }, [commissions]);
 
 
     const monthlyCommissionData = useMemo(() => {
@@ -202,7 +203,7 @@ export default function ReferAndEarnPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Info/> How the Referral System Works</CardTitle>
-                </Header>
+                </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
                         <p><strong>1. Invite Players:</strong> Share your unique referral link. When a new player signs up using your link, they become your <span className="text-primary font-semibold">Level 1</span> referral.</p>
@@ -281,7 +282,7 @@ export default function ReferAndEarnPage() {
              </div>
 
             <Card>
-                <CardHeader><CardTitle>Referral & Commission Management</CardTitle><CardDescription>View your network, transfer funds, and see your history.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Referral &amp; Commission Management</CardTitle><CardDescription>View your network, transfer funds, and see your history.</CardDescription></CardHeader>
                 <CardContent>
                      <Tabs defaultValue="transfer">
                         <TabsList className="grid w-full grid-cols-3">
@@ -398,3 +399,5 @@ const CommissionTable = ({ commissions, loading, referrals }: { commissions: Com
         </Table>
     )
 }
+
+    
