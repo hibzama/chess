@@ -10,7 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getCountFromServer, collection, getDoc } from "firebase/firestore";
+import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -73,8 +73,9 @@ export default function RegisterForm() {
                 email,
                 balance: initialBalance,
                 commissionBalance: 0,
+                marketingBalance: 0,
                 role: 'user', // Default role for new users
-                createdAt: new Date(),
+                createdAt: serverTimestamp(),
             };
 
             if (mref) {
@@ -88,7 +89,7 @@ export default function RegisterForm() {
                 const referrerDoc = await getDoc(doc(db, 'users', ref));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    userData.referredBy = ref; // Direct referrer for 2-level system
+                    userData.referredBy = ref; // Direct referrer for 1-level system
 
                     // Check if the referrer is part of a marketing chain.
                     if (referrerData.referralChain && referrerData.referralChain.length < 20) {

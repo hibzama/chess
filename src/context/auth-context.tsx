@@ -37,7 +37,6 @@ interface UserData {
     role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
     referredBy?: string;
-    mref?: string;
     referralChain?: string[];
     createdAt: any;
 }

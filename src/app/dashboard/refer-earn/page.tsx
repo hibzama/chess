@@ -399,5 +399,3 @@ const CommissionTable = ({ commissions, loading, referrals }: { commissions: Com
         </Table>
     )
 }
-
-    
