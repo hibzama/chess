@@ -61,9 +61,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     if (game.isGameOver()) {
         const fen = game.fen();
         if(game.isCheckmate()){
-            // The player whose turn it is has been checkmated
+            // The player whose turn it IS has been checkmated. The winner is the player whose turn it IS NOT.
             const loserColor = game.turn();
-            // The winner is the *other* color
             const winnerId = loserColor === playerColor ? roomOpponentId : user?.uid;
             setWinner(winnerId, { fen }, 'checkmate');
         } else {
