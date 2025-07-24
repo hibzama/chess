@@ -52,7 +52,7 @@ const GameOverDisplay = () => {
             title = "It's a Draw!";
             description = "The game has ended in a draw by agreement or stalemate.";
             icon = <Handshake className="w-12 h-12 text-yellow-400" />;
-        } else if (winner === 'p1') {
+        } else if ((winner === 'p1' && !isMultiplayer) || (isMultiplayer && user?.uid === winner)) {
             title = "Congratulations, You Win!";
             icon = <Trophy className="w-12 h-12 text-yellow-400" />;
             switch (gameOverReason) {
