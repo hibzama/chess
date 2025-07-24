@@ -144,27 +144,26 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         if (!roomId || !user) return { myPayout: 0 };
     
         try {
-            return await runTransaction(db, async (transaction) => {
+            const payoutResult = await runTransaction(db, async (transaction) => {
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomDoc = await transaction.get(roomRef);
         
                 if (!roomDoc.exists()) throw "Room does not exist!";
                 const roomData = roomDoc.data() as GameRoom;
         
-                let myPayout = 0;
+                let myFinalPayout = 0;
                 if (roomData.payoutTransactionId) {
                     const wager = roomData.wager;
-                    const winnerId = roomData.winner?.uid;
                     const resignerId = roomData.winner?.resignerId;
                     
                     if (resignerId) {
-                        myPayout = resignerId === user.uid ? wager * 0.75 : wager * 1.05;
+                        myFinalPayout = resignerId === user.uid ? wager * 0.75 : wager * 1.05;
                     } else if (roomData.draw) {
-                        myPayout = wager * 0.9;
-                    } else if (winnerId === user.uid) {
-                        myPayout = wager * 1.8;
+                        myFinalPayout = wager * 0.9;
+                    } else if (roomData.winner?.uid === user.uid) {
+                        myFinalPayout = wager * 1.8;
                     }
-                    return { myPayout };
+                    return { myPayout: myFinalPayout };
                 }
         
                 if (!roomData.player2) return { myPayout: 0 };
@@ -220,6 +219,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const isCreator = currentRoom.createdBy.uid === user.uid;
                 return { myPayout: isCreator ? creatorPayout : joinerPayout };
             });
+            return payoutResult;
         } catch (error) {
             console.error("Payout Transaction failed:", error);
             // Even if transaction fails, calculate what the payout should have been for UI display.
