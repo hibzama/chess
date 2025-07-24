@@ -2,7 +2,7 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet, Bell } from 'lucide-react';
+import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet, Bell, Trophy, Frown, Handshake } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
@@ -37,73 +37,75 @@ const GameOverDisplay = () => {
     const getWinnerMessage = () => {
         let title = "Game Over";
         let description = "The game has concluded.";
-        
+        let icon = <Crown className="w-12 h-12 text-primary" />;
+
         if (isMultiplayer) {
-             switch(gameOverReason) {
-                case 'draw':
-                    title = "It's a Draw!";
-                    description = "The game has ended in a draw by agreement or stalemate.";
-                    break;
-                case 'checkmate':
-                     title = winner === 'p1' ? "Congratulations You Win!" : `Bad Luck, You Lost`;
-                     description = winner === 'p1' ? `You beat your opponent by checkmate.` : `Your opponent has checkmated you.`;
-                     break;
-                case 'timeout':
-                     title = winner === 'p1' ? "Congratulations You Win!" : `Bad Luck, You Lost`;
-                     description = winner === 'p1' ? `Your opponent ran out of time.` : "You ran out of time.";
-                     break;
-                case 'resign':
-                     title = winner === 'p1' ? "Congratulations You Win!" : `Bad Luck, You Lost`;
-                     description = winner === 'p1' ? `Your opponent has resigned the game.` : "You have resigned the game.";
-                     break;
-                default:
-                     if (winner === 'p1') {
-                        title = "Congratulations You Win!";
-                        description = "You have won the game.";
-                     } else if (winner === 'p2') {
-                        title = "Bad Luck, You Lost";
-                        description = "You have lost the game.";
-                     }
-                     break;
+            if (winner === 'draw') {
+                title = "It's a Draw!";
+                description = "The game has ended in a draw by agreement or stalemate.";
+                icon = <Handshake className="w-12 h-12 text-yellow-400" />;
+            } else if (winner === 'p1') { // p1 is always the user
+                title = "Congratulations, You Win!";
+                icon = <Trophy className="w-12 h-12 text-yellow-400" />;
+                switch (gameOverReason) {
+                    case 'checkmate': description = "You beat your opponent by checkmate."; break;
+                    case 'timeout': description = "You won on time as your opponent ran out."; break;
+                    case 'resign': description = "Your opponent has resigned the game."; break;
+                    default: description = "You have won the game!";
+                }
+            } else { // p2 is the opponent
+                title = "Bad Luck, You Lost";
+                icon = <Frown className="w-12 h-12 text-destructive" />;
+                 switch (gameOverReason) {
+                    case 'checkmate': description = "Your opponent has checkmated you."; break;
+                    case 'timeout': description = "You lost because you ran out of time."; break;
+                    case 'resign': description = "You have resigned the game."; break;
+                    default: description = "You have lost the game.";
+                }
             }
         } else { // Practice Mode messages
             switch(gameOverReason) {
                 case 'draw':
                     title = "It's a Draw!";
                     description = "The game has ended in a draw by agreement or stalemate.";
+                    icon = <Handshake className="w-12 h-12 text-yellow-400" />;
                     break;
                 case 'checkmate':
-                    title = winner === 'p1' ? `Congratulations You Win!` : `Bad Luck, You Lost`;
+                    title = winner === 'p1' ? `Congratulations, You Win!` : `Bad Luck, You Lost`;
                     description = winner === 'p1' ? `You checkmated the bot. Well played!` : `The bot has checkmated you.`;
+                    icon = winner === 'p1' ? <Trophy className="w-12 h-12 text-yellow-400" /> : <Frown className="w-12 h-12 text-destructive" />;
                     break;
                 case 'timeout':
-                    title = winner === 'p1' ? `Congratulations You Win!` : `Bad Luck, You Lost`;
+                    title = winner === 'p1' ? `Congratulations, You Win!` : `Bad Luck, You Lost`;
                     description = winner === 'p1' ? `The bot ran out of time.` : "You ran out of time.";
+                    icon = winner === 'p1' ? <Trophy className="w-12 h-12 text-yellow-400" /> : <Frown className="w-12 h-12 text-destructive" />;
                     break;
                 case 'resign':
                      title = "You Resigned";
                      description = "You have resigned the game against the bot.";
+                     icon = <Flag className="w-12 h-12 text-muted-foreground" />;
                      break;
                 default:
                      if (winner === 'p1') {
-                        title = `Congratulations You Win!`;
+                        title = `Congratulations, You Win!`;
+                        icon = <Trophy className="w-12 h-12 text-yellow-400" />;
                      } else if (winner === 'p2') {
                         title = `Bad Luck, You Lost`;
+                        icon = <Frown className="w-12 h-12 text-destructive" />;
                      }
                      break;
             }
         }
-
-        return { title, description };
+        return { title, description, icon };
     }
 
-    const { title, description } = getWinnerMessage();
+    const { title, description, icon } = getWinnerMessage();
 
     return (
         <Card className="w-full max-w-lg text-center p-8 bg-card/70 backdrop-blur-sm animate-in fade-in zoom-in-95">
             <CardHeader className="items-center">
                  <div className="p-4 rounded-full bg-primary/10 mb-2">
-                    <Crown className="w-12 h-12 text-primary" />
+                    {icon}
                 </div>
                 <CardTitle className="text-2xl">{title}</CardTitle>
                 <CardDescription>
