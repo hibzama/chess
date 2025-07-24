@@ -44,23 +44,21 @@ const GameOverDisplay = () => {
         let description = "The game has concluded.";
         let icon = <Crown className="w-12 h-12 text-primary" />;
 
-        const isWinner = (winner === 'p1' && !isMultiplayer) || (isMultiplayer && user?.uid === winner);
-        const isLoser = (winner === 'p2' && !isMultiplayer) || (isMultiplayer && user?.uid !== winner && winner !== 'draw');
+        const isWinner = (winner === 'p1' && !isMultiplayer) || (isMultiplayer && user?.uid === room?.winner?.uid);
+        const isLoser = (winner === 'p2' && !isMultiplayer) || (isMultiplayer && user?.uid !== room?.winner?.uid && !room?.draw);
 
-        // Handle resignation specifically
         if (gameOverReason === 'resign') {
-            if (isWinner) {
-                title = "Congratulations, You Win!";
-                description = "Your opponent has resigned the game.";
-                icon = <Trophy className="w-12 h-12 text-yellow-400" />;
-            } else if (isLoser) {
+             const wasITheResigner = user?.uid === room?.winner?.resignerId;
+             if (wasITheResigner) {
                 title = "You Resigned";
                 description = "You chose to resign the match.";
                 icon = <Flag className="w-12 h-12 text-muted-foreground" />;
-            }
-        } 
-        // Handle other win/loss reasons
-        else if (isWinner) {
+             } else {
+                title = "Congratulations, You Win!";
+                description = "Your opponent has resigned the game.";
+                icon = <Trophy className="w-12 h-12 text-yellow-400" />;
+             }
+        } else if (isWinner) {
             title = "Congratulations, You Win!";
             icon = <Trophy className="w-12 h-12 text-yellow-400" />;
             switch (gameOverReason) {
@@ -78,9 +76,7 @@ const GameOverDisplay = () => {
                 case 'piece-capture': description = "Your opponent captured all your pieces."; break;
                 default: description = "You have lost the game.";
             }
-        } 
-        // Handle draws
-        else if (winner === 'draw') {
+        } else if (room?.draw || winner === 'draw') {
             title = "It's a Draw!";
             description = "The game has ended in a draw by agreement or stalemate.";
             icon = <Handshake className="w-12 h-12 text-yellow-400" />;
