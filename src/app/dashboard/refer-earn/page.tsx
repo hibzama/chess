@@ -45,8 +45,6 @@ export default function ReferAndEarnPage() {
     const [level1, setLevel1] = useState<Referral[]>([]);
     const [commissions, setCommissions] = useState<Commission[]>([]);
     const [loading, setLoading] = useState(true);
-    const [transferAmount, setTransferAmount] = useState('');
-    const [isTransferring, setIsTransferring] = useState(false);
 
     const referralLink = useMemo(() => {
         if (typeof window !== 'undefined' && user) {
@@ -121,59 +119,6 @@ export default function ReferAndEarnPage() {
         toast({ title: "Copied!", description: "Referral link copied to clipboard." });
     };
 
-    const handleTransfer = async () => {
-        if (!user || !transferAmount) return;
-        
-        const amount = parseFloat(transferAmount);
-        if (isNaN(amount) || amount <= 0) {
-            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid amount to transfer.' });
-            return;
-        }
-
-        if (!userData || (userData.commissionBalance || 0) < amount) {
-             toast({ variant: 'destructive', title: 'Insufficient Balance', description: 'Your commission balance is too low.' });
-            return;
-        }
-
-        setIsTransferring(true);
-        const userRef = doc(db, 'users', user.uid);
-        const transactionRef = doc(collection(db, 'transactions'));
-
-        try {
-            await runTransaction(db, async (transaction) => {
-                const userDoc = await transaction.get(userRef);
-                if (!userDoc.exists()) throw new Error("User not found");
-                
-                const currentCommissionBalance = userDoc.data().commissionBalance || 0;
-                if (currentCommissionBalance < amount) throw new Error("Insufficient commission balance.");
-
-                transaction.update(userRef, {
-                    commissionBalance: increment(-amount),
-                    balance: increment(amount),
-                });
-                
-                transaction.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'commission_transfer',
-                    amount: amount,
-                    status: 'completed',
-                    description: 'Commission transferred to main wallet',
-                    createdAt: serverTimestamp()
-                });
-            });
-            
-            toast({ title: 'Transfer Successful!', description: `LKR ${amount.toFixed(2)} has been added to your main wallet.` });
-            setTransferAmount('');
-
-        } catch (error: any) {
-            console.error("Transfer failed:", error);
-            toast({ variant: 'destructive', title: 'Transfer Failed', description: error.message || 'An unknown error occurred.' });
-        } finally {
-            setIsTransferring(false);
-        }
-    };
-
-
     return (
         <div className="space-y-8">
              <div>
@@ -200,7 +145,7 @@ export default function ReferAndEarnPage() {
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
                         <p><strong>1. Invite Players:</strong> Share your unique referral link. When a new player signs up using your link, they become your <span className="text-primary font-semibold">Level 1</span> referral.</p>
-                        <p><strong>2. Earn from Level 1:</strong> You earn a commission every time your Level 1 referrals play a game. </p>
+                        <p><strong>2. Earn from Level 1:</strong> You earn a commission every time your Level 1 referrals play a game. Commissions are added directly to your main wallet balance.</p>
                         <p><strong>3. Rank Up for Higher Commissions:</strong> The more players you directly refer (Level 1), the higher your Referral Rank becomes, unlocking better commission rates.</p>
                     </div>
                     <Table>
@@ -224,7 +169,7 @@ export default function ReferAndEarnPage() {
                 </CardContent>
             </Card>
             
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <Card>
                     <CardHeader><CardTitle className="text-sm font-medium">Your Rank</CardTitle></CardHeader>
                     <CardContent>{loading ? <Skeleton className="h-8 w-24"/> : <p className="text-2xl font-bold">{rank}</p>}<p className="text-xs text-muted-foreground">{l1Rate} L1 Commission</p></CardContent>
@@ -234,12 +179,8 @@ export default function ReferAndEarnPage() {
                     <CardContent>{loading ? <Skeleton className="h-8 w-12"/> : <p className="text-2xl font-bold">{level1.length}</p>}<p className="text-xs text-muted-foreground">Directly referred players</p></CardContent>
                 </Card>
                 <Card>
-                    <CardHeader><CardTitle className="text-sm font-medium">Total Commission</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="text-sm font-medium">Total Commission Earned</CardTitle></CardHeader>
                     <CardContent>{loading ? <Skeleton className="h-8 w-32"/> : <p className="text-2xl font-bold">LKR {totalCommission.toFixed(2)}</p>}<p className="text-xs text-muted-foreground">Lifetime earnings from referrals</p></CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader><CardTitle className="text-sm font-medium">Available for Transfer</CardTitle></CardHeader>
-                    <CardContent>{!userData ? <Skeleton className="h-8 w-32"/> : <p className="text-2xl font-bold">LKR {(userData?.commissionBalance || 0).toFixed(2)}</p>}<p className="text-xs text-muted-foreground">Your withdrawable commission</p></CardContent>
                 </Card>
             </div>
 
@@ -275,43 +216,13 @@ export default function ReferAndEarnPage() {
              </div>
 
             <Card>
-                <CardHeader><CardTitle>Referral &amp; Commission Management</CardTitle><CardDescription>View your network, transfer funds, and see your history.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Referral &amp; Commission Management</CardTitle><CardDescription>View your network and see your commission history.</CardDescription></CardHeader>
                 <CardContent>
-                     <Tabs defaultValue="transfer">
-                        <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="transfer"><Wallet className="mr-2"/> Transfer to Wallet</TabsTrigger>
+                     <Tabs defaultValue="level1">
+                        <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="level1"><Layers className="mr-2"/> Referrals ({level1.length})</TabsTrigger>
                             <TabsTrigger value="history"><DollarSign className="mr-2"/> Commission History ({commissions.length})</TabsTrigger>
                         </TabsList>
-                         <TabsContent value="transfer">
-                           <Card>
-                                <CardHeader>
-                                    <CardTitle>Transfer Commission to Main Wallet</CardTitle>
-                                    <CardDescription>Move your earned commission to your main wallet to use for games.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                     <div className="p-4 rounded-lg bg-secondary">
-                                        <p className="text-sm text-muted-foreground">Available Commission Balance</p>
-                                        <p className="text-2xl font-bold">LKR {(userData?.commissionBalance || 0).toFixed(2)}</p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label htmlFor="transfer-amount">Amount to Transfer (LKR)</label>
-                                        <Input 
-                                            id="transfer-amount"
-                                            type="number"
-                                            value={transferAmount}
-                                            onChange={(e) => setTransferAmount(e.target.value)}
-                                            placeholder="e.g. 500"
-                                            />
-                                    </div>
-                                </CardContent>
-                                <CardFooter>
-                                     <Button onClick={handleTransfer} disabled={isTransferring}>
-                                        {isTransferring ? 'Transferring...' : 'Transfer Now'}
-                                     </Button>
-                                </CardFooter>
-                           </Card>
-                        </TabsContent>
                         <TabsContent value="level1">
                             <ReferralTable referrals={level1} loading={loading} />
                         </TabsContent>
@@ -380,5 +291,3 @@ const CommissionTable = ({ commissions, loading }: { commissions: Commission[], 
         </Table>
     )
 }
-
-    

@@ -271,7 +271,6 @@ function MultiplayerGamePageContent() {
                 }
                 const roomData = currentRoomDoc.data();
         
-                // --- Pre-fetch all necessary documents ---
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
         
@@ -289,20 +288,16 @@ function MultiplayerGamePageContent() {
                     { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
                 ];
         
-                // Build a map of all referral UIDs to fetch
                 const referralIdsToFetch = new Set<string>();
                 for (const player of playersWithData) {
-                    // Check for marketing chain first
                     if (player.data.referralChain) {
                         player.data.referralChain.forEach((refId: string) => referralIdsToFetch.add(refId));
                     } 
-                    // Then check for regular L1 referrer
                     else if (player.data.referredBy) {
                         referralIdsToFetch.add(player.data.referredBy);
                     }
                 }
         
-                // Fetch all unique referral documents
                 const referralDocs = await Promise.all(
                     Array.from(referralIdsToFetch).map(id => transaction.get(doc(db, 'users', id)))
                 );
@@ -314,7 +309,6 @@ function MultiplayerGamePageContent() {
                     }
                 });
 
-                // --- Perform all write operations ---
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
@@ -330,7 +324,6 @@ function MultiplayerGamePageContent() {
                     const wagerAmount = roomData.wager;
 
                     for (const player of playersWithData) {
-                        // Deduct wager and log transaction
                         transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
@@ -339,7 +332,7 @@ function MultiplayerGamePageContent() {
                         });
                         
                         // Marketing Chain Commissions
-                        if (player.data.referralChain && player.data.referralChain.length > 0) {
+                        if (player.data.referralChain?.length > 0) {
                             const marketingCommissionRate = 0.03;
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
@@ -358,7 +351,7 @@ function MultiplayerGamePageContent() {
                             const l1ReferrerId = player.data.referredBy;
                             const l1ReferrerData = referralDataMap.get(l1ReferrerId);
                             
-                             if (l1ReferrerData) { // Check if referrer data was successfully fetched
+                             if (l1ReferrerData) {
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
@@ -368,7 +361,7 @@ function MultiplayerGamePageContent() {
                                 const l1Commission = wagerAmount * rank.l1Rate;
         
                                 if (l1Commission > 0) {
-                                    transaction.update(doc(db, 'users', l1ReferrerId), { commissionBalance: increment(l1Commission) });
+                                    transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
                                     transaction.set(doc(collection(db, 'transactions')), {
                                         userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
                                         description: `L1 Commission from ${player.name}`, fromUserId: player.id,
