@@ -29,7 +29,7 @@ interface GameRoom {
     players: string[];
     status: 'waiting' | 'in-progress' | 'completed';
     winner?: {
-        uid: string,
+        uid: string | null,
         method: GameOverReason
     };
     draw?: boolean;
@@ -65,6 +65,7 @@ interface GameContextType extends GameState {
     isMultiplayer: boolean;
     resign: () => void;
     roomWager: number;
+    roomOpponentId: string | null;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -175,7 +176,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 joinerPayout = wager * 0.9;
                 creatorDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.player2.name}`;
                 joinerDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.createdBy.name}`;
-            } else if (roomData.winner) {
+            } else if (roomData.winner && roomData.winner.uid) {
                 const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
                 const winnerName = winnerIsCreator ? roomData.createdBy.name : roomData.player2.name;
                 const loserName = winnerIsCreator ? roomData.player2.name : roomData.createdBy.name;
@@ -234,7 +235,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let updatePayload: any = { status: 'completed' };
                 if(winnerId === 'draw') {
                     updatePayload.draw = true;
-                    updatePayload.winner = { method: 'draw' };
+                    updatePayload.winner = { uid: null, method: 'draw' };
                 } else if (winnerId) {
                     updatePayload.winner = { uid: winnerId, method };
                 }
@@ -273,8 +274,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 handlePayout(roomData).then(({ myPayout }) => {
                     if (gameOverHandledRef.current) return;
                     gameOverHandledRef.current = true;
-
+                    
                     const winnerIsMe = roomData.winner?.uid === user.uid;
+
                     setGameState(prevState => ({
                         ...prevState,
                         boardState: roomData.boardState,
@@ -516,6 +518,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         stopTimer();
     };
 
+    const getOpponentId = () => {
+        if (!user || !room || !room.players) return null;
+        return room.players.find(p => p !== user.uid) || null;
+    }
+
     const contextValue = {
         ...gameState,
         isMounted,
@@ -526,7 +533,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         loadGameState,
         isMultiplayer,
         resign,
-        roomWager: room?.wager || 0
+        roomWager: room?.wager || 0,
+        roomOpponentId: getOpponentId(),
     };
 
     return (

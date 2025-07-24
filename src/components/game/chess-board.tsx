@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, roomOpponentId } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -63,14 +63,14 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         if(game.isCheckmate()){
             // The player whose turn it is has been checkmated
             const loserColor = game.turn();
-            const winner = loserColor === playerColor ? 'p2' : 'p1';
-            const winnerId = winner === 'p1' ? user?.uid ?? 'p1' : 'bot';
-            setWinner(winnerId, { fen });
+            // The winner is the *other* color
+            const winnerId = loserColor === playerColor ? roomOpponentId : user?.uid;
+            setWinner(winnerId, { fen }, 'checkmate');
         } else {
-            setWinner('draw', { fen });
+            setWinner('draw', { fen }, 'draw');
         }
     }
-  }, [game, setWinner, playerColor, user]);
+  }, [game, setWinner, playerColor, user, roomOpponentId]);
 
 
   // Bot logic
