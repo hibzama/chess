@@ -310,18 +310,20 @@ function MultiplayerGamePageContent() {
                         
                         // --- Commission Calculation ---
                         // 1. Marketing Chain Commissions (Highest Priority)
-                        if (player.data.referralChain && player.data.referralChain.length > 0) {
+                        if (player.data.role === 'marketer' || (player.data.referralChain && player.data.referralChain.length > 0)) {
                             const marketingCommissionRate = 0.03; 
-                            for (let i = 0; i < player.data.referralChain.length; i++) {
-                                const marketerId = player.data.referralChain[i];
-                                const commissionAmount = wagerAmount * marketingCommissionRate;
-                                if (commissionAmount > 0) {
-                                    transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
-                                    transaction.set(doc(collection(db, 'transactions')), {
-                                        userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
-                                        description: `Commission from ${player.name}`, fromUserId: player.id,
-                                        level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
-                                    });
+                             if(player.data.referralChain && player.data.referralChain.length > 0) {
+                                for (let i = 0; i < player.data.referralChain.length; i++) {
+                                    const marketerId = player.data.referralChain[i];
+                                    const commissionAmount = wagerAmount * marketingCommissionRate;
+                                    if (commissionAmount > 0) {
+                                        transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
+                                        transaction.set(doc(collection(db, 'transactions')), {
+                                            userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
+                                            description: `Commission from ${player.name}`, fromUserId: player.id,
+                                            level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -330,7 +332,7 @@ function MultiplayerGamePageContent() {
                             const l1ReferrerRef = doc(db, 'users', player.data.referredBy);
                             const l1ReferrerDoc = await transaction.get(l1ReferrerRef);
 
-                            if (l1ReferrerDoc.exists() && !l1ReferrerDoc.data().referralChain) { // Check L1 is not a marketer
+                            if (l1ReferrerDoc.exists() && l1ReferrerDoc.data().role !== 'marketer') {
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
@@ -545,3 +547,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
