@@ -80,20 +80,19 @@ export default function RegisterForm() {
 
             const referrerId = mref || ref;
 
-             if (referrerId) {
+            if (referrerId) {
                 const referrerDoc = await getDoc(doc(db, 'users', referrerId));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
                     
                     if (mref && referrerData.role === 'marketer') {
                          userData.referralChain = [mref];
-                    } 
-                    else if (ref) {
+                    } else if (ref) {
                         userData.referredBy = ref;
                         await updateDoc(doc(db, 'users', ref), { l1Count: increment(1) });
-
-                        if (referrerData.referralChain && referrerData.referralChain.length < 20) {
-                            userData.referralChain = [...referrerData.referralChain, ref];
+                        
+                        if (referrerData.referralChain) {
+                             userData.referralChain = [...referrerData.referralChain, ref];
                         }
                     }
                 }
