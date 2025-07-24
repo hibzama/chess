@@ -254,22 +254,21 @@ function MultiplayerGamePageContent() {
     }, [room, isCreator, handleCancelRoom]);
 
 
-    
     const handleJoinGame = async () => {
         if (!user || !userData || !room || isCreator) return;
-
+    
         if(userData.balance < room.wager) {
             toast({ variant: 'destructive', title: "Insufficient Funds", description: "You don't have enough balance to join this game."});
             return;
         }
-
+    
         setIsJoining(true);
-        const roomRef = doc(db, 'game_rooms', room.id);
-        const userRef = doc(db, 'users', user.uid);
         const batch = writeBatch(db);
-
+        const roomRef = doc(db, 'game_rooms', room.id);
+        const joinerRef = doc(db, 'users', user.uid);
+        const creatorRef = doc(db, 'users', room.createdBy.uid);
+    
         try {
-             // Re-fetch room data to ensure it's still available before joining
             const currentRoomDoc = await getDoc(roomRef);
             if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
                 toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
@@ -277,53 +276,103 @@ function MultiplayerGamePageContent() {
                 router.push(`/lobby/${room.gameType}`);
                 return;
             }
-
-            // Deduct wager from joiner's balance
-            if (room.wager > 0) {
-                batch.update(userRef, { balance: increment(-room.wager) });
-            }
-
+    
+            // Update room to start the game
             const creatorColor = room.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-
-            // Update room to start the game
             batch.update(roomRef, {
                 status: 'in-progress',
-                player2: {
-                    uid: user.uid,
-                    name: `${userData.firstName} ${userData.lastName}`,
-                    color: joinerColor,
-                },
+                player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor },
                 players: [...room.players, user.uid],
-                capturedByP1: [],
-                capturedByP2: [],
-                moveHistory: [],
-                currentPlayer: 'w',
-                p1Time: room.timeControl,
-                p2Time: room.timeControl,
-                turnStartTime: serverTimestamp(),
+                capturedByP1: [], capturedByP2: [], moveHistory: [],
+                currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
             });
-
-            // Log wager transaction for joiner
-            if (room.wager > 0) {
-                const transactionRef = doc(collection(db, 'transactions'));
-                batch.set(transactionRef, {
-                    userId: user.uid, type: 'wager', amount: room.wager, status: 'completed',
+    
+            // --- Commission and Wager Logic ---
+            const wagerAmount = room.wager;
+            if (wagerAmount > 0) {
+                batch.update(joinerRef, { balance: increment(-wagerAmount) });
+                batch.set(doc(collection(db, 'transactions')), {
+                    userId: user.uid, type: 'wager', amount: wagerAmount, status: 'completed',
                     description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
                     gameRoomId: room.id, createdAt: serverTimestamp()
                 });
+    
+                const creatorDoc = await getDoc(creatorRef);
+                const creatorData = creatorDoc.data();
+    
+                const playersData = [
+                    { id: room.createdBy.uid, data: creatorData },
+                    { id: user.uid, data: userData }
+                ];
+    
+                const referralRanks = [
+                    { rank: 1, min: 0, max: 20, l1Rate: 0.03, l2Rate: 0.02 },
+                    { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
+                ];
+    
+                for (const player of playersData) {
+                    if (player.data?.referralChain && player.data.referralChain.length > 0) {
+                        // Marketing referral (20 levels, 3%)
+                        const commissionRate = 0.03;
+                        for (let i = 0; i < player.data.referralChain.length; i++) {
+                            const marketerId = player.data.referralChain[i];
+                            const commissionAmount = wagerAmount * commissionRate;
+                            if (commissionAmount > 0) {
+                                batch.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
+                                batch.set(doc(collection(db, 'transactions')), {
+                                    userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
+                                    description: `L${i + 1} commission from ${player.data.firstName}`,
+                                    fromUserId: player.id, level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
+                                });
+                            }
+                        }
+                    } else if (player.data?.referredBy) {
+                        // Regular referral (2 levels, rank-based)
+                        const l1ReferrerDoc = await getDoc(doc(db, 'users', player.data.referredBy));
+                        if (l1ReferrerDoc.exists()) {
+                            const l1ReferrerData = l1ReferrerDoc.data();
+                            const l1ReferralsCountQuery = await getDocs(query(collection(db, 'users'), where('referredBy', '==', l1ReferrerData.uid)));
+                            const l1Count = l1ReferralsCountQuery.size;
+                            const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
+                            
+                            const l1Commission = wagerAmount * rank.l1Rate;
+                            if (l1Commission > 0) {
+                                batch.update(l1ReferrerDoc.ref, { marketingBalance: increment(l1Commission) });
+                                batch.set(doc(collection(db, 'transactions')), {
+                                    userId: l1ReferrerData.uid, type: 'commission', amount: l1Commission, status: 'completed',
+                                    description: `L1 commission from ${player.data.firstName}`, fromUserId: player.id,
+                                    level: 1, gameRoomId: room.id, createdAt: serverTimestamp()
+                                });
+                            }
+    
+                            if (l1ReferrerData.referredBy) {
+                                const l2ReferrerDoc = await getDoc(doc(db, 'users', l1ReferrerData.referredBy));
+                                 if (l2ReferrerDoc.exists()) {
+                                    const l2Commission = wagerAmount * rank.l2Rate;
+                                    if (l2Commission > 0) {
+                                        batch.update(l2ReferrerDoc.ref, { marketingBalance: increment(l2Commission) });
+                                        batch.set(doc(collection(db, 'transactions')), {
+                                            userId: l1ReferrerData.referredBy, type: 'commission', amount: l2Commission, status: 'completed',
+                                            description: `L2 commission from ${player.data.firstName}`, fromUserId: player.id,
+                                            level: 2, gameRoomId: room.id, createdAt: serverTimestamp()
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             
             await batch.commit();
-            
             toast({ title: "Game Joined!", description: "The match is starting now."});
-
+    
         } catch (error) {
             console.error("Failed to join game:", error);
+            // This is a simplified refund. A more robust system would use a transaction to check if the balance was even deducted.
             if (room.wager > 0) {
-                // Since the batch might have partially failed, we just try to refund.
-                const userRef = doc(db, 'users', user.uid);
-                await updateDoc(userRef, { balance: increment(room.wager) });
+                await updateDoc(joinerRef, { balance: increment(room.wager) });
                 toast({ variant: 'destructive', title: "Error", description: "Could not join the game. Your wager has been refunded."});
             } else {
                  toast({ variant: 'destructive', title: "Error", description: "Could not join the game."});

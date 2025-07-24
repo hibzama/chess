@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 
 type Referral = {
     uid: string;
@@ -152,7 +153,9 @@ export default function ReferAndEarnPage() {
                     <CardDescription>Join our official marketing team to unlock a 20-level deep referral network and higher commission rates. If you're serious about building a large community, this is the next step.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button variant="outline">Apply to Join the Marketing Team</Button>
+                    <Button variant="outline" asChild>
+                        <Link href="/marketing/register">Apply to Join the Marketing Team</Link>
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -284,7 +287,7 @@ const ReferralTable = ({ referrals, loading }: { referrals: Referral[], loading:
                 ) : referrals.length > 0 ? referrals.map(ref => (
                     <TableRow key={ref.uid}>
                         <TableCell>{ref.firstName} {ref.lastName}</TableCell>
-                        <TableCell>{format(ref.createdAt.toDate(), 'yyyy-MM-dd')}</TableCell>
+                        <TableCell>{ref.createdAt ? format(ref.createdAt.toDate(), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                         <TableCell>{ref.wins}</TableCell>
                         <TableCell>{ref.losses}</TableCell>
                         <TableCell>LKR {ref.commissionEarned.toFixed(2)}</TableCell>
@@ -320,7 +323,7 @@ const CommissionTable = ({ commissions, loading, level1, level2 }: { commissions
                     <TableRow><TableCell colSpan={4} className="h-24 text-center">Loading commissions...</TableCell></TableRow>
                 ) : commissions.length > 0 ? commissions.map(comm => (
                     <TableRow key={comm.id}>
-                        <TableCell>{format(comm.createdAt.toDate(), 'PPp')}</TableCell>
+                        <TableCell>{comm.createdAt ? format(comm.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                         <TableCell>{getReferralName(comm.fromUserId)}</TableCell>
                         <TableCell><Badge variant="secondary">Level {comm.level}</Badge></TableCell>
                         <TableCell className="text-green-400">LKR {comm.amount.toFixed(2)}</TableCell>

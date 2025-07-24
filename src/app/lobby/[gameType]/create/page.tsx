@@ -86,7 +86,8 @@ export default function CreateGamePage() {
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
 
-            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            const roomRef = doc(collection(db, 'game_rooms'));
+            batch.set(roomRef, roomData);
             
             // 3. Create a transaction log for the wager
             const transactionRef = doc(collection(db, 'transactions'));
@@ -99,66 +100,12 @@ export default function CreateGamePage() {
                 gameRoomId: roomRef.id,
                 createdAt: serverTimestamp()
             });
-
-            // 4. Handle Referral Commissions for both regular and marketing referrals
-            if (userData.referralChain && userData.referralChain.length > 0) {
-                // This user is in a marketing chain
-                const commissionRate = 0.03; // Assume 3% for all levels for now
-                for (let i = 0; i < userData.referralChain.length; i++) {
-                    const marketerId = userData.referralChain[i];
-                    const commissionAmount = wagerAmount * commissionRate;
-                    if(commissionAmount > 0) {
-                        const marketerRef = doc(db, 'users', marketerId);
-                        batch.update(marketerRef, { marketingBalance: increment(commissionAmount) });
-                        batch.set(doc(collection(db, 'transactions')), {
-                             userId: marketerId,
-                             type: 'commission',
-                             amount: commissionAmount,
-                             status: 'completed',
-                             description: `L${i+1} commission from ${userData.firstName}`,
-                             fromUserId: user.uid,
-                             level: i + 1,
-                             gameRoomId: roomRef.id,
-                             createdAt: serverTimestamp()
-                        });
-                    }
-                }
-            } else if (userData.referredBy) {
-                // This user is in a regular 2-level chain
-                const l1ReferrerRef = doc(db, 'users', userData.referredBy);
-                const l1ReferrerSnap = await getDoc(l1ReferrerRef);
-                if (l1ReferrerSnap.exists()) {
-                    const l1ReferrerData = l1ReferrerSnap.data();
-                    const l1Commission = wagerAmount * 0.03; // Example: 3%
-                    if (l1Commission > 0) {
-                         batch.update(l1ReferrerRef, { marketingBalance: increment(l1Commission) });
-                         batch.set(doc(collection(db, 'transactions')), {
-                            userId: l1ReferrerData.uid, type: 'commission', amount: l1Commission, status: 'completed',
-                            description: `L1 commission from ${userData.firstName}`, fromUserId: user.uid, level: 1,
-                            gameRoomId: roomRef.id, createdAt: serverTimestamp()
-                         });
-                    }
-
-                    if (l1ReferrerData.referredBy) {
-                        const l2ReferrerRef = doc(db, 'users', l1ReferrerData.referredBy);
-                        const l2Commission = wagerAmount * 0.02; // Example: 2%
-                         if (l2Commission > 0) {
-                            batch.update(l2ReferrerRef, { marketingBalance: increment(l2Commission) });
-                            batch.set(doc(collection(db, 'transactions')), {
-                                userId: l1ReferrerData.referredBy, type: 'commission', amount: l2Commission, status: 'completed',
-                                description: `L2 commission from ${userData.firstName}`, fromUserId: user.uid, level: 2,
-                                gameRoomId: roomRef.id, createdAt: serverTimestamp()
-                            });
-                        }
-                    }
-                }
-            }
             
             await batch.commit();
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
 
-            // 5. Navigate to the game room page
+            // 4. Navigate to the game room page
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
@@ -263,5 +210,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-
-    

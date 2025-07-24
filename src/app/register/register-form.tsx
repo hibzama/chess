@@ -76,21 +76,22 @@ export default function RegisterForm() {
             };
 
             if (mref) {
-                 const marketerDoc = await getDoc(doc(db, 'users', mref));
+                // Marketing link used, sets the chain starting with the marketer.
+                const marketerDoc = await getDoc(doc(db, 'users', mref));
                 if (marketerDoc.exists() && marketerDoc.data().role === 'marketer') {
-                    userData.mref = mref; // This is the top-level marketer
-                    userData.referralChain = [mref]; // Start the chain with the marketer
+                    userData.referralChain = [mref];
                 }
-            } else if(ref) {
+            } else if (ref) {
+                // Regular referral link used.
                 const referrerDoc = await getDoc(doc(db, 'users', ref));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    userData.referredBy = ref; // Direct referrer
-                    // If the direct referrer is part of a marketing chain, continue it
+                    userData.referredBy = ref; // Direct referrer for 2-level system
+
+                    // Check if the referrer is part of a marketing chain.
                     if (referrerData.referralChain && referrerData.referralChain.length < 20) {
+                        // If so, continue the chain.
                         userData.referralChain = [...referrerData.referralChain, ref];
-                    } else if (referrerData.mref) { // Or if the referrer has a direct marketer
-                         userData.referralChain = [referrerData.mref, ref];
                     }
                 }
             }
