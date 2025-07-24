@@ -98,10 +98,10 @@ export default function MarketingDashboardPage() {
         fetchReferrals();
 
          // Subscribe to commissions for real-time total updates
-         const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+         const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid));
          const unsubscribe = onSnapshot(commQuery, async (snapshot) => {
              const commsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Commission));
-             setCommissions(commsData);
+             setCommissions(commsData.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
          });
 
          return () => unsubscribe();
