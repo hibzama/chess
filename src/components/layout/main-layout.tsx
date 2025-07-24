@@ -55,6 +55,7 @@ export default function MainLayout({
     }
 
     const USDT_RATE = 310;
+    const isMarketer = userData?.role === 'marketer';
 
 
     return (
@@ -68,41 +69,49 @@ export default function MainLayout({
                 </SidebarHeader>
                 <SidebarContent>
                     <SidebarMenu>
-                        <SidebarMenuItem>
-                            <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><BarChart3 /><span>My Rooms</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={isMounted && pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Friends & Community"><Users /><span>Friends & Community</span></SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Rankings"><Trophy /><span>Rankings</span></SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={isMounted && pathname === '/dashboard/equipment'}><Swords /><span>My Equipment</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                           <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer & Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer & Earn</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                         {userData?.role === 'marketer' && (
-                            <SidebarMenuItem>
-                                 <Link href="/marketing/dashboard"><SidebarMenuButton tooltip="Marketing" isActive={isMounted && pathname.startsWith('/marketing')}><Megaphone /><span>Marketing</span></SidebarMenuButton></Link>
-                            </SidebarMenuItem>
+                        {isMarketer ? (
+                            <>
+                                <SidebarMenuItem>
+                                    <Link href="/marketing/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname.startsWith('/marketing/dashboard')}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <Link href="/marketing/dashboard/wallet"><SidebarMenuButton tooltip="Commission Wallet" isActive={isMounted && pathname.startsWith('/marketing/dashboard/wallet')}><Wallet /><span>Commission Wallet</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                            </>
+                        ) : (
+                            <>
+                                <SidebarMenuItem>
+                                    <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><BarChart3 /><span>My Rooms</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={isMounted && pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton tooltip="Friends & Community"><Users /><span>Friends & Community</span></SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton tooltip="Rankings"><Trophy /><span>Rankings</span></SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={isMounted && pathname === '/dashboard/equipment'}><Swords /><span>My Equipment</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer & Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer & Earn</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton tooltip="Tournaments"><Trophy /><span>Tournaments</span></SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton tooltip="Direct Messages"><MessageSquare /><span>Direct Messages</span></SidebarMenuButton>
+                                </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton tooltip="About Us"><Info /><span>About Us</span></SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </>
                         )}
-                        <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Tournaments"><Trophy /><span>Tournaments</span></SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Direct Messages"><MessageSquare /><span>Direct Messages</span></SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="About Us"><Info /><span>About Us</span></SidebarMenuButton>
-                        </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>
                 <SidebarFooter>
@@ -124,20 +133,20 @@ export default function MainLayout({
                     <SidebarTrigger className="md:hidden"/>
                     <div className="ml-auto flex items-center gap-4">
                        <div className="hidden sm:block">
-                           <Link href="/dashboard/wallet">
+                           <Link href={isMarketer ? "/marketing/dashboard/wallet" : "/dashboard/wallet"}>
                               <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
                                   <CardContent className="p-2 flex items-center gap-2">
                                       <Wallet className="w-5 h-5 text-primary"/>
                                       <div>
-                                      {!isMounted || loading || !userData || typeof userData.balance === 'undefined' ? (
+                                      {!isMounted || loading || !userData || (isMarketer ? typeof userData.marketingBalance === 'undefined' : typeof userData.balance === 'undefined') ? (
                                           <div className="space-y-1">
                                             <Skeleton className="h-4 w-16"/>
                                             <Skeleton className="h-3 w-12"/>
                                           </div>
                                           ) : (
                                           <>
-                                              <p className="text-sm font-bold text-primary">LKR {userData.balance.toFixed(2)}</p>
-                                              <p className="text-xs text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                                              <p className="text-sm font-bold text-primary">LKR {isMarketer ? userData.marketingBalance?.toFixed(2) : userData.balance.toFixed(2)}</p>
+                                              <p className="text-xs text-muted-foreground">~{isMarketer ? (userData.marketingBalance / USDT_RATE).toFixed(2) : (userData.balance / USDT_RATE).toFixed(2)} USDT</p>
                                           </>
                                       )}
                                       </div>
@@ -160,3 +169,5 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
+    

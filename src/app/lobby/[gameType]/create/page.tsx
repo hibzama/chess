@@ -18,18 +18,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Commission Ranks
-const referralRanks = [
-    { rank: 1, min: 0, max: 20, l1Rate: 0.03, l2Rate: 0.02 },
-    { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
-];
-
-const getReferralRank = async (userId: string) => {
-    const l1Query = query(collection(db, 'users'), where('referredBy', '==', userId));
-    const l1Snapshot = await getDocs(l1Query);
-    const l1Count = l1Snapshot.size;
-    return referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
-};
 
 export default function CreateGamePage() {
     const params = useParams();
@@ -112,56 +100,55 @@ export default function CreateGamePage() {
                 createdAt: serverTimestamp()
             });
 
-            // 4. Handle Referral Commissions
-            if (userData.referredBy) {
-                // Level 1 Referrer
-                const l1ReferrerRef = doc(db, 'users', userData.referredBy);
-                const l1ReferrerSnap = await getDoc(l1ReferrerRef);
-
-                if (l1ReferrerSnap.exists()) {
-                    const l1ReferrerData = l1ReferrerSnap.data();
-                    const l1Rank = await getReferralRank(l1ReferrerData.uid);
-                    const l1Commission = wagerAmount * l1Rank.l1Rate;
-
-                    if (l1Commission > 0) {
-                        batch.update(l1ReferrerRef, { marketingBalance: increment(l1Commission) });
+            // 4. Handle Referral Commissions for both regular and marketing referrals
+            if (userData.referralChain && userData.referralChain.length > 0) {
+                // This user is in a marketing chain
+                const commissionRate = 0.03; // Assume 3% for all levels for now
+                for (let i = 0; i < userData.referralChain.length; i++) {
+                    const marketerId = userData.referralChain[i];
+                    const commissionAmount = wagerAmount * commissionRate;
+                    if(commissionAmount > 0) {
+                        const marketerRef = doc(db, 'users', marketerId);
+                        batch.update(marketerRef, { marketingBalance: increment(commissionAmount) });
                         batch.set(doc(collection(db, 'transactions')), {
-                            userId: l1ReferrerData.uid,
-                            type: 'commission',
-                            amount: l1Commission,
-                            status: 'completed',
-                            description: `L1 commission from ${userData.firstName}`,
-                            fromUserId: user.uid,
-                            level: 1,
-                            gameRoomId: roomRef.id,
-                            createdAt: serverTimestamp()
+                             userId: marketerId,
+                             type: 'commission',
+                             amount: commissionAmount,
+                             status: 'completed',
+                             description: `L${i+1} commission from ${userData.firstName}`,
+                             fromUserId: user.uid,
+                             level: i + 1,
+                             gameRoomId: roomRef.id,
+                             createdAt: serverTimestamp()
                         });
                     }
+                }
+            } else if (userData.referredBy) {
+                // This user is in a regular 2-level chain
+                const l1ReferrerRef = doc(db, 'users', userData.referredBy);
+                const l1ReferrerSnap = await getDoc(l1ReferrerRef);
+                if (l1ReferrerSnap.exists()) {
+                    const l1ReferrerData = l1ReferrerSnap.data();
+                    const l1Commission = wagerAmount * 0.03; // Example: 3%
+                    if (l1Commission > 0) {
+                         batch.update(l1ReferrerRef, { marketingBalance: increment(l1Commission) });
+                         batch.set(doc(collection(db, 'transactions')), {
+                            userId: l1ReferrerData.uid, type: 'commission', amount: l1Commission, status: 'completed',
+                            description: `L1 commission from ${userData.firstName}`, fromUserId: user.uid, level: 1,
+                            gameRoomId: roomRef.id, createdAt: serverTimestamp()
+                         });
+                    }
 
-                    // Level 2 Referrer
                     if (l1ReferrerData.referredBy) {
                         const l2ReferrerRef = doc(db, 'users', l1ReferrerData.referredBy);
-                        const l2ReferrerSnap = await getDoc(l2ReferrerRef);
-
-                        if(l2ReferrerSnap.exists()) {
-                            const l2ReferrerData = l2ReferrerSnap.data();
-                             const l2Rank = await getReferralRank(l2ReferrerData.uid);
-                            const l2Commission = wagerAmount * l2Rank.l2Rate;
-
-                             if (l2Commission > 0) {
-                                batch.update(l2ReferrerRef, { marketingBalance: increment(l2Commission) });
-                                batch.set(doc(collection(db, 'transactions')), {
-                                    userId: l2ReferrerData.uid,
-                                    type: 'commission',
-                                    amount: l2Commission,
-                                    status: 'completed',
-                                    description: `L2 commission from ${userData.firstName}`,
-                                    fromUserId: user.uid,
-                                    level: 2,
-                                    gameRoomId: roomRef.id,
-                                    createdAt: serverTimestamp()
-                                });
-                            }
+                        const l2Commission = wagerAmount * 0.02; // Example: 2%
+                         if (l2Commission > 0) {
+                            batch.update(l2ReferrerRef, { marketingBalance: increment(l2Commission) });
+                            batch.set(doc(collection(db, 'transactions')), {
+                                userId: l1ReferrerData.referredBy, type: 'commission', amount: l2Commission, status: 'completed',
+                                description: `L2 commission from ${userData.firstName}`, fromUserId: user.uid, level: 2,
+                                gameRoomId: roomRef.id, createdAt: serverTimestamp()
+                            });
                         }
                     }
                 }
@@ -171,7 +158,7 @@ export default function CreateGamePage() {
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
 
-            // 4. Navigate to the game room page
+            // 5. Navigate to the game room page
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
@@ -276,3 +263,5 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
+    
