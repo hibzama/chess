@@ -274,36 +274,42 @@ function MultiplayerGamePageContent() {
                 // --- Pre-fetch all necessary documents ---
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
+        
                 const [creatorDoc, joinerDoc] = await Promise.all([
                     transaction.get(creatorRef),
                     transaction.get(joinerRef)
                 ]);
         
-                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("One of the players does not exist");
-                
+                if (!creatorDoc.exists() || !joinerDoc.exists()) {
+                    throw new Error("One of the players does not exist");
+                }
+        
                 const playersWithData = [
                     { id: creatorDoc.id, data: creatorDoc.data(), name: roomData.createdBy.name },
                     { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
                 ];
-                
-                const docsToGet: { [key: string]: DocumentReference } = {};
+        
+                // Build a map of all referral UIDs to fetch
+                const referralIdsToFetch = new Set<string>();
                 for (const player of playersWithData) {
                     if (player.data.referralChain) {
-                        player.data.referralChain.forEach((refId: string) => {
-                            docsToGet[refId] = doc(db, 'users', refId);
-                        });
+                        player.data.referralChain.forEach((refId: string) => referralIdsToFetch.add(refId));
                     } else if (player.data.referredBy) {
-                        docsToGet[player.data.referredBy] = doc(db, 'users', player.data.referredBy);
+                        referralIdsToFetch.add(player.data.referredBy);
                     }
                 }
-                const referralSnapshots = await Promise.all(Object.values(docsToGet).map(ref => transaction.get(ref)));
-                const referralDataMap: Map<string, DocumentData> = new Map();
-                Object.keys(docsToGet).forEach((id, index) => {
-                    if (referralSnapshots[index].exists()) {
-                        referralDataMap.set(id, referralSnapshots[index].data());
+        
+                // Fetch all unique referral documents
+                const referralDocs = await Promise.all(
+                    Array.from(referralIdsToFetch).map(id => transaction.get(doc(db, 'users', id)))
+                );
+        
+                const referralDataMap = new Map<string, DocumentData>();
+                referralDocs.forEach(docSnap => {
+                    if (docSnap.exists()) {
+                        referralDataMap.set(docSnap.id, docSnap.data());
                     }
                 });
-
 
                 // --- Perform all write operations ---
                 const creatorColor = roomData.createdBy.color;
