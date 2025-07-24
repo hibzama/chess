@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -191,39 +191,28 @@ function MultiplayerGamePageContent() {
     const handleCancelRoom = useCallback(async (isAutoCancel = false) => {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
+        const roomRef = doc(db, 'game_rooms', roomId as string);
+    
         try {
-            await runTransaction(db, async (transaction) => {
-                const roomRef = doc(db, 'game_rooms', roomId as string);
-                const roomDoc = await transaction.get(roomRef);
-
-                if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
-                    if (!isAutoCancel) router.push('/lobby');
-                    return; 
-                }
-
-                transaction.delete(roomRef);
-
-                if (room.wager > 0) {
-                    const userRef = doc(db, 'users', user.uid);
-                    transaction.update(userRef, { balance: increment(room.wager) });
-                    
-                    const transactionRef = doc(collection(db, 'transactions'));
-                    transaction.set(transactionRef, {
-                        userId: user.uid, type: 'payout', amount: room.wager, status: 'completed',
-                        description: `Refund for cancelled ${room.gameType} game`, gameRoomId: roomId, createdAt: serverTimestamp()
-                    });
-                }
-            });
-
+            const roomDoc = await getDoc(roomRef);
+            if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
+                if (!isAutoCancel) router.push('/lobby');
+                return;
+            }
+    
+            await deleteDoc(roomRef);
+    
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'Your wager has been refunded.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your wager has been refunded.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
             console.error('Failed to cancel room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel the room.' });
+            if (!isAutoCancel) {
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not cancel the room.' });
+            }
         }
     }, [roomId, user, room, router, toast]);
     
@@ -296,10 +285,11 @@ function MultiplayerGamePageContent() {
                 // --- Commission and Wager Logic ---
                 const wagerAmount = room.wager;
                 if (wagerAmount > 0) {
-                    // Deduct wagers first
+                    const commissionsToPay = new Map<string, { amount: number; fromPlayerId: string, fromPlayerName: string, level: number, toWallet: 'main' | 'marketing' }>();
+
+                    // 1. Wager Deduction
                     transaction.update(doc(db, 'users', room.createdBy.uid), { balance: increment(-wagerAmount) });
                     transaction.update(joinerRef, { balance: increment(-wagerAmount) });
-
                     transaction.set(doc(collection(db, 'transactions')), {
                         userId: room.createdBy.uid, type: 'wager', amount: wagerAmount, status: 'completed',
                         description: `Wager for ${room.gameType} game vs ${joinerData?.firstName}`,
@@ -316,63 +306,56 @@ function MultiplayerGamePageContent() {
                         { id: user.uid, data: joinerData }
                     ];
 
-                    // Use a map to ensure each referrer is paid only once per game
-                    const commissionsToPay = new Map<string, { amount: number; fromPlayerId: string, fromPlayerName: string, level: number, toWallet: 'main' | 'marketing' }>();
-
+                    // 2. Commission Calculation
                     for (const player of playersDataWithDocs) {
-                         // 1. Marketing Referral Chain (20 levels, 3%)
-                        if (player.data?.referralChain && player.data.referralChain.length > 0) {
-                             const marketingCommissionRate = 0.03;
-                             for (const marketerId of player.data.referralChain) {
+                        const playerData = player.data;
+                        const fromPlayerId = player.id;
+                        const fromPlayerName = playerData.firstName;
+
+                        // A. Marketing Chain Logic
+                        if (playerData?.referralChain && playerData.referralChain.length > 0) {
+                            const marketingCommissionRate = 0.03;
+                            for (const marketerId of playerData.referralChain) {
                                 const commissionAmount = wagerAmount * marketingCommissionRate;
-                                const level = player.data.referralChain.indexOf(marketerId) + 1;
-                                if (commissionAmount > 0) {
-                                     commissionsToPay.set(marketerId, { 
-                                         amount: commissionAmount,
-                                         fromPlayerId: player.id,
-                                         fromPlayerName: player.data.firstName,
-                                         level: level,
-                                         toWallet: 'marketing'
-                                     });
+                                if (commissionAmount > 0 && !commissionsToPay.has(marketerId)) {
+                                    const level = playerData.referralChain.indexOf(marketerId) + 1;
+                                    commissionsToPay.set(marketerId, {
+                                        amount: commissionAmount,
+                                        fromPlayerId, fromPlayerName, level, toWallet: 'marketing'
+                                    });
                                 }
-                             }
-                        // 2. Regular Referral (2 levels, rank-based) - ONLY if not in a marketing chain
-                        } else if (player.data?.referredBy) {
-                            const l1ReferrerDoc = await getDoc(doc(db, 'users', player.data.referredBy));
-                            if (l1ReferrerDoc.exists() && l1ReferrerDoc.data().role !== 'marketer') {
+                            }
+                        }
+                        // B. Regular Referral Logic (ONLY if not in a marketing chain)
+                        else if (playerData?.referredBy) {
+                            const l1ReferrerDoc = await getDoc(doc(db, 'users', playerData.referredBy));
+                            if (l1ReferrerDoc.exists()) {
                                 const l1ReferrerData = l1ReferrerDoc.data();
-                                
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03, l2Rate: 0.02 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
                                 ];
                                 const l1CountSnapshot = await getDocs(query(collection(db, 'users'), where('referredBy', '==', l1ReferrerData.uid)));
                                 const l1Count = l1CountSnapshot.size;
-                                const rank = referralRanks.find(r => l1Count >= r.min && l1Count < r.max) || referralRanks[1];
-
+                                const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
+                                
+                                // L1 Commission
                                 const l1Commission = wagerAmount * rank.l1Rate;
-                                if (l1Commission > 0) {
-                                     commissionsToPay.set(l1ReferrerData.uid, {
-                                         amount: l1Commission,
-                                         fromPlayerId: player.id,
-                                         fromPlayerName: player.data.firstName,
-                                         level: 1,
-                                         toWallet: 'main'
-                                     });
+                                if (l1Commission > 0 && !commissionsToPay.has(l1ReferrerData.uid)) {
+                                    commissionsToPay.set(l1ReferrerData.uid, {
+                                        amount: l1Commission, fromPlayerId, fromPlayerName, level: 1, toWallet: 'main'
+                                    });
                                 }
-        
+                                
+                                // L2 Commission
                                 if (l1ReferrerData.referredBy) {
                                     const l2ReferrerDoc = await getDoc(doc(db, 'users', l1ReferrerData.referredBy));
-                                     if (l2ReferrerDoc.exists() && l2ReferrerDoc.data().role !== 'marketer') {
+                                    if (l2ReferrerDoc.exists() && !commissionsToPay.has(l2ReferrerDoc.id)) {
                                         const l2Commission = wagerAmount * rank.l2Rate;
                                         if (l2Commission > 0) {
-                                             commissionsToPay.set(l1ReferrerData.referredBy, {
-                                                 amount: l2Commission,
-                                                 fromPlayerId: player.id,
-                                                 fromPlayerName: player.data.firstName,
-                                                 level: 2,
-                                                 toWallet: 'main'
-                                             });
+                                            commissionsToPay.set(l2ReferrerDoc.id, {
+                                                amount: l2Commission, fromPlayerId, fromPlayerName, level: 2, toWallet: 'main'
+                                            });
                                         }
                                     }
                                 }
@@ -380,13 +363,10 @@ function MultiplayerGamePageContent() {
                         }
                     }
 
-                    // Final loop to write all unique commissions
+                    // 3. Final Payout Loop
                     for (const [referrerId, comm] of commissionsToPay.entries()) {
-                         if (comm.toWallet === 'marketing') {
-                            transaction.update(doc(db, 'users', referrerId), { marketingBalance: increment(comm.amount) });
-                         } else {
-                            transaction.update(doc(db, 'users', referrerId), { balance: increment(comm.amount) });
-                         }
+                        const walletField = comm.toWallet === 'marketing' ? 'marketingBalance' : 'balance';
+                        transaction.update(doc(db, 'users', referrerId), { [walletField]: increment(comm.amount) });
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: referrerId, type: 'commission', amount: comm.amount, status: 'completed',
                             description: `Commission from ${comm.fromPlayerName}`, fromUserId: comm.fromPlayerId,
@@ -451,12 +431,12 @@ function MultiplayerGamePageContent() {
 
                              <div className="grid grid-cols-2 gap-4">
                                 <Button size="lg" variant="outline" onClick={copyGameId}><Share className="mr-2"/>Share Room ID</Button>
-                                <Button size="lg" variant="destructive" onClick={() => handleCancelRoom(false)}>Cancel Game & Refund</Button>
+                                <Button size="lg" variant="destructive" onClick={() => handleCancelRoom(false)}>Cancel Game</Button>
                             </div>
                             
                             <div className="text-xs text-muted-foreground flex items-center justify-center gap-2">
                                 <Clock className="w-3.5 h-3.5"/>
-                                <span>This room will be closed in {timeLeft || '...'} if no one joins. Your wager will be refunded.</span>
+                                <span>This room will be closed in {timeLeft || '...'} if no one joins.</span>
                             </div>
                         </CardContent>
                     </Card>
@@ -584,5 +564,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
