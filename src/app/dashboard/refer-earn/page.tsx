@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, onSnapshot, orderBy, doc, runTransaction, increment, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, orderBy, doc, runTransaction, increment, serverTimestamp, writeBatch, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -116,9 +116,9 @@ export default function ReferAndEarnPage() {
 
          const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid));
          const unsubscribe = onSnapshot(commQuery, async (snapshot) => {
-             const commsDataPromises = snapshot.docs.map(async (doc) => {
-                const commission = {...doc.data(), id: doc.id} as Commission;
-                const fromUserDoc = await getDoc(getDoc(db, 'users', commission.fromUserId));
+             const commsDataPromises = snapshot.docs.map(async (d) => {
+                const commission = {...d.data(), id: d.id} as Commission;
+                const fromUserDoc = await getDoc(doc(db, 'users', commission.fromUserId));
                 if(fromUserDoc.exists()){
                     const fromUserData = fromUserDoc.data();
                     commission.fromUserName = `${fromUserData.firstName} ${fromUserData.lastName}`;
