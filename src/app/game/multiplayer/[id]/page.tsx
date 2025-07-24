@@ -271,48 +271,47 @@ function MultiplayerGamePageContent() {
                 }
                 const roomData = currentRoomDoc.data();
         
-                // --- ALL READS ---
+                // --- Pre-fetch all necessary documents ---
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
-                const creatorDoc = await transaction.get(creatorRef);
-                const joinerDoc = await transaction.get(joinerRef);
+                const [creatorDoc, joinerDoc] = await Promise.all([
+                    transaction.get(creatorRef),
+                    transaction.get(joinerRef)
+                ]);
         
                 if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("One of the players does not exist");
                 
-                const creatorData = creatorDoc.data();
-                const joinerData = joinerDoc.data();
-                
                 const playersWithData = [
-                    { id: creatorData.uid, data: creatorData, name: roomData.createdBy.name },
-                    { id: joinerData.uid, data: joinerData, name: `${joinerData.firstName} ${joinerData.lastName}` }
+                    { id: creatorDoc.id, data: creatorDoc.data(), name: roomData.createdBy.name },
+                    { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
                 ];
-
-                const referralDocsToGet: { [key: string]: DocumentReference } = {};
+                
+                const docsToGet: { [key: string]: DocumentReference } = {};
                 for (const player of playersWithData) {
                     if (player.data.referralChain) {
                         player.data.referralChain.forEach((refId: string) => {
-                            referralDocsToGet[refId] = doc(db, 'users', refId);
+                            docsToGet[refId] = doc(db, 'users', refId);
                         });
-                    } 
-                    else if (player.data.referredBy) {
-                        referralDocsToGet[player.data.referredBy] = doc(db, 'users', player.data.referredBy);
+                    } else if (player.data.referredBy) {
+                        docsToGet[player.data.referredBy] = doc(db, 'users', player.data.referredBy);
                     }
                 }
-                const referralSnapshots = await Promise.all(Object.values(referralDocsToGet).map(ref => transaction.get(ref)));
+                const referralSnapshots = await Promise.all(Object.values(docsToGet).map(ref => transaction.get(ref)));
                 const referralDataMap: Map<string, DocumentData> = new Map();
-                Object.keys(referralDocsToGet).forEach((id, index) => {
+                Object.keys(docsToGet).forEach((id, index) => {
                     if (referralSnapshots[index].exists()) {
                         referralDataMap.set(id, referralSnapshots[index].data());
                     }
                 });
 
-                // --- ALL WRITES ---
+
+                // --- Perform all write operations ---
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
                 transaction.update(roomRef, {
                     status: 'in-progress',
-                    player2: { uid: user.uid, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor },
+                    player2: { uid: user.uid, name: playersWithData[1].name, color: joinerColor },
                     players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
@@ -322,10 +321,11 @@ function MultiplayerGamePageContent() {
                     const wagerAmount = roomData.wager;
 
                     for (const player of playersWithData) {
+                        // Deduct wager and log transaction
                         transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${roomData.gameType} game vs ${player.id === creatorData.uid ? playersWithData[1].name : playersWithData[0].name}`,
+                            description: `Wager for ${roomData.gameType} game vs ${player.id === creatorDoc.id ? playersWithData[1].name : playersWithData[0].name}`,
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
@@ -348,7 +348,7 @@ function MultiplayerGamePageContent() {
                         else if (player.data.referredBy) {
                             const l1ReferrerId = player.data.referredBy;
                             const l1ReferrerData = referralDataMap.get(l1ReferrerId);
-
+                            
                              if (l1ReferrerData && l1ReferrerData.role !== 'marketer') {
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
