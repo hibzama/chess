@@ -8,9 +8,8 @@ import { useParams, useRouter } from 'next/navigation';
 
 type PlayerColor = 'w' | 'b';
 type Winner = 'p1' | 'p2' | 'draw' | null;
-type Piece = { type: string; color: 'w' | 'b' };
-type Move = { turn: number; white?: string; black?: string };
-type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | 'piece-capture' | null;
+type Piece = { type: string; color: 'w' | 'b' | Player };
+export type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | 'piece-capture' | null;
 
 interface GameRoom {
     id: string;
@@ -66,7 +65,10 @@ interface GameContextType extends GameState {
     resign: () => void;
     roomWager: number;
     roomOpponentId: string | null;
+    room: GameRoom | null;
 }
+
+type Move = { turn: number; white?: string; black?: string };
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
@@ -147,10 +149,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const roomData = roomDoc.data() as GameRoom;
             if (roomData.payoutTransactionId) {
                 // Payout already processed, just determine what the user's payout was
-                const isCreator = currentRoom.createdBy.uid === user.uid;
+                const winnerIsMe = roomData.winner?.uid === user.uid;
+
                 if(roomData.draw) return { myPayout: roomData.wager * 0.9 };
                 if(!roomData.winner) return { myPayout: 0 };
-                const winnerIsMe = roomData.winner.uid === user.uid;
 
                 if(roomData.winner.method === 'resign') {
                     return { myPayout: winnerIsMe ? roomData.wager * 1.05 : roomData.wager * 0.75 }
@@ -455,10 +457,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             };
             
             if (capturedPiece) {
-                if (room.currentPlayer === room.createdBy.color) {
-                    updatePayload.capturedByP1 = [...(room.capturedByP1 || []), capturedPiece];
-                } else {
-                    updatePayload.capturedByP2 = [...(room.capturedByP2 || []), capturedPiece];
+                const pieceToStore = { type: capturedPiece.type, color: capturedPiece.color };
+                if (room.currentPlayer === room.createdBy.color) { // Creator captured a piece
+                    updatePayload.capturedByP1 = [...(room.capturedByP1 || []), pieceToStore];
+                } else { // Joiner captured a piece
+                    updatePayload.capturedByP2 = [...(room.capturedByP2 || []), pieceToStore];
                 }
             }
 
@@ -536,6 +539,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         resign,
         roomWager: room?.wager || 0,
         roomOpponentId: getOpponentId(),
+        room,
     };
 
     return (
