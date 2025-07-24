@@ -138,15 +138,15 @@ export default function MainLayout({
                                   <CardContent className="p-2 flex items-center gap-2">
                                       <Wallet className="w-5 h-5 text-primary"/>
                                       <div>
-                                      {!isMounted || loading || !userData || (isMarketer ? typeof userData.marketingBalance === 'undefined' : typeof userData.balance === 'undefined') ? (
+                                      {!isMounted || loading || !userData ? (
                                           <div className="space-y-1">
                                             <Skeleton className="h-4 w-16"/>
                                             <Skeleton className="h-3 w-12"/>
                                           </div>
                                           ) : (
                                           <>
-                                              <p className="text-sm font-bold text-primary">LKR {isMarketer ? userData.marketingBalance?.toFixed(2) : userData.balance.toFixed(2)}</p>
-                                              <p className="text-xs text-muted-foreground">~{isMarketer ? (userData.marketingBalance / USDT_RATE).toFixed(2) : (userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                                              <p className="text-sm font-bold text-primary">LKR {(isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0).toFixed(2)}</p>
+                                              <p className="text-xs text-muted-foreground">~{((isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
                                           </>
                                       )}
                                       </div>
@@ -169,3 +169,4 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
