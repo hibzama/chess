@@ -47,32 +47,40 @@ const GameOverDisplay = () => {
         const isWinner = (winner === 'p1' && !isMultiplayer) || (isMultiplayer && user?.uid === winner);
         const isLoser = (winner === 'p2' && !isMultiplayer) || (isMultiplayer && user?.uid !== winner && winner !== 'draw');
 
-        if (isWinner) {
+        // Handle resignation specifically
+        if (gameOverReason === 'resign') {
+            if (isWinner) {
+                title = "Congratulations, You Win!";
+                description = "Your opponent has resigned the game.";
+                icon = <Trophy className="w-12 h-12 text-yellow-400" />;
+            } else if (isLoser) {
+                title = "You Resigned";
+                description = "You chose to resign the match.";
+                icon = <Flag className="w-12 h-12 text-muted-foreground" />;
+            }
+        } 
+        // Handle other win/loss reasons
+        else if (isWinner) {
             title = "Congratulations, You Win!";
             icon = <Trophy className="w-12 h-12 text-yellow-400" />;
             switch (gameOverReason) {
                 case 'checkmate': description = "You won by checkmate. Well played!"; break;
                 case 'timeout': description = "You won on time as your opponent ran out."; break;
-                case 'resign': description = "Your opponent has resigned the game."; break;
                 case 'piece-capture': description = "You captured all your opponent's pieces!"; break;
                 default: description = "You have won the game!";
             }
         } else if (isLoser) {
-            if (gameOverReason === 'resign') {
-                 title = "You Resigned";
-                 description = "You chose to resign the match.";
-                 icon = <Flag className="w-12 h-12 text-muted-foreground" />;
-            } else {
-                title = "Bad Luck, You Lost";
-                icon = <Frown className="w-12 h-12 text-destructive" />;
-                switch (gameOverReason) {
-                    case 'checkmate': description = "Your opponent has checkmated you."; break;
-                    case 'timeout': description = "You lost because you ran out of time."; break;
-                    case 'piece-capture': description = "Your opponent captured all your pieces."; break;
-                    default: description = "You have lost the game.";
-                }
+            title = "Bad Luck, You Lost";
+            icon = <Frown className="w-12 h-12 text-destructive" />;
+            switch (gameOverReason) {
+                case 'checkmate': description = "Your opponent has checkmated you."; break;
+                case 'timeout': description = "You lost because you ran out of time."; break;
+                case 'piece-capture': description = "Your opponent captured all your pieces."; break;
+                default: description = "You have lost the game.";
             }
-        } else if (winner === 'draw') {
+        } 
+        // Handle draws
+        else if (winner === 'draw') {
             title = "It's a Draw!";
             description = "The game has ended in a draw by agreement or stalemate.";
             icon = <Handshake className="w-12 h-12 text-yellow-400" />;
@@ -241,7 +249,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </AlertDialog>
 
      {isMultiplayer && !gameOver && (
-         <Popover open={isChatOpen} onOpenChange={setIsChatOpen}>
+         <Popover>
             <PopoverTrigger asChild>
                 <button className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40">
                     <MessageSquare className="w-8 h-8"/>
@@ -249,14 +257,10 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 </button>
             </PopoverTrigger>
             <PopoverContent side="top" align="end" className="w-80 h-96 p-0 flex flex-col mr-4 mb-2">
-                 <GameChat onClose={() => setIsChatOpen(false)} />
+                 <GameChat onClose={() => {}} />
             </PopoverContent>
          </Popover>
       )}
     </>
   );
 }
-
-    
-
-    
