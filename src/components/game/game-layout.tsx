@@ -109,7 +109,7 @@ const GameOverDisplay = () => {
 }
 
 const ChatButton = ({ onClick }: { onClick: () => void }) => (
-    <button onClick={onClick} className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40">
+    <button onClick={onClick} className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40 lg:hidden">
         <MessageSquare className="w-8 h-8"/>
         <span className="sr-only">Open Chat</span>
     </button>
@@ -193,7 +193,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         </div>
 
         {/* Right Column */}
-        <aside className="hidden lg:grid grid-rows-[auto,auto,1fr] gap-6">
+        <aside className="hidden lg:grid grid-rows-[auto,auto,1fr,auto] gap-6">
             <PlayerInfo
               playerName="Opponent"
               avatarSrc="https://placehold.co/100x100.png"
@@ -201,14 +201,24 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             />
             <CapturedPieces pieceStyle={equipment?.pieceStyle} />
              {isMultiplayer ? (
-                 <Card>
-                    <CardContent className="p-4">
-                        <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
-                            <Flag className="w-4 h-4 mr-2" />
-                            Resign
-                        </Button>
-                    </CardContent>
-                </Card>
+                 <>
+                    <Card className="flex-1">
+                        <CardHeader>
+                            <CardTitle>Chat</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             <Button className="w-full" onClick={() => setIsChatOpen(true)}>Open Chat</Button>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
+                                <Flag className="w-4 h-4 mr-2" />
+                                Resign
+                            </Button>
+                        </CardContent>
+                    </Card>
+                 </>
              ) : (
                 <GameInfo />
              )}
