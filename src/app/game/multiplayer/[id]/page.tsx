@@ -285,7 +285,7 @@ function MultiplayerGamePageContent() {
                 // --- Commission and Wager Logic ---
                 const wagerAmount = room.wager;
                 if (wagerAmount > 0) {
-                    const commissionsToPay = new Map<string, { amount: number; fromPlayerId: string, fromPlayerName: string, level: number, toWallet: 'main' | 'marketing' }>();
+                     const commissionsToPay = new Map<string, { amount: number; fromPlayerId: string; fromPlayerName: string, level: number, toWallet: 'main' | 'marketing' }>();
 
                     // 1. Wager Deduction
                     transaction.update(doc(db, 'users', room.createdBy.uid), { balance: increment(-wagerAmount) });
@@ -305,7 +305,7 @@ function MultiplayerGamePageContent() {
                         { id: room.createdBy.uid, data: creatorData },
                         { id: user.uid, data: joinerData }
                     ];
-
+        
                     // 2. Commission Calculation
                     for (const player of playersDataWithDocs) {
                         const playerData = player.data;
@@ -314,7 +314,7 @@ function MultiplayerGamePageContent() {
 
                         // A. Marketing Chain Logic
                         if (playerData?.referralChain && playerData.referralChain.length > 0) {
-                            const marketingCommissionRate = 0.03;
+                            const marketingCommissionRate = 0.03; 
                             for (const marketerId of playerData.referralChain) {
                                 const commissionAmount = wagerAmount * marketingCommissionRate;
                                 if (commissionAmount > 0 && !commissionsToPay.has(marketerId)) {
@@ -328,13 +328,15 @@ function MultiplayerGamePageContent() {
                         }
                         // B. Regular Referral Logic (ONLY if not in a marketing chain)
                         else if (playerData?.referredBy) {
-                            const l1ReferrerDoc = await getDoc(doc(db, 'users', playerData.referredBy));
-                            if (l1ReferrerDoc.exists()) {
+                             const l1ReferrerDoc = await transaction.get(doc(db, 'users', playerData.referredBy));
+                             if (l1ReferrerDoc.exists()) {
                                 const l1ReferrerData = l1ReferrerDoc.data();
+                                
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03, l2Rate: 0.02 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
                                 ];
+                                
                                 const l1CountSnapshot = await getDocs(query(collection(db, 'users'), where('referredBy', '==', l1ReferrerData.uid)));
                                 const l1Count = l1CountSnapshot.size;
                                 const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
@@ -342,18 +344,18 @@ function MultiplayerGamePageContent() {
                                 // L1 Commission
                                 const l1Commission = wagerAmount * rank.l1Rate;
                                 if (l1Commission > 0 && !commissionsToPay.has(l1ReferrerData.uid)) {
-                                    commissionsToPay.set(l1ReferrerData.uid, {
+                                     commissionsToPay.set(l1ReferrerData.uid, {
                                         amount: l1Commission, fromPlayerId, fromPlayerName, level: 1, toWallet: 'main'
                                     });
                                 }
                                 
                                 // L2 Commission
                                 if (l1ReferrerData.referredBy) {
-                                    const l2ReferrerDoc = await getDoc(doc(db, 'users', l1ReferrerData.referredBy));
-                                    if (l2ReferrerDoc.exists() && !commissionsToPay.has(l2ReferrerDoc.id)) {
+                                     const l2ReferrerDoc = await transaction.get(doc(db, 'users', l1ReferrerData.referredBy));
+                                     if (l2ReferrerDoc.exists() && !commissionsToPay.has(l2ReferrerDoc.id)) {
                                         const l2Commission = wagerAmount * rank.l2Rate;
                                         if (l2Commission > 0) {
-                                            commissionsToPay.set(l2ReferrerDoc.id, {
+                                             commissionsToPay.set(l2ReferrerDoc.id, {
                                                 amount: l2Commission, fromPlayerId, fromPlayerName, level: 2, toWallet: 'main'
                                             });
                                         }
