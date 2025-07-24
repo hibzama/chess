@@ -86,8 +86,8 @@ export default function MarketingDashboardPage() {
             const allReferralsDocs = await getDocs(allReferralsQuery);
             const referralsData = allReferralsDocs.docs.map(doc => {
                  const data = doc.data();
-                 // Level is the index of the marketer's ID in the user's chain + 1
-                 const level = (data.referralChain?.indexOf(user.uid) ?? -1) + 1;
+                 // Correctly calculate level based on the length of the chain.
+                 const level = data.referralChain?.length || 0;
                  return { ...data, uid: doc.id, level } as Referral
             });
             setAllReferrals(referralsData);
