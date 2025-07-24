@@ -20,6 +20,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import GameChat from './game-chat';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+
 
 type GameLayoutProps = {
   children: React.ReactNode;
@@ -106,14 +108,6 @@ const GameOverDisplay = () => {
         </Card>
     )
 }
-
-const ChatButton = ({ onClick }: { onClick: () => void }) => (
-    <button onClick={onClick} className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40">
-        <MessageSquare className="w-8 h-8"/>
-        <span className="sr-only">Open Chat</span>
-    </button>
-);
-
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
   const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame } = useGame();
@@ -244,10 +238,17 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </AlertDialog>
 
      {isMultiplayer && !gameOver && (
-        <>
-            <ChatButton onClick={() => setIsChatOpen(true)} />
-            <GameChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
-        </>
+         <Popover open={isChatOpen} onOpenChange={setIsChatOpen}>
+            <PopoverTrigger asChild>
+                <button className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40">
+                    <MessageSquare className="w-8 h-8"/>
+                    <span className="sr-only">Open Chat</span>
+                </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" align="end" className="w-80 h-96 p-0 flex flex-col mr-4 mb-2">
+                 <GameChat onClose={() => setIsChatOpen(false)} />
+            </PopoverContent>
+         </Popover>
       )}
     </>
   );
