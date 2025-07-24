@@ -80,20 +80,24 @@ export default function RegisterForm() {
             if (mref) {
                 const marketerDoc = await getDoc(doc(db, 'users', mref));
                 if (marketerDoc.exists() && marketerDoc.data().role === 'marketer') {
+                    // This is a new user referred by a marketer. Start the chain.
                     userData.referralChain = [mref];
                 }
             } else if (ref) {
-                const referrerDoc = await getDoc(doc(db, 'users', ref));
-                if (referrerDoc.exists()) {
+                 const referrerDoc = await getDoc(doc(db, 'users', ref));
+                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    // If the direct referrer is part of a marketing chain, the new user joins that chain.
-                    if (referrerData.referralChain && referrerData.referralChain.length < 20) {
-                         userData.referralChain = [...referrerData.referralChain, ref];
+                    // If referrer is a marketer, add new user to their chain
+                    if(referrerData.role === 'marketer' || (referrerData.referralChain && referrerData.referralChain.length > 0)) {
+                         const chain = referrerData.referralChain || [referrerData.uid]; // Start with the marketer if they are the direct referrer
+                         if(chain.length < 20) {
+                            userData.referralChain = [...chain, ref];
+                         }
                     } else {
-                        // Otherwise, it's a standard single-level referral.
+                        // This is a standard user referral.
                         userData.referredBy = ref;
                     }
-                }
+                 }
             }
 
             await setDoc(doc(db, "users", user.uid), userData);
@@ -185,3 +189,4 @@ export default function RegisterForm() {
 }
 
     
+
