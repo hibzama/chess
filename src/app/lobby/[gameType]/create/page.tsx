@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, getDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, getDoc, getDocs, query, where, updateDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -124,7 +124,7 @@ export default function CreateGamePage() {
                     const l1Commission = wagerAmount * l1Rank.l1Rate;
 
                     if (l1Commission > 0) {
-                        batch.update(l1ReferrerRef, { balance: increment(l1Commission) });
+                        batch.update(l1ReferrerRef, { marketingBalance: increment(l1Commission) });
                         batch.set(doc(collection(db, 'transactions')), {
                             userId: l1ReferrerData.uid,
                             type: 'commission',
@@ -149,7 +149,7 @@ export default function CreateGamePage() {
                             const l2Commission = wagerAmount * l2Rank.l2Rate;
 
                              if (l2Commission > 0) {
-                                batch.update(l2ReferrerRef, { balance: increment(l2Commission) });
+                                batch.update(l2ReferrerRef, { marketingBalance: increment(l2Commission) });
                                 batch.set(doc(collection(db, 'transactions')), {
                                     userId: l2ReferrerData.uid,
                                     type: 'commission',
@@ -276,5 +276,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-
-    

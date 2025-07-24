@@ -59,6 +59,7 @@ export default function MarketingApplicationsPage() {
                     phone: app.phone,
                     role: 'marketer',
                     balance: 0,
+                    marketingBalance: 0,
                     createdAt: new Date(),
                     mref: user.uid, // Marketer's own referral code
                 });
@@ -140,5 +141,3 @@ export default function MarketingApplicationsPage() {
         </Card>
     );
 }
-
-    

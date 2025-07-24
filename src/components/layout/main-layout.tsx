@@ -89,14 +89,16 @@ export default function MainLayout({
                         <SidebarMenuItem>
                            <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer & Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer & Earn</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
+                         {userData?.role === 'marketer' && (
+                            <SidebarMenuItem>
+                                 <Link href="/marketing/dashboard"><SidebarMenuButton tooltip="Marketing" isActive={isMounted && pathname.startsWith('/marketing')}><Megaphone /><span>Marketing</span></SidebarMenuButton></Link>
+                            </SidebarMenuItem>
+                        )}
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Tournaments"><Trophy /><span>Tournaments</span></SidebarMenuButton>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Direct Messages"><MessageSquare /><span>Direct Messages</span></SidebarMenuButton>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                             <Link href="/marketing/dashboard"><SidebarMenuButton tooltip="Marketing" isActive={isMounted && pathname.startsWith('/marketing')}><Megaphone /><span>Marketing</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="About Us"><Info /><span>About Us</span></SidebarMenuButton>
@@ -158,5 +160,3 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
-
-    
