@@ -3,7 +3,7 @@
 'use client'
 
 import Link from 'next/link';
-import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet, Bell, Trophy, Frown, Handshake, Sword } from 'lucide-react';
+import { ArrowLeft, History, Users, Settings, Crown, Flag, Wallet, Bell, Trophy, Frown, Handshake, Sword, MessageSquare } from 'lucide-react';
 import PlayerInfo from './player-info';
 import MoveHistory from './move-history';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import GameChat from './game-chat';
 
 type GameLayoutProps = {
   children: React.ReactNode;
@@ -40,7 +41,7 @@ const GameOverDisplay = () => {
         let title = "Game Over";
         let description = "The game has concluded.";
         let icon = <Crown className="w-12 h-12 text-primary" />;
-
+        
         const playerResigned = room?.winner?.resignerId === user?.uid;
         
         if (playerResigned) {
@@ -76,7 +77,8 @@ const GameOverDisplay = () => {
     }
 
     const { title, description, icon } = getWinnerMessage();
-
+    const resignedPlayerGotRefund = room?.winner?.resignerId && payoutAmount > 0;
+    
     return (
         <Card className="w-full max-w-lg text-center p-8 bg-card/70 backdrop-blur-sm animate-in fade-in zoom-in-95">
             <CardHeader className="items-center">
@@ -106,12 +108,21 @@ const GameOverDisplay = () => {
     )
 }
 
+const ChatButton = ({ onClick }: { onClick: () => void }) => (
+    <button onClick={onClick} className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40">
+        <MessageSquare className="w-8 h-8"/>
+        <span className="sr-only">Open Chat</span>
+    </button>
+);
+
+
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
   const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
   const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
@@ -230,6 +241,13 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
+
+     {isMultiplayer && !gameOver && (
+        <>
+            <ChatButton onClick={() => setIsChatOpen(true)} />
+            <GameChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        </>
+      )}
     </>
   );
 }
