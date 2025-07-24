@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState, useEffect, useRef } from 'react';
@@ -11,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetDescription, SheetClose } from '@/components/ui/sheet';
 import { ScrollArea } from '../ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Send, Smile, X } from 'lucide-react';
 
@@ -105,7 +105,7 @@ export default function GameChat({ isOpen, onClose }: GameChatProps) {
                         {messages.length > 0 ? (
                             <div className="space-y-4">
                                 {messages.map((msg) => (
-                                    <div key={msg.id} className={cn("flex items-start gap-3", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
+                                    <div key={msg.id} className={cn("flex items-end gap-3", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
                                         {msg.senderId !== user?.uid && (
                                             <Avatar className="w-8 h-8">
                                                 <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="player avatar"/>
