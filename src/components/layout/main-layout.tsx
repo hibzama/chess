@@ -132,7 +132,7 @@ export default function MainLayout({
                 <header className="px-4 lg:px-6 h-16 flex items-center border-b">
                     <SidebarTrigger className="md:hidden"/>
                     <div className="ml-auto flex items-center gap-4">
-                       <div className="hidden sm:block">
+                       <div>
                            <Link href={isMarketer ? "/marketing/dashboard/wallet" : "/dashboard/wallet"}>
                               <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
                                   <CardContent className="p-2 flex items-center gap-2">
@@ -169,7 +169,3 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
-
-    
-
-  
