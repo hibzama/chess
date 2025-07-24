@@ -292,9 +292,12 @@ function MultiplayerGamePageContent() {
                 // Build a map of all referral UIDs to fetch
                 const referralIdsToFetch = new Set<string>();
                 for (const player of playersWithData) {
+                    // Check for marketing chain first
                     if (player.data.referralChain) {
                         player.data.referralChain.forEach((refId: string) => referralIdsToFetch.add(refId));
-                    } else if (player.data.referredBy) {
+                    } 
+                    // Then check for regular L1 referrer
+                    else if (player.data.referredBy) {
                         referralIdsToFetch.add(player.data.referredBy);
                     }
                 }
@@ -355,7 +358,7 @@ function MultiplayerGamePageContent() {
                             const l1ReferrerId = player.data.referredBy;
                             const l1ReferrerData = referralDataMap.get(l1ReferrerId);
                             
-                             if (l1ReferrerData && l1ReferrerData.role !== 'marketer') {
+                             if (l1ReferrerData) { // Check if referrer data was successfully fetched
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
