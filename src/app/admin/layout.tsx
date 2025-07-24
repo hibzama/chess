@@ -43,7 +43,7 @@ export default function AdminLayout({
                 router.push('/admin/login');
             }
         }
-    }, [user, userData, loading, router, isLoginPage]);
+    }, [user, userData, loading, router, isLoginPage, pathname]);
 
 
     const handleLogout = async () => {

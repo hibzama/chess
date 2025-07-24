@@ -40,7 +40,6 @@ export default function MarketingLayout({
         )
     }
     
-    // For dashboard pages, use the main layout
     return (
         <MainLayout>
             {children}
