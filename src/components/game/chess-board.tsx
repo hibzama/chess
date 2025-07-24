@@ -61,14 +61,15 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     if (game.isGameOver()) {
         const fen = game.fen();
         if (game.isCheckmate()) {
-            // The player whose turn it is has been checkmated, so the other player (the one who just moved) is the winner.
-            const winnerId = playerColor === currentPlayer ? user?.uid : roomOpponentId;
+            // The player whose turn it is has been checkmated. The winner is the other player.
+            const winnerColor = game.turn() === 'w' ? 'b' : 'w';
+            const winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
             setWinner(winnerId, { fen }, 'checkmate');
         } else {
             setWinner('draw', { fen }, 'draw');
         }
     }
-}, [game, setWinner, playerColor, user, roomOpponentId, currentPlayer]);
+}, [game, setWinner, playerColor, user, roomOpponentId]);
 
 
   // Bot logic

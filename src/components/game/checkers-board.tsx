@@ -142,11 +142,14 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         let winnerId: string | 'draw' | null = null;
         
         if (whitePieces === 0) { // Black wins
-            winnerId = playerColor === 'b' ? user?.uid ?? 'p1' : roomOpponentId ?? 'bot';
+            const winnerColor = 'b';
+            winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
         } else if (blackPieces === 0) { // White wins
-            winnerId = playerColor === 'w' ? user?.uid ?? 'p1' : roomOpponentId ?? 'bot';
+            const winnerColor = 'w';
+            winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
         } else if (!hasMoves) { // Current player has no moves, they lose
-             winnerId = nextPlayer === playerColor ? (roomOpponentId ?? 'bot') : (user?.uid ?? 'p1');
+            const winnerColor = nextPlayer === 'w' ? 'b' : 'w';
+            winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
         }
 
         if(winnerId) {
