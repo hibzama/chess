@@ -10,7 +10,6 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import React from "react";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 
 const Logo = () => (
@@ -169,4 +168,3 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
-
