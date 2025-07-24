@@ -146,7 +146,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         else if (!hasMoves) winnerColor = nextPlayer === 'w' ? 'b' : 'w';
     
         if (winnerColor) {
-             let winnerId: string | null = null;
+            let winnerId: string | null = null;
             if (isMultiplayer) {
                 winnerId = (playerColor === winnerColor) ? user?.uid ?? null : roomOpponentId;
             } else {
@@ -175,6 +175,55 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
     }, [getPossibleMovesForPiece]);
 
     
+    const movePiece = useCallback((move: Move) => {
+        const newBoard = board.map(r => [...r]);
+        const piece = newBoard[move.from.row][move.from.col];
+        
+        if (!piece) return;
+
+        // Create move notation
+        const fromSquare = `${String.fromCharCode(97 + move.from.col)}${8 - move.from.row}`;
+        const toSquare = `${String.fromCharCode(97 + move.to.col)}${8 - move.to.row}`;
+        const moveNotation = `${fromSquare}${move.isJump ? 'x' : '-'}${toSquare}`;
+
+
+        // Promote to king
+        if (piece.type === 'pawn' && ( (piece.player === 'w' && move.to.row === 0) || (piece.player === 'b' && move.to.row === 7) )) {
+            piece.type = 'king';
+        }
+
+        newBoard[move.to.row][move.to.col] = piece;
+        newBoard[move.from.row][move.from.col] = null;
+        
+        let captured;
+        if (move.isJump) {
+            const jumpedRow = move.from.row + (move.to.row - move.from.row) / 2;
+            const jumpedCol = move.from.col + (move.to.col - move.from.col) / 2;
+            captured = newBoard[jumpedRow][jumpedCol];
+            newBoard[jumpedRow][jumpedCol] = null;
+        }
+        
+        setBoard(newBoard);
+        checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');
+
+        const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
+
+        if (moreJumps.length > 0 && (isMultiplayer ? currentPlayer === playerColor : true) ) {
+            setConsecutiveJumpPiece(move.to);
+            if (piece.player === playerColor) { // If it's the player's turn, update their possible moves
+                setSelectedPiece(move.to);
+                setPossibleMoves(moreJumps);
+            }
+        } else {
+            setConsecutiveJumpPiece(null);
+            setSelectedPiece(null);
+            setPossibleMoves([]);
+            const finalCapturedPiece = captured ? { type: 'p', color: captured.player } as unknown as Piece : undefined;
+            switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
+        }
+        
+    }, [board, switchTurn, checkForWinner, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer]);
+
     useEffect(() => {
         if(gameOver || !isMounted || isMultiplayer) return;
 
@@ -244,55 +293,6 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         }
     };
     
-    const movePiece = useCallback((move: Move) => {
-        const newBoard = board.map(r => [...r]);
-        const piece = newBoard[move.from.row][move.from.col];
-        
-        if (!piece) return;
-
-        // Create move notation
-        const fromSquare = `${String.fromCharCode(97 + move.from.col)}${8 - move.from.row}`;
-        const toSquare = `${String.fromCharCode(97 + move.to.col)}${8 - move.to.row}`;
-        const moveNotation = `${fromSquare}${move.isJump ? 'x' : '-'}${toSquare}`;
-
-
-        // Promote to king
-        if (piece.type === 'pawn' && ( (piece.player === 'w' && move.to.row === 0) || (piece.player === 'b' && move.to.row === 7) )) {
-            piece.type = 'king';
-        }
-
-        newBoard[move.to.row][move.to.col] = piece;
-        newBoard[move.from.row][move.from.col] = null;
-        
-        let captured;
-        if (move.isJump) {
-            const jumpedRow = move.from.row + (move.to.row - move.from.row) / 2;
-            const jumpedCol = move.from.col + (move.to.col - move.from.col) / 2;
-            captured = newBoard[jumpedRow][jumpedCol];
-            newBoard[jumpedRow][jumpedCol] = null;
-        }
-        
-        setBoard(newBoard);
-        checkForWinner(newBoard, piece.player === 'w' ? 'b' : 'w');
-
-        const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
-
-        if (moreJumps.length > 0 && (isMultiplayer ? currentPlayer === playerColor : true) ) {
-            setConsecutiveJumpPiece(move.to);
-            if (piece.player === playerColor) { // If it's the player's turn, update their possible moves
-                setSelectedPiece(move.to);
-                setPossibleMoves(moreJumps);
-            }
-        } else {
-            setConsecutiveJumpPiece(null);
-            setSelectedPiece(null);
-            setPossibleMoves([]);
-            const finalCapturedPiece = captured ? { type: 'p', color: captured.player } as unknown as Piece : undefined;
-            switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
-        }
-        
-    }, [board, switchTurn, checkForWinner, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer]);
-
     const displayedBoard = isFlipped ? [...board].reverse().map(row => [...row].reverse()) : board;
 
 
