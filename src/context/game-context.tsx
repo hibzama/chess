@@ -7,6 +7,7 @@ import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 
 type PlayerColor = 'w' | 'b';
+type Player = 'p1' | 'p2';
 type Winner = 'p1' | 'p2' | 'draw' | null;
 type Piece = { type: string; color: 'w' | 'b' | Player };
 export type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | 'piece-capture' | null;
@@ -143,30 +144,30 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         return runTransaction(db, async (transaction) => {
             const roomRef = doc(db, 'game_rooms', roomId as string);
             const roomDoc = await transaction.get(roomRef);
-
+    
             if (!roomDoc.exists()) throw "Room does not exist!";
-            
             const roomData = roomDoc.data() as GameRoom;
-            
-            const winnerIsMe = roomData.winner?.uid === user.uid;
-            let myPayout = 0;
-
+    
             if (roomData.payoutTransactionId) {
                 // Payout already processed, just determine what the user's payout was
+                const winnerIsMe = roomData.winner?.uid === user.uid;
+                let myPayout = 0;
                 if(roomData.draw) {
                     myPayout = roomData.wager * 0.9;
-                } else if(!roomData.winner || !roomData.winner.uid) {
+                } else if (!roomData.winner || !roomData.winner.uid) {
                     myPayout = 0;
-                } else if(roomData.winner.method === 'resign') {
-                    myPayout = winnerIsMe ? roomData.wager * 1.05 : roomData.wager * 0.75;
-                } else { // checkmate or timeout or piece-capture
+                } else if (roomData.winner.method === 'resign') {
+                    const resignerId = roomData.players.find(p => p !== roomData.winner?.uid);
+                    if (user.uid === roomData.winner.uid) myPayout = roomData.wager * 1.05;
+                    else if (user.uid === resignerId) myPayout = roomData.wager * 0.75;
+                } else { // checkmate, timeout, or piece-capture
                     myPayout = winnerIsMe ? roomData.wager * 1.8 : 0;
                 }
-                 return { myPayout };
+                return { myPayout };
             }
-
+    
             if (!roomData.player2) return { myPayout: 0 };
-
+    
             let creatorPayout = 0;
             let joinerPayout = 0;
             const creatorRef = doc(db, 'users', roomData.createdBy.uid);
@@ -175,25 +176,25 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const wager = roomData.wager;
             const now = serverTimestamp();
             const payoutTxId = doc(collection(db, 'transactions')).id; 
-
+    
             let creatorDesc = '';
             let joinerDesc = '';
-
+    
             if (roomData.draw) {
                 creatorPayout = wager * 0.9;
                 joinerPayout = wager * 0.9;
-                creatorDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.player2.name}`;
-                joinerDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.createdBy.name}`;
-            } else if (roomData.winner && roomData.winner.uid) {
+                creatorDesc = `Draw refund vs ${roomData.player2.name}`;
+                joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
+            } else if (roomData.winner && roomData.winner.uid && roomData.winner.method) {
                 const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
                 const winnerName = winnerIsCreator ? roomData.createdBy.name : roomData.player2.name;
                 const loserName = winnerIsCreator ? roomData.player2.name : roomData.createdBy.name;
-
+    
                 if (roomData.winner.method === 'resign') {
                     creatorPayout = winnerIsCreator ? wager * 1.05 : wager * 0.75;
                     joinerPayout = !winnerIsCreator ? wager * 1.05 : wager * 0.75;
-                    creatorDesc = winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
-                    joinerDesc = !winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
+                    creatorDesc = winnerIsCreator ? `Forfeit Win vs ${loserName}` : `Resignation Refund vs ${winnerName}`;
+                    joinerDesc = !winnerIsCreator ? `Forfeit Win vs ${loserName}` : `Resignation Refund vs ${winnerName}`;
                 } else { // 'checkmate', 'timeout', or 'piece-capture'
                     creatorPayout = winnerIsCreator ? wager * 1.8 : 0;
                     joinerPayout = !winnerIsCreator ? wager * 1.8 : 0;
@@ -202,7 +203,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     joinerDesc = !winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
                 }
             }
-
+    
             if (creatorPayout > 0) {
                 transaction.update(creatorRef, { balance: increment(creatorPayout) });
                 transaction.set(doc(collection(db, 'transactions')), {
