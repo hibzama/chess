@@ -296,12 +296,23 @@ function MultiplayerGamePageContent() {
                 const referrerDocs: { [key: string]: DocumentData } = {};
 
                 for (const player of playersWithData) {
-                    if (player.data.referredBy) {
+                    if (player.data.mref) { // Marketer chain
+                        if (player.data.referralChain) {
+                             for (const marketerId of player.data.referralChain) {
+                                const ref = doc(db, 'users', marketerId);
+                                referrerRefs[marketerId] = ref;
+                                const referrerDoc = await transaction.get(ref);
+                                if (referrerDoc.exists()) {
+                                    referrerDocs[marketerId] = referrerDoc;
+                                }
+                            }
+                        }
+                    } else if (player.data.referredBy) { // Regular user chain
                         const ref = doc(db, 'users', player.data.referredBy);
                         referrerRefs[player.id] = ref;
                         const referrerDoc = await transaction.get(ref);
                         if (referrerDoc.exists()) {
-                             referrerDocs[player.id] = referrerDoc;
+                            referrerDocs[player.id] = referrerDoc;
                         }
                     }
                 }
@@ -327,23 +338,25 @@ function MultiplayerGamePageContent() {
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
                             description: `Wager for ${roomData.gameType} game vs ${player.id === creatorData.uid ? playersWithData[1].name : playersWithData[0].name}`,
-                            gameRoomId: roomData.id, createdAt: serverTimestamp()
+                            gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
                         // --- Commission Calculation ---
                         // A. Marketing Chain Commissions (Highest Priority)
-                        if (player.data.referralChain && player.data.mref) {
+                        if (player.data.mref && player.data.referralChain) {
                             const marketingCommissionRate = 0.03; 
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
-                                const commissionAmount = wagerAmount * marketingCommissionRate;
-                                if (commissionAmount > 0) {
-                                    transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
-                                    transaction.set(doc(collection(db, 'transactions')), {
-                                        userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
-                                        description: `Commission from ${player.name}`, fromUserId: player.id,
-                                        level: i + 1, gameRoomId: roomData.id, createdAt: serverTimestamp()
-                                    });
+                                if(referrerDocs[marketerId]) { // Check if marketer doc was read
+                                    const commissionAmount = wagerAmount * marketingCommissionRate;
+                                    if (commissionAmount > 0) {
+                                        transaction.update(referrerRefs[marketerId], { marketingBalance: increment(commissionAmount) });
+                                        transaction.set(doc(collection(db, 'transactions')), {
+                                            userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
+                                            description: `Commission from ${player.name}`, fromUserId: player.id,
+                                            level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
+                                        });
+                                    }
                                 }
                             }
                         }
@@ -351,12 +364,15 @@ function MultiplayerGamePageContent() {
                         else if (player.data.referredBy) {
                             const referrerDoc = referrerDocs[player.id];
                             if (referrerDoc && referrerDoc.exists() && referrerDoc.data().role !== 'marketer') {
+                                const l1CountSnapshot = await getDocs(query(collection(db, 'users'), where('referredBy', '==', referrerDoc.id)));
+                                const l1Count = l1CountSnapshot.size;
+
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
                                 ];
                                 
-                                const rank = referralRanks[0]; // Simplified: A proper implementation would use a denormalized count.
+                                const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
         
                                 const l1Commission = wagerAmount * rank.l1Rate;
                                 if (l1Commission > 0) {
@@ -364,7 +380,7 @@ function MultiplayerGamePageContent() {
                                      transaction.set(doc(collection(db, 'transactions')), {
                                         userId: referrerDoc.id, type: 'commission', amount: l1Commission, status: 'completed',
                                         description: `L1 Commission from ${player.name}`, fromUserId: player.id,
-                                        level: 1, gameRoomId: roomData.id, createdAt: serverTimestamp()
+                                        level: 1, gameRoomId: room.id, createdAt: serverTimestamp()
                                     });
                                 }
                             }
@@ -381,7 +397,7 @@ function MultiplayerGamePageContent() {
                  toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
                  router.push(`/lobby/${room.gameType}`);
             } else {
-                 toast({ variant: 'destructive', title: "Error", description: "Could not join the game. If your wager was taken, it will be refunded."});
+                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. ${error.message}`});
             }
         } finally {
             setIsJoining(false);
