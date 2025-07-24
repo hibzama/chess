@@ -60,8 +60,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const checkGameOver = useCallback(() => {
     if (game.isGameOver()) {
         const fen = game.fen();
-        if(game.isCheckmate()){
-            // The player whose turn it IS has been checkmated. The winner is the player whose turn it IS NOT.
+        if (game.isCheckmate()) {
             const loserColor = game.turn();
             const winnerId = loserColor === playerColor ? roomOpponentId : user?.uid;
             setWinner(winnerId, { fen }, 'checkmate');
@@ -69,7 +68,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
             setWinner('draw', { fen }, 'draw');
         }
     }
-  }, [game, setWinner, playerColor, user, roomOpponentId]);
+}, [game, setWinner, playerColor, user, roomOpponentId]);
 
 
   // Bot logic
