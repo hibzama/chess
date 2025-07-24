@@ -5,7 +5,7 @@ import { Chess, Square, Piece } from 'chess.js';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getPieceIcon } from '@/lib/get-piece-icon';
-import { useGame } from '@/context/game-context';
+import { useGame, GameOverReason } from '@/context/game-context';
 
 type BoardTheme = { id: string; name: string; colors: string[] };
 type PieceStyle = { id: string; name: string; colors: string[] };
@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, roomOpponentId } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, room } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -61,13 +61,21 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     if (game.isGameOver()) {
         const fen = game.fen();
         if (game.isCheckmate()) {
-            const winnerId = currentPlayer === playerColor ? user?.uid : roomOpponentId;
-            setWinner(winnerId || null, { fen }, 'checkmate');
+            let winnerId: string | null = null;
+            if (isMultiplayer && room && room.player2) {
+                const loserColor = game.turn(); // The player whose turn it is, is checkmated.
+                const creatorIsWinner = room.createdBy.color !== loserColor;
+                winnerId = creatorIsWinner ? room.createdBy.uid : room.player2.uid;
+            } else { // Practice mode
+                const winnerColor = game.turn() === 'w' ? 'b' : 'w';
+                winnerId = playerColor === winnerColor ? 'p1' : 'bot';
+            }
+            setWinner(winnerId, { fen }, 'checkmate');
         } else {
             setWinner('draw', { fen }, 'draw');
         }
     }
-}, [game, setWinner, user, playerColor, roomOpponentId, currentPlayer]);
+}, [game, setWinner, playerColor, isMultiplayer, room]);
 
 
   // Bot logic
@@ -78,11 +86,13 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         if (moves.length > 0) {
           const move = moves[Math.floor(Math.random() * moves.length)];
           const result = game.move(move);
-          const newGame = new Chess(game.fen());
-          setGame(newGame);
-          const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-          switchTurn({ fen: newGame.fen() }, result.san, captured);
-          checkGameOver();
+          if (result) {
+            const newGame = new Chess(game.fen());
+            setGame(newGame);
+            const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
+            checkGameOver();
+            switchTurn({ fen: newGame.fen() }, result.san, captured);
+          }
         }
       }, 1000); // 1-second delay for bot move
       return () => clearTimeout(timer);
