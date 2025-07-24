@@ -1,15 +1,16 @@
 
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, onSnapshot, orderBy } from 'firebase/firestore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, query, where, getDocs, onSnapshot, orderBy, doc, runTransaction, increment, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Megaphone, Copy, Share, Users, BarChart, BadgeInfo, Info, User, Layers, ArrowRight, DollarSign } from 'lucide-react';
+import { Megaphone, Copy, Share, Users, BarChart, BadgeInfo, Info, User, Layers, ArrowRight, DollarSign, Wallet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Bar, BarChart as RechartsBarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
@@ -32,7 +33,7 @@ type Commission = {
     amount: number;
     createdAt: any;
     fromUserId: string;
-    level: 1 | 2;
+    level: 1;
     fromUserName?: string;
 };
 
@@ -46,9 +47,10 @@ export default function ReferAndEarnPage() {
     const { toast } = useToast();
 
     const [level1, setLevel1] = useState<Referral[]>([]);
-    const [level2, setLevel2] = useState<Referral[]>([]);
     const [commissions, setCommissions] = useState<Commission[]>([]);
     const [loading, setLoading] = useState(true);
+    const [transferAmount, setTransferAmount] = useState('');
+    const [isTransferring, setIsTransferring] = useState(false);
 
     const referralLink = useMemo(() => {
         if (typeof window !== 'undefined' && user) {
@@ -57,16 +59,17 @@ export default function ReferAndEarnPage() {
         return '';
     }, [user]);
 
-    const { rank, l1Rate, totalCommission } = useMemo(() => {
+    const { rank, l1Rate } = useMemo(() => {
         const l1Count = level1.length;
         const currentRank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
-        const total = commissions.reduce((acc, curr) => acc + curr.amount, 0);
         return {
             rank: currentRank.name,
             l1Rate: `${currentRank.l1Rate}%`,
-            totalCommission: total,
         };
-    }, [level1.length, commissions]);
+    }, [level1.length]);
+
+    const totalCommission = useMemo(() => commissions.reduce((acc, curr) => acc + curr.amount, 0), [commissions]);
+
 
     const monthlyCommissionData = useMemo(() => {
         const months: { [key: string]: number } = {};
@@ -87,21 +90,10 @@ export default function ReferAndEarnPage() {
         const fetchReferrals = async () => {
             setLoading(true);
             
-            // Fetch L1
             const l1Query = query(collection(db, 'users'), where('referredBy', '==', user.uid));
             const l1Docs = await getDocs(l1Query);
             const l1Data = l1Docs.docs.map(doc => ({ ...doc.data(), uid: doc.id } as Omit<Referral, 'wins'|'losses'|'commissionEarned'>));
             
-            // Fetch L2
-            const l1Ids = l1Data.map(l1 => l1.uid);
-            let l2Data: Omit<Referral, 'wins'|'losses'|'commissionEarned'>[] = [];
-            if (l1Ids.length > 0) {
-                 const l2Query = query(collection(db, 'users'), where('referredBy', 'in', l1Ids));
-                 const l2Docs = await getDocs(l2Query);
-                 l2Data = l2Docs.docs.map(doc => ({ ...doc.data(), uid: doc.id } as Omit<Referral, 'wins'|'losses'|'commissionEarned'>));
-            }
-
-            // Fetch Commissions to calculate earnings per referral
             const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid));
             const commDocs = await getDocs(commQuery);
             const allCommissions = commDocs.docs.map(doc => ({ ...doc.data(), id: doc.id } as Commission));
@@ -113,17 +105,14 @@ export default function ReferAndEarnPage() {
                         .reduce((sum, c) => sum + c.amount, 0);
                     return { ...ref, wins: 0, losses: 0, commissionEarned };
                 });
-            }
+            };
 
             setLevel1(addStats(l1Data));
-            setLevel2(addStats(l2Data));
-
             setLoading(false);
         };
         
         fetchReferrals();
 
-        // Subscribe to commissions for real-time total updates
          const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid));
          const unsubscribe = onSnapshot(commQuery, async (snapshot) => {
              const commsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Commission));
@@ -131,13 +120,65 @@ export default function ReferAndEarnPage() {
          });
 
          return () => unsubscribe();
-
     }, [user]);
     
     const copyLink = () => {
         navigator.clipboard.writeText(referralLink);
         toast({ title: "Copied!", description: "Referral link copied to clipboard." });
     };
+
+    const handleTransfer = async () => {
+        if (!user || !transferAmount) return;
+        
+        const amount = parseFloat(transferAmount);
+        if (isNaN(amount) || amount <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid amount to transfer.' });
+            return;
+        }
+
+        if (!userData || (userData.commissionBalance || 0) < amount) {
+             toast({ variant: 'destructive', title: 'Insufficient Balance', description: 'Your commission balance is too low.' });
+            return;
+        }
+
+        setIsTransferring(true);
+        const userRef = doc(db, 'users', user.uid);
+        const transactionRef = doc(collection(db, 'transactions'));
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) throw new Error("User not found");
+                
+                const currentCommissionBalance = userDoc.data().commissionBalance || 0;
+                if (currentCommissionBalance < amount) throw new Error("Insufficient commission balance.");
+
+                transaction.update(userRef, {
+                    commissionBalance: increment(-amount),
+                    balance: increment(amount),
+                });
+                
+                transaction.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'commission_transfer',
+                    amount: amount,
+                    status: 'completed',
+                    description: 'Commission transferred to main wallet',
+                    createdAt: serverTimestamp()
+                });
+            });
+            
+            toast({ title: 'Transfer Successful!', description: `LKR ${amount.toFixed(2)} has been added to your main wallet.` });
+            setTransferAmount('');
+
+        } catch (error: any) {
+            console.error("Transfer failed:", error);
+            toast({ variant: 'destructive', title: 'Transfer Failed', description: error.message || 'An unknown error occurred.' });
+        } finally {
+            setIsTransferring(false);
+        }
+    };
+
 
     return (
         <div className="space-y-8">
@@ -161,7 +202,7 @@ export default function ReferAndEarnPage() {
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Info/> How the Referral System Works</CardTitle>
-                </CardHeader>
+                </Header>
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
                         <p><strong>1. Invite Players:</strong> Share your unique referral link. When a new player signs up using your link, they become your <span className="text-primary font-semibold">Level 1</span> referral.</p>
@@ -198,13 +239,13 @@ export default function ReferAndEarnPage() {
                     <CardHeader><CardTitle className="text-sm font-medium">Level 1 Referrals</CardTitle></CardHeader>
                     <CardContent>{loading ? <Skeleton className="h-8 w-12"/> : <p className="text-2xl font-bold">{level1.length}</p>}<p className="text-xs text-muted-foreground">Directly referred players</p></CardContent>
                 </Card>
-                 <Card>
-                    <CardHeader><CardTitle className="text-sm font-medium">Level 2 Referrals</CardTitle></CardHeader>
-                    <CardContent>{loading ? <Skeleton className="h-8 w-12"/> : <p className="text-2xl font-bold">{level2.length}</p>}<p className="text-xs text-muted-foreground">Indirectly referred players</p></CardContent>
-                </Card>
-                 <Card>
+                <Card>
                     <CardHeader><CardTitle className="text-sm font-medium">Total Commission</CardTitle></CardHeader>
                     <CardContent>{loading ? <Skeleton className="h-8 w-32"/> : <p className="text-2xl font-bold">LKR {totalCommission.toFixed(2)}</p>}<p className="text-xs text-muted-foreground">Lifetime earnings from referrals</p></CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader><CardTitle className="text-sm font-medium">Available for Transfer</CardTitle></CardHeader>
+                    <CardContent>{!userData ? <Skeleton className="h-8 w-32"/> : <p className="text-2xl font-bold">LKR {(userData?.commissionBalance || 0).toFixed(2)}</p>}<p className="text-xs text-muted-foreground">Your withdrawable commission</p></CardContent>
                 </Card>
             </div>
 
@@ -240,29 +281,55 @@ export default function ReferAndEarnPage() {
              </div>
 
             <Card>
-                <CardHeader><CardTitle>Referral Details</CardTitle><CardDescription>View your referred network and commission history.</CardDescription></CardHeader>
+                <CardHeader><CardTitle>Referral & Commission Management</CardTitle><CardDescription>View your network, transfer funds, and see your history.</CardDescription></CardHeader>
                 <CardContent>
-                     <Tabs defaultValue="level1">
+                     <Tabs defaultValue="transfer">
                         <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="level1"><Layers className="mr-2"/> Level 1 ({level1.length})</TabsTrigger>
-                            <TabsTrigger value="level2"><Layers className="mr-2"/> Level 2 ({level2.length})</TabsTrigger>
+                            <TabsTrigger value="transfer"><Wallet className="mr-2"/> Transfer to Wallet</TabsTrigger>
+                            <TabsTrigger value="level1"><Layers className="mr-2"/> Referrals ({level1.length})</TabsTrigger>
                             <TabsTrigger value="history"><DollarSign className="mr-2"/> Commission History ({commissions.length})</TabsTrigger>
                         </TabsList>
+                         <TabsContent value="transfer">
+                           <Card>
+                                <CardHeader>
+                                    <CardTitle>Transfer Commission to Main Wallet</CardTitle>
+                                    <CardDescription>Move your earned commission to your main wallet to use for games.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                     <div className="p-4 rounded-lg bg-secondary">
+                                        <p className="text-sm text-muted-foreground">Available Commission Balance</p>
+                                        <p className="text-2xl font-bold">LKR {(userData?.commissionBalance || 0).toFixed(2)}</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label htmlFor="transfer-amount">Amount to Transfer (LKR)</label>
+                                        <Input 
+                                            id="transfer-amount"
+                                            type="number"
+                                            value={transferAmount}
+                                            onChange={(e) => setTransferAmount(e.target.value)}
+                                            placeholder="e.g. 500"
+                                            />
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                     <Button onClick={handleTransfer} disabled={isTransferring}>
+                                        {isTransferring ? 'Transferring...' : 'Transfer Now'}
+                                     </Button>
+                                </CardFooter>
+                           </Card>
+                        </TabsContent>
                         <TabsContent value="level1">
                             <ReferralTable referrals={level1} loading={loading} />
                         </TabsContent>
-                        <TabsContent value="level2">
-                            <ReferralTable referrals={level2} loading={loading} />
-                        </TabsContent>
                         <TabsContent value="history">
-                            <CommissionTable commissions={commissions} loading={loading} level1={level1} level2={level2} />
+                            <CommissionTable commissions={commissions} loading={loading} referrals={level1} />
                         </TabsContent>
                     </Tabs>
                 </CardContent>
             </Card>
 
         </div>
-    )
+    );
 }
 
 
@@ -297,11 +364,10 @@ const ReferralTable = ({ referrals, loading }: { referrals: Referral[], loading:
     )
 }
 
-const CommissionTable = ({ commissions, loading, level1, level2 }: { commissions: Commission[], loading: boolean, level1: Referral[], level2: Referral[] }) => {
-    const allReferrals = [...level1, ...level2];
+const CommissionTable = ({ commissions, loading, referrals }: { commissions: Commission[], loading: boolean, referrals: Referral[] }) => {
 
     const getReferralName = (fromId: string) => {
-        const ref = allReferrals.find(r => r.uid === fromId);
+        const ref = referrals.find(r => r.uid === fromId);
         return ref ? `${ref.firstName} ${ref.lastName}` : 'Unknown User';
     }
     

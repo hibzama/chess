@@ -1,4 +1,5 @@
 
+
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +72,7 @@ export default function RegisterForm() {
                 phone,
                 email,
                 balance: initialBalance,
+                commissionBalance: 0,
                 role: 'user', // Default role for new users
                 createdAt: new Date(),
             };

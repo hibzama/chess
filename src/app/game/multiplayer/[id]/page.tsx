@@ -344,7 +344,7 @@ function MultiplayerGamePageContent() {
                                 // L1 Commission only
                                 const l1Commission = wagerAmount * rank.l1Rate;
                                 if (l1Commission > 0) {
-                                     transaction.update(l1ReferrerRef, { balance: increment(l1Commission) });
+                                     transaction.update(l1ReferrerRef, { commissionBalance: increment(l1Commission) });
                                      transaction.set(doc(collection(db, 'transactions')), {
                                         userId: l1ReferrerDoc.id, type: 'commission', amount: l1Commission, status: 'completed',
                                         description: `L1 Commission from ${player.name}`, fromUserId: player.id,
