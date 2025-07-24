@@ -289,18 +289,15 @@ function MultiplayerGamePageContent() {
 
                 const referralDocsToGet: { [key: string]: DocumentReference } = {};
                 for (const player of playersWithData) {
-                    // For marketing chains
                     if (player.data.referralChain) {
                         player.data.referralChain.forEach((refId: string) => {
                             referralDocsToGet[refId] = doc(db, 'users', refId);
                         });
                     } 
-                    // For regular L1 referrals
                     else if (player.data.referredBy) {
                         referralDocsToGet[player.data.referredBy] = doc(db, 'users', player.data.referredBy);
                     }
                 }
-
                 const referralSnapshots = await Promise.all(Object.values(referralDocsToGet).map(ref => transaction.get(ref)));
                 const referralDataMap: Map<string, DocumentData> = new Map();
                 Object.keys(referralDocsToGet).forEach((id, index) => {
@@ -342,7 +339,7 @@ function MultiplayerGamePageContent() {
                                 transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
                                 transaction.set(doc(collection(db, 'transactions')), {
                                     userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
-                                    description: `L${i+1} Commission from ${player.name}`, fromUserId: player.id,
+                                    description: `L${i + 1} Commission from ${player.name}`, fromUserId: player.id,
                                     level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
                                 });
                             }

@@ -22,13 +22,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 type Transaction = {
     id: string;
-    type: 'deposit' | 'withdrawal' | 'wager' | 'payout';
+    type: 'deposit' | 'withdrawal' | 'wager' | 'payout' | 'commission' | 'commission_transfer';
     amount: number;
     status: 'pending' | 'approved' | 'rejected' | 'completed';
     createdAt: any;
     slipUrl?: string;
     withdrawalDetails?: any;
     description?: string;
+    level?: number;
 };
 
 const USDT_RATE = 310;
@@ -73,7 +74,9 @@ export default function WalletPage() {
     
     const q = query(collection(db, 'transactions'), where('userId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const userTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      const userTransactions = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as Transaction))
+        .filter(tx => tx.type !== 'commission'); // Filter out commission transactions from main wallet
       setTransactions(userTransactions.sort((a, b) => (b.createdAt?.seconds ?? Infinity) - (a.createdAt?.seconds ?? Infinity)));
       setLoading(false);
     }, (error) => {
@@ -203,6 +206,7 @@ export default function WalletPage() {
         case 'withdrawal': return <ArrowDownCircle className="w-5 h-5 text-red-500" />;
         case 'wager': return <Swords className="w-5 h-5 text-orange-500" />;
         case 'payout': return <Trophy className="w-5 h-5 text-yellow-500" />;
+        case 'commission_transfer': return <DollarSign className="w-5 h-5 text-blue-500" />;
         default: return <DollarSign className="w-5 h-5 text-gray-500" />;
     }
   }
@@ -369,7 +373,7 @@ export default function WalletPage() {
                                         <div className="flex items-center gap-2">
                                             {getTransactionIcon(tx.type)}
                                             <div>
-                                                <span className="capitalize font-medium">{tx.type}</span>
+                                                <span className="capitalize font-medium">{tx.type.replace('_', ' ')}</span>
                                                 {tx.description && <p className="text-xs text-muted-foreground">{tx.description}</p>}
                                             </div>
                                         </div>
