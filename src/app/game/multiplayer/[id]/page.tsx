@@ -291,7 +291,7 @@ function MultiplayerGamePageContent() {
 
                 // --- Commission and Wager Logic ---
                 if (wagerAmount > 0) {
-                     const commissionsToPay = new Map<string, { amount: number, level: number, toWallet: 'main' | 'marketing', fromPlayerId: string, fromPlayerName: string }>();
+                    const commissionsToPay = new Map<string, { amount: number, level: number, toWallet: 'main' | 'marketing', fromPlayerId: string, fromPlayerName: string }>();
 
                     const playersDataWithDocs = [
                         { id: room.createdBy.uid, data: creatorData, name: room.createdBy.name },
@@ -307,12 +307,13 @@ function MultiplayerGamePageContent() {
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
 
-                        // 1. Marketing Chain Commissions (Highest Priority)
+                         // 1. Marketing Chain Commissions (Highest Priority)
                         if (player.data.referralChain && player.data.referralChain.length > 0) {
                             const marketingCommissionRate = 0.03; // Flat 3% for all levels
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
                                 const commissionAmount = wagerAmount * marketingCommissionRate;
+                                
                                 const existingComm = commissionsToPay.get(marketerId);
                                 if (existingComm) {
                                     existingComm.amount += commissionAmount;
