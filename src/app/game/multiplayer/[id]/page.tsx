@@ -256,7 +256,7 @@ function MultiplayerGamePageContent() {
         const joinerRef = doc(db, 'users', user.uid);
 
         try {
-            await runTransaction(db, async (transaction) => {
+             await runTransaction(db, async (transaction) => {
                 const currentRoomDoc = await transaction.get(roomRef);
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
                     throw new Error("Room not available");
@@ -305,8 +305,7 @@ function MultiplayerGamePageContent() {
                         { id: room.createdBy.uid, data: creatorData },
                         { id: user.uid, data: joinerData }
                     ];
-        
-                    // 2. Commission Calculation
+
                     for (const player of playersDataWithDocs) {
                         const playerData = player.data;
                         const fromPlayerId = player.id;
@@ -317,7 +316,7 @@ function MultiplayerGamePageContent() {
                             const marketingCommissionRate = 0.03; 
                             for (const marketerId of playerData.referralChain) {
                                 const commissionAmount = wagerAmount * marketingCommissionRate;
-                                if (commissionAmount > 0 && !commissionsToPay.has(marketerId)) {
+                                if (commissionAmount > 0) {
                                     const level = playerData.referralChain.indexOf(marketerId) + 1;
                                     commissionsToPay.set(marketerId, {
                                         amount: commissionAmount,
@@ -337,14 +336,14 @@ function MultiplayerGamePageContent() {
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
                                 ];
                                 
-                                const l1CountSnapshot = await getDocs(query(collection(db, 'users'), where('referredBy', '==', l1ReferrerData.uid)));
+                                const l1CountSnapshot = await getDocs(query(collection(db, 'users'), where('referredBy', '==', l1ReferrerDoc.id)));
                                 const l1Count = l1CountSnapshot.size;
                                 const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
                                 
                                 // L1 Commission
                                 const l1Commission = wagerAmount * rank.l1Rate;
-                                if (l1Commission > 0 && !commissionsToPay.has(l1ReferrerData.uid)) {
-                                     commissionsToPay.set(l1ReferrerData.uid, {
+                                if (l1Commission > 0) {
+                                     commissionsToPay.set(l1ReferrerDoc.id, {
                                         amount: l1Commission, fromPlayerId, fromPlayerName, level: 1, toWallet: 'main'
                                     });
                                 }
@@ -352,7 +351,7 @@ function MultiplayerGamePageContent() {
                                 // L2 Commission
                                 if (l1ReferrerData.referredBy) {
                                      const l2ReferrerDoc = await transaction.get(doc(db, 'users', l1ReferrerData.referredBy));
-                                     if (l2ReferrerDoc.exists() && !commissionsToPay.has(l2ReferrerDoc.id)) {
+                                     if (l2ReferrerDoc.exists()) {
                                         const l2Commission = wagerAmount * rank.l2Rate;
                                         if (l2Commission > 0) {
                                              commissionsToPay.set(l2ReferrerDoc.id, {

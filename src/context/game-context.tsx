@@ -147,19 +147,24 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (!roomDoc.exists()) throw "Room does not exist!";
             
             const roomData = roomDoc.data() as GameRoom;
+            
+            const winnerIsMe = roomData.winner?.uid === user.uid;
+            let myPayout = 0;
+
             if (roomData.payoutTransactionId) {
                 // Payout already processed, just determine what the user's payout was
-                const winnerIsMe = roomData.winner?.uid === user.uid;
-
-                if(roomData.draw) return { myPayout: roomData.wager * 0.9 };
-                if(!roomData.winner) return { myPayout: 0 };
-
-                if(roomData.winner.method === 'resign') {
-                    return { myPayout: winnerIsMe ? roomData.wager * 1.05 : roomData.wager * 0.75 }
+                if(roomData.draw) {
+                    myPayout = roomData.wager * 0.9;
+                } else if(!roomData.winner || !roomData.winner.uid) {
+                    myPayout = 0;
+                } else if(roomData.winner.method === 'resign') {
+                    myPayout = winnerIsMe ? roomData.wager * 1.05 : roomData.wager * 0.75;
                 } else { // checkmate or timeout or piece-capture
-                    return { myPayout: winnerIsMe ? roomData.wager * 1.8 : 0 }
+                    myPayout = winnerIsMe ? roomData.wager * 1.8 : 0;
                 }
+                 return { myPayout };
             }
+
             if (!roomData.player2) return { myPayout: 0 };
 
             let creatorPayout = 0;
