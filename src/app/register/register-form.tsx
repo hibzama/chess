@@ -1,4 +1,5 @@
 
+
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 
 
@@ -74,31 +75,27 @@ export default function RegisterForm() {
                 marketingBalance: 0,
                 role: 'user',
                 createdAt: serverTimestamp(),
+                l1Count: 0,
             };
 
             const referrerId = mref || ref;
 
-            if (referrerId) {
+             if (referrerId) {
                 const referrerDoc = await getDoc(doc(db, 'users', referrerId));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
                     
-                    // Case 1: The referrer is a marketer (direct link or via chain)
                     if (mref && referrerData.role === 'marketer') {
                          userData.referralChain = [mref];
                     } 
-                    // Case 2: The referrer is part of an existing marketing chain
-                    else if (ref && referrerData.referralChain) {
-                         if (referrerData.referralChain.length < 20) {
+                    else if (ref) {
+                        userData.referredBy = ref;
+                        await updateDoc(doc(db, 'users', ref), { l1Count: increment(1) });
+
+                        if (referrerData.referralChain && referrerData.referralChain.length < 20) {
                             userData.referralChain = [...referrerData.referralChain, ref];
                         }
                     }
-                    
-                    // ALWAYS set the direct referrer for L1 tracking
-                    if(ref) {
-                       userData.referredBy = ref;
-                    }
-
                 }
             }
 

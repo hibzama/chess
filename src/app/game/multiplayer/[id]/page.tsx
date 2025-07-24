@@ -271,6 +271,7 @@ function MultiplayerGamePageContent() {
                 }
                 const roomData = currentRoomDoc.data();
         
+                // --- ALL READS ---
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
                 const creatorDoc = await transaction.get(creatorRef);
@@ -280,7 +281,6 @@ function MultiplayerGamePageContent() {
                 
                 const creatorData = creatorDoc.data();
                 const joinerData = joinerDoc.data();
-                const wagerAmount = roomData.wager;
                 
                 const playersWithData = [
                     { id: creatorData.uid, data: creatorData, name: roomData.createdBy.name },
@@ -289,11 +289,14 @@ function MultiplayerGamePageContent() {
 
                 const referralDocsToGet: { [key: string]: DocumentReference } = {};
                 for (const player of playersWithData) {
+                    // For marketing chains
                     if (player.data.referralChain) {
                         player.data.referralChain.forEach((refId: string) => {
                             referralDocsToGet[refId] = doc(db, 'users', refId);
                         });
-                    } else if (player.data.referredBy) {
+                    } 
+                    // For regular L1 referrals
+                    else if (player.data.referredBy) {
                         referralDocsToGet[player.data.referredBy] = doc(db, 'users', player.data.referredBy);
                     }
                 }
@@ -318,7 +321,9 @@ function MultiplayerGamePageContent() {
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
                 });
         
-                if (wagerAmount > 0) {
+                if (roomData.wager > 0) {
+                    const wagerAmount = roomData.wager;
+
                     for (const player of playersWithData) {
                         transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
@@ -558,5 +563,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
