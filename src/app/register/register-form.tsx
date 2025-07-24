@@ -1,5 +1,4 @@
 
-
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -84,21 +83,13 @@ export default function RegisterForm() {
                     userData.referralChain = [mref];
                 }
             } else if (ref) {
-                 const referrerDoc = await getDoc(doc(db, 'users', ref));
-                 if (referrerDoc.exists()) {
-                    const referrerData = referrerDoc.data();
-                    // If referrer is a marketer, add new user to their chain
-                    if(referrerData.role === 'marketer' || (referrerData.referralChain && referrerData.referralChain.length > 0)) {
-                         const chain = referrerData.referralChain || [referrerData.uid]; // Start with the marketer if they are the direct referrer
-                         if(chain.length < 20) {
-                            userData.referralChain = [...chain, ref];
-                         }
-                    } else {
-                        // This is a standard user referral.
-                        userData.referredBy = ref;
-                    }
-                 }
+                // This is a standard referral. It should ONLY set referredBy.
+                const referrerDoc = await getDoc(doc(db, 'users', ref));
+                if (referrerDoc.exists()) {
+                    userData.referredBy = ref;
+                }
             }
+
 
             await setDoc(doc(db, "users", user.uid), userData);
             
@@ -187,6 +178,3 @@ export default function RegisterForm() {
       </Card>
   );
 }
-
-    
-
