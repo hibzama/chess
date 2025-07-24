@@ -2,13 +2,59 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2 } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useEffect, useState } from 'react';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export default function DashboardPage() {
-    const { user, loading } = useAuth();
+    const { user, userData, loading } = useAuth();
+    const [stats, setStats] = useState({
+        totalDeposit: 0,
+        totalWithdrawal: 0,
+        totalEarning: 0,
+    });
+    const [statsLoading, setStatsLoading] = useState(true);
+
+    useEffect(() => {
+        if (user) {
+            const fetchStats = async () => {
+                setStatsLoading(true);
+                const q = query(collection(db, "transactions"), where("userId", "==", user.uid));
+                const querySnapshot = await getDocs(q);
+                let deposit = 0;
+                let withdrawal = 0;
+                let earning = 0;
+
+                querySnapshot.forEach((doc) => {
+                    const transaction = doc.data();
+                    if (transaction.type === 'deposit' && transaction.status === 'approved') {
+                        deposit += transaction.amount;
+                    }
+                    if (transaction.type === 'withdrawal' && transaction.status === 'approved') {
+                        withdrawal += transaction.amount;
+                    }
+                    if (transaction.type === 'payout') {
+                        earning += transaction.amount;
+                    }
+                    if (transaction.type === 'wager') {
+                        earning -= transaction.amount;
+                    }
+                });
+
+                setStats({
+                    totalDeposit: deposit,
+                    totalWithdrawal: withdrawal,
+                    totalEarning: earning
+                });
+                setStatsLoading(false);
+            };
+            fetchStats();
+        }
+    }, [user]);
 
     if (loading) {
         return (
@@ -20,15 +66,15 @@ export default function DashboardPage() {
         
               <div className="grid gap-6">
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {[...Array(4)].map((_, i) => (
-                    <Card key={i}>
-                      <CardHeader>
-                        <Skeleton className="w-8 h-8 rounded-full mb-2" />
-                        <Skeleton className="h-6 w-3/4 mb-1" />
-                        <Skeleton className="h-4 w-1/2" />
-                      </CardHeader>
-                    </Card>
-                  ))}
+                    {[...Array(8)].map((_, i) => (
+                        <Card key={i}>
+                        <CardHeader>
+                            <Skeleton className="w-8 h-8 rounded-full mb-2" />
+                            <Skeleton className="h-6 w-3/4 mb-1" />
+                            <Skeleton className="h-4 w-1/2" />
+                        </CardHeader>
+                        </Card>
+                    ))}
                 </div>
                 <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
                   {[...Array(6)].map((_, i) => (
@@ -48,6 +94,13 @@ export default function DashboardPage() {
     if (!user) {
       redirect('/login');
     }
+    
+    const summaryCards = [
+        { title: "Wallet Balance", value: userData?.balance, icon: Wallet, description: "Your current available funds." },
+        { title: "Total Deposit", value: stats.totalDeposit, icon: ArrowUp, description: "All funds you've added." },
+        { title: "Total Withdrawals", value: stats.totalWithdrawal, icon: ArrowDown, description: "All funds you've taken out." },
+        { title: "Total Earnings", value: stats.totalEarning, icon: Trophy, description: "Your net profit from games." },
+    ];
 
   const mainActions = [
     { title: "Practice Games", description: "Play for free against the bot", icon: Sword, href: "/practice" },
@@ -75,6 +128,27 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {summaryCards.map((card) => (
+                <Card key={card.title}>
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                            <card.icon className="w-4 h-4 text-muted-foreground"/>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {statsLoading ? (
+                            <Skeleton className="h-8 w-3/4" />
+                        ) : (
+                            <div className="text-2xl font-bold">LKR {card.value?.toFixed(2) ?? '0.00'}</div>
+                        )}
+                        <p className="text-xs text-muted-foreground">{card.description}</p>
+                    </CardContent>
+                </Card>
+            ))}
+        </div>
+
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
           {mainActions.map((action) => (
             <Link href={action.href} key={action.title}>
