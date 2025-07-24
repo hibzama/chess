@@ -39,61 +39,27 @@ const GameOverDisplay = () => {
         let description = "The game has concluded.";
         let icon = <Crown className="w-12 h-12 text-primary" />;
 
-        if (isMultiplayer) {
-            if (winner === 'draw') {
-                title = "It's a Draw!";
-                description = "The game has ended in a draw by agreement or stalemate.";
-                icon = <Handshake className="w-12 h-12 text-yellow-400" />;
-            } else if (winner === 'p1') { // p1 is always the user
-                title = "Congratulations, You Win!";
-                icon = <Trophy className="w-12 h-12 text-yellow-400" />;
-                switch (gameOverReason) {
-                    case 'checkmate': description = "You beat your opponent by checkmate."; break;
-                    case 'timeout': description = "You won on time as your opponent ran out."; break;
-                    case 'resign': description = "Your opponent has resigned the game."; break;
-                    default: description = "You have won the game!";
-                }
-            } else { // p2 is the opponent
-                title = "Bad Luck, You Lost";
-                icon = <Frown className="w-12 h-12 text-destructive" />;
-                 switch (gameOverReason) {
-                    case 'checkmate': description = "Your opponent has checkmated you."; break;
-                    case 'timeout': description = "You lost because you ran out of time."; break;
-                    case 'resign': description = "You have resigned the game."; break;
-                    default: description = "You have lost the game.";
-                }
+        if (winner === 'draw') {
+            title = "It's a Draw!";
+            description = "The game has ended in a draw by agreement or stalemate.";
+            icon = <Handshake className="w-12 h-12 text-yellow-400" />;
+        } else if (winner === 'p1') { // p1 is always the local player
+            title = "Congratulations, You Win!";
+            icon = <Trophy className="w-12 h-12 text-yellow-400" />;
+            switch (gameOverReason) {
+                case 'checkmate': description = isMultiplayer ? "You beat your opponent by checkmate." : "You checkmated the bot. Well played!"; break;
+                case 'timeout': description = isMultiplayer ? "You won on time as your opponent ran out." : "The bot ran out of time."; break;
+                case 'resign': description = isMultiplayer ? "Your opponent has resigned the game." : "The bot has resigned."; break;
+                default: description = "You have won the game!";
             }
-        } else { // Practice Mode messages
-            switch(gameOverReason) {
-                case 'draw':
-                    title = "It's a Draw!";
-                    description = "The game has ended in a draw by agreement or stalemate.";
-                    icon = <Handshake className="w-12 h-12 text-yellow-400" />;
-                    break;
-                case 'checkmate':
-                    title = winner === 'p1' ? `Congratulations, You Win!` : `Bad Luck, You Lost`;
-                    description = winner === 'p1' ? `You checkmated the bot. Well played!` : `The bot has checkmated you.`;
-                    icon = winner === 'p1' ? <Trophy className="w-12 h-12 text-yellow-400" /> : <Frown className="w-12 h-12 text-destructive" />;
-                    break;
-                case 'timeout':
-                    title = winner === 'p1' ? `Congratulations, You Win!` : `Bad Luck, You Lost`;
-                    description = winner === 'p1' ? `The bot ran out of time.` : "You ran out of time.";
-                    icon = winner === 'p1' ? <Trophy className="w-12 h-12 text-yellow-400" /> : <Frown className="w-12 h-12 text-destructive" />;
-                    break;
-                case 'resign':
-                     title = "You Resigned";
-                     description = "You have resigned the game against the bot.";
-                     icon = <Flag className="w-12 h-12 text-muted-foreground" />;
-                     break;
-                default:
-                     if (winner === 'p1') {
-                        title = `Congratulations, You Win!`;
-                        icon = <Trophy className="w-12 h-12 text-yellow-400" />;
-                     } else if (winner === 'p2') {
-                        title = `Bad Luck, You Lost`;
-                        icon = <Frown className="w-12 h-12 text-destructive" />;
-                     }
-                     break;
+        } else { // p2 is the opponent, so the local player lost
+            title = "Bad Luck, You Lost";
+            icon = <Frown className="w-12 h-12 text-destructive" />;
+             switch (gameOverReason) {
+                case 'checkmate': description = isMultiplayer ? "Your opponent has checkmated you." : "The bot has checkmated you."; break;
+                case 'timeout': description = isMultiplayer ? "You lost because you ran out of time." : "You ran out of time."; break;
+                case 'resign': description = isMultiplayer ? "You have resigned the game." : "You have resigned the game against the bot."; break;
+                default: description = "You have lost the game.";
             }
         }
         return { title, description, icon };
