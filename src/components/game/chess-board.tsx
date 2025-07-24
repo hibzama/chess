@@ -61,15 +61,13 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     if (game.isGameOver()) {
         const fen = game.fen();
         if (game.isCheckmate()) {
-            // The player who just moved is the winner.
-            const winnerId = user?.uid; 
+            const winnerId = playerColor === game.turn() ? roomOpponentId : user?.uid;
             setWinner(winnerId || null, { fen }, 'checkmate');
         } else {
-            // It's a draw (stalemate, threefold repetition, etc.)
             setWinner('draw', { fen }, 'draw');
         }
     }
-}, [game, setWinner, user]);
+}, [game, setWinner, user, playerColor, roomOpponentId]);
 
 
   // Bot logic
