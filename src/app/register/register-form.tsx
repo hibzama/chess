@@ -55,13 +55,12 @@ export default function RegisterForm() {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            // Check if user is within the first 250
             const usersCollection = collection(db, "users");
             const snapshot = await getCountFromServer(usersCollection);
             const userCount = snapshot.data().count;
             
             let initialBalance = 0;
-            if (userCount <= 250) { // <= because the current user is not yet in the count
+            if (userCount <= 250) {
                 initialBalance = 100;
             }
             
@@ -74,27 +73,25 @@ export default function RegisterForm() {
                 balance: initialBalance,
                 commissionBalance: 0,
                 marketingBalance: 0,
-                role: 'user', // Default role for new users
+                role: 'user',
                 createdAt: serverTimestamp(),
             };
 
             if (mref) {
-                // Marketing link used, sets the chain starting with the marketer.
                 const marketerDoc = await getDoc(doc(db, 'users', mref));
                 if (marketerDoc.exists() && marketerDoc.data().role === 'marketer') {
                     userData.referralChain = [mref];
                 }
             } else if (ref) {
-                // Regular referral link used.
                 const referrerDoc = await getDoc(doc(db, 'users', ref));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    userData.referredBy = ref; // Direct referrer for 1-level system
-
-                    // Check if the referrer is part of a marketing chain.
-                    if (referrerData.referralChain && referrerData.referralChain.length < 20) {
-                        // If so, continue the chain.
-                        userData.referralChain = [...referrerData.referralChain, ref];
+                    if (referrerData.referralChain) {
+                        if (referrerData.referralChain.length < 20) {
+                            userData.referralChain = [...referrerData.referralChain, ref];
+                        }
+                    } else {
+                        userData.referredBy = ref;
                     }
                 }
             }
@@ -187,3 +184,5 @@ export default function RegisterForm() {
       </Card>
   );
 }
+
+    

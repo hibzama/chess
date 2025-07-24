@@ -116,7 +116,16 @@ export default function ReferAndEarnPage() {
 
          const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid));
          const unsubscribe = onSnapshot(commQuery, async (snapshot) => {
-             const commsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as Commission));
+             const commsDataPromises = snapshot.docs.map(async (doc) => {
+                const commission = {...doc.data(), id: doc.id} as Commission;
+                const fromUserDoc = await getDoc(getDoc(db, 'users', commission.fromUserId));
+                if(fromUserDoc.exists()){
+                    const fromUserData = fromUserDoc.data();
+                    commission.fromUserName = `${fromUserData.firstName} ${fromUserData.lastName}`;
+                }
+                return commission;
+             });
+             const commsData = await Promise.all(commsDataPromises);
              setCommissions(commsData);
          });
 
@@ -323,7 +332,7 @@ export default function ReferAndEarnPage() {
                             <ReferralTable referrals={level1} loading={loading} />
                         </TabsContent>
                         <TabsContent value="history">
-                            <CommissionTable commissions={commissions} loading={loading} referrals={level1} />
+                            <CommissionTable commissions={commissions} loading={loading} />
                         </TabsContent>
                     </Tabs>
                 </CardContent>
@@ -365,13 +374,7 @@ const ReferralTable = ({ referrals, loading }: { referrals: Referral[], loading:
     )
 }
 
-const CommissionTable = ({ commissions, loading, referrals }: { commissions: Commission[], loading: boolean, referrals: Referral[] }) => {
-
-    const getReferralName = (fromId: string) => {
-        const ref = referrals.find(r => r.uid === fromId);
-        return ref ? `${ref.firstName} ${ref.lastName}` : 'Unknown User';
-    }
-    
+const CommissionTable = ({ commissions, loading }: { commissions: Commission[], loading: boolean }) => {
     return (
         <Table>
             <TableHeader>
@@ -388,7 +391,7 @@ const CommissionTable = ({ commissions, loading, referrals }: { commissions: Com
                 ) : commissions.length > 0 ? commissions.map(comm => (
                     <TableRow key={comm.id}>
                         <TableCell>{comm.createdAt ? format(comm.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
-                        <TableCell>{getReferralName(comm.fromUserId)}</TableCell>
+                        <TableCell>{comm.fromUserName || 'Unknown User'}</TableCell>
                         <TableCell><Badge variant="secondary">Level {comm.level}</Badge></TableCell>
                         <TableCell className="text-green-400">LKR {comm.amount.toFixed(2)}</TableCell>
                     </TableRow>
@@ -399,3 +402,5 @@ const CommissionTable = ({ commissions, loading, referrals }: { commissions: Com
         </Table>
     )
 }
+
+    
