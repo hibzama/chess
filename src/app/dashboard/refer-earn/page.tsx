@@ -35,9 +35,8 @@ type Commission = {
 };
 
 const referralRanks = [
-    { rank: 1, name: "Rank 1", min: 0, max: 10, l1Rate: 3, l2Rate: 2 },
-    { rank: 2, name: "Rank 2", min: 11, max: 29, l1Rate: 4, l2Rate: 3 },
-    { rank: 3, name: "Rank 3", min: 30, max: Infinity, l1Rate: 5, l2Rate: 4 },
+    { rank: 1, name: "Rank 1", min: 0, max: 20, l1Rate: 3, l2Rate: 2 },
+    { rank: 2, name: "Rank 2", min: 21, max: Infinity, l1Rate: 4, l2Rate: 3 },
 ];
 
 export default function ReferAndEarnPage() {
@@ -75,7 +74,7 @@ export default function ReferAndEarnPage() {
             if (!months[month]) months[month] = 0;
             months[month] += c.amount;
         });
-        return Object.entries(months).map(([name, total) => ({ name, total })).slice(-6);
+        return Object.entries(months).map(([name, total]) => ({ name, total })).slice(-6);
     }, [commissions]);
 
     useEffect(() => {
@@ -163,7 +162,7 @@ export default function ReferAndEarnPage() {
                 <CardContent className="space-y-6">
                     <div className="space-y-2">
                         <p><strong>1. Invite Players:</strong> Share your unique referral link. When a new player signs up using your link, they become your <span className="text-primary font-semibold">Level 1</span> referral.</p>
-                        <p><strong>2. Earn from Two Levels:</strong> You earn a commission every time your Level 1 referrals play a game. When they invite others (your <span className="text-primary font-semibold">Level 2</span> referrals), you also earn a smaller commission from them!</p>
+                        <p><strong>2. Earn from Two Levels:</strong> You earn a commission every time your Level 1 referrals play a game. When they invite others (your <span className="text-primary font-semibold">Level 2</span> referrals), you also earn a smaller, smaller commission from them!</p>
                         <p><strong>3. Rank Up for Higher Commissions:</strong> The more players you directly refer (Level 1), the higher your Referral Rank becomes, unlocking better commission rates for both levels.</p>
                     </div>
                     <Table>
@@ -179,7 +178,7 @@ export default function ReferAndEarnPage() {
                             {referralRanks.map(r => (
                                 <TableRow key={r.rank}>
                                     <TableCell><Badge variant={rank === r.name ? "default" : "secondary"}>{r.name}</Badge></TableCell>
-                                    <TableCell>{r.rank === 3 ? `${r.min}+` : `${r.min} - ${r.max}`}</TableCell>
+                                    <TableCell>{r.rank === 2 ? `${r.min}+` : `${r.min} - ${r.max}`}</TableCell>
                                     <TableCell className="text-green-400 font-bold">{r.l1Rate}%</TableCell>
                                     <TableCell className="text-green-400 font-bold">{r.l2Rate}%</TableCell>
                                 </TableRow>
