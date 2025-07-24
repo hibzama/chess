@@ -265,12 +265,10 @@ function MultiplayerGamePageContent() {
 
         try {
             await runTransaction(db, async (transaction) => {
-                // --- 1. ALL READS FIRST ---
                 const currentRoomDoc = await transaction.get(roomRef);
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
                     throw new Error("Room not available");
                 }
-                
                 const roomData = currentRoomDoc.data();
         
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
@@ -278,9 +276,7 @@ function MultiplayerGamePageContent() {
                 const creatorDoc = await transaction.get(creatorRef);
                 const joinerDoc = await transaction.get(joinerRef);
         
-                if (!creatorDoc.exists() || !joinerDoc.exists()) {
-                    throw new Error("One of the players does not exist");
-                }
+                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("One of the players does not exist");
                 
                 const creatorData = creatorDoc.data();
                 const joinerData = joinerDoc.data();
@@ -290,32 +286,27 @@ function MultiplayerGamePageContent() {
                     { id: creatorData.uid, data: creatorData, name: roomData.createdBy.name },
                     { id: joinerData.uid, data: joinerData, name: `${joinerData.firstName} ${joinerData.lastName}` }
                 ];
-                
-                const referrersToRead : { [key: string]: DocumentReference<DocumentData> } = {};
-                
-                playersWithData.forEach(p => {
-                    if (p.data.referralChain && p.data.referralChain.length > 0) {
-                        p.data.referralChain.forEach((refId: string) => {
-                            referrersToRead[refId] = doc(db, 'users', refId);
+
+                const referralDocsToGet: { [key: string]: DocumentReference } = {};
+                for (const player of playersWithData) {
+                    if (player.data.referralChain) {
+                        player.data.referralChain.forEach((refId: string) => {
+                            referralDocsToGet[refId] = doc(db, 'users', refId);
                         });
-                    } else if (p.data.referredBy) {
-                        referrersToRead[p.data.referredBy] = doc(db, 'users', p.data.referredBy);
+                    } else if (player.data.referredBy) {
+                        referralDocsToGet[player.data.referredBy] = doc(db, 'users', player.data.referredBy);
+                    }
+                }
+
+                const referralSnapshots = await Promise.all(Object.values(referralDocsToGet).map(ref => transaction.get(ref)));
+                const referralDataMap: Map<string, DocumentData> = new Map();
+                Object.keys(referralDocsToGet).forEach((id, index) => {
+                    if (referralSnapshots[index].exists()) {
+                        referralDataMap.set(id, referralSnapshots[index].data());
                     }
                 });
 
-                const referrerDocs = await Promise.all(
-                    Object.values(referrersToRead).map(ref => transaction.get(ref))
-                );
-
-                const referrerDataMap = new Map();
-                Object.keys(referrersToRead).forEach((refId, index) => {
-                    if (referrerDocs[index].exists()) {
-                         referrerDataMap.set(refId, referrerDocs[index].data());
-                    }
-                });
-
-
-                // --- 2. ALL WRITES AFTER READS ---
+                // --- ALL WRITES ---
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
@@ -354,18 +345,13 @@ function MultiplayerGamePageContent() {
                         // Regular 1-Level Commissions
                         else if (player.data.referredBy) {
                             const l1ReferrerId = player.data.referredBy;
-                            const l1ReferrerData = referrerDataMap.get(l1ReferrerId);
+                            const l1ReferrerData = referralDataMap.get(l1ReferrerId);
 
                              if (l1ReferrerData && l1ReferrerData.role !== 'marketer') {
-                                // We need to count their referrals to determine rank
-                                // This read is problematic inside a transaction. Let's simplify. Assume rank based on fetched data if possible
-                                // For true accuracy, this count needs to be stored on the user object and updated.
-                                // Let's use a simplified rate for now.
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
                                 ];
-                                // This is an estimation. A proper implementation would have l1Count stored on the user doc.
                                 const l1Count = l1ReferrerData.l1Count || 0; 
                                 const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
                                 const l1Commission = wagerAmount * rank.l1Rate;

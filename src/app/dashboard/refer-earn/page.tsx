@@ -22,9 +22,6 @@ type Referral = {
     firstName: string;
     lastName: string;
     createdAt: any;
-    wins: number;
-    losses: number;
-    commissionEarned: number;
 };
 
 type Commission = {
@@ -93,28 +90,15 @@ export default function ReferAndEarnPage() {
             
             const l1Query = query(collection(db, 'users'), where('referredBy', '==', user.uid));
             const l1Docs = await getDocs(l1Query);
-            const l1Data = l1Docs.docs.map(doc => ({ ...doc.data(), uid: doc.id } as Omit<Referral, 'wins'|'losses'|'commissionEarned'>));
+            const l1Data = l1Docs.docs.map(doc => ({ ...doc.data(), uid: doc.id } as Referral));
             
-            const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid));
-            const commDocs = await getDocs(commQuery);
-            const allCommissions = commDocs.docs.map(doc => ({ ...doc.data(), id: doc.id } as Commission));
-            
-            const addStats = (referrals: Omit<Referral, 'wins'|'losses'|'commissionEarned'>[]): Referral[] => {
-                return referrals.map(ref => {
-                    const commissionEarned = allCommissions
-                        .filter(c => c.fromUserId === ref.uid)
-                        .reduce((sum, c) => sum + c.amount, 0);
-                    return { ...ref, wins: 0, losses: 0, commissionEarned };
-                });
-            };
-
-            setLevel1(addStats(l1Data));
+            setLevel1(l1Data);
             setLoading(false);
         };
         
         fetchReferrals();
 
-         const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid));
+         const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid), where('level', '==', 1));
          const unsubscribe = onSnapshot(commQuery, async (snapshot) => {
              const commsDataPromises = snapshot.docs.map(async (d) => {
                 const commission = {...d.data(), id: d.id} as Commission;
@@ -350,24 +334,18 @@ const ReferralTable = ({ referrals, loading }: { referrals: Referral[], loading:
                 <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Joined Date</TableHead>
-                    <TableHead>Wins</TableHead>
-                    <TableHead>Losses</TableHead>
-                    <TableHead>Commission Earned</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {loading ? (
-                    <TableRow><TableCell colSpan={5} className="h-24 text-center">Loading referrals...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={2} className="h-24 text-center">Loading referrals...</TableCell></TableRow>
                 ) : referrals.length > 0 ? referrals.map(ref => (
                     <TableRow key={ref.uid}>
                         <TableCell>{ref.firstName} {ref.lastName}</TableCell>
                         <TableCell>{ref.createdAt ? format(ref.createdAt.toDate(), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                        <TableCell>{ref.wins}</TableCell>
-                        <TableCell>{ref.losses}</TableCell>
-                        <TableCell>LKR {ref.commissionEarned.toFixed(2)}</TableCell>
                     </TableRow>
                 )) : (
-                     <TableRow><TableCell colSpan={5} className="h-24 text-center">No referrals in this level yet.</TableCell></TableRow>
+                     <TableRow><TableCell colSpan={2} className="h-24 text-center">No referrals in this level yet.</TableCell></TableRow>
                 )}
             </TableBody>
         </Table>
