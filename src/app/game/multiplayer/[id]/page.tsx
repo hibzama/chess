@@ -270,8 +270,10 @@ function MultiplayerGamePageContent() {
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
                     throw new Error("Room not available");
                 }
+                
+                const roomData = currentRoomDoc.data();
         
-                const creatorRef = doc(db, 'users', room.createdBy.uid);
+                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
                 const creatorDoc = await transaction.get(creatorRef);
                 const joinerDoc = await transaction.get(joinerRef);
@@ -282,47 +284,55 @@ function MultiplayerGamePageContent() {
                 
                 const creatorData = creatorDoc.data();
                 const joinerData = joinerDoc.data();
-                const wagerAmount = room.wager;
+                const wagerAmount = roomData.wager;
                 
-                // Read potential referrer data
-                let l1ReferrerDoc: DocumentData | null = null;
-                if (joinerData.referredBy) {
-                    const l1ReferrerRef = doc(db, 'users', joinerData.referredBy);
-                    l1ReferrerDoc = await transaction.get(l1ReferrerRef);
+                // Read potential referrer data for both players upfront
+                const playersWithData = [
+                    { id: creatorData.uid, data: creatorData, name: roomData.createdBy.name },
+                    { id: joinerData.uid, data: joinerData, name: `${joinerData.firstName} ${joinerData.lastName}` }
+                ];
+
+                const referrerRefs: { [key: string]: DocumentReference<DocumentData> } = {};
+                const referrerDocs: { [key: string]: DocumentData } = {};
+
+                for (const player of playersWithData) {
+                    if (player.data.referredBy) {
+                        const ref = doc(db, 'users', player.data.referredBy);
+                        referrerRefs[player.id] = ref;
+                        const referrerDoc = await transaction.get(ref);
+                        if (referrerDoc.exists()) {
+                             referrerDocs[player.id] = referrerDoc;
+                        }
+                    }
                 }
                 
                 // --- 2. ALL WRITES AFTER READS ---
-                const creatorColor = room.createdBy.color;
+                const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
                 // Write 1: Update room to start the game
                 transaction.update(roomRef, {
                     status: 'in-progress',
                     player2: { uid: user.uid, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor },
-                    players: [...room.players, user.uid],
+                    players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
-                    currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
+                    currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
                 });
         
                 // --- Commission and Wager Logic ---
                 if (wagerAmount > 0) {
-                     const players = [
-                        { id: room.createdBy.uid, data: creatorData, name: room.createdBy.name },
-                        { id: user.uid, data: joinerData, name: `${joinerData.firstName} ${joinerData.lastName}` }
-                    ];
-
-                    for (const player of players) {
+                    for (const player of playersWithData) {
                         // Write 2 & 3: Deduct wager and create transaction log for each player
                         transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${room.gameType} game vs ${player.id === room.createdBy.uid ? players[1].name : players[0].name}`,
-                            gameRoomId: room.id, createdAt: serverTimestamp()
+                            description: `Wager for ${roomData.gameType} game vs ${player.id === creatorData.uid ? playersWithData[1].name : playersWithData[0].name}`,
+                            gameRoomId: roomData.id, createdAt: serverTimestamp()
                         });
                         
                         // --- Commission Calculation ---
                         // A. Marketing Chain Commissions (Highest Priority)
-                        if (player.data.mref && player.data.referralChain) {
+                        if (player.data.referralChain && player.data.mref) {
                             const marketingCommissionRate = 0.03; 
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
@@ -332,35 +342,29 @@ function MultiplayerGamePageContent() {
                                     transaction.set(doc(collection(db, 'transactions')), {
                                         userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
                                         description: `Commission from ${player.name}`, fromUserId: player.id,
-                                        level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
+                                        level: i + 1, gameRoomId: roomData.id, createdAt: serverTimestamp()
                                     });
                                 }
                             }
                         }
                         // B. Regular 1-Level Commissions (Only if NOT in a marketing chain)
                         else if (player.data.referredBy) {
-                            const referrerRef = doc(db, 'users', player.data.referredBy);
-                            const referrerDoc = await transaction.get(referrerRef); // Re-get inside the loop for each player
-
-                            if (referrerDoc.exists() && referrerDoc.data().role !== 'marketer') {
+                            const referrerDoc = referrerDocs[player.id];
+                            if (referrerDoc && referrerDoc.exists() && referrerDoc.data().role !== 'marketer') {
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
                                 ];
-        
-                                // This is a limitation, for high traffic this should be a denormalized count on the user object.
-                                // But for a transaction, we must do this read before any writes. We can't do it here.
-                                // For now, we assume a simple rank system without querying inside the transaction.
-                                // We'll just use rank 1 as a fallback. A denormalized `l1Count` on the user object would fix this.
-                                const rank = referralRanks[0]; // Fallback to Rank 1 to avoid reads after writes.
+                                
+                                const rank = referralRanks[0]; // Simplified: A proper implementation would use a denormalized count.
         
                                 const l1Commission = wagerAmount * rank.l1Rate;
                                 if (l1Commission > 0) {
-                                     transaction.update(referrerRef, { commissionBalance: increment(l1Commission) });
+                                     transaction.update(referrerRefs[player.id], { commissionBalance: increment(l1Commission) });
                                      transaction.set(doc(collection(db, 'transactions')), {
                                         userId: referrerDoc.id, type: 'commission', amount: l1Commission, status: 'completed',
                                         description: `L1 Commission from ${player.name}`, fromUserId: player.id,
-                                        level: 1, gameRoomId: room.id, createdAt: serverTimestamp()
+                                        level: 1, gameRoomId: roomData.id, createdAt: serverTimestamp()
                                     });
                                 }
                             }
