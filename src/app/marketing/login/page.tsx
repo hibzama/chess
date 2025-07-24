@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -48,17 +49,37 @@ export default function MarketingLoginPage() {
         toast({
             variant: "destructive",
             title: "Login failed",
-            description: "You are not authorized to access this page.",
+            description: "You are not authorized to access the marketing dashboard.",
         });
       }
 
     } catch (error: any) {
         console.error("Error signing in:", error);
-        toast({
-            variant: "destructive",
-            title: "Login failed",
-            description: "Invalid email or password.",
-        });
+
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+            // Check if there's a pending application
+            const q = query(collection(db, "marketing_applications"), where("email", "==", email), where("status", "==", "pending"));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                 toast({
+                    title: "Application Pending",
+                    description: "Your marketing partner application is still under review. We'll notify you upon approval.",
+                });
+            } else {
+                toast({
+                    variant: "destructive",
+                    title: "Login failed",
+                    description: "Invalid email or password.",
+                });
+            }
+        } else {
+             toast({
+                variant: "destructive",
+                title: "Login failed",
+                description: "An unexpected error occurred. Please try again.",
+            });
+        }
     } finally {
         setIsLoading(false);
     }
