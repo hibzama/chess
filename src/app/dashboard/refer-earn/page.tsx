@@ -68,7 +68,7 @@ export default function ReferAndEarnPage() {
     }, [level1.length]);
 
     const totalCommission = useMemo(() => {
-      return commissions.reduce((acc, curr) => acc + curr.amount, 0)
+        return commissions.reduce((acc, curr) => acc + curr.amount, 0);
     }, [commissions]);
 
 

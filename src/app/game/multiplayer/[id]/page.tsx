@@ -310,11 +310,13 @@ function MultiplayerGamePageContent() {
                         
                         // --- Commission Calculation ---
                         // 1. Marketing Chain Commissions (Highest Priority)
-                        if (player.data.role === 'marketer' || (player.data.referralChain && player.data.referralChain.length > 0)) {
-                            const marketingCommissionRate = 0.03; 
-                             if(player.data.referralChain && player.data.referralChain.length > 0) {
-                                for (let i = 0; i < player.data.referralChain.length; i++) {
-                                    const marketerId = player.data.referralChain[i];
+                        if (player.data.mref) {
+                            const marketingChainRef = doc(db, 'users', player.data.mref);
+                            const marketingChainDoc = await transaction.get(marketingChainRef);
+                            if (marketingChainDoc.exists() && marketingChainDoc.data().role === 'marketer' && marketingChainDoc.data().referralChain) {
+                                const marketingCommissionRate = 0.03; 
+                                for (let i = 0; i < marketingChainDoc.data().referralChain.length; i++) {
+                                    const marketerId = marketingChainDoc.data().referralChain[i];
                                     const commissionAmount = wagerAmount * marketingCommissionRate;
                                     if (commissionAmount > 0) {
                                         transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
