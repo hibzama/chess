@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -116,7 +116,7 @@ export default function DashboardPage() {
     { title: "Ranking", icon: BarChart3, href: "#" },
     { title: "Start Earning", icon: DollarSign, href: "/lobby" },
     { title: "Chat", icon: MessageSquare, href: "#" },
-    { title: "Refer & Earn", icon: Gift, href: "#" },
+    { title: "Refer & Earn", icon: Megaphone, href: "/dashboard/refer-earn" },
     { title: "Equipment", icon: Gamepad2, href: "/dashboard/equipment" },
   ];
 

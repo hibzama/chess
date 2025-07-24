@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, getDoc, getDocs } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,6 +18,19 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+// Commission Ranks
+const referralRanks = [
+    { rank: 1, min: 0, max: 10, l1Rate: 0.03, l2Rate: 0.02 },
+    { rank: 2, min: 11, max: 29, l1Rate: 0.04, l2Rate: 0.03 },
+    { rank: 3, min: 30, max: Infinity, l1Rate: 0.05, l2Rate: 0.04 },
+];
+
+const getReferralRank = async (userId: string) => {
+    const l1Query = query(collection(db, 'users'), where('referredBy', '==', userId));
+    const l1Snapshot = await getDocs(l1Query);
+    const l1Count = l1Snapshot.size;
+    return referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
+};
 
 export default function CreateGamePage() {
     const params = useParams();
@@ -99,6 +112,61 @@ export default function CreateGamePage() {
                 gameRoomId: roomRef.id,
                 createdAt: serverTimestamp()
             });
+
+            // 4. Handle Referral Commissions
+            if (userData.referredBy) {
+                // Level 1 Referrer
+                const l1ReferrerRef = doc(db, 'users', userData.referredBy);
+                const l1ReferrerSnap = await getDoc(l1ReferrerRef);
+
+                if (l1ReferrerSnap.exists()) {
+                    const l1ReferrerData = l1ReferrerSnap.data();
+                    const l1Rank = await getReferralRank(l1ReferrerData.uid);
+                    const l1Commission = wagerAmount * l1Rank.l1Rate;
+
+                    if (l1Commission > 0) {
+                        batch.update(l1ReferrerRef, { balance: increment(l1Commission) });
+                        batch.set(doc(collection(db, 'transactions')), {
+                            userId: l1ReferrerData.uid,
+                            type: 'commission',
+                            amount: l1Commission,
+                            status: 'completed',
+                            description: `L1 commission from ${userData.firstName}`,
+                            fromUserId: user.uid,
+                            level: 1,
+                            gameRoomId: roomRef.id,
+                            createdAt: serverTimestamp()
+                        });
+                    }
+
+                    // Level 2 Referrer
+                    if (l1ReferrerData.referredBy) {
+                        const l2ReferrerRef = doc(db, 'users', l1ReferrerData.referredBy);
+                        const l2ReferrerSnap = await getDoc(l2ReferrerRef);
+
+                        if(l2ReferrerSnap.exists()) {
+                            const l2ReferrerData = l2ReferrerSnap.data();
+                             const l2Rank = await getReferralRank(l2ReferrerData.uid);
+                            const l2Commission = wagerAmount * l2Rank.l2Rate;
+
+                             if (l2Commission > 0) {
+                                batch.update(l2ReferrerRef, { balance: increment(l2Commission) });
+                                batch.set(doc(collection(db, 'transactions')), {
+                                    userId: l2ReferrerData.uid,
+                                    type: 'commission',
+                                    amount: l2Commission,
+                                    status: 'completed',
+                                    description: `L2 commission from ${userData.firstName}`,
+                                    fromUserId: user.uid,
+                                    level: 2,
+                                    gameRoomId: roomRef.id,
+                                    createdAt: serverTimestamp()
+                                });
+                            }
+                        }
+                    }
+                }
+            }
             
             await batch.commit();
             
@@ -214,4 +282,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-

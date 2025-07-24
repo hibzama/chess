@@ -1,10 +1,11 @@
+
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -14,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function RegisterPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
 
@@ -35,6 +37,7 @@ export default function RegisterPage() {
         const email = target.email.value;
         const password = target.password.value;
         const confirmPassword = target['confirm-password'].value;
+        const ref = searchParams.get('ref');
 
         if (password !== confirmPassword) {
             toast({
@@ -59,8 +62,8 @@ export default function RegisterPage() {
             if (userCount <= 250) { // <= because the current user is not yet in the count
                 initialBalance = 100;
             }
-
-            await setDoc(doc(db, "users", user.uid), {
+            
+            const userData: any = {
                 uid: user.uid,
                 firstName,
                 lastName,
@@ -68,7 +71,14 @@ export default function RegisterPage() {
                 email,
                 balance: initialBalance,
                 role: 'user', // Default role for new users
-            });
+                createdAt: new Date(),
+            };
+
+            if(ref) {
+                userData.referredBy = ref;
+            }
+
+            await setDoc(doc(db, "users", user.uid), userData);
             
             const LKR_BONUS = 100;
             const USDT_RATE = 310;

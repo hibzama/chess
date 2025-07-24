@@ -33,6 +33,8 @@ interface UserData {
     balance: number;
     role: 'user' | 'admin';
     equipment?: EquipmentSettings;
+    referredBy?: string;
+    createdAt: any;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
