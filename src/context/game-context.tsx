@@ -52,7 +52,7 @@ interface GameState {
     capturedByPlayer: Piece[];
     capturedByBot: Piece[];
     payoutAmount: number | null;
-    isEnding: boolean; // New state to handle end-of-game transition
+    isEnding: boolean;
 }
 
 interface GameContextType extends GameState {
@@ -101,7 +101,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const savedState = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
             if (savedState) {
                 const parsed = JSON.parse(savedState);
-                return { ...defaultState, ...parsed, gameOver: false, winner: null };
+                return { ...defaultState, ...parsed, gameOver: false, winner: null, isEnding: false };
             }
         } catch (error) {
             console.error("Failed to parse game state from localStorage", error);
@@ -134,7 +134,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
     }, []);
 
-    const handlePayout = useCallback(async (currentRoom: GameRoom) => {
+    const handlePayout = useCallback(async (currentRoom: GameRoom): Promise<{ myPayout: number }> => {
         if (!roomId || !user) return { myPayout: 0 };
     
         let creatorPayout = 0;
@@ -145,18 +145,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomDoc = await transaction.get(roomRef);
     
-                if (!roomDoc.exists()) {
-                    throw "Room does not exist!";
-                }
-    
+                if (!roomDoc.exists()) throw "Room does not exist!";
+                
                 const roomData = roomDoc.data() as GameRoom;
-    
-                if (roomData.payoutTransactionId) {
-                    return;
-                }
-                 if (!roomData.player2) {
-                    return;
-                }
+                if (roomData.payoutTransactionId) return; // Already processed
+                if (!roomData.player2) return;
     
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', roomData.player2.uid);
@@ -271,11 +264,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
             if (roomData.status === 'completed') {
                 if (gameOverHandledRef.current) return;
-                gameOverHandledRef.current = true;
                 
                 stopTimer();
 
                 handlePayout(roomData).then(({ myPayout }) => {
+                    if (gameOverHandledRef.current) return;
+                    gameOverHandledRef.current = true;
+
                     const winnerIsMe = roomData.winner?.uid === user.uid;
                     setGameState(prevState => ({
                         ...prevState,
@@ -545,3 +540,5 @@ export const useGame = () => {
     }
     return context;
 }
+
+    
