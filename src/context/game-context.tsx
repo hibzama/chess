@@ -137,82 +137,85 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const handlePayout = useCallback(async (currentRoom: GameRoom): Promise<{ myPayout: number }> => {
         if (!roomId || !user) return { myPayout: 0 };
     
-        let creatorPayout = 0;
-        let joinerPayout = 0;
-            
-        try {
-            await runTransaction(db, async (transaction) => {
-                const roomRef = doc(db, 'game_rooms', roomId as string);
-                const roomDoc = await transaction.get(roomRef);
-    
-                if (!roomDoc.exists()) throw "Room does not exist!";
-                
-                const roomData = roomDoc.data() as GameRoom;
-                if (roomData.payoutTransactionId) return; // Already processed
-                if (!roomData.player2) return;
-    
-                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
-                const joinerRef = doc(db, 'users', roomData.player2.uid);
-                
-                const wager = roomData.wager;
-                const now = serverTimestamp();
-                const payoutTxId = doc(collection(db, 'transactions')).id; 
+        return runTransaction(db, async (transaction) => {
+            const roomRef = doc(db, 'game_rooms', roomId as string);
+            const roomDoc = await transaction.get(roomRef);
 
-                let creatorDesc = '';
-                let joinerDesc = '';
-
-                if (roomData.draw) {
-                    creatorPayout = wager * 0.9;
-                    joinerPayout = wager * 0.9;
-                    creatorDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.player2.name}`;
-                    joinerDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.createdBy.name}`;
-                } else if (roomData.winner) {
-                    const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
-                    const winnerName = winnerIsCreator ? roomData.createdBy.name : roomData.player2.name;
-                    const loserName = winnerIsCreator ? roomData.player2.name : roomData.createdBy.name;
-    
-                    if (roomData.winner.method === 'resign') {
-                        const winnerPayoutAmount = wager * 1.05;
-                        const loserPayoutAmount = wager * 0.75;
-                        creatorPayout = winnerIsCreator ? winnerPayoutAmount : loserPayoutAmount;
-                        joinerPayout = winnerIsCreator ? loserPayoutAmount : winnerPayoutAmount;
-                        creatorDesc = winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
-                        joinerDesc = winnerIsCreator ? `Forfeit refund vs ${winnerName}` : `Forfeit win vs ${loserName}`;
-                    } else { // 'checkmate' or 'timeout'
-                        const winnerPayoutAmount = wager * 1.8;
-                        creatorPayout = winnerIsCreator ? winnerPayoutAmount : 0;
-                        joinerPayout = winnerIsCreator ? 0 : winnerPayoutAmount;
-                        const reason = roomData.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win on time';
-                        creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
-                        joinerDesc = winnerIsCreator ? `Loss vs ${winnerName}` : `${reason} vs ${loserName}`;
-                    }
-                }
-    
-                if (creatorPayout > 0) {
-                    transaction.update(creatorRef, { balance: increment(creatorPayout) });
-                    transaction.set(doc(collection(db, 'transactions')), {
-                        userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed',
-                        description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
-                    });
-                }
-                if (joinerPayout > 0) {
-                    transaction.update(joinerRef, { balance: increment(joinerPayout) });
-                    transaction.set(doc(collection(db, 'transactions')), {
-                        userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed',
-                        description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
-                    });
-                }
-                
-                transaction.update(roomRef, { payoutTransactionId: payoutTxId });
-            });
+            if (!roomDoc.exists()) throw "Room does not exist!";
             
+            const roomData = roomDoc.data() as GameRoom;
+            if (roomData.payoutTransactionId) {
+                // Payout already processed, just determine what the user's payout was
+                const isCreator = currentRoom.createdBy.uid === user.uid;
+                if(roomData.draw) return { myPayout: roomData.wager * 0.9 };
+                if(!roomData.winner) return { myPayout: 0 };
+                const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
+                if(roomData.winner.method === 'resign') {
+                    return { myPayout: isCreator === winnerIsCreator ? roomData.wager * 1.05 : roomData.wager * 0.75 }
+                } else {
+                    return { myPayout: isCreator === winnerIsCreator ? roomData.wager * 1.8 : 0 }
+                }
+            }
+            if (!roomData.player2) return { myPayout: 0 };
+
+            let creatorPayout = 0;
+            let joinerPayout = 0;
+            const creatorRef = doc(db, 'users', roomData.createdBy.uid);
+            const joinerRef = doc(db, 'users', roomData.player2.uid);
+            
+            const wager = roomData.wager;
+            const now = serverTimestamp();
+            const payoutTxId = doc(collection(db, 'transactions')).id; 
+
+            let creatorDesc = '';
+            let joinerDesc = '';
+
+            if (roomData.draw) {
+                creatorPayout = wager * 0.9;
+                joinerPayout = wager * 0.9;
+                creatorDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.player2.name}`;
+                joinerDesc = `Draw refund for ${roomData.gameType} game vs ${roomData.createdBy.name}`;
+            } else if (roomData.winner) {
+                const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
+                const winnerName = winnerIsCreator ? roomData.createdBy.name : roomData.player2.name;
+                const loserName = winnerIsCreator ? roomData.player2.name : roomData.createdBy.name;
+
+                if (roomData.winner.method === 'resign') {
+                    creatorPayout = winnerIsCreator ? wager * 1.05 : wager * 0.75;
+                    joinerPayout = !winnerIsCreator ? wager * 1.05 : wager * 0.75;
+                    creatorDesc = winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
+                    joinerDesc = !winnerIsCreator ? `Forfeit win vs ${loserName}` : `Forfeit refund vs ${winnerName}`;
+                } else { // 'checkmate' or 'timeout'
+                    creatorPayout = winnerIsCreator ? wager * 1.8 : 0;
+                    joinerPayout = !winnerIsCreator ? wager * 1.8 : 0;
+                    const reason = roomData.winner.method === 'checkmate' ? 'Win by checkmate' : 'Win on time';
+                    creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
+                    joinerDesc = !winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
+                }
+            }
+
+            if (creatorPayout > 0) {
+                transaction.update(creatorRef, { balance: increment(creatorPayout) });
+                transaction.set(doc(collection(db, 'transactions')), {
+                    userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed',
+                    description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
+                });
+            }
+            if (joinerPayout > 0) {
+                transaction.update(joinerRef, { balance: increment(joinerPayout) });
+                transaction.set(doc(collection(db, 'transactions')), {
+                    userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed',
+                    description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId: payoutTxId
+                });
+            }
+            
+            transaction.update(roomRef, { payoutTransactionId: payoutTxId });
             const isCreator = currentRoom.createdBy.uid === user.uid;
             return { myPayout: isCreator ? creatorPayout : joinerPayout };
-    
-        } catch (error) {
+        }).catch(error => {
             console.error("Payout Transaction failed:", error);
             return { myPayout: 0 };
-        }
+        })
     }, [user, roomId, gameType]);
 
 
