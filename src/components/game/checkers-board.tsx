@@ -112,7 +112,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                 // Jump move
                 else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                     const jumpedPiece = currentBoard[newRow][newCol]!;
-                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true, jumpedPiece: { type: 'p', color: jumpedPiece.player } as Piece });
+                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true, jumpedPiece: { type: 'p', color: jumpedPiece.player } as unknown as Piece });
                 }
             }
         }
@@ -139,7 +139,6 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             }
         }
         
-        let winnerId: string | 'draw' | null = null;
         let winnerColor: Player | null = null;
         
         if (whitePieces === 0) winnerColor = 'b';
@@ -147,7 +146,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         else if (!hasMoves) winnerColor = nextPlayer === 'w' ? 'b' : 'w';
         
         if(winnerColor) {
-             winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
+             const winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
              setWinner(winnerId || null, { board: currentBoard });
         }
         
@@ -284,7 +283,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             setConsecutiveJumpPiece(null);
             setSelectedPiece(null);
             setPossibleMoves([]);
-            const finalCapturedPiece = captured ? { type: 'p', color: captured.player } : undefined;
+            const finalCapturedPiece = captured ? { type: 'p', color: captured.player } as unknown as Piece : undefined;
             switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
         }
         

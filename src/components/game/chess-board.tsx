@@ -61,7 +61,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
     if (game.isGameOver()) {
         const fen = game.fen();
         if (game.isCheckmate()) {
-            const winnerId = playerColor === currentPlayer ? user?.uid : roomOpponentId;
+            const winnerId = currentPlayer === playerColor ? user?.uid : roomOpponentId;
             setWinner(winnerId || null, { fen }, 'checkmate');
         } else {
             setWinner('draw', { fen }, 'draw');

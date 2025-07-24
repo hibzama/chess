@@ -43,7 +43,7 @@ const GameOverDisplay = () => {
             title = "It's a Draw!";
             description = "The game has ended in a draw by agreement or stalemate.";
             icon = <Handshake className="w-12 h-12 text-yellow-400" />;
-        } else if (winner === 'p1') { // p1 is always the local player
+        } else if (winner === 'p1') {
             title = "Congratulations, You Win!";
             icon = <Trophy className="w-12 h-12 text-yellow-400" />;
             switch (gameOverReason) {
@@ -52,7 +52,7 @@ const GameOverDisplay = () => {
                 case 'resign': description = isMultiplayer ? "Your opponent has resigned the game." : "The bot has resigned."; break;
                 default: description = "You have won the game!";
             }
-        } else { // p2 is the opponent, so the local player lost
+        } else {
             title = "Bad Luck, You Lost";
             icon = <Frown className="w-12 h-12 text-destructive" />;
              switch (gameOverReason) {
