@@ -1,3 +1,4 @@
+
 'use client'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
@@ -96,10 +98,10 @@ export default function DashboardPage() {
     }
     
     const summaryCards = [
-        { title: "Wallet Balance", value: userData?.balance, icon: Wallet, description: "Your current available funds." },
-        { title: "Total Deposit", value: stats.totalDeposit, icon: ArrowUp, description: "All funds you've added." },
-        { title: "Total Withdrawals", value: stats.totalWithdrawal, icon: ArrowDown, description: "All funds you've taken out." },
-        { title: "Total Earnings", value: stats.totalEarning, icon: Trophy, description: "Your net profit from games." },
+        { title: "Wallet Balance", value: userData?.balance, icon: Wallet, description: "Your current available funds.", colorClass: "text-primary" },
+        { title: "Total Deposit", value: stats.totalDeposit, icon: ArrowUp, description: "All funds you've added.", colorClass: "text-green-500" },
+        { title: "Total Withdrawals", value: stats.totalWithdrawal, icon: ArrowDown, description: "All funds you've taken out.", colorClass: "text-red-500" },
+        { title: "Total Earnings", value: stats.totalEarning, icon: Trophy, description: "Your net profit from games.", colorClass: "text-yellow-500" },
     ];
 
   const mainActions = [
@@ -134,14 +136,14 @@ export default function DashboardPage() {
                     <CardHeader>
                         <div className="flex justify-between items-center">
                             <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                            <card.icon className="w-4 h-4 text-muted-foreground"/>
+                            <card.icon className={cn("w-4 h-4 text-muted-foreground", card.colorClass)} />
                         </div>
                     </CardHeader>
                     <CardContent>
                         {statsLoading ? (
                             <Skeleton className="h-8 w-3/4" />
                         ) : (
-                            <div className="text-2xl font-bold">LKR {card.value?.toFixed(2) ?? '0.00'}</div>
+                            <div className={cn("text-2xl font-bold", card.colorClass)}>LKR {card.value?.toFixed(2) ?? '0.00'}</div>
                         )}
                         <p className="text-xs text-muted-foreground">{card.description}</p>
                     </CardContent>
