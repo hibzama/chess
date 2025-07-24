@@ -315,9 +315,9 @@ function MultiplayerGamePageContent() {
                 for (const player of playersData) {
                     // Marketing referral (20 levels, 3%)
                     if (player.data?.referralChain && player.data.referralChain.length > 0) {
-                        const commissionRate = 0.03;
+                        const marketingCommissionRate = 0.03;
                         for (const marketerId of player.data.referralChain) {
-                             const commissionAmount = wagerAmount * commissionRate;
+                             const commissionAmount = wagerAmount * marketingCommissionRate;
                              const level = player.data.referralChain.indexOf(marketerId) + 1;
                             if (commissionAmount > 0) {
                                 batch.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
