@@ -153,12 +153,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         
                 let myPayout = 0;
                 if (roomData.payoutTransactionId) {
-                    if (roomData.draw) {
-                        myPayout = roomData.wager * 0.9;
-                    } else if (roomData.winner?.resignerId) {
-                        myPayout = roomData.winner.resignerId === user.uid ? roomData.wager * 0.75 : roomData.wager * 1.05;
-                    } else if (roomData.winner?.uid === user.uid) {
-                        myPayout = roomData.wager * 1.8;
+                    const wager = roomData.wager;
+                    const winnerId = roomData.winner?.uid;
+                    const resignerId = roomData.winner?.resignerId;
+                    
+                    if (resignerId) {
+                        myPayout = resignerId === user.uid ? wager * 0.75 : wager * 1.05;
+                    } else if (roomData.draw) {
+                        myPayout = wager * 0.9;
+                    } else if (winnerId === user.uid) {
+                        myPayout = wager * 1.8;
                     }
                     return { myPayout };
                 }
@@ -177,7 +181,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let creatorDesc = '';
                 let joinerDesc = '';
         
-                if (roomData.winner?.resignerId) {
+                 if (roomData.winner?.resignerId) {
                     const resignerIsCreator = roomData.winner.resignerId === roomData.createdBy.uid;
                     creatorPayout = resignerIsCreator ? wager * 0.75 : wager * 1.05;
                     joinerPayout = !resignerIsCreator ? wager * 0.75 : wager * 1.05;
@@ -221,8 +225,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             // Even if transaction fails, calculate what the payout should have been for UI display.
             let myPayout = 0;
             const wager = currentRoom.wager;
-            if (currentRoom.winner?.resignerId) {
-                myPayout = currentRoom.winner.resignerId === user.uid ? wager * 0.75 : wager * 1.05;
+            const resignerId = currentRoom.winner?.resignerId;
+            if (resignerId) {
+                myPayout = resignerId === user.uid ? wager * 0.75 : wager * 1.05;
             } else if (currentRoom.draw) {
                 myPayout = wager * 0.9;
             } else if (currentRoom.winner?.uid === user.uid) {
