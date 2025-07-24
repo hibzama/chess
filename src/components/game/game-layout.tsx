@@ -41,9 +41,9 @@ const GameOverDisplay = () => {
         let description = "The game has concluded.";
         let icon = <Crown className="w-12 h-12 text-primary" />;
 
-        const playerHasResigned = gameOverReason === 'resign' && room?.winner?.uid !== user?.uid;
+        const playerResigned = room?.winner?.resignerId === user?.uid;
         
-        if (playerHasResigned) {
+        if (playerResigned) {
             title = "You Resigned";
             description = "You chose to resign the match.";
             icon = <Flag className="w-12 h-12 text-muted-foreground" />;
