@@ -140,21 +140,17 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         }
         
         let winnerId: string | 'draw' | null = null;
+        let winnerColor: Player | null = null;
         
-        if (whitePieces === 0) { // Black wins
-            const winnerColor = 'b';
-            winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
-        } else if (blackPieces === 0) { // White wins
-            const winnerColor = 'w';
-            winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
-        } else if (!hasMoves) { // Current player has no moves, they lose
-            const winnerColor = nextPlayer === 'w' ? 'b' : 'w';
-            winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
+        if (whitePieces === 0) winnerColor = 'b';
+        else if (blackPieces === 0) winnerColor = 'w';
+        else if (!hasMoves) winnerColor = nextPlayer === 'w' ? 'b' : 'w';
+        
+        if(winnerColor) {
+             winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
+             setWinner(winnerId || null, { board: currentBoard });
         }
-
-        if(winnerId) {
-          setWinner(winnerId, { board: currentBoard });
-        }
+        
 
     }, [getPossibleMovesForPiece, playerColor, setWinner, user, roomOpponentId]);
 
