@@ -152,6 +152,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const roomData = roomDoc.data() as GameRoom;
         
                 let myFinalPayout = 0;
+                
+                // If payout already happened, just calculate the amount to show in UI
                 if (roomData.payoutTransactionId) {
                     const wager = roomData.wager;
                     const resignerId = roomData.winner?.resignerId;
@@ -162,6 +164,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         myFinalPayout = wager * 0.9;
                     } else if (roomData.winner?.uid === user.uid) {
                         myFinalPayout = wager * 1.8;
+                    } else {
+                        myFinalPayout = 0;
                     }
                     return { myPayout: myFinalPayout };
                 }
@@ -569,3 +573,5 @@ export const useGame = () => {
     }
     return context;
 }
+
+    
