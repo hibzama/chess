@@ -43,38 +43,41 @@ const GameOverDisplay = () => {
         let title = "Game Over";
         let description = "The game has concluded.";
         let icon = <Crown className="w-12 h-12 text-primary" />;
-        
-        const playerResigned = room?.winner?.resignerId === user?.uid;
-        
-        if (playerResigned) {
-            title = "You Resigned";
-            description = "You chose to resign the match.";
-            icon = <Flag className="w-12 h-12 text-muted-foreground" />;
+
+        const isWinner = (winner === 'p1' && !isMultiplayer) || (isMultiplayer && user?.uid === winner);
+        const isLoser = (winner === 'p2' && !isMultiplayer) || (isMultiplayer && user?.uid !== winner && winner !== 'draw');
+
+        if (isWinner) {
+            title = "Congratulations, You Win!";
+            icon = <Trophy className="w-12 h-12 text-yellow-400" />;
+            switch (gameOverReason) {
+                case 'checkmate': description = "You won by checkmate. Well played!"; break;
+                case 'timeout': description = "You won on time as your opponent ran out."; break;
+                case 'resign': description = "Your opponent has resigned the game."; break;
+                case 'piece-capture': description = "You captured all your opponent's pieces!"; break;
+                default: description = "You have won the game!";
+            }
+        } else if (isLoser) {
+            if (gameOverReason === 'resign') {
+                 title = "You Resigned";
+                 description = "You chose to resign the match.";
+                 icon = <Flag className="w-12 h-12 text-muted-foreground" />;
+            } else {
+                title = "Bad Luck, You Lost";
+                icon = <Frown className="w-12 h-12 text-destructive" />;
+                switch (gameOverReason) {
+                    case 'checkmate': description = "Your opponent has checkmated you."; break;
+                    case 'timeout': description = "You lost because you ran out of time."; break;
+                    case 'piece-capture': description = "Your opponent captured all your pieces."; break;
+                    default: description = "You have lost the game.";
+                }
+            }
         } else if (winner === 'draw') {
             title = "It's a Draw!";
             description = "The game has ended in a draw by agreement or stalemate.";
             icon = <Handshake className="w-12 h-12 text-yellow-400" />;
-        } else if ((winner === 'p1' && !isMultiplayer) || (isMultiplayer && user?.uid === winner)) {
-            title = "Congratulations, You Win!";
-            icon = <Trophy className="w-12 h-12 text-yellow-400" />;
-            switch (gameOverReason) {
-                case 'checkmate': description = isMultiplayer ? "You won by checkmate. Well played!" : "You checkmated the bot. Well played!"; break;
-                case 'timeout': description = isMultiplayer ? "You won on time as your opponent ran out." : "The bot ran out of time."; break;
-                case 'resign': description = isMultiplayer ? "Your opponent has resigned the game." : "The bot has resigned."; break;
-                case 'piece-capture': description = isMultiplayer ? "You captured all your opponent's pieces!" : "You captured all the bot's pieces!"; break;
-                default: description = "You have won the game!";
-            }
-        } else {
-            title = "Bad Luck, You Lost";
-            icon = <Frown className="w-12 h-12 text-destructive" />;
-             switch (gameOverReason) {
-                case 'checkmate': description = isMultiplayer ? "Your opponent has checkmated you." : "The bot has checkmated you."; break;
-                case 'timeout': description = isMultiplayer ? "You lost because you ran out of time." : "You ran out of time."; break;
-                case 'resign': description = isMultiplayer ? "You have resigned the game." : "You have resigned the game against the bot."; break;
-                case 'piece-capture': description = isMultiplayer ? "Your opponent captured all your pieces." : "The bot captured all your pieces."; break;
-                default: description = "You have lost the game.";
-            }
         }
+        
         return { title, description, icon };
     }
 
@@ -238,7 +241,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </AlertDialog>
 
      {isMultiplayer && !gameOver && (
-         <Popover>
+         <Popover open={isChatOpen} onOpenChange={setIsChatOpen}>
             <PopoverTrigger asChild>
                 <button className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40">
                     <MessageSquare className="w-8 h-8"/>
@@ -246,12 +249,14 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 </button>
             </PopoverTrigger>
             <PopoverContent side="top" align="end" className="w-80 h-96 p-0 flex flex-col mr-4 mb-2">
-                 <GameChat onClose={() => {}} />
+                 <GameChat onClose={() => setIsChatOpen(false)} />
             </PopoverContent>
          </Popover>
       )}
     </>
   );
 }
+
+    
 
     
