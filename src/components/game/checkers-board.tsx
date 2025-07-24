@@ -123,7 +123,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         let whitePieces = 0;
         let blackPieces = 0;
         let hasMoves = false;
-
+    
         for (let r = 0; r < 8; r++) {
             for (let c = 0; c < 8; c++) {
                 const piece = currentBoard[r][c];
@@ -131,27 +131,32 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
                     if (piece.player === 'w') whitePieces++;
                     else blackPieces++;
                     if (piece.player === nextPlayer) {
-                        if (getPossibleMovesForPiece(piece, {row: r, col: c}, currentBoard, nextPlayer).length > 0) {
+                        if (getPossibleMovesForPiece(piece, { row: r, col: c }, currentBoard, nextPlayer).length > 0) {
                             hasMoves = true;
                         }
                     }
                 }
             }
         }
-        
+    
         let winnerColor: Player | null = null;
-        
+    
         if (whitePieces === 0) winnerColor = 'b';
         else if (blackPieces === 0) winnerColor = 'w';
         else if (!hasMoves) winnerColor = nextPlayer === 'w' ? 'b' : 'w';
-        
-        if(winnerColor) {
-             const winnerId = playerColor === winnerColor ? user?.uid : roomOpponentId;
-             setWinner(winnerId || null, { board: currentBoard });
+    
+        if (winnerColor) {
+            let winnerId: string | null = null;
+            if (isMultiplayer) {
+                // If local player's color matches the winner color, they are the winner.
+                // Otherwise, the opponent is the winner.
+                winnerId = playerColor === winnerColor ? user?.uid ?? null : roomOpponentId;
+            } else {
+                 winnerId = playerColor === winnerColor ? user?.uid ?? 'p1' : 'bot';
+            }
+            setWinner(winnerId || null, { board: currentBoard });
         }
-        
-
-    }, [getPossibleMovesForPiece, playerColor, setWinner, user, roomOpponentId]);
+    }, [getPossibleMovesForPiece, playerColor, setWinner, user, roomOpponentId, isMultiplayer]);
 
     
     const calculateAllMoves = useCallback((currentBoard: Board, forPlayer: Player) => {
