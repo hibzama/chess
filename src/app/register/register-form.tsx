@@ -86,10 +86,12 @@ export default function RegisterForm() {
                 const referrerDoc = await getDoc(doc(db, 'users', ref));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
+                    // If the direct referrer is part of a marketing chain, the new user joins that chain.
                     if (referrerData.referralChain) {
                         if (referrerData.referralChain.length < 20) {
                             userData.referralChain = [...referrerData.referralChain, ref];
                         }
+                    // Otherwise, it's a standard single-level referral.
                     } else {
                         userData.referredBy = ref;
                     }
