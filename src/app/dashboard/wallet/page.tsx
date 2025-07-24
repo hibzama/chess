@@ -74,7 +74,7 @@ export default function WalletPage() {
     const q = query(collection(db, 'transactions'), where('userId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const userTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-      setTransactions(userTransactions.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
+      setTransactions(userTransactions.sort((a, b) => (b.createdAt?.seconds ?? Infinity) - (a.createdAt?.seconds ?? Infinity)));
       setLoading(false);
     }, (error) => {
       console.error("Error fetching transactions:", error);
