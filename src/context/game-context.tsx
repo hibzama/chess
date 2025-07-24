@@ -152,7 +152,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
                 if(roomData.winner.method === 'resign') {
                     return { myPayout: isCreator === winnerIsCreator ? roomData.wager * 1.05 : roomData.wager * 0.75 }
-                } else {
+                } else { // checkmate or timeout
                     return { myPayout: isCreator === winnerIsCreator ? roomData.wager * 1.8 : 0 }
                 }
             }
