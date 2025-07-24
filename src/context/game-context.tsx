@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -149,20 +150,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const roomData = roomDoc.data() as GameRoom;
     
             if (roomData.payoutTransactionId) {
-                // Payout already processed, just determine what the user's payout was
                 const winnerIsMe = roomData.winner?.uid === user.uid;
                 let myPayout = 0;
-                if(roomData.draw) {
+                
+                if (roomData.draw) {
                     myPayout = roomData.wager * 0.9;
-                } else if (!roomData.winner || !roomData.winner.uid) {
-                    myPayout = 0;
-                } else if (roomData.winner.method === 'resign') {
-                    const resignerId = roomData.players.find(p => p !== roomData.winner?.uid);
-                    if (user.uid === roomData.winner.uid) myPayout = roomData.wager * 1.05;
-                    else if (user.uid === resignerId) myPayout = roomData.wager * 0.75;
-                } else { // checkmate, timeout, or piece-capture
-                    myPayout = winnerIsMe ? roomData.wager * 1.8 : 0;
+                } else if (roomData.winner?.method === 'resign') {
+                    const isWinner = roomData.winner.uid === user.uid;
+                    myPayout = isWinner ? roomData.wager * 1.05 : roomData.wager * 0.75;
+                } else if (winnerIsMe) {
+                    myPayout = roomData.wager * 1.8;
                 }
+                
                 return { myPayout };
             }
     
@@ -187,20 +186,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
             } else if (roomData.winner && roomData.winner.uid && roomData.winner.method) {
                 const winnerIsCreator = roomData.winner.uid === roomData.createdBy.uid;
-                const winnerName = winnerIsCreator ? roomData.createdBy.name : roomData.player2.name;
-                const loserName = winnerIsCreator ? roomData.player2.name : roomData.createdBy.name;
     
                 if (roomData.winner.method === 'resign') {
                     creatorPayout = winnerIsCreator ? wager * 1.05 : wager * 0.75;
                     joinerPayout = !winnerIsCreator ? wager * 1.05 : wager * 0.75;
-                    creatorDesc = winnerIsCreator ? `Forfeit Win vs ${loserName}` : `Resignation Refund vs ${winnerName}`;
-                    joinerDesc = !winnerIsCreator ? `Forfeit Win vs ${loserName}` : `Resignation Refund vs ${winnerName}`;
+                    creatorDesc = winnerIsCreator ? `Forfeit Win vs ${roomData.player2.name}` : `Resignation Refund vs ${roomData.player2.name}`;
+                    joinerDesc = !winnerIsCreator ? `Forfeit Win vs ${roomData.createdBy.name}` : `Resignation Refund vs ${roomData.createdBy.name}`;
                 } else { // 'checkmate', 'timeout', or 'piece-capture'
                     creatorPayout = winnerIsCreator ? wager * 1.8 : 0;
                     joinerPayout = !winnerIsCreator ? wager * 1.8 : 0;
                     const reason = roomData.winner.method === 'checkmate' ? 'Win by checkmate' : (roomData.winner.method === 'timeout' ? 'Win on time' : 'Win by capture');
-                    creatorDesc = winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
-                    joinerDesc = !winnerIsCreator ? `${reason} vs ${loserName}` : `Loss vs ${winnerName}`;
+                    creatorDesc = winnerIsCreator ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.createdBy.name}`;
+                    joinerDesc = !winnerIsCreator ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.player2.name}`;
                 }
             }
     

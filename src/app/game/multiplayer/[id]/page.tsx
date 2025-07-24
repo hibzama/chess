@@ -258,23 +258,24 @@ function MultiplayerGamePageContent() {
     
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
-        const joinerRef = doc(db, 'users', user.uid);
 
         try {
-             await runTransaction(db, async (transaction) => {
+            await runTransaction(db, async (transaction) => {
                 const currentRoomDoc = await transaction.get(roomRef);
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
                     throw new Error("Room not available");
                 }
-                const creatorDoc = await transaction.get(doc(db, 'users', room.createdBy.uid));
-                const joinerDoc = await transaction.get(joinerRef);
 
-                if(!creatorDoc.exists() || !joinerDoc.exists()) {
+                const creatorDoc = await transaction.get(doc(db, 'users', room.createdBy.uid));
+                const joinerDoc = await transaction.get(doc(db, 'users', user.uid));
+
+                if (!creatorDoc.exists() || !joinerDoc.exists()) {
                     throw new Error("One of the players does not exist");
                 }
                 
                 const creatorData = creatorDoc.data();
                 const joinerData = joinerDoc.data();
+                const wagerAmount = room.wager;
 
                 // Update room to start the game
                 const creatorColor = room.createdBy.color;
@@ -286,76 +287,65 @@ function MultiplayerGamePageContent() {
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
                 });
-        
+
                 // --- Commission and Wager Logic ---
-                const wagerAmount = room.wager;
-                 if (wagerAmount > 0) {
-                    const commissionsToPay = new Map<string, { amount: number, level: number, toWallet: 'main' | 'marketing', fromPlayerName: string }>();
+                if (wagerAmount > 0) {
+                    const commissionsToPay = new Map<string, { amount: number, level: number, toWallet: 'main' | 'marketing', fromPlayerId: string, fromPlayerName: string }>();
 
                     const playersDataWithDocs = [
-                        { id: room.createdBy.uid, data: creatorData },
-                        { id: user.uid, data: joinerData }
+                        { id: room.createdBy.uid, data: creatorData, name: room.createdBy.name },
+                        { id: user.uid, data: joinerData, name: `${joinerData.firstName} ${joinerData.lastName}` }
                     ];
 
                     for (const player of playersDataWithDocs) {
-                        const playerData = player.data;
-                        const fromPlayerId = player.id;
-                        const fromPlayerName = playerData.firstName;
-
                         // Deduct wager for each player
-                        transaction.update(doc(db, 'users', fromPlayerId), { balance: increment(-wagerAmount) });
+                        transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
-                            userId: fromPlayerId, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${room.gameType} game vs ${fromPlayerId === room.createdBy.uid ? joinerData.firstName : creatorData.firstName}`,
+                            userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
+                            description: `Wager for ${room.gameType} game vs ${player.id === room.createdBy.uid ? playersDataWithDocs[1].name : playersDataWithDocs[0].name}`,
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
-
-                        // Prioritize Marketing Chain
-                        if (playerData?.referralChain && playerData.referralChain.length > 0) {
-                            const marketingCommissionRate = 0.03; 
-                            for (const marketerId of playerData.referralChain) {
+                        
+                        // Check if player is part of a marketing chain
+                        if (player.data.referralChain && player.data.referralChain.length > 0) {
+                            const marketingCommissionRate = 0.03;
+                            for (let i = 0; i < player.data.referralChain.length; i++) {
+                                const marketerId = player.data.referralChain[i];
                                 const commissionAmount = wagerAmount * marketingCommissionRate;
-                                const level = playerData.referralChain.indexOf(marketerId) + 1;
-                                commissionsToPay.set(marketerId, {
-                                    amount: (commissionsToPay.get(marketerId)?.amount || 0) + commissionAmount,
-                                    level, toWallet: 'marketing', fromPlayerName
-                                });
+                                const currentComm = commissionsToPay.get(marketerId) || { amount: 0, level: i + 1, toWallet: 'marketing', fromPlayerId: player.id, fromPlayerName: player.name };
+                                currentComm.amount += commissionAmount;
+                                commissionsToPay.set(marketerId, currentComm);
                             }
-                        }
-                        // Fallback to Regular Referral Logic
-                        else if (playerData?.referredBy) {
-                            const l1ReferrerDoc = await getDoc(doc(db, 'users', playerData.referredBy));
-                             if (l1ReferrerDoc.exists()) {
+                        } 
+                        // If not, handle regular 2-level referrals
+                        else if (player.data.referredBy) {
+                            const l1ReferrerDoc = await getDoc(doc(db, 'users', player.data.referredBy));
+                            if (l1ReferrerDoc.exists()) {
                                 const l1ReferrerData = l1ReferrerDoc.data();
-                                
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03, l2Rate: 0.02 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.04, l2Rate: 0.03 },
                                 ];
-                                
+
                                 const l1CountSnapshot = await getDocs(query(collection(db, 'users'), where('referredBy', '==', l1ReferrerDoc.id)));
                                 const l1Count = l1CountSnapshot.size;
                                 const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
-                                
-                                // L1 Commission
+
                                 const l1Commission = wagerAmount * rank.l1Rate;
                                 if (l1Commission > 0) {
-                                     commissionsToPay.set(l1ReferrerDoc.id, {
-                                        amount: (commissionsToPay.get(l1ReferrerDoc.id)?.amount || 0) + l1Commission, 
-                                        level: 1, toWallet: 'main', fromPlayerName
-                                    });
+                                    const currentComm = commissionsToPay.get(l1ReferrerDoc.id) || { amount: 0, level: 1, toWallet: 'main', fromPlayerId: player.id, fromPlayerName: player.name };
+                                    currentComm.amount += l1Commission;
+                                    commissionsToPay.set(l1ReferrerDoc.id, currentComm);
                                 }
-                                
-                                // L2 Commission
+
                                 if (l1ReferrerData.referredBy) {
-                                     const l2ReferrerDoc = await getDoc(doc(db, 'users', l1ReferrerData.referredBy));
-                                     if (l2ReferrerDoc.exists()) {
+                                    const l2ReferrerDoc = await getDoc(doc(db, 'users', l1ReferrerData.referredBy));
+                                    if (l2ReferrerDoc.exists()) {
                                         const l2Commission = wagerAmount * rank.l2Rate;
                                         if (l2Commission > 0) {
-                                             commissionsToPay.set(l2ReferrerDoc.id, {
-                                                amount: (commissionsToPay.get(l2ReferrerDoc.id)?.amount || 0) + l2Commission, 
-                                                level: 2, toWallet: 'main', fromPlayerName
-                                            });
+                                            const currentComm = commissionsToPay.get(l2ReferrerDoc.id) || { amount: 0, level: 2, toWallet: 'main', fromPlayerId: player.id, fromPlayerName: player.name };
+                                            currentComm.amount += l2Commission;
+                                            commissionsToPay.set(l2ReferrerDoc.id, currentComm);
                                         }
                                     }
                                 }
@@ -363,13 +353,12 @@ function MultiplayerGamePageContent() {
                         }
                     }
 
-                    // Final Payout Loop
                     for (const [referrerId, comm] of commissionsToPay.entries()) {
                         const walletField = comm.toWallet === 'marketing' ? 'marketingBalance' : 'balance';
                         transaction.update(doc(db, 'users', referrerId), { [walletField]: increment(comm.amount) });
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: referrerId, type: 'commission', amount: comm.amount, status: 'completed',
-                            description: `Commission from ${comm.fromPlayerName}`, fromUserId: user.uid, // This needs to be fixed
+                            description: `Commission from ${comm.fromPlayerName}`, fromUserId: comm.fromPlayerId,
                             level: comm.level, gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                     }

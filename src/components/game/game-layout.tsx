@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Link from 'next/link';
@@ -26,7 +27,8 @@ type GameLayoutProps = {
 };
 
 const GameOverDisplay = () => {
-    const { winner, gameOverReason, isMultiplayer, payoutAmount } = useGame();
+    const { user } = useAuth();
+    const { winner, gameOverReason, isMultiplayer, payoutAmount, room } = useGame();
     const router = useRouter();
     const USDT_RATE = 310;
 
@@ -39,7 +41,13 @@ const GameOverDisplay = () => {
         let description = "The game has concluded.";
         let icon = <Crown className="w-12 h-12 text-primary" />;
 
-        if (winner === 'draw') {
+        const playerHasResigned = gameOverReason === 'resign' && room?.winner?.uid !== user?.uid;
+        
+        if (playerHasResigned) {
+            title = "You Resigned";
+            description = "You chose to resign the match.";
+            icon = <Flag className="w-12 h-12 text-muted-foreground" />;
+        } else if (winner === 'draw') {
             title = "It's a Draw!";
             description = "The game has ended in a draw by agreement or stalemate.";
             icon = <Handshake className="w-12 h-12 text-yellow-400" />;
