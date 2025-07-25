@@ -54,7 +54,7 @@ const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfi
             )}
         </div>
         <div className="flex gap-2">
-            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat`}><MessageSquare /></Link></Button>}
+            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${person.uid}`}><MessageSquare /></Link></Button>}
             {actionType !== 'suggestion' && 
                 <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
                      {actionType === 'add' ? <UserPlus /> : <UserMinus />}
@@ -118,7 +118,6 @@ export default function FriendsPage() {
         // To query with 'not-in', the list cannot be empty.
         if (excludeIds.length === 0) excludeIds.push('dummy-id');
         
-        // Fetch up to 20 users who are not the current user or their friends.
         const q = query(collection(db, 'users'), where('uid', 'not-in', excludeIds), limit(20));
         
         const userDocs = await getDocs(q);
@@ -126,15 +125,14 @@ export default function FriendsPage() {
         const suggestedUsers = userDocs.docs
             .map(doc => ({...doc.data(), uid: doc.id} as UserProfile));
         
-        // Sort: online first, then by last seen
         suggestedUsers.sort((a,b) => {
             if (a.status === 'online' && b.status !== 'online') return -1;
             if (a.status !== 'online' && b.status === 'online') return 1;
             if (a.lastSeen && b.lastSeen) {
                  return b.lastSeen.seconds - a.lastSeen.seconds;
             }
-            if (a.lastSeen) return -1; // a is more recent
-            if (b.lastSeen) return 1; // b is more recent
+            if (a.lastSeen) return -1;
+            if (b.lastSeen) return 1;
             return 0;
         });
 
@@ -162,13 +160,11 @@ export default function FriendsPage() {
         if(!user || !userData) return;
         setActionLoading(targetId);
         try {
-            // Check if already friends
             if(userData.friends?.includes(targetId)) {
                 toast({ variant: 'destructive', title: 'Already Friends', description: `You are already friends with ${targetName}.` });
                 return;
             }
 
-            // Check if a request already exists
             const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('toId', '==', targetId), where('status', '==', 'pending'));
             const receivedReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', targetId), where('toId', '==', user.uid), where('status', '==', 'pending'));
             const [sentSnapshot, receivedSnapshot] = await Promise.all([getDocs(sentReqQuery), getDocs(receivedReqQuery)]);

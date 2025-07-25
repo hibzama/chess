@@ -35,11 +35,13 @@ type GameRoom = {
         uid: string;
         name: string;
         color: 'w' | 'b';
+        photoURL?: string;
     };
     player2?: {
         uid: string;
         name: string;
         color: 'w' | 'b';
+        photoURL?: string;
     };
     players: string[];
     createdAt: any;
@@ -169,15 +171,12 @@ function MultiplayerGamePageContent() {
                 if (roomData.status === 'completed') {
                     setRoom(roomData);
                 }
-                // If room is waiting, and we are not the creator, we might be a potential joiner
                 else if (roomData.status === 'waiting' && roomData.createdBy.uid !== user.uid) {
                     setRoom(roomData);
                 } 
-                // If room is active, only players should be here
                 else if (roomData.players.includes(user.uid)) {
                     setRoom(roomData);
                 } 
-                // User is not authorized for this room unless it's a private room they are trying to join
                 else if (roomData.isPrivate || roomData.status !== 'waiting') {
                     toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
                     router.push('/lobby');
@@ -226,7 +225,6 @@ function MultiplayerGamePageContent() {
     }, [roomId, user, room, router, toast]);
     
 
-    // Timer for room expiration
     useEffect(() => {
         if (room?.status !== 'waiting' || !room.expiresAt || !isCreator) {
             return;
@@ -310,7 +308,7 @@ function MultiplayerGamePageContent() {
                 
                 transaction.update(roomRef, {
                     status: 'in-progress',
-                    player2: { uid: user.uid, name: playersWithData[1].name, color: joinerColor },
+                    player2: { uid: user.uid, name: playersWithData[1].name, color: joinerColor, photoURL: userData.photoURL || '' },
                     players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
@@ -453,7 +451,7 @@ function MultiplayerGamePageContent() {
                         <CardHeader className="text-center">
                             <div className="flex justify-center mb-4">
                                  <Avatar className="h-20 w-20 border-2 border-primary">
-                                    <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="player avatar" />
+                                    <AvatarImage src={room.createdBy.photoURL} />
                                     <AvatarFallback>{room.createdBy.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             </div>
@@ -565,3 +563,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    

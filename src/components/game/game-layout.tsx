@@ -117,7 +117,7 @@ const GameOverDisplay = () => {
 }
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame } = useGame();
+  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame, room } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
@@ -134,6 +134,9 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
   
+  const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
+
+
   return (
     <>
     <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
@@ -157,7 +160,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 <>
                     <div className="w-full flex justify-between items-center px-2">
                         <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
-                            <p className="font-semibold">Opponent</p>
+                            <p className="font-semibold">{opponentData?.name ?? "Opponent"}</p>
                             <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p>
                         </div>
                         <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
@@ -194,8 +197,8 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         {/* Right Column */}
         <aside className="hidden lg:grid grid-rows-[auto,auto,1fr,auto] gap-6">
             <PlayerInfo
-              playerName="Opponent"
-              avatarSrc="https://placehold.co/100x100.png"
+              playerName={opponentData?.name ?? "Opponent"}
+              avatarSrc={opponentData?.photoURL}
             />
             <CapturedPieces pieceStyle={equipment?.pieceStyle} />
              {isMultiplayer ? (

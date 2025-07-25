@@ -22,7 +22,7 @@ export default function PlayerInfo({ playerName, avatarSrc }: PlayerInfoProps) {
           <AvatarFallback>{playerName.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <h3 className="font-semibold text-lg">{playerName}</h3>
+          <h3 className="font-semibold text-lg truncate">{playerName}</h3>
         </div>
       </CardContent>
     </Card>

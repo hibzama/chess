@@ -57,8 +57,6 @@ export default function CreateGamePage() {
         setIsCreating(true);
         
         try {
-            // No need for a write batch if we just create the room
-            // Wager will be deducted for both players on join
             
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
@@ -75,6 +73,7 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
+                    photoURL: userData.photoURL || ''
                 },
                 players: [user.uid],
                 createdAt: serverTimestamp(),
@@ -185,3 +184,5 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
+    
