@@ -17,11 +17,21 @@ import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc } 
 import { db } from '@/lib/firebase';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from "@/lib/utils";
-import Image from "next/image";
 
 
 const Logo = () => (
-    <Image src="https://firebasestorage.googleapis.com/v0/b/nexbattle-ymmmq.appspot.com/o/playstore.png?alt=media" alt="Nexbattle Logo" width={32} height={32} />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="w-8 h-8 text-primary"
+    >
+      <path
+        fillRule="evenodd"
+        d="M12.96 2.544a3 3 0 00-1.92 0L8.14 4.167a1.5 1.5 0 01-1.39.07l-3.03-1.684a1.5 1.5 0 00-1.74 2.29l1.684 3.03a1.5 1.5 0 01-.07 1.39L3.02 12.86a3 3 0 000 1.92l1.623 2.9a1.5 1.5 0 01.07 1.39l-1.684 3.03a1.5 1.5 0 002.29 1.74l3.03-1.684a1.5 1.5 0 011.39.07l2.9 1.623a3 3 0 001.92 0l2.9-1.623a1.5 1.5 0 011.39-.07l3.03 1.684a1.5 1.5 0 001.74-2.29l-1.684-3.03a1.5 1.5 0 01.07-1.39l1.623-2.9a3 3 0 000-1.92l-1.623-2.9a1.5 1.5 0 01-.07-1.39l1.684-3.03a1.5 1.5 0 00-2.29-1.74l-3.03 1.684a1.5 1.5 0 01-1.39-.07l-2.9-1.623z"
+        clipRule="evenodd"
+      />
+    </svg>
   );
 
 type Notification = {
@@ -281,7 +291,7 @@ export default function MainLayout({
                     <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
-                    <a href="https://wa.me/+94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
+                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
                     <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
