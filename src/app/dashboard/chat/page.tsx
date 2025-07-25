@@ -28,12 +28,19 @@ export default function ChatInboxPage() {
 
         const q = query(
             collection(db, 'chats'),
-            where(`users.${user.uid}.exists`, '==', true),
-            orderBy('lastMessage.timestamp', 'desc')
+            where(`users.${user.uid}.exists`, '==', true)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const chatData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatRoom));
+            
+            // Sort chats by last message timestamp client-side
+            chatData.sort((a, b) => {
+                const aTimestamp = a.lastMessage?.timestamp?.seconds || 0;
+                const bTimestamp = b.lastMessage?.timestamp?.seconds || 0;
+                return bTimestamp - aTimestamp;
+            });
+
             setChats(chatData);
             setLoading(false);
         });
@@ -93,5 +100,3 @@ export default function ChatInboxPage() {
         </div>
     );
 }
-
-    
