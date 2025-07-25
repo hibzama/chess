@@ -77,8 +77,7 @@ export default function ProfilePage() {
             const gamesQuery = query(
                 collection(db, 'game_rooms'), 
                 where('players', 'array-contains', user.uid), 
-                where('status', '==', 'completed'),
-                orderBy('createdAt', 'desc')
+                where('status', '==', 'completed')
             );
             const gamesSnapshot = await getDocs(gamesQuery);
 
@@ -93,7 +92,7 @@ export default function ProfilePage() {
             });
             
             setTotalWins(wins);
-            setGameHistory(history);
+            setGameHistory(history.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
             setStatsLoading(false);
         };
 
