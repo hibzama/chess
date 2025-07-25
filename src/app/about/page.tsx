@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, GitNetwork, Megaphone, Sword, Trophy } from 'lucide-react';
+import { DollarSign, Network, Megaphone, Sword, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AboutPage() {
@@ -18,7 +18,7 @@ export default function AboutPage() {
         {
             title: "Standard Referral System",
             content: "Every user can earn by inviting friends. Share your unique referral link, and when someone signs up, they become your Level 1 referral. You'll earn a commission from every game they play. The more direct referrals you have, the higher your commission rate becomes.",
-            icon: GitNetwork,
+            icon: Network,
         },
         {
             title: "Marketing Partner System",
