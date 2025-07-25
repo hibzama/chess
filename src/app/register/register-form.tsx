@@ -1,5 +1,3 @@
-
-
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,7 +34,7 @@ export default function RegisterForm() {
         const lastName = target['last-name'].value;
         const phone = target.phone.value;
         const email = target.email.value;
-        const password = target.password.value;
+        const password = target['password'].value;
         const confirmPassword = target['confirm-password'].value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
@@ -174,6 +172,13 @@ export default function RegisterForm() {
             </div>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
+                <p className="text-xs text-muted-foreground px-6 text-center">
+                    By creating an account, you agree to our{' '}
+                    <Link href="/terms" className="underline hover:text-primary">
+                        Terms & Conditions
+                    </Link>
+                    .
+                </p>
                 <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Creating Account...' : 'Create an account'}</Button>
                 <div className="text-center text-sm">
                     Already have an account?{" "}

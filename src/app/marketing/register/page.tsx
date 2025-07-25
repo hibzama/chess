@@ -1,4 +1,3 @@
-
 'use client'
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -105,8 +104,14 @@ export default function MarketingRegisterPage() {
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-4">
+                        <p className="text-xs text-muted-foreground px-6 text-center">
+                            By creating an account, you agree to our{' '}
+                            <Link href="/terms" className="underline hover:text-primary">
+                                Terms & Conditions
+                            </Link>
+                            .
+                        </p>
                         <Button type="submit" className="w-full" disabled={isLoading}>{isLoading ? 'Submitting...' : 'Submit Application'}</Button>
-                        <p className="text-xs text-muted-foreground text-center">By applying, you agree to our marketing partner terms and conditions.</p>
                         <div className="text-center text-sm">
                             Already a partner?{" "}
                             <Link href="/marketing/login" className="underline">

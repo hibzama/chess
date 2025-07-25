@@ -1,4 +1,3 @@
-
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -200,7 +199,7 @@ export default function MainLayout({
                                     <Link href="/dashboard/chat"><SidebarMenuButton tooltip="Direct Messages" isActive={isMounted && pathname.startsWith('/dashboard/chat')}><MessageSquare /><span>Direct Messages</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton tooltip="About Us"><Info /><span>About Us</span></SidebarMenuButton>
+                                    <Link href="/about"><SidebarMenuButton tooltip="About Us" isActive={isMounted && pathname === '/about'}><Info /><span>About Us</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                             </>
                         )}
@@ -294,7 +293,7 @@ export default function MainLayout({
                     <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
-                    <a href="https://t.me/nexbattlehelp" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
+                    <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
                     <a href="mailto:nexbattlehelp@gmail.com"><Mail/> nexbattlehelp@gmail.com</a>
