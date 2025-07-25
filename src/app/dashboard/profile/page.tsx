@@ -119,7 +119,7 @@ export default function ProfilePage() {
         fetchGameData();
     }, [user]);
 
-    const { chessStats, checkersStats, totalWins } = useMemo(() => {
+    const { chess: chessStats, checkers: checkersStats, totalWins } = useMemo(() => {
         const stats: { chess: GameStats, checkers: GameStats, totalWins: number } = {
             chess: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
             checkers: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
@@ -157,7 +157,7 @@ export default function ProfilePage() {
             stats.checkers.winRate = Math.round((stats.checkers.wins / stats.checkers.played) * 100);
         }
 
-        return { chess: stats.chess, checkers: stats.checkers, totalWins: stats.totalWins };
+        return stats;
     }, [gameHistory, user]);
     
     const { rank, nextRank, winsToNextLevel, progress } = useMemo(() => {
@@ -395,3 +395,4 @@ export default function ProfilePage() {
         </div>
     );
 }
+
