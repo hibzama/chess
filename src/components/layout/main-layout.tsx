@@ -53,14 +53,14 @@ const NotificationBell = () => {
         const q = query(
             collection(db, 'notifications'), 
             where('userId', '==', user.uid), 
-            orderBy('createdAt', 'desc'),
-            limit(10)
+            limit(20)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const notifs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
-            setNotifications(notifs);
-            setUnreadCount(notifs.filter(n => !n.read).length);
+            const sortedNotifs = notifs.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds);
+            setNotifications(sortedNotifs);
+            setUnreadCount(sortedNotifs.filter(n => !n.read).length);
         });
 
         return () => unsubscribe();
@@ -272,3 +272,5 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
+    
