@@ -112,10 +112,10 @@ export default function DashboardPage() {
   ];
 
   const secondaryActions = [
-    { title: "Friends", icon: Users, href: "#" },
-    { title: "Ranking", icon: BarChart3, href: "#" },
+    { title: "Friends", icon: Users, href: "/dashboard/friends" },
+    { title: "Ranking", icon: BarChart3, href: "/dashboard/rankings" },
     { title: "Start Earning", icon: DollarSign, href: "/lobby" },
-    { title: "Chat", icon: MessageSquare, href: "#" },
+    { title: "Chat", icon: MessageSquare, href: "/dashboard/chat" },
     { title: "Refer & Earn", icon: Megaphone, href: "/dashboard/refer-earn" },
     { title: "Equipment", icon: Gamepad2, href: "/dashboard/equipment" },
   ];
