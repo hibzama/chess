@@ -104,7 +104,7 @@ export default function ProfilePage() {
         fetchGameData();
     }, [user]);
 
-    const { chessStats, checkersStats, totalWins } = useMemo(() => {
+    const { chess: chessStats, checkers: checkersStats, totalWins } = useMemo(() => {
         const stats: { chess: GameStats, checkers: GameStats, totalWins: number } = {
             chess: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
             checkers: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
