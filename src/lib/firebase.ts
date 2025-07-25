@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getDatabase } from "firebase/database";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -11,7 +12,8 @@ const firebaseConfig = {
   projectId: "nexbattle-ymmmq",
   storageBucket: "nexbattle-ymmmq.appspot.com",
   messagingSenderId: "1022888526676",
-  appId: "1:1022888526676:web:2cf620984302526cbe3ec1"
+  appId: "1:1022888526676:web:2cf620984302526cbe3ec1",
+  databaseURL: "https://nexbattle-ymmmq-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
 // Initialize Firebase

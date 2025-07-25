@@ -13,6 +13,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Users, UserPlus, Mail, MessageSquare, UserMinus, Search, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { formatDistanceToNowStrict } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 type FriendRequest = {
   id: string;
@@ -28,23 +30,41 @@ type UserProfile = {
   lastName: string;
   photoURL?: string;
   email: string;
+  status?: 'online' | 'offline';
+  lastSeen?: any;
 };
 
-const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove', loading: boolean }) => (
+const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean }) => (
     <Card className="flex items-center p-4 gap-4">
-        <Avatar>
-            <AvatarImage src={person.photoURL} data-ai-hint="avatar" />
-            <AvatarFallback>{person.firstName?.[0]}{person.lastName?.[0]}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+            <Avatar>
+                <AvatarImage src={person.photoURL} data-ai-hint="avatar" />
+                <AvatarFallback>{person.firstName?.[0]}{person.lastName?.[0]}</AvatarFallback>
+            </Avatar>
+             {person.status === 'online' && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />}
+        </div>
         <div className="flex-grow">
             <p className="font-semibold">{person.firstName} {person.lastName}</p>
-            <p className="text-xs text-muted-foreground">{person.email}</p>
+            {person.status === 'online' ? (
+                <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">Online</Badge>
+            ) : (
+                 <p className="text-xs text-muted-foreground">
+                    {person.lastSeen ? `Last seen ${formatDistanceToNowStrict(person.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'}
+                </p>
+            )}
         </div>
         <div className="flex gap-2">
             {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/chat/${person.uid}`}><MessageSquare /></Link></Button>}
-            <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
-                 {actionType === 'add' ? <UserPlus /> : <UserMinus />}
-            </Button>
+            {actionType !== 'suggestion' && 
+                <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
+                     {actionType === 'add' ? <UserPlus /> : <UserMinus />}
+                </Button>
+            }
+             {actionType === 'suggestion' && 
+                <Button variant="outline" size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
+                    <UserPlus />
+                </Button>
+            }
         </div>
     </Card>
 );
@@ -91,11 +111,21 @@ export default function FriendsPage() {
 
     const fetchSuggestions = useCallback(async () => {
         if(!user) return;
-        const q = query(collection(db, 'users'), where('uid', '!=', user.uid), orderBy('uid'), limit(10));
+        const q = query(collection(db, 'users'), where('uid', '!=', user.uid), limit(20));
         const userDocs = await getDocs(q);
-        const suggestedUsers = userDocs.docs.map(doc => ({...doc.data(), uid: doc.id} as UserProfile));
-        setSuggestions(suggestedUsers.filter(u => !userData?.friends?.includes(u.uid)));
-    }, [user, userData?.friends]);
+        const suggestedUsers = userDocs.docs
+            .map(doc => ({...doc.data(), uid: doc.id} as UserProfile))
+            .filter(u => !userData?.friends?.includes(u.uid) && !requests.some(r => r.fromId === u.uid));
+        
+        // Sort: online first, then by last seen
+        suggestedUsers.sort((a,b) => {
+            if (a.status === 'online' && b.status !== 'online') return -1;
+            if (a.status !== 'online' && b.status === 'online') return 1;
+            return (b.lastSeen?.seconds || 0) - (a.lastSeen?.seconds || 0);
+        });
+
+        setSuggestions(suggestedUsers);
+    }, [user, userData?.friends, requests]);
     
     useEffect(() => {
         if (!user) {
@@ -227,7 +257,8 @@ export default function FriendsPage() {
             if(querySnapshot.empty) {
                 toast({ variant: 'destructive', title: 'Not Found', description: 'No user found with that email.' });
             } else {
-                const foundUser = querySnapshot.docs[0].data() as UserProfile;
+                const foundUserDoc = querySnapshot.docs[0];
+                const foundUser = {...foundUserDoc.data(), uid: foundUserDoc.id } as UserProfile;
                  if(foundUser.uid === user?.uid) {
                      toast({ variant: 'destructive', title: 'Error', description: "You can't add yourself as a friend."});
                      return;
@@ -306,7 +337,7 @@ export default function FriendsPage() {
                                 <h3 className="font-semibold mb-2">Suggestions</h3>
                                 <div className="space-y-4">
                                      {loading ? <p>Loading suggestions...</p> : suggestions.length > 0 ? suggestions.map(person => (
-                                       <UserCard key={person.uid} person={person} onAction={handleAddFriend} actionType="add" loading={actionLoading === person.uid} />
+                                       <UserCard key={person.uid} person={person} onAction={handleAddFriend} actionType="suggestion" loading={actionLoading === person.uid} />
                                    )) : <p className="text-muted-foreground text-center p-4">No suggestions right now. Check back later!</p>}
                                 </div>
                             </div>

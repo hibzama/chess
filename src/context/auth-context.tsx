@@ -4,7 +4,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { getDatabase, ref, onValue, off, set, onDisconnect } from "firebase/database";
 
 interface AuthContextType {
   user: User | null;
@@ -41,6 +42,8 @@ interface UserData {
     l1Count?: number;
     photoURL?: string;
     friends?: string[];
+    status?: 'online' | 'offline';
+    lastSeen?: any;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,21 +54,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setUser(user);
       if (!user) {
         setUserData(null);
         setLoading(false);
       }
     });
-    return () => unsubscribe();
+    return () => unsubscribeAuth();
   }, []);
 
   useEffect(() => {
+    let unsubscribeFirestore: () => void;
     if (user) {
       setLoading(true);
       const userDocRef = doc(db, 'users', user.uid);
-      const unsubscribe = onSnapshot(userDocRef, (doc) => {
+      
+      unsubscribeFirestore = onSnapshot(userDocRef, (doc) => {
         if (doc.exists()) {
           setUserData(doc.data() as UserData);
         } else {
@@ -78,12 +83,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       });
 
-      return () => unsubscribe();
+      // Presence system
+      const rtdb = getDatabase();
+      const userStatusDatabaseRef = ref(rtdb, '/status/' + user.uid);
+      const userStatusFirestoreRef = doc(db, '/users/' + user.uid);
+
+      const isOfflineForDatabase = {
+        state: 'offline',
+        last_changed: serverTimestamp(),
+      };
+      
+      const isOnlineForDatabase = {
+        state: 'online',
+        last_changed: serverTimestamp(),
+      };
+
+      const isOfflineForFirestore = {
+          status: 'offline',
+          lastSeen: serverTimestamp(),
+      };
+
+      const isOnlineForFirestore = {
+          status: 'online',
+          lastSeen: serverTimestamp(),
+      };
+
+      onValue(ref(rtdb, '.info/connected'), (snapshot) => {
+        if (snapshot.val() === false) {
+          updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
+          return;
+        }
+
+        onDisconnect(userStatusDatabaseRef).set(isOfflineForDatabase).then(() => {
+            set(userStatusDatabaseRef, isOnlineForDatabase);
+            updateDoc(userStatusFirestoreRef, isOnlineForFirestore);
+        });
+      });
+
     }
+
+    return () => {
+      if (unsubscribeFirestore) {
+        unsubscribeFirestore();
+      }
+    };
   }, [user]);
 
 
   const logout = async () => {
+    if(user) {
+        const userStatusFirestoreRef = doc(db, '/users/' + user.uid);
+         await updateDoc(userStatusFirestoreRef, {
+          status: 'offline',
+          lastSeen: serverTimestamp(),
+        });
+    }
     await auth.signOut();
   };
 
