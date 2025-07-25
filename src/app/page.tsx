@@ -33,14 +33,13 @@ export default function LandingPage() {
     setIsDownloading(true);
     try {
       const storage = getStorage();
-      // NOTE: Replace 'apks/app-release.apk' with the actual path to your file in Firebase Storage.
-      const apkRef = ref(storage, 'apks/app-release.apk');
+      const apkRef = ref(storage, 'Nexbattle (1).apk');
       const url = await getDownloadURL(apkRef);
 
       // Trigger download
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', 'nexbattle.apk'); 
+      link.setAttribute('download', 'Nexbattle.apk'); 
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
