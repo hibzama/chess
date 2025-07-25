@@ -328,6 +328,7 @@ export default function ProfilePage() {
                                         </Badge>
                                         <Badge variant="secondary" className="text-base py-1 px-3">World Rank: #{worldRank ?? 'N/A'}</Badge>
                                         <Badge variant="secondary" className="text-base py-1 px-3">Win Rate: {overallWinRate().toFixed(0)}%</Badge>
+                                        <Badge variant="secondary" className="text-base py-1 px-3 flex items-center gap-1.5"><Users className="w-4 h-4" /> Friends: {userData?.friends?.length || 0}</Badge>
                                     </div>
                                 </div>
                             </div>
@@ -341,12 +342,11 @@ export default function ProfilePage() {
                              <div className="space-y-6">
                                 <div>
                                     <h3 className="font-semibold flex items-center gap-2 mb-4"><BrainCircuit/> Chess Stats</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                         <StatCard icon={<Swords/>} label="Played" value={chessStats.played} />
                                         <StatCard icon={<Trophy/>} label="Wins" value={chessStats.wins} />
                                         <StatCard icon={<Ban/>} label="Losses" value={chessStats.losses} />
                                         <StatCard icon={<Handshake/>} label="Draws" value={chessStats.draws} />
-                                        <StatCard icon={<Users />} label="Friends" value={userData?.friends?.length || 0} />
                                     </div>
                                 </div>
                                 <div>
