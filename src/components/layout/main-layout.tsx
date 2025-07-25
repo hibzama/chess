@@ -82,6 +82,9 @@ export default function MainLayout({
                                 <SidebarMenuItem>
                                     <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
+                                 <SidebarMenuItem>
+                                    <Link href="/dashboard/profile"><SidebarMenuButton tooltip="My Profile" isActive={isMounted && pathname === '/dashboard/profile'}><User /><span>My Profile</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><BarChart3 /><span>My Rooms</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
@@ -155,10 +158,12 @@ export default function MainLayout({
                        </div>
                         <Button variant="ghost" size="icon"><Bell /></Button>
                         <Button variant="ghost" size="icon"><Settings /></Button>
-                        <Avatar>
-                            <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
-                            <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
-                        </Avatar>
+                        <Link href="/dashboard/profile">
+                            <Avatar>
+                                <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
+                                <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
+                            </Avatar>
+                        </Link>
                     </div>
                 </header>
                 <main className="flex-1 p-4 md:p-8">
@@ -168,3 +173,4 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
