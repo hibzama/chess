@@ -3,21 +3,24 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { db, storage } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Upload } from 'lucide-react';
+import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Upload, Layers, ShieldQuestion, Ban, BarChart, BrainCircuit, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
 
 type Game = {
     id: string;
@@ -28,6 +31,14 @@ type Game = {
     createdAt: any;
     createdBy: { uid: string, name: string };
     player2?: { uid: string, name: string };
+};
+
+type GameStats = {
+    played: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    winRate: number;
 };
 
 const ranks = [
@@ -43,12 +54,12 @@ const ranks = [
     { title: "Immortal", minWins: 91444, level: 100 },
 ];
 
-const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: number }) => (
+const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: number | string }) => (
     <Card className="bg-card/50 text-center">
-        <CardContent className="p-4">
-            <div className="mx-auto w-fit p-2 rounded-full bg-primary/10 mb-2 text-primary">{icon}</div>
-            <p className="text-3xl font-bold">{value}</p>
-            <p className="text-sm text-muted-foreground">{label}</p>
+        <CardContent className="p-4 flex flex-col items-center gap-1">
+            <div className="text-primary mb-1">{icon}</div>
+            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
         </CardContent>
     </Card>
 );
@@ -56,11 +67,11 @@ const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string
 export default function ProfilePage() {
     const { user, userData, loading: authLoading } = useAuth();
     const { toast } = useToast();
-    const [totalWins, setTotalWins] = useState(0);
     const [gameHistory, setGameHistory] = useState<Game[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isSendingReset, setIsSendingReset] = useState(false);
 
     const getInitials = () => {
         if (userData) {
@@ -81,23 +92,67 @@ export default function ProfilePage() {
             );
             const gamesSnapshot = await getDocs(gamesQuery);
 
-            let wins = 0;
             const history: Game[] = [];
             gamesSnapshot.forEach(doc => {
-                const game = { ...doc.data(), id: doc.id } as Game;
-                if (game.winner?.uid === user.uid) {
-                    wins++;
-                }
-                history.push(game);
+                history.push({ ...doc.data(), id: doc.id } as Game);
             });
             
-            setTotalWins(wins);
             setGameHistory(history.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
             setStatsLoading(false);
         };
 
         fetchGameData();
     }, [user]);
+
+    const { chessStats, checkersStats, totalWins } = useMemo(() => {
+        const stats: { chess: GameStats, checkers: GameStats, totalWins: number } = {
+            chess: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
+            checkers: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
+            totalWins: 0,
+        };
+
+        if (!user) return stats;
+
+        gameHistory.forEach(game => {
+            const statType = game.gameType;
+            let result: 'win' | 'loss' | 'draw' = 'loss';
+            if (game.draw) {
+                result = 'draw';
+            } else if (game.winner?.uid === user.uid) {
+                result = 'win';
+            }
+
+            stats[statType].played++;
+            if (result === 'win') {
+                stats[statType].wins++;
+                stats.totalWins++;
+            } else if (result === 'loss') {
+                stats[statType].losses++;
+            } else {
+                stats[statType].draws++;
+            }
+        });
+
+        if (stats.chess.played > 0) {
+            stats.chess.winRate = Math.round((stats.chess.wins / stats.chess.played) * 100);
+        }
+        if (stats.checkers.played > 0) {
+            stats.checkers.winRate = Math.round((stats.checkers.wins / stats.checkers.played) * 100);
+        }
+
+        return stats;
+    }, [gameHistory, user]);
+    
+    const { rank, nextRank, winsToNextLevel, progress } = useMemo(() => {
+        const currentRankIndex = ranks.slice().reverse().findIndex(r => totalWins >= r.minWins) ?? (ranks.length - 1);
+        const rank = ranks[ranks.length - 1 - currentRankIndex];
+        const nextRank = ranks[ranks.length - currentRankIndex] || null;
+        const winsInLevel = totalWins - rank.minWins;
+        const winsToNext = nextRank ? nextRank.minWins - rank.minWins : 0;
+        const progress = winsToNext > 0 ? Math.round((winsInLevel / winsToNext) * 100) : 100;
+
+        return { rank, nextRank, winsToNextLevel: winsToNext, progress };
+    }, [totalWins]);
 
     const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -120,17 +175,23 @@ export default function ProfilePage() {
             setIsUploading(false);
         }
     };
-
-    const { rank, nextRank, progress, level } = useMemo(() => {
-        const currentRankIndex = ranks.slice().reverse().findIndex(r => totalWins >= r.minWins) ?? (ranks.length - 1);
-        const rank = ranks[ranks.length - 1 - currentRankIndex];
-        const nextRank = ranks[ranks.length - currentRankIndex] || null;
-        const winsInLevel = totalWins - rank.minWins;
-        const winsToNext = nextRank ? nextRank.minWins - rank.minWins : 0;
-        const progress = winsToNext > 0 ? Math.round((winsInLevel / winsToNext) * 100) : 100;
-
-        return { rank, nextRank, progress, level: rank.level };
-    }, [totalWins]);
+    
+    const handlePasswordReset = async () => {
+        if (!user?.email) {
+            toast({ variant: 'destructive', title: "Error", description: "No email address found for this user." });
+            return;
+        };
+        setIsSendingReset(true);
+        try {
+            await sendPasswordResetEmail(auth, user.email);
+            toast({ title: "Email Sent", description: "A password reset link has been sent to your email address." });
+        } catch (error) {
+            console.error("Password reset failed:", error);
+            toast({ variant: 'destructive', title: "Error", description: "Failed to send password reset email." });
+        } finally {
+            setIsSendingReset(false);
+        }
+    }
     
     const getResultForUser = (game: Game) => {
         if (game.draw) return { text: 'Draw', color: 'text-yellow-400' };
@@ -157,7 +218,7 @@ export default function ProfilePage() {
                 </TabsList>
                 <TabsContent value="profile">
                     <Card>
-                        <CardHeader>
+                        <CardContent className="p-6 space-y-6">
                             <div className="flex flex-col md:flex-row items-center gap-6">
                                 <div className="relative">
                                     <Avatar className="w-24 h-24 border-2 border-primary">
@@ -170,39 +231,47 @@ export default function ProfilePage() {
                                     </Button>
                                     <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
                                 </div>
-                                <div className="space-y-1 text-center md:text-left">
+                                <div className="flex-1 space-y-2 text-center md:text-left">
                                     <h1 className="text-3xl font-bold">{userData?.firstName} {userData?.lastName}</h1>
                                     <p className="text-muted-foreground">{userData?.email}</p>
-                                    <div className="flex items-center justify-center md:justify-start gap-4 pt-2 text-sm">
-                                        <div className="flex items-center gap-1 bg-yellow-400/20 text-yellow-300 px-2 py-1 rounded-md">
+                                    <div className="flex items-center justify-center md:justify-start gap-4 pt-2 text-sm flex-wrap">
+                                        <Badge variant="secondary" className="gap-1.5 text-base py-1 px-3 bg-yellow-400/20 text-yellow-300">
                                             <Star className="w-4 h-4 fill-current"/>
                                             <span className="font-bold">{rank.title}</span>
-                                            <span className="text-xs">(Level {level})</span>
-                                        </div>
+                                            <span className="text-xs">Rank Title</span>
+                                        </Badge>
+                                        <Badge variant="secondary" className="text-base py-1 px-3">World Rank: #1</Badge>
+                                        <Badge variant="secondary" className="text-base py-1 px-3">Win Rate: {((chessStats.winRate + checkersStats.winRate) / 2).toFixed(0)}%</Badge>
                                     </div>
                                 </div>
                             </div>
                              <div className="mt-4">
                                 <Progress value={progress} className="h-2" />
                                 <p className="text-xs text-muted-foreground text-right mt-1">
-                                    {nextRank ? `${totalWins} / ${nextRank.minWins} wins to next rank (${nextRank.title})` : `Max rank achieved!`}
+                                    {nextRank ? `${totalWins - rank.minWins} / ${winsToNextLevel} wins to next level` : `Max rank achieved!`}
                                 </p>
                              </div>
-                        </CardHeader>
-                        <CardContent>
-                             <Card className="bg-card/30">
-                                 <CardHeader><CardTitle className="text-lg">Global Standing</CardTitle></CardHeader>
-                                 <CardContent className="grid grid-cols-2 gap-4">
-                                     <div className="text-center p-4 rounded-lg bg-background">
-                                        <p className="text-4xl font-bold">{totalWins}</p>
-                                        <p className="text-muted-foreground">Total Wins</p>
-                                     </div>
-                                      <div className="text-center p-4 rounded-lg bg-background">
-                                        <p className="text-4xl font-bold">#1</p>
-                                        <p className="text-muted-foreground">World Rank</p>
-                                     </div>
-                                 </CardContent>
-                             </Card>
+
+                             <div className="space-y-6">
+                                <div>
+                                    <h3 className="font-semibold flex items-center gap-2 mb-4"><BrainCircuit/> Chess Stats</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <StatCard icon={<Swords/>} label="Played" value={chessStats.played} />
+                                        <StatCard icon={<Trophy/>} label="Wins" value={chessStats.wins} />
+                                        <StatCard icon={<Ban/>} label="Losses" value={chessStats.losses} />
+                                        <StatCard icon={<Handshake/>} label="Draws" value={chessStats.draws} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 className="font-semibold flex items-center gap-2 mb-4"><Layers/> Checkers Stats</h3>
+                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <StatCard icon={<Swords/>} label="Played" value={checkersStats.played} />
+                                        <StatCard icon={<Trophy/>} label="Wins" value={checkersStats.wins} />
+                                        <StatCard icon={<Ban/>} label="Losses" value={checkersStats.losses} />
+                                        <StatCard icon={<Handshake/>} label="Draws" value={checkersStats.draws} />
+                                    </div>
+                                </div>
+                             </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -248,10 +317,20 @@ export default function ProfilePage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Security Settings</CardTitle>
-                            <CardDescription>Manage your account security.</CardDescription>
+                            <CardDescription>Manage your account security options.</CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <p className="text-center text-muted-foreground py-8">Security settings will be implemented soon.</p>
+                        <CardContent className="space-y-6">
+                            <Card className="bg-card/30">
+                                <CardHeader>
+                                    <CardTitle className="text-lg flex items-center gap-2"><ShieldQuestion/> Password Reset</CardTitle>
+                                    <CardDescription>If you wish to change your password, we can send a reset link to your registered email address.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Button onClick={handlePasswordReset} disabled={isSendingReset}>
+                                        {isSendingReset ? "Sending..." : "Send Password Reset Email"}
+                                    </Button>
+                                </CardContent>
+                            </Card>
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -259,3 +338,6 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+
+    
