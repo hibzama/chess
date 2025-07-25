@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -42,6 +43,13 @@ type Notification = {
     href?: string;
 }
 
+const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M22 2L11 13" />
+        <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+    </svg>
+)
+
 const NotificationBell = () => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -53,14 +61,14 @@ const NotificationBell = () => {
         const q = query(
             collection(db, 'notifications'), 
             where('userId', '==', user.uid), 
+            orderBy('createdAt', 'desc'),
             limit(20)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const notifs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
-            const sortedNotifs = notifs.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds);
-            setNotifications(sortedNotifs);
-            setUnreadCount(sortedNotifs.filter(n => !n.read).length);
+            setNotifications(notifs);
+            setUnreadCount(notifs.filter(n => !n.read).length);
         });
 
         return () => unsubscribe();
@@ -141,6 +149,7 @@ export default function MainLayout({
 
 
     return (
+        <Dialog>
         <SidebarProvider>
             <Sidebar>
                 <SidebarHeader>
@@ -205,7 +214,9 @@ export default function MainLayout({
                             <Link href="/dashboard/settings"><SidebarMenuButton tooltip="Settings" isActive={isMounted && pathname === '/dashboard/settings'}><Settings /><span>Settings</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Support"><LifeBuoy /><span>Support</span></SidebarMenuButton>
+                           <DialogTrigger asChild>
+                                <SidebarMenuButton tooltip="Support"><LifeBuoy /><span>Support</span></SidebarMenuButton>
+                           </DialogTrigger>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Logout" onClick={handleLogout}><LogOut /><span>Logout</span></SidebarMenuButton>
@@ -270,7 +281,28 @@ export default function MainLayout({
                 <MobileBottomNav />
             </SidebarInset>
         </SidebarProvider>
+         <DialogContent>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
+                <DialogDescription>
+                    Have an issue? Reach out to us through any of the channels below.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+                <Button asChild className="w-full justify-start gap-3" variant="outline">
+                    <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
+                </Button>
+                <Button asChild className="w-full justify-start gap-3" variant="outline">
+                    <a href="https://wa.me/94742974001" target="_blank"><MessageCircle/> WhatsApp</a>
+                </Button>
+                <Button asChild className="w-full justify-start gap-3" variant="outline">
+                    <a href="https://t.me/nexbattlehelp" target="_blank"><TelegramIcon/> Telegram</a>
+                </Button>
+                <Button asChild className="w-full justify-start gap-3" variant="outline">
+                    <a href="mailto:nexbattlehelp@gmail.com"><Mail/> nexbattlehelp@gmail.com</a>
+                </Button>
+            </div>
+        </DialogContent>
+        </Dialog>
     )
   }
-
-    
