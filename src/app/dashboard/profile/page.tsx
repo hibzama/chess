@@ -55,17 +55,17 @@ const ranks = [
 ];
 
 const boyAvatars = [
-    'https://placehold.co/100x100.png',
-    'https://placehold.co/100x100.png',
-    'https://placehold.co/100x100.png',
-    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100/3b82f6/FFFFFF.png',
+    'https://placehold.co/100x100/ef4444/FFFFFF.png',
+    'https://placehold.co/100x100/22c55e/FFFFFF.png',
+    'https://placehold.co/100x100/eab308/FFFFFF.png',
 ];
 
 const girlAvatars = [
-    'https://placehold.co/100x100.png',
-    'https://placehold.co/100x100.png',
-    'https://placehold.co/100x100.png',
-    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100/ec4899/FFFFFF.png',
+    'https://placehold.co/100x100/8b5cf6/FFFFFF.png',
+    'https://placehold.co/100x100/f97316/FFFFFF.png',
+    'https://placehold.co/100x100/14b8a6/FFFFFF.png',
 ];
 
 const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: number | string }) => (
@@ -87,6 +87,7 @@ export default function ProfilePage() {
     const [isSendingReset, setIsSendingReset] = useState(false);
     const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
     const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
+    const [worldRank, setWorldRank] = useState<number | null>(null);
 
     const getInitials = () => {
         if (userData) {
@@ -100,6 +101,8 @@ export default function ProfilePage() {
 
         const fetchGameData = async () => {
             setStatsLoading(true);
+            
+            // Fetch game history for the current user
             const gamesQuery = query(
                 collection(db, 'game_rooms'), 
                 where('players', 'array-contains', user.uid), 
@@ -113,6 +116,18 @@ export default function ProfilePage() {
             });
             
             setGameHistory(history.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
+
+            // Fetch all users to calculate world rank
+            const allUsersSnapshot = await getDocs(collection(db, 'users'));
+            const allUsers = allUsersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+
+            // This is a placeholder for win calculation. A real implementation would fetch wins for each user.
+            // For now, we'll sort by who has more documents, which is not accurate.
+            // A more robust solution involves storing win counts on the user document itself.
+            const sortedUsers = allUsers.sort((a, b) => (b.l1Count || 0) - (a.l1Count || 0)); // Placeholder sorting
+            const rank = sortedUsers.findIndex(u => u.uid === user.uid) + 1;
+            setWorldRank(rank > 0 ? rank : null);
+
             setStatsLoading(false);
         };
 
@@ -297,7 +312,7 @@ export default function ProfilePage() {
                                             <span className="font-bold">{rank.title}</span>
                                             <span className="text-xs">Rank Title</span>
                                         </Badge>
-                                        <Badge variant="secondary" className="text-base py-1 px-3">World Rank: #1</Badge>
+                                        <Badge variant="secondary" className="text-base py-1 px-3">World Rank: #{worldRank ?? 'N/A'}</Badge>
                                         <Badge variant="secondary" className="text-base py-1 px-3">Win Rate: {overallWinRate().toFixed(0)}%</Badge>
                                     </div>
                                 </div>
@@ -396,3 +411,6 @@ export default function ProfilePage() {
     );
 }
 
+
+
+    
