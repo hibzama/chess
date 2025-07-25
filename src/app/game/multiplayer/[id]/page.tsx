@@ -287,25 +287,21 @@ function MultiplayerGamePageContent() {
                     { id: creatorDoc.id, data: creatorDoc.data(), name: roomData.createdBy.name },
                     { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
                 ];
-        
-                const referralIdsToFetch = new Set<string>();
-                for (const player of playersWithData) {
-                    if (player.data.referralChain) {
-                        player.data.referralChain.forEach((refId: string) => referralIdsToFetch.add(refId));
-                    } 
-                    else if (player.data.referredBy) {
-                        referralIdsToFetch.add(player.data.referredBy);
-                    }
-                }
-        
-                const referralDocs = await Promise.all(
-                    Array.from(referralIdsToFetch).map(id => transaction.get(doc(db, 'users', id)))
+                
+                const allReferrerIds = new Set<string>();
+                playersWithData.forEach(p => {
+                    if (p.data.referredBy) allReferrerIds.add(p.data.referredBy);
+                    if (p.data.referralChain) p.data.referralChain.forEach((id: string) => allReferrerIds.add(id));
+                });
+    
+                const referrerDocs = await Promise.all(
+                    Array.from(allReferrerIds).map(id => transaction.get(doc(db, 'users', id)))
                 );
-        
-                const referralDataMap = new Map<string, DocumentData>();
-                referralDocs.forEach(docSnap => {
+    
+                const referrerDataMap = new Map<string, DocumentData>();
+                referrerDocs.forEach(docSnap => {
                     if (docSnap.exists()) {
-                        referralDataMap.set(docSnap.id, docSnap.data());
+                        referrerDataMap.set(docSnap.id, docSnap.data());
                     }
                 });
 
@@ -331,7 +327,7 @@ function MultiplayerGamePageContent() {
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
-                        // Marketing Chain Commissions
+                        // Marketing Chain Commissions (always takes precedence)
                         if (player.data.referralChain?.length > 0) {
                             const marketingCommissionRate = 0.03;
                             for (let i = 0; i < player.data.referralChain.length; i++) {
@@ -346,10 +342,11 @@ function MultiplayerGamePageContent() {
                                 });
                             }
                         }
-                        // Regular 1-Level Commissions
-                        else if (player.data.referredBy) {
+
+                        // Direct L1 Commissions (can happen in addition to marketing chain)
+                        if (player.data.referredBy) {
                             const l1ReferrerId = player.data.referredBy;
-                            const l1ReferrerData = referralDataMap.get(l1ReferrerId);
+                            const l1ReferrerData = referrerDataMap.get(l1ReferrerId);
                             
                              if (l1ReferrerData) {
                                 const referralRanks = [
@@ -361,7 +358,13 @@ function MultiplayerGamePageContent() {
                                 const l1Commission = wagerAmount * rank.l1Rate;
         
                                 if (l1Commission > 0) {
-                                    transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
+                                    // Payout depends on referrer's role
+                                    if (l1ReferrerData.role === 'marketer') {
+                                        transaction.update(doc(db, 'users', l1ReferrerId), { marketingBalance: increment(l1Commission) });
+                                    } else {
+                                        transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
+                                    }
+                                    
                                     transaction.set(doc(collection(db, 'transactions')), {
                                         userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
                                         description: `L1 Commission from ${player.name}`, fromUserId: player.id,
