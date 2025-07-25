@@ -2,10 +2,8 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Gift, Trophy, Download } from 'lucide-react';
-import { collection, getCountFromServer } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { Trophy, Download } from 'lucide-react';
+import { BonusCard } from './bonus-card';
 
 const Logo = () => (
     <svg
@@ -24,17 +22,6 @@ const Logo = () => (
 
 
 export default async function LandingPage() {
-  const bonusLimit = 250;
-  let claimedBonuses = 0;
-  try {
-    const usersCollection = collection(db, "users");
-    const snapshot = await getCountFromServer(usersCollection);
-    claimedBonuses = snapshot.data().count;
-  } catch(e) {
-    console.error("Could not fetch user count for bonus", e)
-  }
-  const remainingBonuses = Math.max(0, bonusLimit - claimedBonuses);
-  const LKR_BONUS = 100;
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -50,19 +37,7 @@ export default async function LandingPage() {
         </p>
 
         <div className="w-full max-w-md mx-auto space-y-8">
-          <Card className="bg-card/50 border-primary/20">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-center gap-2">
-                <Gift className="w-6 h-6 text-yellow-300" />
-                <span className="text-yellow-300">{LKR_BONUS} LKR Registration Bonus!</span>
-              </CardTitle>
-              <CardDescription>The next {bonusLimit} users get a free bonus to start playing.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Progress value={Math.min(100, (claimedBonuses / bonusLimit) * 100)} className="mb-2" />
-              <p className="text-sm text-muted-foreground">{Math.min(claimedBonuses, bonusLimit)} / {bonusLimit} bonuses claimed. {remainingBonuses} remaining in this batch!</p>
-            </CardContent>
-          </Card>
+          <BonusCard />
           
           <div className="flex items-center justify-center gap-4">
             <Link href="/login" passHref>
@@ -107,5 +82,3 @@ export default async function LandingPage() {
     </div>
   );
 }
-
-    

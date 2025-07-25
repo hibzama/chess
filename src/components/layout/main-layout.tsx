@@ -50,7 +50,7 @@ export default function MainLayout({
         if (userData) {
             return `${userData.firstName.charAt(0)}${userData.lastName.charAt(0)}`.toUpperCase();
         }
-        return '...';
+        return '..';
     }
 
     const USDT_RATE = 310;
@@ -160,7 +160,7 @@ export default function MainLayout({
                         <Button variant="ghost" size="icon"><Settings /></Button>
                         <Link href="/dashboard/profile">
                             <Avatar>
-                                <AvatarImage src="https://placehold.co/40x40.png" data-ai-hint="avatar" />
+                                <AvatarImage src={userData?.photoURL} data-ai-hint="avatar" />
                                 <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
                             </Avatar>
                         </Link>
@@ -173,4 +173,3 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
-

@@ -40,6 +40,7 @@ interface UserData {
     referralChain?: string[];
     createdAt: any;
     l1Count?: number;
+    photoURL?: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
