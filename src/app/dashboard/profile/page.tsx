@@ -3,16 +3,15 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Upload, Layers, ShieldQuestion, Ban, BarChart, BrainCircuit, CheckCircle } from 'lucide-react';
+import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Ban, BrainCircuit, Layers, ShieldQuestion } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,6 +19,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 
 type Game = {
@@ -54,6 +54,20 @@ const ranks = [
     { title: "Immortal", minWins: 91444, level: 100 },
 ];
 
+const boyAvatars = [
+    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100.png',
+];
+
+const girlAvatars = [
+    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100.png',
+    'https://placehold.co/100x100.png',
+];
+
 const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: number | string }) => (
     <Card className="bg-card/50 text-center">
         <CardContent className="p-4 flex flex-col items-center gap-1">
@@ -69,9 +83,10 @@ export default function ProfilePage() {
     const { toast } = useToast();
     const [gameHistory, setGameHistory] = useState<Game[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [isUploading, setIsUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [isSendingReset, setIsSendingReset] = useState(false);
+    const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
+    const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
     const getInitials = () => {
         if (userData) {
@@ -97,7 +112,7 @@ export default function ProfilePage() {
                 history.push({ ...doc.data(), id: doc.id } as Game);
             });
             
-            setGameHistory(history.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
+            setGameHistory(history.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
             setStatsLoading(false);
         };
 
@@ -156,25 +171,21 @@ export default function ProfilePage() {
         return { rank, nextRank, winsToNextLevel: winsToNext, progress };
     }, [totalWins]);
 
-    const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file || !user) return;
+    const handleAvatarSave = async () => {
+        if (!selectedAvatar || !user) return;
 
-        setIsUploading(true);
+        setIsSaving(true);
         try {
-            const avatarRef = ref(storage, `avatars/${user.uid}/${file.name}`);
-            await uploadBytes(avatarRef, file);
-            const downloadURL = await getDownloadURL(avatarRef);
-
             const userDocRef = doc(db, 'users', user.uid);
-            await updateDoc(userDocRef, { photoURL: downloadURL });
+            await updateDoc(userDocRef, { photoURL: selectedAvatar });
             
             toast({ title: "Success", description: "Avatar updated successfully." });
+            setIsAvatarDialogOpen(false);
         } catch (error) {
-            console.error("Avatar upload failed:", error);
-            toast({ variant: 'destructive', title: "Upload Failed", description: "Could not upload your avatar." });
+            console.error("Avatar update failed:", error);
+            toast({ variant: 'destructive', title: "Update Failed", description: "Could not update your avatar." });
         } finally {
-            setIsUploading(false);
+            setIsSaving(false);
         }
     };
     
@@ -230,17 +241,53 @@ export default function ProfilePage() {
                     <Card>
                         <CardContent className="p-6 space-y-6">
                             <div className="flex flex-col md:flex-row items-center gap-6">
-                                <div className="relative">
-                                    <Avatar className="w-24 h-24 border-2 border-primary">
-                                        <AvatarImage src={userData?.photoURL} data-ai-hint="user avatar" />
-                                        <AvatarFallback>{getInitials()}</AvatarFallback>
-                                    </Avatar>
-                                     <Button size="icon" variant="secondary" className="absolute bottom-0 right-0 rounded-full h-8 w-8" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                                        {isUploading ? <Upload className="w-4 h-4 animate-pulse"/> : <Camera className="w-4 h-4"/>}
-                                        <span className="sr-only">Change Avatar</span>
-                                    </Button>
-                                    <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" />
-                                </div>
+                                <AlertDialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+                                    <AlertDialogTrigger asChild>
+                                        <div className="relative cursor-pointer">
+                                            <Avatar className="w-24 h-24 border-2 border-primary">
+                                                <AvatarImage src={userData?.photoURL} data-ai-hint="user avatar" />
+                                                <AvatarFallback>{getInitials()}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-secondary flex items-center justify-center">
+                                                <Camera className="w-4 h-4"/>
+                                            </div>
+                                        </div>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Choose your Avatar</AlertDialogTitle>
+                                            <AlertDialogDescription>Select an icon to represent you on the platform.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <h4 className="font-semibold mb-2">Boy Avatars</h4>
+                                                <div className="grid grid-cols-4 gap-4">
+                                                    {boyAvatars.map((url, i) => (
+                                                        <button key={`boy-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint="boy avatar" /></Avatar>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-semibold mb-2">Girl Avatars</h4>
+                                                 <div className="grid grid-cols-4 gap-4">
+                                                    {girlAvatars.map((url, i) => (
+                                                        <button key={`girl-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint="girl avatar" /></Avatar>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleAvatarSave} disabled={isSaving || !selectedAvatar}>
+                                                {isSaving ? "Saving..." : "Save Avatar"}
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                                 <div className="flex-1 space-y-2 text-center md:text-left">
                                     <h1 className="text-3xl font-bold">{userData?.firstName} {userData?.lastName}</h1>
                                     <p className="text-muted-foreground">{userData?.email}</p>
@@ -312,7 +359,7 @@ export default function ProfilePage() {
                                                 <TableCell>{opponent?.name || 'Unknown'}</TableCell>
                                                 <TableCell><Badge variant={result.text === 'Win' ? 'default' : result.text === 'Loss' ? 'destructive' : 'secondary'}>{result.text}</Badge></TableCell>
                                                 <TableCell className="capitalize">{game.winner?.method || 'N/A'}</TableCell>
-                                                <TableCell>{format(game.createdAt.toDate(), 'PPp')}</TableCell>
+                                                <TableCell>{game.createdAt ? format(game.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                                             </TableRow>
                                         )
                                     }) : (
