@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, doc, updateDoc, getCountFromServer } from 'firebase/firestore';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -55,18 +55,19 @@ const ranks = [
 ];
 
 const boyAvatars = [
-    'https://placehold.co/100x100/3b82f6/FFFFFF.png',
-    'https://placehold.co/100x100/ef4444/FFFFFF.png',
-    'https://placehold.co/100x100/22c55e/FFFFFF.png',
-    'https://placehold.co/100x100/eab308/FFFFFF.png',
+    'https://avatar.iran.liara.run/public/boy?username=Scott',
+    'https://avatar.iran.liara.run/public/boy?username=Roy',
+    'https://avatar.iran.liara.run/public/boy?username=James',
+    'https://avatar.iran.liara.run/public/boy?username=Alex',
 ];
 
 const girlAvatars = [
-    'https://placehold.co/100x100/ec4899/FFFFFF.png',
-    'https://placehold.co/100x100/8b5cf6/FFFFFF.png',
-    'https://placehold.co/100x100/f97316/FFFFFF.png',
-    'https://placehold.co/100x100/14b8a6/FFFFFF.png',
+    'https://avatar.iran.liara.run/public/girl?username=Maria',
+    'https://avatar.iran.liara.run/public/girl?username=Jane',
+    'https://avatar.iran.liara.run/public/girl?username=Susan',
+    'https://avatar.iran.liara.run/public/girl?username=Jessica',
 ];
+
 
 const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: number | string }) => (
     <Card className="bg-card/50 text-center">
@@ -102,7 +103,6 @@ export default function ProfilePage() {
         const fetchGameData = async () => {
             setStatsLoading(true);
             
-            // Fetch game history for the current user
             const gamesQuery = query(
                 collection(db, 'game_rooms'), 
                 where('players', 'array-contains', user.uid), 
@@ -117,16 +117,18 @@ export default function ProfilePage() {
             
             setGameHistory(history.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
 
-            // Fetch all users to calculate world rank
-            const allUsersSnapshot = await getDocs(collection(db, 'users'));
-            const allUsers = allUsersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+            const allUsersCollection = collection(db, 'users');
+            const allUsersSnapshot = await getDocs(allUsersCollection);
+            const allUsers = allUsersSnapshot.docs.map(doc => {
+                const data = doc.data();
+                const wins = (data.chessStats?.wins || 0) + (data.checkersStats?.wins || 0); // Placeholder
+                return { uid: doc.id, wins };
+            });
 
-            // This is a placeholder for win calculation. A real implementation would fetch wins for each user.
-            // For now, we'll sort by who has more documents, which is not accurate.
-            // A more robust solution involves storing win counts on the user document itself.
-            const sortedUsers = allUsers.sort((a, b) => (b.l1Count || 0) - (a.l1Count || 0)); // Placeholder sorting
-            const rank = sortedUsers.findIndex(u => u.uid === user.uid) + 1;
+            allUsers.sort((a, b) => b.wins - a.wins);
+            const rank = allUsers.findIndex(u => u.uid === user.uid) + 1;
             setWorldRank(rank > 0 ? rank : null);
+
 
             setStatsLoading(false);
         };
@@ -134,7 +136,7 @@ export default function ProfilePage() {
         fetchGameData();
     }, [user]);
 
-    const { chess: chessStats, checkers: checkersStats, totalWins } = useMemo(() => {
+     const { chess: chessStats, checkers: checkersStats, totalWins } = useMemo(() => {
         const stats: { chess: GameStats, checkers: GameStats, totalWins: number } = {
             chess: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
             checkers: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
@@ -279,7 +281,7 @@ export default function ProfilePage() {
                                                 <div className="grid grid-cols-4 gap-4">
                                                     {boyAvatars.map((url, i) => (
                                                         <button key={`boy-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint={`boy avatar ${i + 1}`} /></Avatar>
+                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} /></Avatar>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -289,7 +291,7 @@ export default function ProfilePage() {
                                                  <div className="grid grid-cols-4 gap-4">
                                                     {girlAvatars.map((url, i) => (
                                                         <button key={`girl-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint={`girl avatar ${i + 1}`} /></Avatar>
+                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} /></Avatar>
                                                         </button>
                                                     ))}
                                                 </div>
