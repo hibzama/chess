@@ -91,8 +91,8 @@ export default function MainLayout({
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={isMounted && pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton tooltip="Friends & Community"><Users /><span>Friends & Community</span></SidebarMenuButton>
+                                 <SidebarMenuItem>
+                                    <Link href="/dashboard/friends"><SidebarMenuButton tooltip="Friends & Community" isActive={isMounted && pathname.startsWith('/dashboard/friends')}><Users /><span>Friends & Community</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton tooltip="Rankings"><Trophy /><span>Rankings</span></SidebarMenuButton>
@@ -106,8 +106,8 @@ export default function MainLayout({
                                 <SidebarMenuItem>
                                     <SidebarMenuButton tooltip="Tournaments"><Trophy /><span>Tournaments</span></SidebarMenuButton>
                                 </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton tooltip="Direct Messages"><MessageSquare /><span>Direct Messages</span></SidebarMenuButton>
+                                 <SidebarMenuItem>
+                                    <Link href="/dashboard/chat"><SidebarMenuButton tooltip="Direct Messages" isActive={isMounted && pathname.startsWith('/dashboard/chat')}><MessageSquare /><span>Direct Messages</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <SidebarMenuButton tooltip="About Us"><Info /><span>About Us</span></SidebarMenuButton>

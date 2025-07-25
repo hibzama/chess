@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -41,6 +40,7 @@ interface UserData {
     createdAt: any;
     l1Count?: number;
     photoURL?: string;
+    friends?: string[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

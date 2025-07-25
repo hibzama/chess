@@ -1,6 +1,14 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import { Inter as FontSans } from 'next/font/google';
+import { cn } from '@/lib/utils';
+
+const fontSans = FontSans({
+  subsets: ['latin'],
+  variable: '--font-sans',
+});
 
 export const metadata: Metadata = {
   title: 'Nexbattle',
@@ -13,16 +21,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className="font-body antialiased">
-        <Providers>
-          {children}
-        </Providers>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head />
+      <body
+        className={cn(
+          'min-h-screen bg-background font-sans antialiased',
+          fontSans.variable
+        )}
+      >
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
