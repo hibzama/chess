@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { MessageSquare, Circle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { formatDistanceToNowStrict } from 'date-fns';
 
 type Friend = {
     uid: string;
@@ -17,6 +19,8 @@ type Friend = {
     lastName: string;
     photoURL?: string;
     hasUnread?: boolean;
+    status?: 'online' | 'offline';
+    lastSeen?: any;
 }
 
 export default function ChatInboxPage() {
@@ -38,7 +42,7 @@ export default function ChatInboxPage() {
         const friendPromises = userData.friends.map(friendId => getDoc(doc(db, 'users', friendId)));
 
         Promise.all(friendPromises).then(friendDocs => {
-            const friendsData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), uid: doc.id } as Friend));
+            const friendsData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), id: doc.id } as Friend));
             
             const unsubscribes = friendsData.map(friend => {
                 const chatId = getChatId(user.uid, friend.uid);
@@ -102,7 +106,13 @@ export default function ChatInboxPage() {
         }
     };
     
-    const sortedFriends = friendsWithChatStatus.sort((a,b) => (b.hasUnread ? 1 : 0) - (a.hasUnread ? 1 : 0))
+    const sortedFriends = [...friendsWithChatStatus].sort((a,b) => {
+        if (a.hasUnread && !b.hasUnread) return -1;
+        if (!a.hasUnread && b.hasUnread) return 1;
+        if (a.status === 'online' && b.status !== 'online') return -1;
+        if (a.status !== 'online' && b.status === 'online') return 1;
+        return 0;
+    });
 
     return (
         <div className="space-y-8">
@@ -125,12 +135,22 @@ export default function ChatInboxPage() {
                         <div className="space-y-2">
                            {sortedFriends.map(friend => (
                                 <div key={friend.uid} className="p-4 rounded-lg hover:bg-muted transition-colors flex items-center gap-4">
-                                    <Avatar>
-                                        <AvatarImage src={friend.photoURL} />
-                                        <AvatarFallback>{friend.firstName?.[0]}</AvatarFallback>
-                                    </Avatar>
+                                     <div className="relative">
+                                        <Avatar>
+                                            <AvatarImage src={friend.photoURL} />
+                                            <AvatarFallback>{friend.firstName?.[0]}</AvatarFallback>
+                                        </Avatar>
+                                         {friend.status === 'online' && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />}
+                                    </div>
                                     <div className="flex-grow">
                                         <p className="font-semibold">{friend.firstName} {friend.lastName}</p>
+                                         {friend.status === 'online' ? (
+                                            <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">Online</Badge>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">
+                                                {friend.lastSeen ? `Last seen ${formatDistanceToNowStrict(friend.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-4">
                                         {friend.hasUnread && <Circle className="w-3 h-3 text-primary fill-current" />}
@@ -150,5 +170,3 @@ export default function ChatInboxPage() {
         </div>
     );
 }
-
-    
