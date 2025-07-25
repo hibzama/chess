@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, MessageCircle } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -61,12 +61,13 @@ const NotificationBell = () => {
         const q = query(
             collection(db, 'notifications'), 
             where('userId', '==', user.uid),
-            orderBy('createdAt', 'desc'),
             limit(20)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const notifsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
+            // Sort client-side
+            notifsData.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
             setNotifications(notifsData);
             setUnreadCount(notifsData.filter(n => !n.read).length);
         });
@@ -290,7 +291,7 @@ export default function MainLayout({
                     <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
-                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer"><MessageCircle/> WhatsApp</a>
+                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
                     <a href="https://t.me/nexbattlehelp" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
