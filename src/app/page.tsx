@@ -1,9 +1,13 @@
+'use client';
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trophy, Download } from 'lucide-react';
+import { Trophy, Download, Loader2 } from 'lucide-react';
 import { BonusCard } from './bonus-card';
+import { useState } from 'react';
+import { getStorage, ref, getDownloadURL } from 'firebase/storage';
+import { useToast } from '@/hooks/use-toast';
 
 const Logo = () => (
     <svg
@@ -21,7 +25,42 @@ const Logo = () => (
   );
 
 
-export default async function LandingPage() {
+export default function LandingPage() {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
+
+  const handleDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const storage = getStorage();
+      // NOTE: Replace 'apks/app-release.apk' with the actual path to your file in Firebase Storage.
+      const apkRef = ref(storage, 'apks/app-release.apk');
+      const url = await getDownloadURL(apkRef);
+
+      // Trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'nexbattle.apk'); 
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Download Started",
+        description: "Your download will begin shortly.",
+      });
+
+    } catch (error: any) {
+      console.error("Error downloading APK:", error);
+       toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: "Could not find the APK file. Please contact support.",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -73,7 +112,9 @@ export default async function LandingPage() {
               <CardDescription>Get the best experience with our dedicated mobile app.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Button className="w-full bg-accent hover:bg-accent/90">Download APK</Button>
+              <Button onClick={handleDownload} disabled={isDownloading} className="w-full bg-accent hover:bg-accent/90">
+                {isDownloading ? <Loader2 className="animate-spin" /> : 'Download APK'}
+              </Button>
               <p className="text-xs text-muted-foreground mt-2">You may need to "Allow from this source" in your phone's settings to install the app.</p>
             </CardContent>
           </Card>
