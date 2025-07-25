@@ -21,9 +21,15 @@ const Logo = () => (
       strokeLinejoin="round"
       className="w-16 h-16 text-primary"
     >
-      <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Z" />
-      <path d="M12 12a5 5 0 1 0 5 5 5 5 0 0 0-5-5Z" />
-      <path d="M12 12h5" />
+        <circle cx="12" cy="12" r="10" />
+        <path d="m14.5 9.5-5 5" />
+        <path d="m9.5 9.5 5 5" />
+        <path d="M12 3v1" />
+        <path d="M12 20v1" />
+        <path d="m5 7 1-1" />
+        <path d="m18 18 1-1" />
+        <path d="m5 17 1 1" />
+        <path d="m18 6-1 1" />
     </svg>
   );
 
