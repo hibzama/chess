@@ -11,7 +11,7 @@ import { MessageSquare } from 'lucide-react';
 
 type ChatRoom = {
     id: string;
-    users: { [uid: string]: { name: string, avatar?: string }};
+    users: { [uid: string]: { name: string, avatar?: string, exists: boolean }};
     lastMessage?: { text: string, senderId: string, timestamp: any };
 }
 
@@ -67,7 +67,7 @@ export default function ChatInboxPage() {
                            {chats.map(chat => {
                                 const otherUser = getOtherUser(chat);
                                 return (
-                                <Link href={`/chat/${chat.id}`} key={chat.id} className="block">
+                                <Link href={`/dashboard/chat/${chat.id}`} key={chat.id} className="block">
                                     <div className="p-4 rounded-lg hover:bg-muted transition-colors flex items-center gap-4">
                                         <Avatar>
                                             <AvatarImage src={otherUser.avatar} data-ai-hint="user avatar" />
@@ -85,7 +85,7 @@ export default function ChatInboxPage() {
                     ) : (
                         <div className="text-center p-8 text-muted-foreground">
                             <p>You have no active chats.</p>
-                            <p>Add some friends to start a conversation!</p>
+                            <p>Find friends to start a conversation!</p>
                         </div>
                     )}
                 </CardContent>
@@ -93,3 +93,5 @@ export default function ChatInboxPage() {
         </div>
     );
 }
+
+    

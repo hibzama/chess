@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp, getDoc, updateDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -46,12 +46,12 @@ export default function ChatPage() {
                 const chatData = docSnap.data();
                 const otherUserId = Object.keys(chatData.users).find(uid => uid !== user.uid);
                 if (!otherUserId || !chatData.users[otherUserId].exists) {
-                    router.push('/chat'); // Not a member of this chat
+                    router.push('/dashboard/chat'); // Not a member of this chat
                     return;
                 }
                 setOtherUser(chatData.users[otherUserId]);
             } else {
-                 router.push('/chat');
+                 router.push('/dashboard/chat');
             }
              setLoading(false);
         });
@@ -115,7 +115,7 @@ export default function ChatPage() {
         <Card className="flex flex-col h-[calc(100vh-10rem)] w-full max-w-4xl mx-auto">
              <div className="p-4 border-b flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                     <Link href="/chat" className="p-1 rounded-full hover:bg-muted lg:hidden">
+                     <Link href="/dashboard/chat" className="p-1 rounded-full hover:bg-muted lg:hidden">
                         <ArrowLeft className="h-5 w-5" />
                         <span className="sr-only">Back to Chats</span>
                      </Link>
@@ -171,3 +171,5 @@ export default function ChatPage() {
         </Card>
     );
 }
+
+    

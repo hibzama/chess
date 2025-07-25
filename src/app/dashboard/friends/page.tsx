@@ -54,7 +54,7 @@ const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfi
             )}
         </div>
         <div className="flex gap-2">
-            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/chat/${person.uid}`}><MessageSquare /></Link></Button>}
+            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${person.uid}`}><MessageSquare /></Link></Button>}
             {actionType !== 'suggestion' && 
                 <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
                      {actionType === 'add' ? <UserPlus /> : <UserMinus />}
@@ -105,27 +105,41 @@ export default function FriendsPage() {
         }
         const friendPromises = userData.friends.map(friendId => getDoc(doc(db, 'users', friendId)));
         const friendDocs = await Promise.all(friendPromises);
-        const friendData = friendDocs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
+        const friendData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
         setFriends(friendData);
     }, [userData]);
 
     const fetchSuggestions = useCallback(async () => {
-        if(!user) return;
-        const q = query(collection(db, 'users'), where('uid', '!=', user.uid), limit(20));
+        if(!user || !userData) return;
+        
+        // Create a list of users to exclude (current user + their friends)
+        const excludeIds = [user.uid, ...(userData.friends || [])];
+        
+        // To query with 'not-in', the list cannot be empty.
+        if (excludeIds.length === 0) excludeIds.push('dummy-id');
+        
+        // Fetch up to 20 users who are not the current user or their friends.
+        const q = query(collection(db, 'users'), where('uid', 'not-in', excludeIds), limit(20));
+        
         const userDocs = await getDocs(q);
+        
         const suggestedUsers = userDocs.docs
-            .map(doc => ({...doc.data(), uid: doc.id} as UserProfile))
-            .filter(u => !userData?.friends?.includes(u.uid) && !requests.some(r => r.fromId === u.uid));
+            .map(doc => ({...doc.data(), uid: doc.id} as UserProfile));
         
         // Sort: online first, then by last seen
         suggestedUsers.sort((a,b) => {
             if (a.status === 'online' && b.status !== 'online') return -1;
             if (a.status !== 'online' && b.status === 'online') return 1;
-            return (b.lastSeen?.seconds || 0) - (a.lastSeen?.seconds || 0);
+            if (a.lastSeen && b.lastSeen) {
+                 return b.lastSeen.seconds - a.lastSeen.seconds;
+            }
+            if (a.lastSeen) return -1; // a is more recent
+            if (b.lastSeen) return 1; // b is more recent
+            return 0;
         });
 
         setSuggestions(suggestedUsers);
-    }, [user, userData?.friends, requests]);
+    }, [user, userData]);
     
     useEffect(() => {
         if (!user) {
@@ -348,3 +362,5 @@ export default function FriendsPage() {
         </div>
     )
 }
+
+    
