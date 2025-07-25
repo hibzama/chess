@@ -1,3 +1,4 @@
+
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -120,7 +121,7 @@ export default function MainLayout({
                 <SidebarFooter>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Settings"><Settings /><span>Settings</span></SidebarMenuButton>
+                            <Link href="/dashboard/settings"><SidebarMenuButton tooltip="Settings" isActive={isMounted && pathname === '/dashboard/settings'}><Settings /><span>Settings</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                             <SidebarMenuButton tooltip="Support"><LifeBuoy /><span>Support</span></SidebarMenuButton>
@@ -158,7 +159,6 @@ export default function MainLayout({
                           </Link>
                        </div>
                         <Button variant="ghost" size="icon"><Bell /></Button>
-                        <Button variant="ghost" size="icon"><Settings /></Button>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button>
@@ -174,19 +174,11 @@ export default function MainLayout({
                                     <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
                                 </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild><Link href="/dashboard/profile"><User/> Profile</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/wallet"><Wallet/> Wallet</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard"><LayoutGrid/> Dashboard</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/my-rooms"><BarChart3/> My Rooms</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/friends"><Users/> Friends</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/chat"><MessageSquare/> Chat</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/rankings"><Trophy/> Leaderboard</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/equipment"><Gamepad2/> Equipment</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/refer-earn"><Megaphone/> Referrals</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="#"><Trophy/> Events</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="#"><Info/> About</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/profile"><User className="mr-2"/> Profile</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2"/> Settings</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/wallet"><Wallet className="mr-2"/> Wallet</Link></DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={handleLogout}><LogOut /> Log out</DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2"/> Log out</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -199,3 +191,4 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
