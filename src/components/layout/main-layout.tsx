@@ -160,7 +160,7 @@ export default function MainLayout({
                         <Button variant="ghost" size="icon"><Settings /></Button>
                         <Link href="/dashboard/profile">
                             <Avatar>
-                                <AvatarImage src={userData?.photoURL} data-ai-hint="avatar" />
+                                <AvatarImage src={userData?.photoURL} />
                                 <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
                             </Avatar>
                         </Link>
@@ -173,3 +173,5 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
+
+    

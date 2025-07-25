@@ -12,6 +12,7 @@ interface AuthContextType {
   userData: UserData | null;
   loading: boolean;
   logout: () => Promise<void>;
+  setUserData: React.Dispatch<React.SetStateAction<UserData | null>>;
 }
 
 interface EquipmentSettings {
@@ -142,7 +143,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, logout }}>
+    <AuthContext.Provider value={{ user, userData, loading, logout, setUserData }}>
       {children}
     </AuthContext.Provider>
   );
@@ -155,3 +156,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    

@@ -126,7 +126,7 @@ export default function ChatInboxPage() {
                            {sortedFriends.map(friend => (
                                 <div key={friend.uid} className="p-4 rounded-lg hover:bg-muted transition-colors flex items-center gap-4">
                                     <Avatar>
-                                        <AvatarImage src={friend.photoURL} data-ai-hint="user avatar" />
+                                        <AvatarImage src={friend.photoURL} />
                                         <AvatarFallback>{friend.firstName?.[0]}</AvatarFallback>
                                     </Avatar>
                                     <div className="flex-grow">
@@ -150,3 +150,5 @@ export default function ChatInboxPage() {
         </div>
     );
 }
+
+    

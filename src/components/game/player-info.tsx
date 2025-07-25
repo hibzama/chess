@@ -10,16 +10,15 @@ import { Skeleton } from '../ui/skeleton';
 
 type PlayerInfoProps = {
   playerName: string;
-  avatarSrc: string;
-  'data-ai-hint': string;
+  avatarSrc?: string;
 };
 
-export default function PlayerInfo({ playerName, avatarSrc, ...props }: PlayerInfoProps) {
+export default function PlayerInfo({ playerName, avatarSrc }: PlayerInfoProps) {
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-4">
         <Avatar className="h-16 w-16 border-2 border-primary/50">
-          <AvatarImage src={avatarSrc} alt={playerName} {...props} />
+          <AvatarImage src={avatarSrc} alt={playerName} />
           <AvatarFallback>{playerName.slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
@@ -29,3 +28,5 @@ export default function PlayerInfo({ playerName, avatarSrc, ...props }: PlayerIn
     </Card>
   );
 }
+
+    

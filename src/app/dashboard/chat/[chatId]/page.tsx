@@ -129,7 +129,7 @@ export default function ChatPage() {
                         <span className="sr-only">Back to Chats</span>
                      </Link>
                     <Avatar>
-                        <AvatarImage src={otherUser?.avatar} data-ai-hint="user avatar"/>
+                        <AvatarImage src={otherUser?.avatar} />
                         <AvatarFallback>{otherUser?.name?.[0]}</AvatarFallback>
                     </Avatar>
                     <h3 className="font-semibold">{otherUser?.name}</h3>
@@ -143,7 +143,7 @@ export default function ChatPage() {
                                 <div key={msg.id} className={cn("flex items-end gap-3", msg.senderId === user?.uid ? "justify-end" : "justify-start")}>
                                     {msg.senderId !== user?.uid && (
                                         <Avatar className="w-8 h-8">
-                                            <AvatarImage src={otherUser?.avatar} data-ai-hint="user avatar"/>
+                                            <AvatarImage src={otherUser?.avatar} />
                                             <AvatarFallback>{otherUser?.name?.[0]}</AvatarFallback>
                                         </Avatar>
                                     )}
@@ -180,3 +180,5 @@ export default function ChatPage() {
         </Card>
     );
 }
+
+    

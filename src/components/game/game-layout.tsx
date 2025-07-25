@@ -141,8 +141,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         <div className="hidden lg:grid grid-rows-[auto,1fr] gap-6">
             <PlayerInfo
               playerName={userData ? `${userData.firstName} (You)`: "Player 1 (You)"}
-              avatarSrc="https://placehold.co/100x100.png"
-              data-ai-hint="player avatar"
+              avatarSrc={userData?.photoURL}
             />
              <MoveHistory />
         </div>
@@ -197,7 +196,6 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             <PlayerInfo
               playerName="Opponent"
               avatarSrc="https://placehold.co/100x100.png"
-              data-ai-hint="gamer portrait"
             />
             <CapturedPieces pieceStyle={equipment?.pieceStyle} />
              {isMultiplayer ? (
@@ -260,3 +258,5 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </>
   );
 }
+
+    

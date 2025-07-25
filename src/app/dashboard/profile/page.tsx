@@ -80,7 +80,7 @@ const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string
 );
 
 export default function ProfilePage() {
-    const { user, userData, loading: authLoading } = useAuth();
+    const { user, userData, loading: authLoading, setUserData } = useAuth();
     const { toast } = useToast();
     const [gameHistory, setGameHistory] = useState<Game[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
@@ -189,13 +189,16 @@ export default function ProfilePage() {
     }, [totalWins]);
 
     const handleAvatarSave = async () => {
-        if (!selectedAvatar || !user) return;
+        if (!selectedAvatar || !user || !userData) return;
 
         setIsSaving(true);
         try {
             const userDocRef = doc(db, 'users', user.uid);
             await updateDoc(userDocRef, { photoURL: selectedAvatar });
             
+            // Manually update local state to reflect change immediately
+            setUserData({ ...userData, photoURL: selectedAvatar });
+
             toast({ title: "Success", description: "Avatar updated successfully." });
             setIsAvatarDialogOpen(false);
         } catch (error) {
@@ -413,3 +416,5 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+    

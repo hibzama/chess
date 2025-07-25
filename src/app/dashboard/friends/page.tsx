@@ -54,7 +54,7 @@ const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfi
             )}
         </div>
         <div className="flex gap-2">
-            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${person.uid}`}><MessageSquare /></Link></Button>}
+            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat`}><MessageSquare /></Link></Button>}
             {actionType !== 'suggestion' && 
                 <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
                      {actionType === 'add' ? <UserPlus /> : <UserMinus />}
@@ -362,3 +362,5 @@ export default function FriendsPage() {
         </div>
     )
 }
+
+    
