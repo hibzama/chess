@@ -36,19 +36,27 @@ export default function ChatPage() {
     const [otherUser, setOtherUser] = useState<OtherUser | null>(null);
     const [loading, setLoading] = useState(true);
     const scrollViewportRef = useRef<HTMLDivElement>(null);
+    const otherUserIdRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (!user || !chatId) return;
 
         const chatRef = doc(db, 'chats', chatId as string);
+
+        // Mark messages as read when component mounts
+        updateDoc(chatRef, { [`users.${user.uid}.hasUnread`]: false }).catch(e => console.log("Failed to mark as read initially:", e));
+
         const unsubscribeChat = onSnapshot(chatRef, (docSnap) => {
             if (docSnap.exists()) {
                 const chatData = docSnap.data();
                 const otherUserId = Object.keys(chatData.users).find(uid => uid !== user.uid);
+
                 if (!otherUserId || !chatData.users[otherUserId].exists) {
                     router.push('/dashboard/chat'); // Not a member of this chat
                     return;
                 }
+                
+                otherUserIdRef.current = otherUserId;
                 setOtherUser(chatData.users[otherUserId]);
             } else {
                  router.push('/dashboard/chat');
@@ -80,7 +88,7 @@ export default function ChatPage() {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !user || !chatId) return;
+        if (!newMessage.trim() || !user || !chatId || !otherUserIdRef.current) return;
 
         setIsSending(true);
         const messagesRef = collection(db, 'chats', chatId as string, 'messages');
@@ -97,7 +105,8 @@ export default function ChatPage() {
                     text: newMessage,
                     senderId: user.uid,
                     timestamp: serverTimestamp(),
-                }
+                },
+                [`users.${otherUserIdRef.current}.hasUnread`]: true,
             })
             setNewMessage('');
         } catch (error) {
@@ -171,5 +180,3 @@ export default function ChatPage() {
         </Card>
     );
 }
-
-    
