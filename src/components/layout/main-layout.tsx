@@ -4,7 +4,8 @@ import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -158,12 +159,36 @@ export default function MainLayout({
                        </div>
                         <Button variant="ghost" size="icon"><Bell /></Button>
                         <Button variant="ghost" size="icon"><Settings /></Button>
-                        <Link href="/dashboard/profile">
-                            <Avatar>
-                                <AvatarImage src={userData?.photoURL} />
-                                <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
-                            </Avatar>
-                        </Link>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button>
+                                     <Avatar>
+                                        <AvatarImage src={userData?.photoURL} />
+                                        <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
+                                    </Avatar>
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>
+                                    <p>{userData?.firstName} {userData?.lastName}</p>
+                                    <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild><Link href="/dashboard/profile"><User/> Profile</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/wallet"><Wallet/> Wallet</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard"><LayoutGrid/> Dashboard</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/my-rooms"><BarChart3/> My Rooms</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/friends"><Users/> Friends</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/chat"><MessageSquare/> Chat</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/rankings"><Trophy/> Leaderboard</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/equipment"><Gamepad2/> Equipment</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="/dashboard/refer-earn"><Megaphone/> Referrals</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="#"><Trophy/> Events</Link></DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href="#"><Info/> About</Link></DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={handleLogout}><LogOut /> Log out</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </header>
                 <main className="flex-1 p-4 md:p-8">
