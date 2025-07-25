@@ -115,6 +115,8 @@ export default function ProfilePage() {
 
         gameHistory.forEach(game => {
             const statType = game.gameType;
+            if (!statType || !stats[statType]) return;
+
             let result: 'win' | 'loss' | 'draw' = 'loss';
             if (game.draw) {
                 result = 'draw';
@@ -203,6 +205,14 @@ export default function ProfilePage() {
         return <Skeleton className="w-full h-[600px]" />
     }
 
+    const overallWinRate = () => {
+        const rates = [];
+        if (chessStats?.winRate > 0) rates.push(chessStats.winRate);
+        if (checkersStats?.winRate > 0) rates.push(checkersStats.winRate);
+        if (rates.length === 0) return 0;
+        return rates.reduce((a, b) => a + b, 0) / rates.length;
+    };
+
     return (
         <div className="space-y-6">
             <Link href="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
@@ -241,7 +251,7 @@ export default function ProfilePage() {
                                             <span className="text-xs">Rank Title</span>
                                         </Badge>
                                         <Badge variant="secondary" className="text-base py-1 px-3">World Rank: #1</Badge>
-                                        <Badge variant="secondary" className="text-base py-1 px-3">Win Rate: {((chessStats.winRate + checkersStats.winRate) / 2).toFixed(0)}%</Badge>
+                                        <Badge variant="secondary" className="text-base py-1 px-3">Win Rate: {overallWinRate().toFixed(0)}%</Badge>
                                     </div>
                                 </div>
                             </div>
@@ -338,6 +348,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-
-    
