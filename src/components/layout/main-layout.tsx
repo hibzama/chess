@@ -60,15 +60,15 @@ const NotificationBell = () => {
         if (!user) return;
         const q = query(
             collection(db, 'notifications'), 
-            where('userId', '==', user.uid), 
+            where('userId', '==', user.uid),
+            orderBy('createdAt', 'desc'),
             limit(20)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const notifsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
-            const notifs = notifsData.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds);
-            setNotifications(notifs);
-            setUnreadCount(notifs.filter(n => !n.read).length);
+            setNotifications(notifsData);
+            setUnreadCount(notifsData.filter(n => !n.read).length);
         });
 
         return () => unsubscribe();
@@ -105,7 +105,7 @@ const NotificationBell = () => {
                             <div className={cn("flex-1 space-y-1", n.read && "pl-5")}>
                                 <p className="font-semibold">{n.title}</p>
                                 <p className="text-xs text-muted-foreground">{n.description}</p>
-                                <p className="text-xs text-muted-foreground">{formatDistanceToNowStrict(n.createdAt.toDate(), { addSuffix: true })}</p>
+                                <p className="text-xs text-muted-foreground">{n.createdAt ? formatDistanceToNowStrict(n.createdAt.toDate(), { addSuffix: true }) : ''}</p>
                             </div>
                         </DropdownMenuItem>
                     ))
@@ -194,9 +194,6 @@ export default function MainLayout({
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                 <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer & Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer & Earn</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton tooltip="Tournaments"><Trophy /><span>Tournaments</span></SidebarMenuButton>
                                 </SidebarMenuItem>
                                  <SidebarMenuItem>
                                     <Link href="/dashboard/chat"><SidebarMenuButton tooltip="Direct Messages" isActive={isMounted && pathname.startsWith('/dashboard/chat')}><MessageSquare /><span>Direct Messages</span></SidebarMenuButton></Link>
