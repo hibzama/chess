@@ -22,7 +22,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <head />
+      <head>
+        <link rel="icon" href="https://firebasestorage.googleapis.com/v0/b/nexbattle-ymmmq.appspot.com/o/playstore.png?alt=media" type="image/png" />
+      </head>
       <body
         className={cn(
           'min-h-screen bg-background font-sans antialiased',
