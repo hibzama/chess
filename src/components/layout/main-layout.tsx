@@ -1,4 +1,3 @@
-
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,6 +10,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import React from "react";
+import MobileBottomNav from "./mobile-bottom-nav";
 
 
 const Logo = () => (
@@ -191,9 +191,10 @@ export default function MainLayout({
                         </DropdownMenu>
                     </div>
                 </header>
-                <main className="flex-1 p-4 md:p-8">
+                <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
                     {children}
                 </main>
+                <MobileBottomNav />
             </SidebarInset>
         </SidebarProvider>
     )

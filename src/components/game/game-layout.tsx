@@ -1,5 +1,3 @@
-
-
 'use client'
 
 import Link from 'next/link';
@@ -139,7 +137,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
 
   return (
     <>
-    <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6">
+    <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6 md:pb-8 pb-24">
         {/* Left Column */}
         <div className="hidden lg:grid grid-rows-[auto,1fr] gap-6">
             <PlayerInfo
@@ -151,7 +149,9 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
 
         {/* Center Column */}
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
-            {headerContent}
+            <div className="hidden md:block w-full">
+             {headerContent}
+            </div>
             {gameOver ? (
                 <div className="flex items-center justify-center w-full h-full min-h-[50vh]">
                     <GameOverDisplay />
@@ -248,7 +248,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
      {isMultiplayer && !gameOver && (
          <Popover>
             <PopoverTrigger asChild>
-                <button className="fixed bottom-6 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40">
+                <button className="fixed bottom-24 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40 md:hidden">
                     <MessageSquare className="w-8 h-8"/>
                     <span className="sr-only">Open Chat</span>
                 </button>
@@ -261,5 +261,3 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </>
   );
 }
-
-    
