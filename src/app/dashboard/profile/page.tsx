@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Ban, BrainCircuit, Layers, ShieldQuestion } from 'lucide-react';
+import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Ban, BrainCircuit, Layers, ShieldQuestion, Users } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -262,7 +262,7 @@ export default function ProfilePage() {
                                     <AlertDialogTrigger asChild>
                                         <div className="relative cursor-pointer">
                                             <Avatar className="w-24 h-24 border-2 border-primary">
-                                                <AvatarImage src={userData?.photoURL} data-ai-hint="user avatar" />
+                                                <AvatarImage src={userData?.photoURL} />
                                                 <AvatarFallback>{getInitials()}</AvatarFallback>
                                             </Avatar>
                                             <div className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-secondary flex items-center justify-center">
@@ -329,11 +329,12 @@ export default function ProfilePage() {
                              <div className="space-y-6">
                                 <div>
                                     <h3 className="font-semibold flex items-center gap-2 mb-4"><BrainCircuit/> Chess Stats</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                         <StatCard icon={<Swords/>} label="Played" value={chessStats.played} />
                                         <StatCard icon={<Trophy/>} label="Wins" value={chessStats.wins} />
                                         <StatCard icon={<Ban/>} label="Losses" value={chessStats.losses} />
                                         <StatCard icon={<Handshake/>} label="Draws" value={chessStats.draws} />
+                                        <StatCard icon={<Users />} label="Friends" value={userData?.friends?.length || 0} />
                                     </div>
                                 </div>
                                 <div>
@@ -412,7 +413,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-
-
-    

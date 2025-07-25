@@ -38,7 +38,7 @@ const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfi
     <Card className="flex items-center p-4 gap-4">
         <div className="relative">
             <Avatar>
-                <AvatarImage src={person.photoURL} data-ai-hint="avatar" />
+                <AvatarImage src={person.photoURL} />
                 <AvatarFallback>{person.firstName?.[0]}{person.lastName?.[0]}</AvatarFallback>
             </Avatar>
              {person.status === 'online' && <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />}
@@ -72,7 +72,7 @@ const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfi
 const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (
      <Card className="flex items-center p-4 gap-4">
         <Avatar>
-            <AvatarImage src={req.fromAvatar} data-ai-hint="avatar" />
+            <AvatarImage src={req.fromAvatar} />
             <AvatarFallback>{req.fromName?.[0]}</AvatarFallback>
         </Avatar>
         <div className="flex-grow">
@@ -362,5 +362,3 @@ export default function FriendsPage() {
         </div>
     )
 }
-
-    
