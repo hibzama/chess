@@ -119,7 +119,7 @@ export default function ProfilePage() {
         fetchGameData();
     }, [user]);
 
-    const { chess: chessStats, checkers: checkersStats, totalWins } = useMemo(() => {
+    const { chessStats, checkersStats, totalWins } = useMemo(() => {
         const stats: { chess: GameStats, checkers: GameStats, totalWins: number } = {
             chess: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
             checkers: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
@@ -157,7 +157,7 @@ export default function ProfilePage() {
             stats.checkers.winRate = Math.round((stats.checkers.wins / stats.checkers.played) * 100);
         }
 
-        return stats;
+        return { chess: stats.chess, checkers: stats.checkers, totalWins: stats.totalWins };
     }, [gameHistory, user]);
     
     const { rank, nextRank, winsToNextLevel, progress } = useMemo(() => {
@@ -264,7 +264,7 @@ export default function ProfilePage() {
                                                 <div className="grid grid-cols-4 gap-4">
                                                     {boyAvatars.map((url, i) => (
                                                         <button key={`boy-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint="boy avatar" /></Avatar>
+                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint={`boy avatar ${i + 1}`} /></Avatar>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -274,7 +274,7 @@ export default function ProfilePage() {
                                                  <div className="grid grid-cols-4 gap-4">
                                                     {girlAvatars.map((url, i) => (
                                                         <button key={`girl-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint="girl avatar" /></Avatar>
+                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} data-ai-hint={`girl avatar ${i + 1}`} /></Avatar>
                                                         </button>
                                                     ))}
                                                 </div>
