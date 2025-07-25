@@ -69,7 +69,7 @@ const UserCard = ({ person, onAction, actionType, loading }: { person: UserProfi
     </Card>
 );
 
-const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (
+const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string, fromName: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (
      <Card className="flex items-center p-4 gap-4">
         <Avatar>
             <AvatarImage src={req.fromAvatar} />
@@ -80,7 +80,7 @@ const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest
             <p className="text-xs text-muted-foreground">Wants to be your friend.</p>
         </div>
         <div className="flex gap-2">
-            <Button size="sm" onClick={() => onAccept(req.id, req.fromId)} disabled={loading}>Accept</Button>
+            <Button size="sm" onClick={() => onAccept(req.id, req.fromId, req.fromName)} disabled={loading}>Accept</Button>
             <Button size="sm" variant="destructive" onClick={() => onDecline(req.id)} disabled={loading}>Decline</Button>
         </div>
     </Card>
@@ -112,10 +112,8 @@ export default function FriendsPage() {
     const fetchSuggestions = useCallback(async () => {
         if(!user || !userData) return;
         
-        // Create a list of users to exclude (current user + their friends)
         const excludeIds = [user.uid, ...(userData.friends || [])];
         
-        // To query with 'not-in', the list cannot be empty.
         if (excludeIds.length === 0) excludeIds.push('dummy-id');
         
         const q = query(collection(db, 'users'), where('uid', 'not-in', excludeIds), limit(20));
@@ -182,6 +180,17 @@ export default function FriendsPage() {
                 status: 'pending',
                 createdAt: serverTimestamp(),
             });
+
+            await addDoc(collection(db, 'notifications'), {
+                userId: targetId,
+                title: "New Friend Request",
+                description: `${userData.firstName} ${userData.lastName} wants to be your friend.`,
+                href: '/dashboard/friends',
+                createdAt: serverTimestamp(),
+                read: false,
+            });
+
+
             toast({ title: 'Request Sent!', description: `Friend request sent to ${targetName}.` });
         } catch (e) {
             console.error(e);
@@ -191,8 +200,8 @@ export default function FriendsPage() {
         }
     }
     
-     const handleAcceptRequest = async (requestId: string, fromId: string) => {
-        if (!user) return;
+     const handleAcceptRequest = async (requestId: string, fromId: string, fromName: string) => {
+        if (!user || !userData) return;
         setActionLoading(requestId);
         const batch = writeBatch(db);
 
@@ -207,7 +216,17 @@ export default function FriendsPage() {
         
         try {
              await batch.commit();
-             toast({ title: "Friend Added!", description: "You are now friends." });
+
+             await addDoc(collection(db, 'notifications'), {
+                userId: fromId,
+                title: "Friend Request Accepted",
+                description: `${userData.firstName} ${userData.lastName} accepted your friend request.`,
+                href: `/dashboard/chat`,
+                createdAt: serverTimestamp(),
+                read: false,
+            });
+
+             toast({ title: "Friend Added!", description: `You are now friends with ${fromName}.` });
              fetchFriends();
         } catch (e) {
             console.error(e);
@@ -358,5 +377,3 @@ export default function FriendsPage() {
         </div>
     )
 }
-
-    

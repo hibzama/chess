@@ -5,13 +5,17 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2 } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import MobileBottomNav from "./mobile-bottom-nav";
+import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { formatDistanceToNowStrict } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 
 const Logo = () => (
@@ -28,6 +32,83 @@ const Logo = () => (
       />
     </svg>
   );
+
+type Notification = {
+    id: string;
+    title: string;
+    description: string;
+    createdAt: any;
+    read: boolean;
+    href?: string;
+}
+
+const NotificationBell = () => {
+    const { user } = useAuth();
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!user) return;
+        const q = query(
+            collection(db, 'notifications'), 
+            where('userId', '==', user.uid), 
+            orderBy('createdAt', 'desc'),
+            limit(10)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const notifs = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
+            setNotifications(notifs);
+            setUnreadCount(notifs.filter(n => !n.read).length);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    const handleNotificationClick = async (notification: Notification) => {
+        if (!notification.read) {
+            await updateDoc(doc(db, 'notifications', notification.id), { read: true });
+        }
+        if (notification.href) {
+            router.push(notification.href);
+        }
+    }
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative">
+                    <Bell />
+                    {unreadCount > 0 && (
+                        <div className="absolute top-1 right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center">
+                            {unreadCount}
+                        </div>
+                    )}
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {notifications.length > 0 ? (
+                    notifications.map(n => (
+                        <DropdownMenuItem key={n.id} onClick={() => handleNotificationClick(n)} className={cn("flex items-start gap-3 cursor-pointer", !n.read && "bg-primary/10")}>
+                           {!n.read && <Circle className="w-2 h-2 mt-1.5 text-primary fill-current" />}
+                            <div className={cn("flex-1 space-y-1", n.read && "pl-5")}>
+                                <p className="font-semibold">{n.title}</p>
+                                <p className="text-xs text-muted-foreground">{n.description}</p>
+                                <p className="text-xs text-muted-foreground">{formatDistanceToNowStrict(n.createdAt.toDate(), { addSuffix: true })}</p>
+                            </div>
+                        </DropdownMenuItem>
+                    ))
+                ) : (
+                    <DropdownMenuItem disabled>No new notifications</DropdownMenuItem>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+};
+
 
 export default function MainLayout({
     children,
@@ -158,7 +239,7 @@ export default function MainLayout({
                               </Card>
                           </Link>
                        </div>
-                        <Button variant="ghost" size="icon"><Bell /></Button>
+                        <NotificationBell />
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <button>
@@ -191,4 +272,3 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
-

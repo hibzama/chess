@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, doc, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, addDoc, query, orderBy, onSnapshot, serverTimestamp, Timestamp, getDoc, updateDoc, where, getDocs, limit } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -29,7 +29,7 @@ type OtherUser = {
 export default function ChatPage() {
     const { chatId } = useParams();
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [messages, setMessages] = useState<Message[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
@@ -43,7 +43,6 @@ export default function ChatPage() {
 
         const chatRef = doc(db, 'chats', chatId as string);
 
-        // Mark messages as read when component mounts
         updateDoc(chatRef, { [`users.${user.uid}.hasUnread`]: false }).catch(e => console.log("Failed to mark as read initially:", e));
 
         const unsubscribeChat = onSnapshot(chatRef, (docSnap) => {
@@ -52,7 +51,7 @@ export default function ChatPage() {
                 const otherUserId = Object.keys(chatData.users).find(uid => uid !== user.uid);
 
                 if (!otherUserId || !chatData.users[otherUserId].exists) {
-                    router.push('/dashboard/chat'); // Not a member of this chat
+                    router.push('/dashboard/chat');
                     return;
                 }
                 
@@ -88,11 +87,12 @@ export default function ChatPage() {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !user || !chatId || !otherUserIdRef.current) return;
+        if (!newMessage.trim() || !user || !chatId || !otherUserIdRef.current || !userData) return;
 
         setIsSending(true);
         const messagesRef = collection(db, 'chats', chatId as string, 'messages');
         const chatRef = doc(db, 'chats', chatId as string);
+        const recipientId = otherUserIdRef.current;
 
         try {
             await addDoc(messagesRef, {
@@ -106,8 +106,29 @@ export default function ChatPage() {
                     senderId: user.uid,
                     timestamp: serverTimestamp(),
                 },
-                [`users.${otherUserIdRef.current}.hasUnread`]: true,
+                [`users.${recipientId}.hasUnread`]: true,
             })
+
+            // Check if we need to send a notification
+            const notifQuery = query(
+                collection(db, 'notifications'), 
+                where('userId', '==', recipientId), 
+                where('contextId', '==', chatId), 
+                limit(1)
+            );
+            const notifSnapshot = await getDocs(notifQuery);
+            if (notifSnapshot.empty) { // Only send if no recent notification for this chat exists
+                 await addDoc(collection(db, 'notifications'), {
+                    userId: recipientId,
+                    title: "New Message",
+                    description: `You have a new message from ${userData.firstName}.`,
+                    href: `/dashboard/chat/${chatId}`,
+                    createdAt: serverTimestamp(),
+                    read: false,
+                    contextId: chatId, // Add context to prevent spamming
+                });
+            }
+
             setNewMessage('');
         } catch (error) {
             console.error("Error sending message:", error);
@@ -180,5 +201,3 @@ export default function ChatPage() {
         </Card>
     );
 }
-
-    
