@@ -45,6 +45,7 @@ interface UserData {
     friends?: string[];
     status?: 'online' | 'offline';
     lastSeen?: any;
+    wins?: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -156,5 +157,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-    

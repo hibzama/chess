@@ -110,9 +110,14 @@ export default function ProfilePage() {
             );
             const gamesSnapshot = await getDocs(gamesQuery);
 
+            let wins = 0;
             const history: Game[] = [];
             gamesSnapshot.forEach(doc => {
-                history.push({ ...doc.data(), id: doc.id } as Game);
+                const game = { ...doc.data(), id: doc.id } as Game;
+                if (!game.draw && game.winner?.uid === user.uid) {
+                    wins++;
+                }
+                history.push(game);
             });
             
             setGameHistory(history.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
@@ -121,20 +126,24 @@ export default function ProfilePage() {
             const allUsersSnapshot = await getDocs(allUsersCollection);
             const allUsers = allUsersSnapshot.docs.map(doc => {
                 const data = doc.data();
-                const wins = (data.chessStats?.wins || 0) + (data.checkersStats?.wins || 0); // Placeholder
-                return { uid: doc.id, wins };
+                const totalWins = data.wins || 0; // Assuming 'wins' is a field on the user doc
+                return { uid: doc.id, wins: totalWins };
             });
 
             allUsers.sort((a, b) => b.wins - a.wins);
             const rank = allUsers.findIndex(u => u.uid === user.uid) + 1;
             setWorldRank(rank > 0 ? rank : null);
 
+            // Update user's win count in firestore if it's different
+            if(userData?.wins !== wins) {
+                await updateDoc(doc(db, 'users', user.uid), { wins });
+            }
 
             setStatsLoading(false);
         };
 
         fetchGameData();
-    }, [user]);
+    }, [user, userData]);
 
      const { chess: chessStats, checkers: checkersStats, totalWins } = useMemo(() => {
         const stats: { chess: GameStats, checkers: GameStats, totalWins: number } = {
@@ -168,10 +177,10 @@ export default function ProfilePage() {
         });
 
         if (stats.chess.played > 0) {
-            stats.chess.winRate = Math.round((stats.chess.wins / stats.chess.played) * 100);
+            stats.chess.winRate = Math.round((stats.chess.wins / (stats.chess.played - stats.chess.draws)) * 100) || 0;
         }
         if (stats.checkers.played > 0) {
-            stats.checkers.winRate = Math.round((stats.checkers.wins / stats.checkers.played) * 100);
+            stats.checkers.winRate = Math.round((stats.checkers.wins / (stats.checkers.played - stats.checkers.draws)) * 100) || 0;
         }
 
         return stats;
@@ -183,9 +192,9 @@ export default function ProfilePage() {
         const nextRank = ranks[ranks.length - currentRankIndex] || null;
         const winsInLevel = totalWins - rank.minWins;
         const winsToNext = nextRank ? nextRank.minWins - rank.minWins : 0;
-        const progress = winsToNext > 0 ? Math.round((winsInLevel / winsToNext) * 100) : 100;
+        const progressValue = winsToNext > 0 ? Math.round((winsInLevel / winsToNext) * 100) : 100;
 
-        return { rank, nextRank, winsToNextLevel: winsToNext, progress };
+        return { rank, nextRank, winsToNextLevel: winsToNext, progress: progressValue };
     }, [totalWins]);
 
     const handleAvatarSave = async () => {
@@ -217,7 +226,7 @@ export default function ProfilePage() {
         setIsSendingReset(true);
         try {
             await sendPasswordResetEmail(auth, user.email);
-            toast({ title: "Email Sent", description: "A password reset link has been sent to your email address." });
+            toast({ title: "Email Sent", description: "A password reset link has been sent to your registered email address." });
         } catch (error) {
             console.error("Password reset failed:", error);
             toast({ variant: 'destructive', title: "Error", description: "Failed to send password reset email." });
@@ -235,14 +244,14 @@ export default function ProfilePage() {
     if (authLoading || statsLoading) {
         return <Skeleton className="w-full h-[600px]" />
     }
-
+    
     const overallWinRate = () => {
-        const rates = [];
-        if (chessStats?.winRate > 0) rates.push(chessStats.winRate);
-        if (checkersStats?.winRate > 0) rates.push(checkersStats.winRate);
-        if (rates.length === 0) return 0;
-        return rates.reduce((a, b) => a + b, 0) / rates.length;
-    };
+        const totalPlayed = chessStats.played + checkersStats.played;
+        if (totalPlayed === 0) return 0;
+        const totalNonDraws = totalPlayed - (chessStats.draws + checkersStats.draws);
+        if (totalNonDraws === 0) return 0;
+        return Math.round((totalWins / totalNonDraws) * 100);
+    }
 
     return (
         <div className="space-y-6">
@@ -325,7 +334,7 @@ export default function ProfilePage() {
                              <div className="mt-4">
                                 <Progress value={progress} className="h-2" />
                                 <p className="text-xs text-muted-foreground text-right mt-1">
-                                    {nextRank ? `${totalWins - rank.minWins} / ${winsToNextLevel} wins to next level` : `Max rank achieved!`}
+                                    {nextRank ? `${totalWins - rank.minWins} / ${winsToNextLevel} wins to ${nextRank.title}` : `Max rank achieved!`}
                                 </p>
                              </div>
 
@@ -416,5 +425,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-    

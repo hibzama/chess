@@ -95,7 +95,7 @@ export default function MainLayout({
                                     <Link href="/dashboard/friends"><SidebarMenuButton tooltip="Friends & Community" isActive={isMounted && pathname.startsWith('/dashboard/friends')}><Users /><span>Friends & Community</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <SidebarMenuButton tooltip="Rankings"><Trophy /><span>Rankings</span></SidebarMenuButton>
+                                    <Link href="/dashboard/rankings"><SidebarMenuButton tooltip="Rankings" isActive={isMounted && pathname.startsWith('/dashboard/rankings')}><Trophy /><span>Rankings</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={isMounted && pathname === '/dashboard/equipment'}><Swords /><span>My Equipment</span></SidebarMenuButton></Link>
@@ -173,5 +173,3 @@ export default function MainLayout({
         </SidebarProvider>
     )
   }
-
-    
