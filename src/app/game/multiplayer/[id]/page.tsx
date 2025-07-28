@@ -5,8 +5,9 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
+import { getDatabase, ref, get } from "firebase/database";
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -200,6 +201,7 @@ function MultiplayerGamePageContent() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
+        const userRef = doc(db, 'users', user.uid);
     
         try {
             const roomDoc = await getDoc(roomRef);
@@ -208,12 +210,17 @@ function MultiplayerGamePageContent() {
                 return;
             }
     
-            await deleteDoc(roomRef);
+            const batch = writeBatch(db);
+            batch.delete(roomRef);
+            if(room.wager > 0) {
+                 batch.update(userRef, { balance: increment(room.wager) });
+            }
+            await batch.commit();
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -262,6 +269,19 @@ function MultiplayerGamePageContent() {
         const roomRef = doc(db, 'game_rooms', room.id);
 
         try {
+
+            // Presence Check
+            const rtdb = getDatabase();
+            const creatorStatusRef = ref(rtdb, `/status/${room.createdBy.uid}`);
+            const creatorStatusSnapshot = await get(creatorStatusRef);
+            if (!creatorStatusSnapshot.exists() || creatorStatusSnapshot.val().state !== 'online') {
+                await deleteDoc(roomRef);
+                toast({ variant: "destructive", title: "Opponent Offline", description: "The creator is no longer active. This room has been closed." });
+                router.push(`/lobby/${room.gameType}`);
+                setIsJoining(false);
+                return;
+            }
+
             await runTransaction(db, async (transaction) => {
                 const currentRoomDoc = await transaction.get(roomRef);
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
