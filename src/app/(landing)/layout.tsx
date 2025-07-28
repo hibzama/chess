@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy } from "lucide-react";
+import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DollarSign, Network, Sword } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const Logo = () => (
     <div className="flex items-center gap-2 text-2xl font-bold">
@@ -156,6 +157,87 @@ export default function LandingLayout({
                     <Button asChild>
                         <Link href="/register">Sign Up</Link>
                     </Button>
+                     <Sheet>
+                        <SheetTrigger asChild>
+                            <Button variant="outline" size="icon" className="md:hidden">
+                                <Menu />
+                                <span className="sr-only">Toggle navigation menu</span>
+                            </Button>
+                        </SheetTrigger>
+                        <SheetContent side="left">
+                             <nav className="grid gap-6 text-lg font-medium mt-12">
+                                <Dialog>
+                                    <DialogTrigger asChild><button className="hover:text-primary text-left">About Us</button></DialogTrigger>
+                                     <DialogContent className="max-w-2xl">
+                                        <DialogHeader>
+                                            <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
+                                            <DialogDescription>The ultimate platform where skill meets investment.</DialogDescription>
+                                        </DialogHeader>
+                                        <ScrollArea className="h-[60vh] p-4">
+                                            <div className="space-y-6">
+                                            {aboutSections.map(section => (
+                                                <div key={section.title}>
+                                                    <h3 className="font-semibold text-lg flex items-center gap-3 mb-2 text-primary">
+                                                        <section.icon className="w-5 h-5"/>
+                                                        {section.title}
+                                                    </h3>
+                                                    <p className="text-sm text-muted-foreground">{section.content}</p>
+                                                    {section.link && (
+                                                        <Link href={section.link} className="text-primary font-semibold hover:underline mt-2 inline-block text-sm">
+                                                            {section.linkText} &rarr;
+                                                        </Link>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            </div>
+                                        </ScrollArea>
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog>
+                                    <DialogTrigger asChild><button className="hover:text-primary text-left">Support</button></DialogTrigger>
+                                     <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
+                                            <DialogDescription>
+                                                Have an issue? Reach out to us through any of the channels below.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                                <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
+                                            </Button>
+                                            <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                                <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
+                                            </Button>
+                                            <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                                <a href="mailto:nexbattlehelp@gmail.com"><Mail/> nexbattlehelp@gmail.com</a>
+                                            </Button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                                <Dialog>
+                                    <DialogTrigger asChild><button className="hover:text-primary text-left">Join Marketing Team</button></DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle className="flex items-center gap-2"><Trophy/> Join the Marketing Team</DialogTitle>
+                                            <DialogDescription>
+                                                Supercharge your earnings by joining our official Marketing Partner program.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <Card className="bg-primary/5 border-primary/20 mt-4">
+                                            <CardContent className="p-6 text-sm space-y-4">
+                                                <p>Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.</p>
+                                                <p className="text-muted-foreground">If you are a community builder with a vision for growth, we want you on our team. Apply now to get started.</p>
+                                                 <Button asChild className="w-full">
+                                                    <Link href="/marketing/register">Apply to be a Marketer</Link>
+                                                </Button>
+                                            </CardContent>
+                                        </Card>
+                                    </DialogContent>
+                                </Dialog>
+                            </nav>
+                        </SheetContent>
+                    </Sheet>
                 </div>
             </header>
             <main className="flex-1">
