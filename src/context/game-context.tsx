@@ -200,8 +200,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             });
             return payoutResult;
         } catch (error) {
-            console.error("Payout Transaction failed:", error);
-            // Don't change UI state on error, let the onSnapshot handle it
+            if (String(error) !== 'Payout already processed') {
+                 console.error("Payout Transaction failed:", error);
+            }
             return { myPayout: 0 };
         }
     }, [user, roomId]);
