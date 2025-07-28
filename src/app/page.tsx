@@ -8,8 +8,8 @@ import { BonusCard } from './bonus-card';
 import Image from 'next/image';
 
 const HeroIcon = () => (
-    <div className="w-full h-full">
-        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full animate-zoom-in-out">
+    <div>
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full animate-zoom-in-out" style={{ overflow: 'visible' }}>
             <defs>
                 <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
                     <stop offset="0%" style={{stopColor: 'hsl(326, 100%, 50%)', stopOpacity: 0.8}} />
