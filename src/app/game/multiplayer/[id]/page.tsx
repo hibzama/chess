@@ -171,7 +171,7 @@ function MultiplayerGamePageContent() {
                 
                 if (roomData.status === 'completed') {
                     setRoom(roomData);
-                }
+                } 
                 else if (roomData.status === 'waiting' && roomData.createdBy.uid !== user.uid) {
                     setRoom(roomData);
                 } 
@@ -564,4 +564,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
