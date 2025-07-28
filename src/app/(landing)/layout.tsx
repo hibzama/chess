@@ -15,13 +15,19 @@ const Logo = () => (
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="w-8 h-8"
+            className="w-8 h-8 text-primary"
         >
             <circle cx="12" cy="12" r="10" />
             <path d="m14.5 9.5-5 5" />
             <path d="m9.5 9.5 5 5" />
+            <path d="M12 3v1" />
+            <path d="M12 20v1" />
+            <path d="m5 7 1-1" />
+            <path d="m18 18 1-1" />
+            <path d="m5 17 1 1" />
+            <path d="m18 6-1 1" />
         </svg>
-        <span>GO</span>
+        <span>Nexbattle</span>
     </div>
 );
 
@@ -38,7 +44,7 @@ export default function LandingLayout({
     children: React.ReactNode
   }) {
     return (
-        <div className="flex flex-col min-h-screen bg-gradient-to-r from-[#2a003f] to-[#340064]">
+        <div className="flex flex-col min-h-screen bg-gradient-to-r from-[#2a003f] to-[#340064] text-white">
             <header className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
                  <Link href="/" className="flex items-center gap-2 font-bold">
                     <Logo />

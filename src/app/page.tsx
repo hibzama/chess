@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, CheckCircle } from 'lucide-react';
 import { BonusCard } from './bonus-card';
 import Image from 'next/image';
 
@@ -82,6 +82,34 @@ export default function LandingPage() {
             </div>
         </section>
       </main>
+       <section className="py-20 px-4">
+          <div className="container mx-auto grid grid-cols-1 md:grid-cols-2 items-center gap-12">
+              <div>
+                  <p className="font-semibold text-primary">BECOME TODAY A NEXBATTLE PARTNER</p>
+                  <h2 className="text-4xl lg:text-5xl font-bold leading-tight mt-2">Your Skill is Your Investment</h2>
+                  <p className="mt-4 text-muted-foreground">
+                      Your earnings are unlimited and have no restrictions. Promote Nexbattle and start increasing your earnings today!
+                  </p>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
+                      <li className="flex items-center gap-2"><CheckCircle className="text-green-500"/> High Conversion</li>
+                      <li className="flex items-center gap-2"><CheckCircle className="text-green-500"/> Profitable Commission</li>
+                      <li className="flex items-center gap-2"><CheckCircle className="text-green-500"/> Real-Time Statistics</li>
+                      <li className="flex items-center gap-2"><CheckCircle className="text-green-500"/> Marketing Support</li>
+                  </ul>
+                  <div className="flex flex-col sm:flex-row gap-4 mt-8">
+                      <Button asChild size="lg">
+                          <Link href="/marketing/register">Become a Partner</Link>
+                      </Button>
+                      <Button asChild size="lg" variant="outline">
+                          <a href="#"><Download/> Download APK</a>
+                      </Button>
+                  </div>
+              </div>
+               <div className="hidden md:block">
+                  {/* You can add an image or another icon here if you like */}
+               </div>
+          </div>
+      </section>
     </div>
   );
 }
