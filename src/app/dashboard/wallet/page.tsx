@@ -267,17 +267,18 @@ export default function WalletPage() {
                                 <div>
                                     <Label>Binance PayID</Label>
                                     <div className="flex items-center gap-2">
-                                        <Input readOnly value="123456789" />
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard('123456789', 'PayID')}><Copy/></Button>
+                                        <Input readOnly value="38881724" />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard('38881724', 'PayID')}><Copy/></Button>
                                     </div>
                                 </div>
                              </Card>
                         )}
                         {depositMethod === 'bank' && (
                              <Card className="p-4 bg-card/50 space-y-4">
-                                <p className="text-sm font-semibold">Bank: Commercial Bank</p>
-                                <p className="text-sm font-semibold">Account: 100012345678</p>
-                                <p className="text-sm font-semibold">Name: Nexbattle Pvt Ltd</p>
+                                <p className="text-sm font-semibold">Bank: BOC</p>
+                                <p className="text-sm font-semibold">Branch: Galenbidunuwewa</p>
+                                <p className="text-sm font-semibold">Name: Jd Aththanayaka</p>
+                                <p className="text-sm font-semibold">Account: 81793729</p>
                              </Card>
                         )}
                         
