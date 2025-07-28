@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -36,13 +37,13 @@ const HeroIcon = () => (
                 <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.5)" strokeWidth="1" rx="5"/>
              </g>
 
-             <g transform="translate(-25, -20) scale(1.5)" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.5)" strokeWidth="0.5" strokeLinejoin="round">
-                {/* King */}
-                <path d="M9,36h27v-3H9v3z M12.5,30.5h20v-2.5h-20V30.5z M12.5,15.5l-3,3l-3-3l3-3L12.5,15.5z M32.5,15.5l-3,3l-3-3l3-3L32.5,15.5z M22.5,15.5l-3,3l-3-3l3-3L22.5,15.5z M12.5,28h20v-8l-7.5-5.5h-5L12.5,20V28z"/>
+             <g transform="translate(-10, -15) scale(1.8)" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.5)" strokeWidth="0.5" strokeLinejoin="round">
+                {/* Dollar Sign */}
+                <path d="M17.5 22.5c-2.49 0-4.5-2.01-4.5-4.5s2.01-4.5 4.5-4.5c1.2 0 2.29.47 3.11 1.24.63-.43 1.38-.74 2.19-.74 1.93 0 3.5 1.57 3.5 3.5 0 1.29-.71 2.42-1.75 3.03.11.2.25.4.25.66 0 .83-.67 1.5-1.5 1.5h-5.8zm-1.5-3.5c0 .83.67 1.5 1.5 1.5h1.5v-3h-1.5c-.83 0-1.5.67-1.5 1.5zm6.5-1c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zM20 12v-1.5h-5V12h5zm0 13v-1.5h-5V25h5z" />
              </g>
-              <g transform="translate(20, 5) scale(1.2)" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" strokeLinejoin="round">
-                {/* Knight */}
-                <path d="M22,10C32.02,10,32.02,24.33,32.02,24.33C32.02,24.33,26.01,27.33,26.01,27.33L25.01,29.33L32.02,31.33L32.02,36.33L12,36.33L12,32.33L18,29.33L18,10L22,10z"/>
+              <g transform="translate(20, 15) scale(1.3)" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" strokeLinejoin="round">
+                {/* Dollar sign */}
+                <path d="M17.5 22.5c-2.49 0-4.5-2.01-4.5-4.5s2.01-4.5 4.5-4.5c1.2 0 2.29.47 3.11 1.24.63-.43 1.38-.74 2.19-.74 1.93 0 3.5 1.57 3.5 3.5 0 1.29-.71 2.42-1.75 3.03.11.2.25.4.25.66 0 .83-.67 1.5-1.5 1.5h-5.8zm-1.5-3.5c0 .83.67 1.5 1.5 1.5h1.5v-3h-1.5c-.83 0-1.5.67-1.5 1.5zm6.5-1c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zM20 12v-1.5h-5V12h5zm0 13v-1.5h-5V25h5z" />
              </g>
         </g>
         
