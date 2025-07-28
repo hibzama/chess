@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -18,7 +19,7 @@ export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <main className="flex-1 flex flex-col items-center justify-center p-4 text-center" style={{ 
-          backgroundImage: "url('/background-pattern.svg')", 
+          backgroundImage: "url('/hero-background.svg')", 
           backgroundSize: 'cover', 
           backgroundPosition: 'center'
       }}>
@@ -44,7 +45,7 @@ export default function LandingPage() {
                      <Button asChild variant="outline" size="lg" className="px-12"
                         onClick={() => window.open('https://jani20001212.itch.io/nebattle', '_blank')}
                      >
-                        <Download className="mr-2"/> Download APK
+                        <span><Download className="mr-2"/> Download APK</span>
                     </Button>
                 </div>
             </div>
