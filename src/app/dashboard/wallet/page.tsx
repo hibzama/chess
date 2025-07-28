@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle, Swords, Trophy } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle, Swords, Trophy, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -363,22 +363,13 @@ export default function WalletPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[400px]">
-                        <Table>
-                            <TableHeader>
-                            <TableRow>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead>Status</TableHead>
-                            </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                        <div className="space-y-4">
                             {loading ? (
-                                <TableRow><TableCell colSpan={4} className="text-center">Loading history...</TableCell></TableRow>
+                                <p className="text-center">Loading history...</p>
                             ) : transactions.length > 0 ? (
                                 transactions.map(tx => (
-                                <TableRow key={tx.id}>
-                                    <TableCell>
+                                <Card key={tx.id} className="p-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
                                         <div className="flex items-center gap-2">
                                             {getTransactionIcon(tx.type)}
                                             <div>
@@ -386,25 +377,44 @@ export default function WalletPage() {
                                                 {tx.description && <p className="text-xs text-muted-foreground">{tx.description}</p>}
                                             </div>
                                         </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="font-medium">LKR {tx.amount.toFixed(2)}</div>
-                                        <div className="text-xs text-muted-foreground">~{(tx.amount / USDT_RATE).toFixed(2)} USDT</div>
-                                    </TableCell>
-                                    <TableCell>{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={tx.status === 'approved' || tx.status === 'completed' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">
-                                            {getStatusIcon(tx.status)}
-                                            <span className="capitalize">{tx.status}</span>
-                                        </Badge>
-                                    </TableCell>
-                                </TableRow>
+                                        <div>
+                                            <div className="font-medium">LKR {tx.amount.toFixed(2)}</div>
+                                            <div className="text-xs text-muted-foreground">~{(tx.amount / USDT_RATE).toFixed(2)} USDT</div>
+                                        </div>
+                                        <div className="text-muted-foreground text-sm">{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</div>
+                                        <div>
+                                            <Badge variant={tx.status === 'approved' || tx.status === 'completed' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">
+                                                {getStatusIcon(tx.status)}
+                                                <span className="capitalize">{tx.status}</span>
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    {tx.type === 'deposit' && tx.status === 'pending' && (
+                                        <div className="mt-4 p-3 rounded-md bg-secondary space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Info className="w-4 h-4 text-primary" />
+                                                <p className="text-sm font-semibold">For faster approval, send a screenshot to support.</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" asChild className="w-full bg-green-600 hover:bg-green-700">
+                                                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer">
+                                                        <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+                                                    </a>
+                                                </Button>
+                                                <Button size="sm" asChild className="w-full bg-blue-500 hover:bg-blue-600">
+                                                    <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">
+                                                        <TelegramIcon className="mr-2 h-4 w-4" /> Telegram
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </Card>
                                 ))
                             ) : (
-                                <TableRow><TableCell colSpan={4} className="text-center">No transactions yet.</TableCell></TableRow>
+                                <p className="text-center h-24 flex items-center justify-center text-muted-foreground">No transactions yet.</p>
                             )}
-                            </TableBody>
-                        </Table>
+                        </div>
                     </ScrollArea>
                 </CardContent>
             </Card>
