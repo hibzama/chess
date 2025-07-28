@@ -59,22 +59,26 @@ export default function LandingPage() {
       <main className="flex-1 flex items-center justify-center p-4">
         <section className="container mx-auto grid grid-cols-1 md:grid-cols-2 items-center gap-12">
             <div className="hero-text text-center md:text-left">
+                <p className="font-bold text-primary mb-2">BECOME TODAY A NEXBATTLE PARTNER</p>
                 <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
-                    <span className="text-accent">ENRICHING</span><br/>YOUR PLAY
+                    Your Skill is Your Investment
                 </h1>
                 <p className="my-6 text-lg text-muted-foreground">
-                   Welcome to the ultimate strategy gaming experience. Your skill is your greatest asset. Compete, conquer, and earn on a secure platform built for champions.
+                   Your earnings are unlimited and have no restrictions. Promote Nexbattle and start increasing your earnings today!
                 </p>
+                <ul className="grid grid-cols-2 gap-4 text-left mb-8">
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> High Conversion</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> Profitable Commission</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> Real-Time Statistics</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> Marketing Support</li>
+                </ul>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-                    <Button asChild size="lg" className="bg-[#00e1ff] text-black hover:bg-[#00e1ff]/80">
-                        <Link href="/about">READ MORE</Link>
+                    <Button asChild size="lg">
+                        <Link href="/marketing/register">Become a Partner</Link>
                     </Button>
-                     <Button asChild size="lg">
-                        <Link href="/register">Get Started</Link>
+                     <Button asChild size="lg" variant="outline">
+                        <Link href="#"><Download className="mr-2"/> Download APK</Link>
                     </Button>
-                </div>
-                 <div className="mt-8">
-                    <BonusCard />
                 </div>
             </div>
             <div className="hero-image">
