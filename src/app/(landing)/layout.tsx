@@ -2,29 +2,17 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { LifeBuoy, Phone, Mail, Megaphone } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Logo = () => (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="w-8 h-8 text-primary"
+      viewBox="0 0 100 28"
+      fill="currentColor"
+      className="w-24 h-7 text-primary"
     >
-        <circle cx="12" cy="12" r="10" />
-        <path d="m14.5 9.5-5 5" />
-        <path d="m9.5 9.5 5 5" />
-        <path d="M12 3v1" />
-        <path d="M12 20v1" />
-        <path d="m5 7 1-1" />
-        <path d="m18 18 1-1" />
-        <path d="m5 17 1 1" />
-        <path d="m18 6-1 1" />
+      <path d="M14 0C6.268 0 0 6.268 0 14s6.268 14 14 14c4.695 0 8.826-2.28 11.458-5.795a1 1 0 00-1.464-1.362A12 12 0 1114 2a1 1 0 000-2zM42.857 0h14.286v28h-14.286V0zM64.285 0h14.286v28h-14.286V0zM85.714 0h14.286v28H85.714V0zM21.285 7h14.286v14H21.285V7z" />
     </svg>
   );
 
@@ -47,17 +35,11 @@ export default function LandingLayout({
                     <div className="container mx-auto flex h-16 items-center justify-between px-4">
                          <Link href="/" className="flex items-center gap-2 font-bold">
                             <Logo />
-                            <span>Nexbattle</span>
                         </Link>
                          <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-                            <Link href="/" className="hover:text-primary">Home</Link>
-                            <Link href="/about" className="hover:text-primary">About Us</Link>
-                             <DialogTrigger asChild>
-                                <button className="hover:text-primary">Marketing</button>
-                            </DialogTrigger>
-                             <DialogTrigger asChild>
-                                <button className="hover:text-primary">Support</button>
-                            </DialogTrigger>
+                            <DialogTrigger asChild><button className="hover:text-primary">About Us</button></DialogTrigger>
+                            <DialogTrigger asChild><button className="hover:text-primary">Support</button></DialogTrigger>
+                            <DialogTrigger asChild><button className="hover:text-primary">Join Marketing Team</button></DialogTrigger>
                         </nav>
                         <div className="flex items-center gap-2">
                              <Button variant="outline" asChild>
@@ -73,6 +55,15 @@ export default function LandingLayout({
                     {children}
                 </main>
             </div>
+             <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4 text-sm text-muted-foreground">
+                    <p>Nexbattle is the ultimate online arena where strategy, skill, and stakes collide. We provide a secure and engaging platform for Chess and Checkers enthusiasts to compete for real rewards, fostering a global community of strategic thinkers.</p>
+                    <p>Earn by winning games, referring friends, or joining our exclusive marketing team for deep referral networks and higher commissions.</p>
+                </div>
+            </DialogContent>
              <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
@@ -94,9 +85,9 @@ export default function LandingLayout({
             </DialogContent>
              <DialogContent>
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2"><Megaphone/> Become a Marketing Partner</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2"><Trophy/> Join the Marketing Team</DialogTitle>
                     <DialogDescription>
-                        Supercharge your earnings by joining our official Marketing Team.
+                        Supercharge your earnings by joining our official Marketing Partner program.
                     </DialogDescription>
                 </DialogHeader>
                 <Card className="bg-primary/5 border-primary/20 mt-4">
