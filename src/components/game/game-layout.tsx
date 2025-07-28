@@ -141,11 +141,11 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     <>
     <div className="absolute inset-0 z-0">
         <Image
-          src="https://allnews.ltd/wp-content/uploads/2025/07/geometric-gradient-technology-background_23-2149110132.avif"
+          src="https://allnews.ltd/wp-content/uploads/2025/07/beautiful-gradient-background_52683-82960.avif"
           alt="background"
           fill
           className="object-cover opacity-30"
-          data-ai-hint="geometric technology"
+          data-ai-hint="gradient abstract"
         />
         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
     </div>
