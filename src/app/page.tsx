@@ -21,29 +21,20 @@ const HeroIcon = () => (
                 </feMerge>
             </filter>
         </defs>
-
         <g fill="none" stroke="hsl(var(--primary))" strokeWidth="2">
-            
             <path d="M100,50 C50,50 50,150 100,150" opacity="0.3"/>
             <path d="M300,50 C350,50 350,150 300,150" opacity="0.3"/>
-            
             <path d="M 25,100 a 75,75 0 0,1 150,0" strokeWidth="1" opacity="0.2" />
             <path d="M 225,100 a 75,75 0 0,1 150,0" strokeWidth="1" opacity="0.2" />
-            
         </g>
-
-        
         <g filter="url(#neon-glow)" transform="translate(0, 5)">
             <path d="M 120 70 L 150 70 L 150 100 L 120 100 Z" fill="hsl(var(--primary))" opacity="0.8" />
             <path d="M 160 70 L 190 70 L 190 85 L 160 85 Z" fill="hsl(var(--primary))" opacity="0.8" />
             <path d="M 210 70 L 240 70 L 240 100 L 210 100 Z" fill="hsl(var(--primary))" opacity="0.8" />
-             <path d="M 250 70 L 280 70 L 280 85 L 250 85 Z" fill="hsl(var(--primary))" opacity="0.8" />
-
-
+            <path d="M 250 70 L 280 70 L 280 85 L 250 85 Z" fill="hsl(var(--primary))" opacity="0.8" />
             <rect x="175" y="110" width="50" height="20" rx="5" fill="hsl(var(--accent))" opacity="0.8"/>
             <circle cx="160" cy="120" r="5" fill="hsl(var(--accent))" opacity="0.8" />
             <circle cx="240" cy="120" r="5" fill="hsl(var(--accent))" opacity="0.8" />
-            
             <path d="M50 100 L 90 70 C 95 65, 105 65, 110 70 L 130 90" stroke="hsl(var(--accent))" strokeWidth="2.5" />
             <path d="M350 100 L 310 70 C 305 65, 295 65, 290 70 L 270 90" stroke="hsl(var(--accent))" strokeWidth="2.5" />
         </g>
@@ -72,7 +63,7 @@ export default function LandingPage() {
                     </Button>
                      <Button asChild variant="outline" size="lg" className="px-12">
                         <a href="https://jani20001212.itch.io/nebattle" target="_blank" rel="noopener noreferrer">
-                           <Download className="mr-2"/> Download APK
+                            <Download className="mr-2"/> Download APK
                         </a>
                     </Button>
                 </div>
