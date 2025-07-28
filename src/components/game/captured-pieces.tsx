@@ -31,9 +31,7 @@ export function CapturedPieces({ pieceStyle = 'black_white' }: CapturedPiecesPro
             <div className="p-2 bg-secondary rounded-md min-h-[44px] grid grid-cols-8 gap-1">
                 {pieces.map((piece, index) => (
                     <div key={index} className="w-8 h-8">
-                        <svg viewBox="0 0 45 45" className="w-full h-full">
-                            {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
-                        </svg>
+                       {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
                     </div>
                 ))}
             </div>

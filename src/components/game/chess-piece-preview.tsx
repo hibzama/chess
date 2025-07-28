@@ -41,9 +41,9 @@ export function ChessPiecePreview({ boardTheme = 'ocean', pieceStyle = 'black_wh
                     return (
                         <div key={`${rowIndex}-${colIndex}`} className={cn('w-full h-full flex items-center justify-center')} style={{backgroundColor: isLight ? theme.colors[0] : theme.colors[1]}}>
                            {piece && (
-                                <svg viewBox="0 0 45 45" className="w-full h-full p-1">
+                                <div className="w-full h-full p-1">
                                     {getPieceIcon(piece.type, piece.color === 'w' ? styles.colors[1] : styles.colors[0])}
-                                </svg>
+                                </div>
                            )}
                         </div>
                     )
