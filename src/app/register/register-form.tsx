@@ -10,6 +10,8 @@ import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Ban } from "lucide-react";
 
 
 export default function RegisterForm() {
@@ -133,12 +135,19 @@ export default function RegisterForm() {
       <Card className="w-full max-w-sm">
         <form onSubmit={handleRegister}>
             <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Sign Up</CardTitle>
+            <CardTitle className="text-2xl">Create an Account</CardTitle>
             <CardDescription>
-                Enter your information to create an account.
+                Enter your details to sign up.
             </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
+            <Alert variant="destructive">
+                <Ban className="h-4 w-4" />
+                <AlertTitle>Fair Play Policy</AlertTitle>
+                <AlertDescription>
+                    Creating multiple accounts from the same device is strictly prohibited and will result in suspension.
+                </AlertDescription>
+            </Alert>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                   <Label htmlFor="first-name">First name</Label>
