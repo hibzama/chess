@@ -55,17 +55,17 @@ const ranks = [
 ];
 
 const boyAvatars = [
-    'https://i.ibb.co/6n20Ncc/boy-1.png',
-    'https://i.ibb.co/3kC6vfb/boy-2.png',
-    'https://i.ibb.co/P9pBzTA/boy-3.png',
-    'https://i.ibb.co/3fLg8gW/boy-4.png',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/boy-1.png?alt=media&token=e93e5088-297c-4767-9689-e152e259160d',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/boy-2.png?alt=media&token=c198f1f5-e40a-4286-8f3e-5163a38a7199',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/boy-3.png?alt=media&token=0b68a576-9d47-4977-8356-89a3a111867c',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/boy-4.png?alt=media&token=2620f508-4148-4340-9755-901b87a810c9',
 ];
 
 const girlAvatars = [
-    'https://i.ibb.co/Sns5pTT/girl-1.png',
-    'https://i.ibb.co/yQW0kH4/girl-2.png',
-    'https://i.ibb.co/mBv06nB/girl-3.png',
-    'https://i.ibb.co/k8bJgBx/girl-4.png',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/girl-1.png?alt=media&token=3532f831-2946-4595-8178-574f5195393a',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/girl-2.png?alt=media&token=c633a6b5-021c-43f9-ac6d-1f6da21a2491',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/girl-3.png?alt=media&token=189dd1a7-195b-4e6f-8a5b-1b64cf634731',
+    'https://firebasestorage.googleapis.com/v0/b/mainnextbattle.appspot.com/o/girl-4.png?alt=media&token=73792b3a-aa11-4045-a74c-47343e061806',
 ];
 
 
@@ -427,3 +427,5 @@ export default function ProfilePage() {
 
     
 }
+
+    
