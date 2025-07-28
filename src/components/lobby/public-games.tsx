@@ -1,4 +1,5 @@
 
+
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -32,7 +33,8 @@ export default function PublicGames({ gameType }: { gameType: string }) {
             collection(db, 'game_rooms'), 
             where('gameType', '==', gameType),
             where('isPrivate', '==', false),
-            where('status', '==', 'waiting')
+            where('status', '==', 'waiting'),
+            where('expiresAt', '>', Timestamp.now())
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {

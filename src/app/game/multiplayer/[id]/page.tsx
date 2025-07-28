@@ -201,7 +201,6 @@ function MultiplayerGamePageContent() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
     
         try {
             const roomDoc = await getDoc(roomRef);
@@ -210,17 +209,12 @@ function MultiplayerGamePageContent() {
                 return;
             }
     
-            const batch = writeBatch(db);
-            batch.delete(roomRef);
-            if(room.wager > 0) {
-                 batch.update(userRef, { balance: increment(room.wager) });
-            }
-            await batch.commit();
+            await deleteDoc(roomRef);
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -570,3 +564,4 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
