@@ -74,30 +74,19 @@ export default function LandingLayout({
 
 
     return (
-        <div className="flex flex-col min-h-screen bg-gradient-to-r from-[#2a003f] to-[#340064] text-white relative">
-            <div 
-                className="absolute inset-0 z-0 opacity-10"
+        <div className="flex flex-col min-h-screen bg-[#0d041a] text-white relative">
+             <div 
+                className="absolute inset-0 z-0 opacity-40"
                 style={{
-                    backgroundImage: `
-                        radial-gradient(circle at top left, hsl(var(--primary) / 0.2), transparent 30%),
-                        radial-gradient(circle at bottom right, hsl(var(--accent) / 0.2), transparent 30%)
-                    `
+                    backgroundImage: `url(https://i.ibb.co/8M4x4pB/d236034f-039c-449b-8919-98336382e3f5.jpg)`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
                 }}
             />
-            <div 
-                className="absolute inset-0 z-0 opacity-5"
-                style={{
-                    backgroundImage: `
-                       linear-gradient(45deg, hsl(var(--primary)) 2px, transparent 2px),
-                       linear-gradient(-45deg, hsl(var(--primary)) 2px, transparent 2px)
-                    `,
-                    backgroundSize: '100px 100px',
-                    maskImage: 'linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)'
-                }}
-            />
+            <div className="absolute inset-0 z-10 bg-black/50" />
 
 
-            <header className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6 relative z-10">
+            <header className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6 relative z-20">
                  <Link href="/" className="flex items-center gap-2 font-bold">
                     <Logo />
                 </Link>
@@ -262,7 +251,7 @@ export default function LandingLayout({
                     </Sheet>
                 </div>
             </header>
-            <main className="flex-1 relative z-10">
+            <main className="flex-1 relative z-20">
                 {children}
             </main>
         </div>
