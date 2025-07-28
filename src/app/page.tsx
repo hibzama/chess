@@ -36,22 +36,29 @@ const HeroIcon = () => (
                 <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" rx="5"/>
              </g>
              
-             <g transform="translate(-10, -15) scale(1.8)" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.5)" strokeWidth="0.5" strokeLinejoin="round">
-                {/* Abstract shape 1 */}
-                <path d="M10 18 C 5 18, 5 12, 10 12 L 15 12 C 20 12, 20 18, 15 18 Z" />
-                <circle cx="12.5" cy="15" r="1.5" fill="black" />
-             </g>
-              <g transform="translate(20, 15) scale(1.3)" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" strokeLinejoin="round">
-                {/* Abstract shape 2 */}
-                <path d="M-5 28 C 0 28, 0 22, -5 22 L -10 22 C -15 22, -15 28, -10 28 Z" />
-                <circle cx="-7.5" cy="25" r="1.5" fill="white" />
+             {/* Abstract Pieces */}
+             <g>
+                {/* Top cyan circle */}
+                <circle cx="15" cy="-25" r="8" fill="#00e1ff" opacity="0.9" />
+                {/* Middle "eye" piece */}
+                <g transform="translate(25, 5)">
+                  <ellipse cx="0" cy="0" rx="12" ry="7" fill="white" />
+                  <circle cx="0" cy="0" r="5" fill="black" />
+                </g>
+                 {/* Bottom right cyan circle with border */}
+                <g transform="translate(38, 25)">
+                    <circle cx="0" cy="0" r="10" fill="#00e1ff" opacity="0.9" />
+                    <circle cx="0" cy="0" r="8" fill="none" stroke="white" strokeWidth="1.5" />
+                </g>
+                 {/* Bottom left small eye piece */}
+                 <g transform="translate(-20, 35)">
+                  <ellipse cx="0" cy="0" rx="8" ry="5" fill="white" />
+                  <circle cx="0" cy="0" r="3" fill="black" />
+                </g>
+                {/* Middle left yellow circle */}
+                <circle cx="-30" cy="10" r="6" fill="#fdee00" opacity="0.9" />
              </g>
         </g>
-        
-        <circle cx="160" cy="50" r="8" fill="hsl(187, 100%, 50%)" opacity="0.9" />
-        <circle cx="60" cy="150" r="6" fill="hsl(var(--accent))" opacity="0.9" />
-        <circle cx="135" cy="145" r="12" fill="hsl(187, 100%, 50%)" opacity="0.9" />
-        <circle cx="135" cy="145" r="9" fill="none" stroke="white" strokeWidth="1.5" />
     </svg>
 )
 
