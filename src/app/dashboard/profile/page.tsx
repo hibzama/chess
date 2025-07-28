@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { renderToString } from 'react-dom/server';
 
 
 type Game = {
@@ -54,19 +55,18 @@ const ranks = [
     { title: "Immortal", minWins: 91444, level: 100 },
 ];
 
-const boyAvatars = [
-    '/avatars/boy-1.png',
-    '/avatars/boy-2.png',
-    '/avatars/boy-3.png',
-    '/avatars/boy-4.png',
-];
+const BoyAvatar1 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#4a90e2"/><path d="M30,60 C40,70 60,70 70,60" stroke="#000" strokeWidth="3" fill="none"/><circle cx="35" cy="40" r="5" fill="#000"/><circle cx="65" cy="40" r="5" fill="#000"/><path d="M40 20 C 40 10, 60 10, 60 20" stroke="#000" strokeWidth="4" fill="none"/></g></svg>;
+const BoyAvatar2 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#50e3c2"/><path d="M35,65 Q50,55 65,65" stroke="#000" strokeWidth="3" fill="none"/><circle cx="35" cy="45" r="5" fill="#000"/><circle cx="65" cy="45" r="5" fill="#000"/><path d="M30 25 C 40 15, 60 15, 70 25" stroke="#000" strokeWidth="4" fill="none"/></g></svg>;
+const BoyAvatar3 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#f5a623"/><path d="M40,65 L60,65" stroke="#000" strokeWidth="3" fill="none"/><circle cx="38" cy="42" r="6" fill="#000"/><circle cx="62" cy="42" r="6" fill="#000"/><path d="M25 30 L 75 30" stroke="#000" strokeWidth="5" fill="none" strokeLinecap="round"/></g></svg>;
+const BoyAvatar4 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#bd10e0"/><path d="M30,60 Q50,75 70,60" stroke="#000" strokeWidth="3" fill="none"/><path d="M35,45 L45,35 L35,35 Z" fill="#000"/><path d="M65,45 L55,35 L65,35 Z" fill="#000"/><path d="M45 20 L 55 20" stroke="#000" strokeWidth="4" fill="none" /></g></svg>;
 
-const girlAvatars = [
-    '/avatars/girl-1.png',
-    '/avatars/girl-2.png',
-    '/avatars/girl-3.png',
-    '/avatars/girl-4.png',
-];
+const GirlAvatar1 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#f783ac"/><path d="M30,65 C40,75 60,75 70,65" stroke="#000" strokeWidth="3" fill="none"/><path d="M35,40 C40,35,40,35,45,40" stroke="#000" strokeWidth="2" fill="none"/><path d="M65,40 C60,35,60,35,55,40" stroke="#000" strokeWidth="2" fill="none"/><path d="M15 50 C 5 70, 20 95, 40 90" stroke="#d0021b" strokeWidth="4" fill="none"/><path d="M85 50 C 95 70, 80 95, 60 90" stroke="#d0021b" strokeWidth="4" fill="none"/></g></svg>;
+const GirlAvatar2 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#7ed321"/><path d="M40,68 Q50,60 60,68" stroke="#000" strokeWidth="3" fill="none"/><circle cx="40" cy="45" r="4" fill="#000"/><circle cx="60" cy="45" r="4" fill="#000"/><path d="M10 30 C 20 -10, 80 -10, 90 30" stroke="#000" strokeWidth="5" fill="none"/></g></svg>;
+const GirlAvatar3 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#e84a5f"/><path d="M40,70 L60,70" stroke="#000" strokeWidth="3" fill="none"/><path d="M35,45 a5,3 0 1,0 10,0 a5,3 0 1,0 -10,0"/><path d="M55,45 a5,3 0 1,0 10,0 a5,3 0 1,0 -10,0"/><path d="M30 15 C 30 5, 50 5, 50 15 C 50 5, 70 5, 70 15" stroke="#000" strokeWidth="4" fill="none"/></g></svg>;
+const GirlAvatar4 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#8b5cf6"/><path d="M30,60 Q50,75 70,60" stroke="#000" strokeWidth="3" fill="none"/><path d="M35,45 L45,35" stroke="#000" strokeWidth="2"/><path d="M45,45 L35,35" stroke="#000" strokeWidth="2"/><path d="M55,45 L65,35" stroke="#000" strokeWidth="2"/><path d="M65,45 L55,35" stroke="#000" strokeWidth="2"/><path d="M50,10 L50,30" stroke="#f8e71c" strokeWidth="5"/><path d="M40,20 L60,20" stroke="#f8e71c" strokeWidth="5"/></g></svg>;
+
+const boyAvatars = [BoyAvatar1, BoyAvatar2, BoyAvatar3, BoyAvatar4];
+const girlAvatars = [GirlAvatar1, GirlAvatar2, GirlAvatar3, GirlAvatar4];
 
 
 const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: number | string }) => (
@@ -87,7 +87,7 @@ export default function ProfilePage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isSendingReset, setIsSendingReset] = useState(false);
     const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
-    const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
+    const [selectedAvatar, setSelectedAvatar] = useState<React.FC | null>(null);
     const [worldRank, setWorldRank] = useState<number | null>(null);
 
     const getInitials = () => {
@@ -203,13 +203,17 @@ export default function ProfilePage() {
         setIsSaving(true);
         try {
             const userDocRef = doc(db, 'users', user.uid);
-            await updateDoc(userDocRef, { photoURL: selectedAvatar });
+            const svgString = renderToString(React.createElement(selectedAvatar));
+            const dataUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
+            
+            await updateDoc(userDocRef, { photoURL: dataUri });
             
             // Manually update local state to reflect change immediately
-            setUserData({ ...userData, photoURL: selectedAvatar });
+            setUserData({ ...userData, photoURL: dataUri });
 
             toast({ title: "Success", description: "Avatar updated successfully." });
             setIsAvatarDialogOpen(false);
+            setSelectedAvatar(null);
         } catch (error) {
             console.error("Avatar update failed:", error);
             toast({ variant: 'destructive', title: "Update Failed", description: "Could not update your avatar." });
@@ -291,9 +295,11 @@ export default function ProfilePage() {
                                             <div>
                                                 <h4 className="font-semibold mb-2">Boy Avatars</h4>
                                                 <div className="grid grid-cols-4 gap-4">
-                                                    {boyAvatars.map((url, i) => (
-                                                        <button key={`boy-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2 p-1', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <img src={url} alt={`Boy Avatar ${i + 1}`} className="w-16 h-16 rounded-full" />
+                                                    {boyAvatars.map((AvatarComponent, i) => (
+                                                        <button key={`boy-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                             <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
+                                                                <AvatarComponent/>
+                                                            </div>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -301,9 +307,11 @@ export default function ProfilePage() {
                                             <div>
                                                 <h4 className="font-semibold mb-2">Girl Avatars</h4>
                                                  <div className="grid grid-cols-4 gap-4">
-                                                    {girlAvatars.map((url, i) => (
-                                                        <button key={`girl-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2 p-1', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <img src={url} alt={`Girl Avatar ${i + 1}`} className="w-16 h-16 rounded-full" />
+                                                    {girlAvatars.map((AvatarComponent, i) => (
+                                                        <button key={`girl-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                            <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
+                                                                <AvatarComponent/>
+                                                            </div>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -427,5 +435,7 @@ export default function ProfilePage() {
 
     
 }
+
+    
 
     
