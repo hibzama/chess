@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Download, Gamepad2 } from 'lucide-react';
+import { BonusCard } from './bonus-card';
 
 const Feature = ({ text }: { text: string }) => (
     <div className="flex items-center gap-2">
@@ -49,8 +50,9 @@ export default function LandingPage() {
                     </Button>
                 </div>
             </div>
-             <div className="relative">
+             <div className="relative space-y-6">
                 <img src="/hero-image.png" alt="Gaming representation" className="w-full max-w-md mx-auto" data-ai-hint="gaming collage"/>
+                <BonusCard />
              </div>
         </div>
       </main>
