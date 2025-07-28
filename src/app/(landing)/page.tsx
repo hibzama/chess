@@ -5,13 +5,14 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Download, CheckCircle } from 'lucide-react';
-import { BonusCard } from './bonus-card';
+import { BonusCard } from '../bonus-card';
 import Image from 'next/image';
-import ConditionalLayout from './conditional-layout';
+import { useAuth } from '@/context/auth-context';
+import { redirect } from 'next/navigation';
 
 const HeroIcon = () => (
-    <div>
-        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="animate-zoom-in-out" style={{ overflow: 'visible' }}>
+    <div className="relative w-full h-full min-h-[300px] md:min-h-[400px]">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-full h-full animate-zoom-in-out" style={{ overflow: 'visible' }}>
             <defs>
                 <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
                     <stop offset="0%" style={{stopColor: 'hsl(326, 100%, 50%)', stopOpacity: 0.8}} />
@@ -55,9 +56,17 @@ const HeroIcon = () => (
 
 
 export default function LandingPage() {
+    const { user, loading } = useAuth();
+ 
+    if (loading) {
+        return null; // Or a loading spinner
+    }
+
+    if (user) {
+        redirect('/dashboard');
+    }
  
   return (
-    <ConditionalLayout>
     <div className="flex flex-col min-h-[calc(100vh-5rem)]">
       <main className="flex-1 flex items-center justify-center p-4">
         <section className="container mx-auto grid grid-cols-1 md:grid-cols-2 items-center gap-12">
@@ -93,6 +102,5 @@ export default function LandingPage() {
         </section>
       </main>
     </div>
-    </ConditionalLayout>
   );
 }

@@ -4,7 +4,6 @@ import './globals.css';
 import { Providers } from './providers';
 import { Inter as FontSans } from 'next/font/google';
 import { cn } from '@/lib/utils';
-import ConditionalLayout from './conditional-layout';
 
 const fontSans = FontSans({
   subsets: ['latin'],
