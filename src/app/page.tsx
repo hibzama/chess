@@ -80,6 +80,9 @@ export default function LandingPage() {
                         <Link href="#"><Download className="mr-2"/> Download APK</Link>
                     </Button>
                 </div>
+                 <div className="mt-8">
+                    <BonusCard />
+                </div>
             </div>
             <div className="hero-image">
                 <HeroIcon />
