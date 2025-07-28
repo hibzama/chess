@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -291,9 +292,8 @@ export default function ProfilePage() {
                                                 <h4 className="font-semibold mb-2">Boy Avatars</h4>
                                                 <div className="grid grid-cols-4 gap-4">
                                                     {boyAvatars.map((url, i) => (
-                                                        <button key={`boy-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} /></Avatar>
-                                                        </button>
+                                                        <button key={`boy-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2 p-1', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                            <img src={url} alt={`Boy Avatar ${i + 1}`} className="w-16 h-16 rounded-full" /></button>
                                                     ))}
                                                 </div>
                                             </div>
@@ -301,9 +301,8 @@ export default function ProfilePage() {
                                                 <h4 className="font-semibold mb-2">Girl Avatars</h4>
                                                  <div className="grid grid-cols-4 gap-4">
                                                     {girlAvatars.map((url, i) => (
-                                                        <button key={`girl-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <Avatar className="w-16 h-16"><AvatarImage src={url} /></Avatar>
-                                                        </button>
+                                                        <button key={`girl-${i}`} onClick={() => setSelectedAvatar(url)} className={cn('rounded-full border-2 p-1', selectedAvatar === url ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                            <img src={url} alt={`Girl Avatar ${i + 1}`} className="w-16 h-16 rounded-full" /></button>
                                                     ))}
                                                 </div>
                                             </div>
@@ -426,3 +425,5 @@ export default function ProfilePage() {
 
     
 }
+
+    
