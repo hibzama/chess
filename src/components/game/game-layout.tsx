@@ -195,7 +195,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
         </div>
 
         {/* Right Column */}
-        <aside className="hidden lg:grid grid-rows-[auto,auto,1fr,auto] gap-6">
+        <aside className="hidden lg:grid grid-rows-[auto,auto,auto,1fr] gap-6">
             <PlayerInfo
               playerName={opponentData?.name ?? "Opponent"}
               avatarSrc={opponentData?.photoURL}
@@ -204,7 +204,17 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
              {isMultiplayer ? (
                  <>
                     <Card>
-                        <CardContent className="p-4">
+                        <CardContent className="p-4 space-y-2">
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full">
+                                        <MessageSquare className="w-4 h-4 mr-2" /> Game Chat
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 h-96 p-0 flex flex-col">
+                                    <GameChat onClose={() => {}} />
+                                </PopoverContent>
+                            </Popover>
                             <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
                                 <Flag className="w-4 h-4 mr-2" />
                                 Resign
@@ -248,7 +258,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
      {isMultiplayer && !gameOver && (
          <Popover>
             <PopoverTrigger asChild>
-                <button className="fixed bottom-24 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40 md:hidden">
+                <button className="fixed bottom-24 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40 lg:hidden">
                     <MessageSquare className="w-8 h-8"/>
                     <span className="sr-only">Open Chat</span>
                 </button>
