@@ -17,6 +17,7 @@ import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc } 
 import { db } from '@/lib/firebase';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from "@/lib/utils";
+import Image from 'next/image';
 
 
 const Logo = () => (
@@ -225,60 +226,72 @@ export default function MainLayout({
                 </SidebarFooter>
             </Sidebar>
             <SidebarInset>
-                <header className="px-4 lg:px-6 h-16 flex items-center border-b">
-                    <SidebarTrigger className="md:hidden"/>
-                    <div className="ml-auto flex items-center gap-4">
-                       <div>
-                           <Link href={isMarketer ? "/marketing/dashboard/wallet" : "/dashboard/wallet"}>
-                              <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
-                                  <CardContent className="p-2 flex items-center gap-2">
-                                      <Wallet className="w-5 h-5 text-primary"/>
-                                      <div>
-                                      {!isMounted || loading || !userData ? (
-                                          <div className="space-y-1">
-                                            <Skeleton className="h-4 w-16"/>
-                                            <Skeleton className="h-3 w-12"/>
+                <div className="absolute inset-0 z-0">
+                    <Image
+                        src="https://allnews.ltd/wp-content/uploads/2025/07/futuristic-video-game-controller-background-with-text-space_1017-54730.avif"
+                        alt="background"
+                        fill
+                        className="object-cover"
+                        data-ai-hint="futuristic gamepad"
+                    />
+                    <div className="absolute inset-0 bg-background/90" />
+                </div>
+                <div className="relative z-10 flex flex-col min-h-svh">
+                    <header className="px-4 lg:px-6 h-16 flex items-center border-b">
+                        <SidebarTrigger className="md:hidden"/>
+                        <div className="ml-auto flex items-center gap-4">
+                           <div>
+                               <Link href={isMarketer ? "/marketing/dashboard/wallet" : "/dashboard/wallet"}>
+                                  <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
+                                      <CardContent className="p-2 flex items-center gap-2">
+                                          <Wallet className="w-5 h-5 text-primary"/>
+                                          <div>
+                                          {!isMounted || loading || !userData ? (
+                                              <div className="space-y-1">
+                                                <Skeleton className="h-4 w-16"/>
+                                                <Skeleton className="h-3 w-12"/>
+                                              </div>
+                                              ) : (
+                                              <>
+                                                  <p className="text-sm font-bold text-primary">LKR {(isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0).toFixed(2)}</p>
+                                                  <p className="text-xs text-muted-foreground">~{((isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
+                                              </>
+                                          )}
                                           </div>
-                                          ) : (
-                                          <>
-                                              <p className="text-sm font-bold text-primary">LKR {(isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0).toFixed(2)}</p>
-                                              <p className="text-xs text-muted-foreground">~{((isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
-                                          </>
-                                      )}
-                                      </div>
-                                  </CardContent>
-                              </Card>
-                          </Link>
-                       </div>
-                        <NotificationBell />
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button>
-                                     <Avatar>
-                                        <AvatarImage src={userData?.photoURL} />
-                                        <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
-                                    </Avatar>
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>
-                                    <p>{userData?.firstName} {userData?.lastName}</p>
-                                    <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem asChild><Link href="/dashboard/profile"><User className="mr-2"/> Profile</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2"/> Settings</Link></DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href="/dashboard/wallet"><Wallet className="mr-2"/> Wallet</Link></DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2"/> Log out</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                </header>
-                <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
-                    {children}
-                </main>
-                <MobileBottomNav />
+                                      </CardContent>
+                                  </Card>
+                              </Link>
+                           </div>
+                            <NotificationBell />
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button>
+                                         <Avatar>
+                                            <AvatarImage src={userData?.photoURL} />
+                                            <AvatarFallback>{loading || !isMounted ? '..' : getInitials()}</AvatarFallback>
+                                        </Avatar>
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuLabel>
+                                        <p>{userData?.firstName} {userData?.lastName}</p>
+                                        <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild><Link href="/dashboard/profile"><User className="mr-2"/> Profile</Link></DropdownMenuItem>
+                                    <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2"/> Settings</Link></DropdownMenuItem>
+                                    <DropdownMenuItem asChild><Link href="/dashboard/wallet"><Wallet className="mr-2"/> Wallet</Link></DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2"/> Log out</DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </header>
+                    <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
+                        {children}
+                    </main>
+                    <MobileBottomNav />
+                </div>
             </SidebarInset>
         </SidebarProvider>
          <DialogContent>

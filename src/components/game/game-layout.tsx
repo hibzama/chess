@@ -20,6 +20,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import GameChat from './game-chat';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import Image from 'next/image';
 
 
 type GameLayoutProps = {
@@ -138,7 +139,17 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
 
   return (
     <>
-    <main className="flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6 md:pb-8 pb-24">
+    <div className="absolute inset-0 z-0">
+        <Image
+          src="https://allnews.ltd/wp-content/uploads/2025/07/geometric-gradient-technology-background_23-2149110132.avif"
+          alt="background"
+          fill
+          className="object-cover opacity-30"
+          data-ai-hint="geometric technology"
+        />
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+    </div>
+    <main className="relative z-10 flex-1 w-full grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] xl:grid-cols-[340px_auto_340px] gap-6 p-4 md:p-6 md:pb-8 pb-24">
         {/* Left Column */}
         <div className="hidden lg:grid grid-rows-[auto,1fr] gap-6">
             <PlayerInfo

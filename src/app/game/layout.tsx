@@ -7,8 +7,8 @@ export default function GameLayout({
     children: React.ReactNode
   }) {
     return (
-        <MainLayout>
+        <div className="relative w-full h-full">
             {children}
-        </MainLayout>
+        </div>
     )
   }
