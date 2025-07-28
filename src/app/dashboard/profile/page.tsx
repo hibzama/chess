@@ -55,17 +55,17 @@ const ranks = [
 ];
 
 const boyAvatars = [
-    'https://avatar.iran.liara.run/public/boy?username=Scott',
-    'https://avatar.iran.liara.run/public/boy?username=Roy',
-    'https://avatar.iran.liara.run/public/boy?username=James',
-    'https://avatar.iran.liara.run/public/boy?username=Alex',
+    'https://i.ibb.co/6n20Ncc/boy-1.png',
+    'https://i.ibb.co/3kC6vfb/boy-2.png',
+    'https://i.ibb.co/P9pBzTA/boy-3.png',
+    'https://i.ibb.co/3fLg8gW/boy-4.png',
 ];
 
 const girlAvatars = [
-    'https://avatar.iran.liara.run/public/girl?username=Maria',
-    'https://avatar.iran.liara.run/public/girl?username=Jane',
-    'https://avatar.iran.liara.run/public/girl?username=Susan',
-    'https://avatar.iran.liara.run/public/girl?username=Jessica',
+    'https://i.ibb.co/Sns5pTT/girl-1.png',
+    'https://i.ibb.co/yQW0kH4/girl-2.png',
+    'https://i.ibb.co/mBv06nB/girl-3.png',
+    'https://i.ibb.co/k8bJgBx/girl-4.png',
 ];
 
 
