@@ -13,7 +13,7 @@ import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, u
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
-import { BoyAvatar1 } from "@/components/icons/avatars";
+import { boyAvatars, girlAvatars } from "@/components/icons/avatars";
 import { renderToString } from "react-dom/server";
 
 
@@ -67,7 +67,9 @@ export default function RegisterForm() {
                 initialBalance = 100;
             }
 
-            const svgString = renderToString(React.createElement(BoyAvatar1));
+            const allAvatars = [...boyAvatars, ...girlAvatars];
+            const randomAvatar = allAvatars[Math.floor(Math.random() * allAvatars.length)];
+            const svgString = renderToString(React.createElement(randomAvatar));
             const defaultAvatarUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
             
             const userData: any = {

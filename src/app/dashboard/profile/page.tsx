@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { auth, db } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, doc, updateDoc, getCountFromServer } from 'firebase/firestore';
@@ -77,6 +77,7 @@ export default function ProfilePage() {
     const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
     const [selectedAvatar, setSelectedAvatar] = useState<React.FC | null>(null);
     const [worldRank, setWorldRank] = useState<number | null>(null);
+    const [avatarTab, setAvatarTab] = useState<'boy' | 'girl'>('boy');
 
     const getInitials = () => {
         if (userData) {
@@ -279,32 +280,19 @@ export default function ProfilePage() {
                                             <AlertDialogTitle>Choose your Avatar</AlertDialogTitle>
                                             <AlertDialogDescription>Select an icon to represent you on the platform.</AlertDialogDescription>
                                         </AlertDialogHeader>
+                                        <div className="grid grid-cols-2 gap-2 mb-4">
+                                            <Button variant={avatarTab === 'boy' ? 'default' : 'outline'} onClick={() => setAvatarTab('boy')}>Boy Avatars</Button>
+                                            <Button variant={avatarTab === 'girl' ? 'default' : 'outline'} onClick={() => setAvatarTab('girl')}>Girl Avatars</Button>
+                                        </div>
                                         <ScrollArea className="h-72">
-                                            <div className="space-y-4 p-1">
-                                                <div>
-                                                    <h4 className="font-semibold mb-2">Boy Avatars</h4>
-                                                    <div className="grid grid-cols-4 gap-4">
-                                                        {boyAvatars.map((AvatarComponent, i) => (
-                                                            <button key={`boy-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                                <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
-                                                                    <AvatarComponent/>
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-semibold mb-2">Girl Avatars</h4>
-                                                    <div className="grid grid-cols-4 gap-4">
-                                                        {girlAvatars.map((AvatarComponent, i) => (
-                                                            <button key={`girl-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                                <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
-                                                                    <AvatarComponent/>
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
+                                            <div className="grid grid-cols-4 gap-4 p-1">
+                                                {(avatarTab === 'boy' ? boyAvatars : girlAvatars).map((AvatarComponent, i) => (
+                                                    <button key={`${avatarTab}-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                        <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
+                                                            <AvatarComponent/>
+                                                        </div>
+                                                    </button>
+                                                ))}
                                             </div>
                                         </ScrollArea>
                                         <AlertDialogFooter>
@@ -422,6 +410,4 @@ export default function ProfilePage() {
             </Tabs>
         </div>
     );
-
-    
 }
