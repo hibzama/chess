@@ -1,9 +1,12 @@
+
 'use client'
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { DollarSign, Network, Sword } from "lucide-react";
 
 const Logo = () => (
     <div className="flex items-center gap-2 text-2xl font-bold">
@@ -37,6 +40,38 @@ export default function LandingLayout({
   }: {
     children: React.ReactNode
   }) {
+
+    const aboutSections = [
+        {
+            title: "Our Mission",
+            content: "Nexbattle is the ultimate online arena where strategy, skill, and stakes collide. We provide a secure and engaging platform for Chess and Checkers enthusiasts to compete for real rewards, fostering a global community of strategic thinkers.",
+            icon: Sword,
+        },
+        {
+            title: "How to Earn",
+            content: "In our Multiplayer Mode, you invest a wager from your wallet into each match. Victorious players receive an 180% return on their investment. Games ending in a draw result in a 90% refund to both players. To ensure fair play, players who resign receive a 75% refund, while their opponent gets a 105% payout.",
+            icon: DollarSign,
+        },
+        {
+            title: "Standard Referral System",
+            content: "Every user can earn by inviting friends. Share your unique referral link, and when someone signs up, they become your Level 1 referral. You'll earn a commission from every game they play. The more direct referrals you have, the higher your commission rate becomes.",
+            icon: Network,
+        },
+        {
+            title: "Marketing Partner System",
+            content: "For our most dedicated community builders, the Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn commissions from a vast network of players, creating a significant passive income stream. Anyone can apply to join the team.",
+            link: "/marketing/register",
+            linkText: "Apply to be a Marketer",
+            icon: Megaphone
+        },
+        {
+            title: "Ranking & Leaderboards",
+            content: "Your legacy is built on wins. Accumulate victories across both Chess and Checkers to increase your level and unlock prestigious Rank Titles, from 'Beginner' to 'Immortal'. Compete against everyone on the platform to climb the live World Rank leaderboard.",
+            icon: Trophy
+        }
+    ];
+
+
     return (
         <div className="flex flex-col min-h-screen bg-gradient-to-r from-[#2a003f] to-[#340064] text-white">
             <header className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
@@ -46,14 +81,29 @@ export default function LandingLayout({
                  <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
                     <Dialog>
                         <DialogTrigger asChild><button className="hover:text-primary">About Us</button></DialogTrigger>
-                         <DialogContent>
+                         <DialogContent className="max-w-2xl">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
+                                <DialogDescription>The ultimate platform where skill meets investment.</DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-4 text-sm text-muted-foreground">
-                                <p>Nexbattle is the ultimate online arena where strategy, skill, and stakes collide. We provide a secure and engaging platform for Chess and Checkers enthusiasts to compete for real rewards, fostering a global community of strategic thinkers.</p>
-                                <p>Earn by winning games, referring friends, or joining our exclusive marketing team for deep referral networks and higher commissions.</p>
-                            </div>
+                            <ScrollArea className="h-[60vh] p-4">
+                                <div className="space-y-6">
+                                {aboutSections.map(section => (
+                                    <div key={section.title}>
+                                        <h3 className="font-semibold text-lg flex items-center gap-3 mb-2 text-primary">
+                                            <section.icon className="w-5 h-5"/>
+                                            {section.title}
+                                        </h3>
+                                        <p className="text-sm text-muted-foreground">{section.content}</p>
+                                        {section.link && (
+                                            <Link href={section.link} className="text-primary font-semibold hover:underline mt-2 inline-block text-sm">
+                                                {section.linkText} &rarr;
+                                            </Link>
+                                        )}
+                                    </div>
+                                ))}
+                                </div>
+                            </ScrollArea>
                         </DialogContent>
                     </Dialog>
                      <Dialog>
