@@ -25,22 +25,18 @@ const HeroIcon = () => (
         {/* Base circle with glow */}
         <circle cx="100" cy="100" r="80" fill="url(#grad1)" filter="url(#glow)" opacity="0.8"/>
         
-        {/* Stylized Chess King */}
-        <g transform="translate(60 50) scale(1.2)">
-            <path d="M22.5 13.5L22.5 8.5M20 11H25" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M14.5 29.5V13.5H30.5V29.5H14.5Z" fill="none" stroke="white" strokeWidth="1.5" />
+        {/* Stylized Game Piece */}
+        <g transform="translate(85 85)">
+            <rect x="-15" y="-15" width="30" height="30" fill="none" stroke="white" strokeWidth="2" />
+            <line x1="0" y1="-25" x2="0" y2="-20" stroke="white" strokeWidth="2" />
+            <line x1="-2.5" y1="-22.5" x2="2.5" y2="-22.5" stroke="white" strokeWidth="2" />
         </g>
 
-        {/* Stylized Checkers Piece */}
-        <g transform="translate(110 120) scale(1.1)">
-             <circle cx="20" cy="20" r="15" fill="#00e1ff" opacity="0.9" />
-             <circle cx="20" cy="20" r="12" fill="none" stroke="white" strokeWidth="1.5" opacity="0.7"/>
-        </g>
-        
-         {/* Small decorative elements */}
-        <circle cx="40" cy="150" r="6" fill="hsl(var(--accent))" opacity="0.9" />
-        <circle cx="160" cy="50" r="8" fill="#00e1ff" opacity="0.8" />
-
+        {/* Small decorative elements */}
+        <circle cx="160" cy="50" r="8" fill="#00e1ff" opacity="0.9" />
+        <circle cx="60" cy="150" r="6" fill="hsl(var(--accent))" opacity="0.9" />
+        <circle cx="135" cy="145" r="12" fill="#00e1ff" opacity="0.9" />
+        <circle cx="135" cy="145" r="9" fill="none" stroke="white" strokeWidth="1.5" />
     </svg>
 )
 
