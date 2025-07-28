@@ -74,9 +74,9 @@ export default function LandingLayout({
 
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#0d041a] text-white relative">
+        <div className="flex flex-col min-h-screen bg-[#0d041a] text-white relative overflow-hidden">
              <div 
-                className="absolute inset-0 z-0 opacity-40"
+                className="absolute inset-0 z-0 opacity-40 animate-zoom-in-out"
                 style={{
                     backgroundImage: `url(https://allnews.ltd/wp-content/uploads/2025/07/image_c53578c4-bdf8-463e-9f83-91fe04552e6e.png)`,
                     backgroundSize: 'cover',
