@@ -20,12 +20,6 @@ const Logo = () => (
             <circle cx="12" cy="12" r="10" />
             <path d="m14.5 9.5-5 5" />
             <path d="m9.5 9.5 5 5" />
-            <path d="M12 3v1" />
-            <path d="M12 20v1" />
-            <path d="m5 7 1-1" />
-            <path d="m18 18 1-1" />
-            <path d="m5 17 1 1" />
-            <path d="m18 6-1 1" />
         </svg>
         <span>Nexbattle</span>
     </div>
