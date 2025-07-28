@@ -53,10 +53,10 @@ export default function LandingLayout({
                             <Link href="/" className="hover:text-primary">Home</Link>
                             <Link href="/about" className="hover:text-primary">About Us</Link>
                              <DialogTrigger asChild>
-                                <button className="hover:text-primary" data-dialog-id="marketing">Marketing</button>
+                                <button className="hover:text-primary">Marketing</button>
                             </DialogTrigger>
                              <DialogTrigger asChild>
-                                <button className="hover:text-primary" data-dialog-id="support">Support</button>
+                                <button className="hover:text-primary">Support</button>
                             </DialogTrigger>
                         </nav>
                         <div className="flex items-center gap-2">
@@ -73,7 +73,7 @@ export default function LandingLayout({
                     {children}
                 </main>
             </div>
-             <DialogContent data-dialog-id="support">
+             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
                     <DialogDescription>
@@ -92,7 +92,7 @@ export default function LandingLayout({
                     </Button>
                 </div>
             </DialogContent>
-             <DialogContent data-dialog-id="marketing">
+             <DialogContent>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2"><Megaphone/> Become a Marketing Partner</DialogTitle>
                     <DialogDescription>

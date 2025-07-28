@@ -89,11 +89,9 @@ export default function LandingPage() {
                      <Button asChild size="lg" className="px-12 bg-gradient-to-r from-primary to-purple-600">
                         <Link href="/register">Become a Partner</Link>
                     </Button>
-                     <Button asChild variant="outline" size="lg" className="px-12"
-                        onClick={() => window.open('https://jani20001212.itch.io/nebattle', '_blank')}
-                     >
+                     <Button asChild variant="outline" size="lg" className="px-12">
                         <a href="https://jani20001212.itch.io/nebattle" target="_blank" rel="noopener noreferrer">
-                            <span><Download className="mr-2"/> Download APK</span>
+                           <Download className="mr-2"/> Download APK
                         </a>
                     </Button>
                 </div>
