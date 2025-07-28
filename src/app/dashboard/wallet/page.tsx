@@ -271,6 +271,19 @@ export default function WalletPage() {
                                         <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard('38881724', 'PayID')}><Copy/></Button>
                                     </div>
                                 </div>
+                                <div>
+                                    <Label htmlFor="deposit-amount">Amount (LKR)</Label>
+                                    <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
+                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: 100 LKR</p>
+                                </div>
+                                <div>
+                                    <Label>Amount (USDT)</Label>
+                                     <div className="flex items-center gap-2">
+                                        <Input readOnly value={usdtAmount} />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard(usdtAmount, 'USDT Amount')}><Copy/></Button>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground pt-1">Please send this exact USDT amount.</p>
+                                </div>
                              </Card>
                         )}
                         {depositMethod === 'bank' && (
@@ -279,19 +292,14 @@ export default function WalletPage() {
                                 <p className="text-sm font-semibold">Branch: Galenbidunuwewa</p>
                                 <p className="text-sm font-semibold">Name: Jd Aththanayaka</p>
                                 <p className="text-sm font-semibold">Account: 81793729</p>
+                                <div className="space-y-2">
+                                    <Label htmlFor="deposit-amount-bank">Amount (LKR)</Label>
+                                    <Input id="deposit-amount-bank" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
+                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: 100 LKR</p>
+                                </div>
                              </Card>
                         )}
                         
-                        <div className="space-y-2">
-                            <Label htmlFor="deposit-amount">Amount (LKR)</Label>
-                            <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
-                            <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: 100 LKR</p>
-                        </div>
-                        
-                        <div className="p-3 bg-yellow-900/20 rounded-md text-sm text-yellow-300">
-                            Equivalent in USDT: {usdtAmount} USDT
-                        </div>
-
                         <Card className="p-4 bg-card/50 space-y-2">
                             <div className="flex items-center gap-2 font-semibold"><User/> Important: Use Your Username</div>
                             <p className="text-sm text-muted-foreground">Please use your username as the payment reference or remark. This helps us verify your deposit faster.</p>
