@@ -73,6 +73,7 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
+                    photoURL: userData.photoURL || ''
                 },
                 players: [user.uid],
                 createdAt: serverTimestamp(),
