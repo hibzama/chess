@@ -1,15 +1,16 @@
 
 'use client'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Gamepad2, Info, Flag } from 'lucide-react';
+import { Gamepad2, Info, Flag, DollarSign, Trophy } from 'lucide-react';
 import { useGame } from '@/context/game-context';
 import { Button } from '../ui/button';
 import { useEffect, useState } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useAuth } from '@/context/auth-context';
+import { Separator } from '../ui/separator';
 
 export function GameInfo() {
-    const { playerColor, moveCount, resign, isMultiplayer, room, user } = useGame();
+    const { playerColor, moveCount, resign, isMultiplayer, room, user, roomWager } = useGame();
     const { userData } = useAuth();
     const [isClient, setIsClient] = useState(false);
     const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
@@ -25,7 +26,8 @@ export function GameInfo() {
     
     const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
     const opponentName = isMultiplayer ? (opponentData?.name ?? 'Opponent') : 'Bot';
-
+    
+    const winnerReturn = roomWager * 1.8;
 
     return (
         <>
@@ -49,6 +51,19 @@ export function GameInfo() {
                     <span className="text-muted-foreground">Total Moves:</span>
                     <span className="font-medium">{isClient ? moveCount : 0}</span>
                 </div>
+                 {isMultiplayer && roomWager > 0 && (
+                    <>
+                        <Separator/>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground flex items-center gap-1.5"><DollarSign className="w-4 h-4"/> Player Investment:</span>
+                            <span className="font-medium">LKR {roomWager.toFixed(2)}</span>
+                        </div>
+                         <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground flex items-center gap-1.5"><Trophy className="w-4 h-4"/> Winner's Return:</span>
+                            <span className="font-medium text-green-400">LKR {winnerReturn.toFixed(2)}</span>
+                        </div>
+                    </>
+                 )}
                  {!isMultiplayer && (
                     <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)}>
                         <Flag className="w-4 h-4 mr-2" />
