@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -16,7 +17,7 @@ interface Transaction {
     status: 'pending' | 'approved' | 'rejected';
     createdAt: any;
     depositMethod: 'bank' | 'binance';
-    user?: { firstName: string; lastName: string; email: string };
+    user?: { firstName: string; lastName: string; email: string; phone: string; };
 }
 
 export default function PendingDepositsPage() {
@@ -110,6 +111,7 @@ export default function PendingDepositsPage() {
                                 <TableCell>
                                     <div className="font-medium">{deposit.user?.firstName} {deposit.user?.lastName}</div>
                                     <div className="text-sm text-muted-foreground">{deposit.user?.email}</div>
+                                    <div className="text-sm text-muted-foreground">{deposit.user?.phone}</div>
                                 </TableCell>
                                 <TableCell>{deposit.amount.toFixed(2)}</TableCell>
                                 <TableCell>
