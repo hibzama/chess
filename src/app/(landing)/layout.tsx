@@ -74,7 +74,7 @@ export default function LandingLayout({
 
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#0d041a] text-white relative overflow-hidden">
+        <div className="flex flex-col min-h-screen bg-background text-white relative overflow-hidden">
              <div 
                 className="absolute inset-0 z-0 opacity-40 animate-zoom-in-out"
                 style={{
