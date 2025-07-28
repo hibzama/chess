@@ -8,58 +8,47 @@ import { BonusCard } from './bonus-card';
 import Image from 'next/image';
 
 const HeroIcon = () => (
-    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-        <defs>
-            <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                <stop offset="0%" style={{stopColor: 'hsl(326, 100%, 50%)', stopOpacity: 0.8}} />
-                <stop offset="70%" style={{stopColor: 'hsl(54, 100%, 50%)', stopOpacity: 0.7}} />
-                <stop offset="100%" style={{stopColor: 'hsl(54, 100%, 50%)', stopOpacity: 0}} />
-            </radialGradient>
-            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
-                <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-            </filter>
-            <pattern id="chessboard" patternUnits="userSpaceOnUse" width="20" height="20">
-              <rect x="0" y="0" width="10" height="10" fill="hsl(var(--primary))" fillOpacity="0.1"/>
-              <rect x="10" y="0" width="10" height="10" fill="hsl(var(--background))" fillOpacity="0.1"/>
-              <rect x="0" y="10" width="10" height="10" fill="hsl(var(--background))" fillOpacity="0.1"/>
-              <rect x="10" y="10" width="10" height="10" fill="hsl(var(--primary))" fillOpacity="0.1"/>
-            </pattern>
-        </defs>
-        
-        <g transform="translate(100 100) scale(1.4) rotate(15)">
-             <g transform="skewX(-20) scale(1.1)">
-                <rect x="-50" y="-50" width="100" height="100" fill="url(#grad1)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" rx="5" filter="url(#glow)" />
-                <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" rx="5"/>
-             </g>
-             
-             {/* Abstract Pieces */}
-             <g>
-                {/* Top cyan circle */}
-                <circle cx="15" cy="-25" r="8" fill="#00e1ff" opacity="0.9" />
-                {/* Middle "eye" piece */}
-                <g transform="translate(25, 5)">
-                  <ellipse cx="0" cy="0" rx="12" ry="7" fill="white" />
-                  <circle cx="0" cy="0" r="5" fill="black" />
+    <div className="group w-full h-full">
+        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+            <defs>
+                <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                    <stop offset="0%" style={{stopColor: 'hsl(326, 100%, 50%)', stopOpacity: 0.8}} />
+                    <stop offset="70%" style={{stopColor: 'hsl(54, 100%, 50%)', stopOpacity: 0.7}} />
+                    <stop offset="100%" style={{stopColor: 'hsl(54, 100%, 50%)', stopOpacity: 0}} />
+                </radialGradient>
+                <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+                <pattern id="chessboard" patternUnits="userSpaceOnUse" width="20" height="20">
+                  <rect x="0" y="0" width="10" height="10" fill="hsl(var(--primary))" fillOpacity="0.1"/>
+                  <rect x="10" y="0" width="10" height="10" fill="hsl(var(--background))" fillOpacity="0.1"/>
+                  <rect x="0" y="10" width="10" height="10" fill="hsl(var(--background))" fillOpacity="0.1"/>
+                  <rect x="10" y="10" width="10" height="10" fill="hsl(var(--primary))" fillOpacity="0.1"/>
+                </pattern>
+            </defs>
+            
+            <g className="transition-transform duration-300 ease-in-out group-hover:scale-105" transform="translate(100 100) scale(1.4) rotate(15)">
+                 <g transform="skewX(-20) scale(1.1)">
+                    <rect x="-50" y="-50" width="100" height="100" fill="url(#grad1)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" rx="5" filter="url(#glow)" />
+                    <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" rx="5"/>
+                 </g>
+                 
+                 <g className="animate-float" style={{ animationDelay: '0s' }}>
+                    <text x="-30" y="-15" fontFamily="Poppins, sans-serif" fontSize="24" fontWeight="bold" fill="#fdee00" textAnchor="middle" stroke="#000" strokeWidth="0.5" >$</text>
+                 </g>
+                 <g className="animate-float" style={{ animationDelay: '1s' }}>
+                     <text x="25" y="0" fontFamily="Poppins, sans-serif" fontSize="28" fontWeight="bold" fill="#fdee00" textAnchor="middle" stroke="#000" strokeWidth="0.5">$</text>
+                 </g>
+                 <g className="animate-float" style={{ animationDelay: '2s' }}>
+                     <text x="-5" y="30" fontFamily="Poppins, sans-serif" fontSize="20" fontWeight="bold" fill="#fdee00" textAnchor="middle" stroke="#000" strokeWidth="0.5">$</text>
                 </g>
-                 {/* Bottom right cyan circle with border */}
-                <g transform="translate(38, 25)">
-                    <circle cx="0" cy="0" r="10" fill="#00e1ff" opacity="0.9" />
-                    <circle cx="0" cy="0" r="8" fill="none" stroke="white" strokeWidth="1.5" />
-                </g>
-                 {/* Bottom left small eye piece */}
-                 <g transform="translate(-20, 35)">
-                  <ellipse cx="0" cy="0" rx="8" ry="5" fill="white" />
-                  <circle cx="0" cy="0" r="3" fill="black" />
-                </g>
-                {/* Middle left yellow circle */}
-                <circle cx="-30" cy="10" r="6" fill="#fdee00" opacity="0.9" />
-             </g>
-        </g>
-    </svg>
+            </g>
+        </svg>
+    </div>
 )
 
 
