@@ -23,17 +23,14 @@ const HeroIcon = () => (
             </filter>
         </defs>
         
-        {/* Base circle with glow */}
         <circle cx="100" cy="100" r="80" fill="url(#grad2)" filter="url(#glow)" opacity="0.8"/>
         
-        {/* Stylized Game Piece */}
-        <g transform="translate(100 100)">
-             <rect x="-15" y="-15" width="30" height="30" fill="none" stroke="white" strokeWidth="2" />
-             <line x1="0" y1="-25" x2="0" y2="-20" stroke="white" strokeWidth="2" />
-             <line x1="-2.5" y1="-22.5" x2="2.5" y2="-22.5" stroke="white" strokeWidth="2" />
+        <g transform="translate(100 100) scale(1.5)">
+             <rect x="-15" y="-15" width="30" height="30" fill="hsl(326, 100%, 50%)" stroke="white" strokeWidth="1.5" />
+             <line x1="0" y1="-20" x2="0" y2="-15" stroke="white" strokeWidth="1.5" />
+             <line x1="-2.5" y1="-17.5" x2="2.5" y2="-17.5" stroke="white" strokeWidth="1.5" />
         </g>
-
-        {/* Small decorative elements */}
+        
         <circle cx="160" cy="50" r="8" fill="#00e1ff" opacity="0.9" />
         <circle cx="60" cy="150" r="6" fill="hsl(var(--accent))" opacity="0.9" />
         <circle cx="135" cy="145" r="12" fill="#00e1ff" opacity="0.9" />
