@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, onSnapshot, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, serverTimestamp, updateDoc, getDoc } from 'firebase/firestore';
 import { getDatabase, ref, onValue, off, set, onDisconnect } from "firebase/database";
 
 interface AuthContextType {
@@ -112,13 +112,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       onValue(ref(rtdb, '.info/connected'), (snapshot) => {
         if (snapshot.val() === false) {
-          updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
+           getDoc(userStatusFirestoreRef).then(docSnap => {
+                if (docSnap.exists()) {
+                    updateDoc(userStatusFirestoreRef, isOfflineForFirestore);
+                }
+            });
           return;
         }
 
         onDisconnect(userStatusDatabaseRef).set(isOfflineForDatabase).then(() => {
-            set(userStatusDatabaseRef, isOnlineForDatabase);
-            updateDoc(userStatusFirestoreRef, isOnlineForFirestore);
+             getDoc(userStatusFirestoreRef).then(docSnap => {
+                if (docSnap.exists()) {
+                    set(userStatusDatabaseRef, isOnlineForDatabase);
+                    updateDoc(userStatusFirestoreRef, isOnlineForFirestore);
+                }
+            });
         });
       });
 
