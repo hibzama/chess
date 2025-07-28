@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -55,17 +54,17 @@ const ranks = [
 ];
 
 const boyAvatars = [
-    'https://i.ibb.co/3kC2C2B/boy-1.png',
-    'https://i.ibb.co/hK1j1Jz/boy-2.png',
-    'https://i.ibb.co/d2MdV9Y/boy-3.png',
-    'https://i.ibb.co/f2P60r5/boy-4.png',
+    '/avatars/boy-1.png',
+    '/avatars/boy-2.png',
+    '/avatars/boy-3.png',
+    '/avatars/boy-4.png',
 ];
 
 const girlAvatars = [
-    'https://i.ibb.co/yQz3b7j/girl-1.png',
-    'https://i.ibb.co/ygnf4st/girl-2.png',
-    'https://i.ibb.co/q0VzTQz/girl-3.png',
-    'https://i.ibb.co/1n0Gq83/girl-4.png',
+    '/avatars/girl-1.png',
+    '/avatars/girl-2.png',
+    '/avatars/girl-3.png',
+    '/avatars/girl-4.png',
 ];
 
 
@@ -427,5 +426,3 @@ export default function ProfilePage() {
 
     
 }
-
-    
