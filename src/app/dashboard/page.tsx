@@ -98,10 +98,10 @@ export default function DashboardPage() {
     }
     
     const summaryCards = [
-        { title: "Wallet Balance", value: userData?.balance, icon: Wallet, description: "Your current available funds.", colorClass: "text-primary" },
-        { title: "Total Deposit", value: stats.totalDeposit, icon: ArrowUp, description: "All funds you've added.", colorClass: "text-green-500" },
-        { title: "Total Withdrawals", value: stats.totalWithdrawal, icon: ArrowDown, description: "All funds you've taken out.", colorClass: "text-red-500" },
-        { title: "Total Earnings", value: stats.totalEarning, icon: Trophy, description: "Your net profit from games.", colorClass: "text-yellow-500" },
+        { title: "Wallet Balance", value: userData?.balance, description: "Your current available funds.", colorClass: "text-primary" },
+        { title: "Total Deposit", value: stats.totalDeposit, description: "All funds you've added.", colorClass: "text-green-500" },
+        { title: "Total Withdrawals", value: stats.totalWithdrawal, description: "All funds you've taken out.", colorClass: "text-red-500" },
+        { title: "Total Earnings", value: stats.totalEarning, description: "Your net profit from games.", colorClass: "text-yellow-500" },
     ];
 
   const mainActions = [
@@ -109,15 +109,6 @@ export default function DashboardPage() {
     { title: "Start Earning", description: "Play against others to win", icon: DollarSign, href: "/lobby" },
     { title: "My Rooms", description: "Check on your active games", icon: List, href: "/dashboard/my-rooms" },
     { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "/dashboard/wallet" },
-  ];
-
-  const secondaryActions = [
-    { title: "Friends", icon: Users, href: "/dashboard/friends" },
-    { title: "Ranking", icon: BarChart3, href: "/dashboard/rankings" },
-    { title: "Start Earning", icon: DollarSign, href: "/lobby" },
-    { title: "Chat", icon: MessageSquare, href: "/dashboard/chat" },
-    { title: "Refer & Earn", icon: Megaphone, href: "/dashboard/refer-earn" },
-    { title: "Equipment", icon: Gamepad2, href: "/dashboard/equipment" },
   ];
 
   return (
@@ -132,61 +123,37 @@ export default function DashboardPage() {
       <div className="grid gap-6">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {summaryCards.map((card) => (
-                <Card key={card.title}>
+                <Card key={card.title} className="bg-card/50">
                     <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                            <card.icon className={cn("w-4 h-4 text-muted-foreground", card.colorClass)} />
-                        </div>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {statsLoading ? (
+                         {statsLoading ? (
                             <Skeleton className="h-8 w-3/4" />
                         ) : (
-                            <div className={cn("text-2xl font-bold", card.colorClass)}>LKR {card.value?.toFixed(2) ?? '0.00'}</div>
+                            <div className={cn("text-3xl font-bold", card.colorClass)}>LKR {card.value?.toFixed(2) ?? '0.00'}</div>
                         )}
-                        <p className="text-xs text-muted-foreground">{card.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{card.description}</p>
                     </CardContent>
                 </Card>
             ))}
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {mainActions.map((action) => (
             <Link href={action.href} key={action.title}>
-                <Card className="hover:bg-primary/5 transition-all cursor-pointer h-full">
+                <Card className="bg-card/50 hover:bg-primary/5 transition-all cursor-pointer h-full">
                 <CardHeader>
-                    <action.icon className="w-8 h-8 text-primary mb-2" />
-                    <CardTitle>{action.title}</CardTitle>
+                    <div className="p-3 bg-primary/10 rounded-full w-fit mb-4">
+                        <action.icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <CardTitle className="text-lg">{action.title}</CardTitle>
                     <CardDescription>{action.description}</CardDescription>
                 </CardHeader>
                 </Card>
             </Link>
           ))}
         </div>
-        <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
-          {secondaryActions.map((action) => (
-             <Link href={action.href} key={action.title} className="block">
-                <Card className="hover:bg-primary/5 transition-all cursor-pointer h-full">
-                <CardContent className="p-4 flex flex-col items-center justify-center gap-2 h-full">
-                    <action.icon className="w-7 h-7 text-primary" />
-                    <span className="font-semibold text-center text-sm">{action.title}</span>
-                </CardContent>
-                </Card>
-            </Link>
-          ))}
-        </div>
-         <Card>
-            <CardHeader>
-                <CardTitle>Ready to Level Up Your Earnings?</CardTitle>
-                <CardDescription>Join our official marketing team to unlock a 20-level deep referral network and higher commission rates. If you're serious about building a large community, this is the next step.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button variant="outline" asChild>
-                    <Link href="/marketing/register">Apply to Join the Marketing Team</Link>
-                </Button>
-            </CardContent>
-        </Card>
       </div>
     </div>
   );

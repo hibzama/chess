@@ -33,12 +33,6 @@ const Logo = () => (
         <circle cx="12" cy="12" r="10" />
         <path d="m14.5 9.5-5 5" />
         <path d="m9.5 9.5 5 5" />
-        <path d="M12 3v1" />
-        <path d="M12 20v1" />
-        <path d="m5 7 1-1" />
-        <path d="m18 18 1-1" />
-        <path d="m5 17 1 1" />
-        <path d="m18 6-1 1" />
     </svg>
   );
 
@@ -183,11 +177,11 @@ export default function MainLayout({
                                 <SidebarMenuItem>
                                     <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
-                                 <SidebarMenuItem>
+                                <SidebarMenuItem>
                                     <Link href="/dashboard/profile"><SidebarMenuButton tooltip="My Profile" isActive={isMounted && pathname === '/dashboard/profile'}><User /><span>My Profile</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><BarChart3 /><span>My Rooms</span></SidebarMenuButton></Link>
+                                    <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><List /><span>My Rooms</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={isMounted && pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
@@ -199,10 +193,10 @@ export default function MainLayout({
                                     <Link href="/dashboard/rankings"><SidebarMenuButton tooltip="Rankings" isActive={isMounted && pathname.startsWith('/dashboard/rankings')}><Trophy /><span>Rankings</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={isMounted && pathname === '/dashboard/equipment'}><Swords /><span>My Equipment</span></SidebarMenuButton></Link>
+                                    <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={isMounted && pathname === '/dashboard/equipment'}><Gamepad2 /><span>My Equipment</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer & Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer & Earn</span></SidebarMenuButton></Link>
+                                    <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer & Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer & Earn</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                  <SidebarMenuItem>
                                     <Link href="/dashboard/chat"><SidebarMenuButton tooltip="Direct Messages" isActive={isMounted && pathname.startsWith('/dashboard/chat')}><MessageSquare /><span>Direct Messages</span></SidebarMenuButton></Link>
