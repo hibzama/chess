@@ -6,28 +6,9 @@ import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy } from "lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Logo = () => (
-    <div className="flex items-center gap-2">
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="w-8 h-8 text-primary"
-        >
-            <circle cx="12" cy="12" r="10" />
-            <path d="m14.5 9.5-5 5" />
-            <path d="m9.5 9.5 5 5" />
-            <path d="M12 3v1" />
-            <path d="M12 20v1" />
-            <path d="m5 7 1-1" />
-            <path d="m18 18 1-1" />
-            <path d="m5 17 1 1" />
-            <path d="m18 6-1 1" />
-        </svg>
-        <span className="text-xl font-bold text-primary">Nexbattle</span>
+    <div className="flex items-center gap-2 text-2xl font-bold">
+        <span>🎮</span>
+        <span>GO</span>
     </div>
   );
 
@@ -44,9 +25,9 @@ export default function LandingLayout({
     children: React.ReactNode
   }) {
     return (
-        <div className="flex flex-col min-h-screen">
-            <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm">
-                <div className="container mx-auto flex h-16 items-center justify-between px-4">
+        <div className="flex flex-col min-h-screen bg-gradient-to-r from-[#2a003f] to-[#340064]">
+            <header className="fixed top-0 left-0 right-0 z-50 bg-transparent">
+                <div className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6">
                      <Link href="/" className="flex items-center gap-2 font-bold">
                         <Logo />
                     </Link>
@@ -116,7 +97,7 @@ export default function LandingLayout({
                     </div>
                 </div>
             </header>
-            <main className="flex-1 pt-16">
+            <main className="flex-1 pt-20">
                 {children}
             </main>
         </div>
