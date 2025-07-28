@@ -10,10 +10,10 @@ import Image from 'next/image';
 const HeroIcon = () => (
     <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
         <defs>
-            <radialGradient id="grad2" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+            <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
                 <stop offset="0%" style={{stopColor: 'hsl(326, 100%, 50%)', stopOpacity: 0.8}} />
-                <stop offset="70%" style={{stopColor: 'hsl(36, 100%, 50%)', stopOpacity: 0.7}} />
-                <stop offset="100%" style={{stopColor: 'hsl(36, 100%, 50%)', stopOpacity: 0}} />
+                <stop offset="70%" style={{stopColor: 'hsl(54, 100%, 50%)', stopOpacity: 0.7}} />
+                <stop offset="100%" style={{stopColor: 'hsl(54, 100%, 50%)', stopOpacity: 0}} />
             </radialGradient>
             <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur stdDeviation="10" result="coloredBlur"/>
@@ -23,33 +23,34 @@ const HeroIcon = () => (
                 </feMerge>
             </filter>
             <pattern id="chessboard" patternUnits="userSpaceOnUse" width="20" height="20">
-              <rect x="0" y="0" width="10" height="10" fill="#fff" fillOpacity="0.2"/>
-              <rect x="10" y="0" width="10" height="10" fill="#000" fillOpacity="0.2"/>
-              <rect x="0" y="10" width="10" height="10" fill="#000" fillOpacity="0.2"/>
-              <rect x="10" y="10" width="10" height="10" fill="#fff" fillOpacity="0.2"/>
+              <rect x="0" y="0" width="10" height="10" fill="hsl(var(--primary))" fillOpacity="0.1"/>
+              <rect x="10" y="0" width="10" height="10" fill="hsl(var(--background))" fillOpacity="0.1"/>
+              <rect x="0" y="10" width="10" height="10" fill="hsl(var(--background))" fillOpacity="0.1"/>
+              <rect x="10" y="10" width="10" height="10" fill="hsl(var(--primary))" fillOpacity="0.1"/>
             </pattern>
         </defs>
         
-        <circle cx="100" cy="100" r="80" fill="url(#grad2)" filter="url(#glow)" opacity="0.8"/>
-        
-        <g transform="translate(100 100) scale(1.4)">
-             <g transform="rotate(-15) skewX(-20) scale(1.1)">
-                <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.5)" strokeWidth="1" rx="5"/>
+        <g transform="translate(100 100) scale(1.4) rotate(15)">
+             <g transform="skewX(-20) scale(1.1)">
+                <rect x="-50" y="-50" width="100" height="100" fill="url(#grad1)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" rx="5" filter="url(#glow)" />
+                <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" rx="5"/>
              </g>
-
+             
              <g transform="translate(-10, -15) scale(1.8)" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.5)" strokeWidth="0.5" strokeLinejoin="round">
-                {/* Dollar Sign */}
-                <path d="M17.5 22.5c-2.49 0-4.5-2.01-4.5-4.5s2.01-4.5 4.5-4.5c1.2 0 2.29.47 3.11 1.24.63-.43 1.38-.74 2.19-.74 1.93 0 3.5 1.57 3.5 3.5 0 1.29-.71 2.42-1.75 3.03.11.2.25.4.25.66 0 .83-.67 1.5-1.5 1.5h-5.8zm-1.5-3.5c0 .83.67 1.5 1.5 1.5h1.5v-3h-1.5c-.83 0-1.5.67-1.5 1.5zm6.5-1c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zM20 12v-1.5h-5V12h5zm0 13v-1.5h-5V25h5z" />
+                {/* Abstract shape 1 */}
+                <path d="M10 18 C 5 18, 5 12, 10 12 L 15 12 C 20 12, 20 18, 15 18 Z" />
+                <circle cx="12.5" cy="15" r="1.5" fill="black" />
              </g>
               <g transform="translate(20, 15) scale(1.3)" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" strokeLinejoin="round">
-                {/* Dollar sign */}
-                <path d="M17.5 22.5c-2.49 0-4.5-2.01-4.5-4.5s2.01-4.5 4.5-4.5c1.2 0 2.29.47 3.11 1.24.63-.43 1.38-.74 2.19-.74 1.93 0 3.5 1.57 3.5 3.5 0 1.29-.71 2.42-1.75 3.03.11.2.25.4.25.66 0 .83-.67 1.5-1.5 1.5h-5.8zm-1.5-3.5c0 .83.67 1.5 1.5 1.5h1.5v-3h-1.5c-.83 0-1.5.67-1.5 1.5zm6.5-1c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zM20 12v-1.5h-5V12h5zm0 13v-1.5h-5V25h5z" />
+                {/* Abstract shape 2 */}
+                <path d="M-5 28 C 0 28, 0 22, -5 22 L -10 22 C -15 22, -15 28, -10 28 Z" />
+                <circle cx="-7.5" cy="25" r="1.5" fill="white" />
              </g>
         </g>
         
-        <circle cx="160" cy="50" r="8" fill="#00e1ff" opacity="0.9" />
+        <circle cx="160" cy="50" r="8" fill="hsl(187, 100%, 50%)" opacity="0.9" />
         <circle cx="60" cy="150" r="6" fill="hsl(var(--accent))" opacity="0.9" />
-        <circle cx="135" cy="145" r="12" fill="#00e1ff" opacity="0.9" />
+        <circle cx="135" cy="145" r="12" fill="hsl(187, 100%, 50%)" opacity="0.9" />
         <circle cx="135" cy="145" r="9" fill="none" stroke="white" strokeWidth="1.5" />
     </svg>
 )
