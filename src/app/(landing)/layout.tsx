@@ -1,4 +1,3 @@
-
 'use client'
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -7,26 +6,29 @@ import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy } from "lucide-re
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Logo = () => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="w-8 h-8 text-primary"
-    >
-        <circle cx="12" cy="12" r="10" />
-        <path d="m14.5 9.5-5 5" />
-        <path d="m9.5 9.5 5 5" />
-        <path d="M12 3v1" />
-        <path d="M12 20v1" />
-        <path d="m5 7 1-1" />
-        <path d="m18 18 1-1" />
-        <path d="m5 17 1 1" />
-        <path d="m18 6-1 1" />
-    </svg>
+    <div className="flex items-center gap-2">
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-8 h-8 text-primary"
+        >
+            <circle cx="12" cy="12" r="10" />
+            <path d="m14.5 9.5-5 5" />
+            <path d="m9.5 9.5 5 5" />
+            <path d="M12 3v1" />
+            <path d="M12 20v1" />
+            <path d="m5 7 1-1" />
+            <path d="m18 18 1-1" />
+            <path d="m5 17 1 1" />
+            <path d="m18 6-1 1" />
+        </svg>
+        <span className="text-xl font-bold text-primary">Nexbattle</span>
+    </div>
   );
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
