@@ -78,7 +78,7 @@ export default function LandingLayout({
              <div 
                 className="absolute inset-0 z-0 opacity-40"
                 style={{
-                    backgroundImage: `url(https://i.ibb.co/8M4x4pB/d236034f-039c-449b-8919-98336382e3f5.jpg)`,
+                    backgroundImage: `url(https://allnews.ltd/wp-content/uploads/2025/07/image_c53578c4-bdf8-463e-9f83-91fe04552e6e.png)`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                 }}
