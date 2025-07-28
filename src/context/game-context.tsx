@@ -382,7 +382,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         return () => stopTimer();
     
-    }, [isMounted, gameState.gameOver, gameState.currentPlayer, gameState.playerColor, stopTimer, setWinner, gameState.boardState, isMultiplayer, room, user, updateAndSaveState, gameState.isEnding]);
+    }, [isMounted, gameState.gameOver, gameState.currentPlayer, gameState.playerColor, stopTimer, setWinner, gameState.boardState, isMultiplayer, room, user, updateAndSaveState, gameState.isEnding, gameState.p1Time, gameState.p2Time]);
 
 
     const loadGameState = (state: GameState) => {
@@ -391,8 +391,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const setupGame = (color: PlayerColor, time: number, diff: string) => {
         gameOverHandledRef.current = false;
+        // Clear previous game state from local storage for practice mode
+        if (!isMultiplayer && typeof window !== 'undefined') {
+            localStorage.removeItem(storageKey);
+        }
+        const defaultState = getInitialState();
         const newState: GameState = {
-            ...getInitialState(),
+            ...defaultState,
             playerColor: color,
             timeLimit: time,
             difficulty: diff,
