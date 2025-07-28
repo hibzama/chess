@@ -21,14 +21,29 @@ const HeroIcon = () => (
                     <feMergeNode in="SourceGraphic"/>
                 </feMerge>
             </filter>
+            <pattern id="chessboard" patternUnits="userSpaceOnUse" width="20" height="20">
+              <rect x="0" y="0" width="10" height="10" fill="#fff" fillOpacity="0.2"/>
+              <rect x="10" y="0" width="10" height="10" fill="#000" fillOpacity="0.2"/>
+              <rect x="0" y="10" width="10" height="10" fill="#000" fillOpacity="0.2"/>
+              <rect x="10" y="10" width="10" height="10" fill="#fff" fillOpacity="0.2"/>
+            </pattern>
         </defs>
         
         <circle cx="100" cy="100" r="80" fill="url(#grad2)" filter="url(#glow)" opacity="0.8"/>
         
-        <g transform="translate(100 100) scale(1.5)">
-             <rect x="-15" y="-15" width="30" height="30" fill="hsl(326, 100%, 50%)" stroke="white" strokeWidth="1.5" />
-             <line x1="0" y1="-20" x2="0" y2="-15" stroke="white" strokeWidth="1.5" />
-             <line x1="-2.5" y1="-17.5" x2="2.5" y2="-17.5" stroke="white" strokeWidth="1.5" />
+        <g transform="translate(100 100) scale(1.4)">
+             <g transform="rotate(-15) skewX(-20) scale(1.1)">
+                <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.5)" strokeWidth="1" rx="5"/>
+             </g>
+
+             <g transform="translate(-25, -20) scale(1.5)" fill="rgba(255,255,255,0.9)" stroke="rgba(0,0,0,0.5)" strokeWidth="0.5" strokeLinejoin="round">
+                {/* King */}
+                <path d="M9,36h27v-3H9v3z M12.5,30.5h20v-2.5h-20V30.5z M12.5,15.5l-3,3l-3-3l3-3L12.5,15.5z M32.5,15.5l-3,3l-3-3l3-3L32.5,15.5z M22.5,15.5l-3,3l-3-3l3-3L22.5,15.5z M12.5,28h20v-8l-7.5-5.5h-5L12.5,20V28z"/>
+             </g>
+              <g transform="translate(20, 5) scale(1.2)" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" strokeLinejoin="round">
+                {/* Knight */}
+                <path d="M22,10C32.02,10,32.02,24.33,32.02,24.33C32.02,24.33,26.01,27.33,26.01,27.33L25.01,29.33L32.02,31.33L32.02,36.33L12,36.33L12,32.33L18,29.33L18,10L22,10z"/>
+             </g>
         </g>
         
         <circle cx="160" cy="50" r="8" fill="#00e1ff" opacity="0.9" />
@@ -37,6 +52,7 @@ const HeroIcon = () => (
         <circle cx="135" cy="145" r="9" fill="none" stroke="white" strokeWidth="1.5" />
     </svg>
 )
+
 
 export default function LandingPage() {
  
