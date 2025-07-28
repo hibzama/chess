@@ -77,7 +77,7 @@ export default function LandingPage() {
                         <Link href="/marketing/register">Become a Partner</Link>
                     </Button>
                      <Button asChild size="lg" variant="outline">
-                        <Link href="#"><Download className="mr-2"/> Download APK</Link>
+                        <Link href="https://jani20001212.itch.io/nebattle" target="_blank" rel="noopener noreferrer"><Download className="mr-2"/> Download APK</Link>
                     </Button>
                 </div>
                  <div className="mt-8">
