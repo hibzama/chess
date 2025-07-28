@@ -21,6 +21,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { renderToString } from 'react-dom/server';
+import { boyAvatars, girlAvatars } from '@/components/icons/avatars';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 type Game = {
@@ -54,20 +56,6 @@ const ranks = [
     { title: "Legend", minWins: 43680, level: 75 },
     { title: "Immortal", minWins: 91444, level: 100 },
 ];
-
-const BoyAvatar1 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#fef3c7"/><path d="M25,80 h50 v15 h-50 z" fill="#fca5a5"/><path d="M25,80 h50 v-10 h-50 z" fill="#fb923c"/><path d="m35,45 h30" stroke="#000" strokeWidth="2"/><circle cx="40" cy="45" r="5" fill="#000"/><circle cx="60" cy="45" r="5" fill="#000"/><path d="M40,65 a10,10 0 0,0 20,0" fill="none" stroke="#000" strokeWidth="2"/></g></svg>;
-const BoyAvatar2 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#eef2ff"/><path d="M30,80 h40 v15 h-40 z" fill="#c4b5fd"/><circle cx="40" cy="50" r="2.5" fill="#000"/><circle cx="60" cy="50" r="2.5" fill="#000"/><path d="M35,30 a20,15 0 0,1 30,0" fill="none" stroke="#000" strokeWidth="2"/><path d="M45,65 a5,5 0 0,0 10,0" fill="none" stroke="#000" strokeWidth="2"/></g></svg>;
-const BoyAvatar3 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#f0fdf4"/><path d="M30,80 h40 v15 h-40 z" fill="#166534"/><circle cx="40" cy="50" r="2.5" fill="#000"/><circle cx="60" cy="50" r="2.5" fill="#000"/><path d="M35,30 a20,15 0 0,1 30,0" fill="none" stroke="#000" strokeWidth="2"/><path d="M45,65 a5,5 0 0,0 10,0" fill="none" stroke="#000" strokeWidth="2"/></g></svg>;
-const BoyAvatar4 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#e7e5e4"/><path d="M30,80 h40 v15 h-40 z" fill="#78716c"/><path d="M30 40 C 35 30, 65 30, 70 40" stroke="#f1f5f9" strokeWidth="5" fill="none"/><path d="M30,60 C40,80 60,80 70,60 L70,65 C60,90 40,90 30,65 Z" fill="#f1f5f9"/><circle cx="40" cy="50" r="2.5" fill="#000"/><circle cx="60" cy="50" r="2.5" fill="#000"/><path d="M45,65 a5,5 0 0,0 10,0" fill="none" stroke="#000" strokeWidth="2"/></g></svg>;
-
-const GirlAvatar1 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#eff6ff"/><path d="M30,80 h40 v15 h-40 z" fill="#60a5fa"/><path d="M30,85 C40,75 60,75 70,85 C 60,80 40,80 30,85" fill="#bfdbfe"/><path d="M30,35 a20,20 0 0,1 40,0" fill="#1e293b"/><circle cx="40" cy="55" r="2.5" fill="#000"/><circle cx="60" cy="55" r="2.5" fill="#000"/><path d="M45,70 a5,5 0 0,0 10,0" fill="none" stroke="#000" strokeWidth="2"/></g></svg>;
-const GirlAvatar2 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#f1f5f9"/><path d="M30,80 h40 v15 h-40 z" fill="#94a3b8"/><path d="M30,35 a20,20 0 0,1 40,0" fill="#1e293b"/><circle cx="40" cy="55" r="2.5" fill="#000"/><circle cx="60" cy="55" r="2.5" fill="#000"/><path d="M45,70 a5,5 0 0,0 10,0" fill="none" stroke="#000" strokeWidth="2"/></g></svg>;
-const GirlAvatar3 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#ede9fe"/><path d="M30,80 h40 v15 h-40 z" fill="#a78bfa"/><path d="M30,35 a20,20 0 0,1 40,0" fill="#1e293b"/><circle cx="40" cy="55" r="2.5" fill="#000"/><circle cx="60" cy="55" r="2.5" fill="#000"/><path d="M45,70 a5,5 0 0,0 10,0" fill="none" stroke="#000" strokeWidth="2"/><circle cx="35" cy="65" r="3" fill="#fcd34d"/><circle cx="65" cy="65" r="3" fill="#fcd34d"/></g></svg>;
-const GirlAvatar4 = () => <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g><circle cx="50" cy="50" r="45" fill="#f3e8ff"/><path d="M35 75 C 35 60 45 60 45 75 L 45 95 L 35 95 Z" fill="#c084fc"/><path d="M65 75 C 65 60 55 60 55 75 L 55 95 L 65 95 Z" fill="#c084fc"/><path d="M20 45 C 15 20, 50 15, 50 35 C 70 15, 95 25, 80 50 C 95 60, 90 80, 75 75" fill="#1e293b"/><circle cx="40" cy="55" r="2.5" fill="#000"/><path d="M35,65 a5,5 0 0,0 10,0" fill="none" stroke="#000" strokeWidth="2"/></g></svg>;
-
-const boyAvatars = [BoyAvatar1, BoyAvatar2, BoyAvatar3, BoyAvatar4];
-const girlAvatars = [GirlAvatar1, GirlAvatar2, GirlAvatar3, GirlAvatar4];
-
 
 const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string, value: number | string }) => (
     <Card className="bg-card/50 text-center">
@@ -291,32 +279,34 @@ export default function ProfilePage() {
                                             <AlertDialogTitle>Choose your Avatar</AlertDialogTitle>
                                             <AlertDialogDescription>Select an icon to represent you on the platform.</AlertDialogDescription>
                                         </AlertDialogHeader>
-                                        <div className="space-y-4">
-                                            <div>
-                                                <h4 className="font-semibold mb-2">Boy Avatars</h4>
-                                                <div className="grid grid-cols-4 gap-4">
-                                                    {boyAvatars.map((AvatarComponent, i) => (
-                                                        <button key={`boy-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                             <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
-                                                                <AvatarComponent/>
-                                                            </div>
-                                                        </button>
-                                                    ))}
+                                        <ScrollArea className="h-72">
+                                            <div className="space-y-4 p-1">
+                                                <div>
+                                                    <h4 className="font-semibold mb-2">Boy Avatars</h4>
+                                                    <div className="grid grid-cols-4 gap-4">
+                                                        {boyAvatars.map((AvatarComponent, i) => (
+                                                            <button key={`boy-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                                <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
+                                                                    <AvatarComponent/>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold mb-2">Girl Avatars</h4>
+                                                    <div className="grid grid-cols-4 gap-4">
+                                                        {girlAvatars.map((AvatarComponent, i) => (
+                                                            <button key={`girl-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                                <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
+                                                                    <AvatarComponent/>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div>
-                                                <h4 className="font-semibold mb-2">Girl Avatars</h4>
-                                                 <div className="grid grid-cols-4 gap-4">
-                                                    {girlAvatars.map((AvatarComponent, i) => (
-                                                        <button key={`girl-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                            <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
-                                                                <AvatarComponent/>
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
+                                        </ScrollArea>
                                         <AlertDialogFooter>
                                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                                             <AlertDialogAction onClick={handleAvatarSave} disabled={isSaving || !selectedAvatar}>
@@ -435,5 +425,3 @@ export default function ProfilePage() {
 
     
 }
-
-    

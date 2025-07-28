@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,13 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from "react";
+import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
+import { BoyAvatar1 } from "@/components/icons/avatars";
+import { renderToString } from "react-dom/server";
 
 
 export default function RegisterForm() {
@@ -63,6 +66,9 @@ export default function RegisterForm() {
             if (userCount <= 250) {
                 initialBalance = 100;
             }
+
+            const svgString = renderToString(React.createElement(BoyAvatar1));
+            const defaultAvatarUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
             
             const userData: any = {
                 uid: user.uid,
@@ -76,6 +82,7 @@ export default function RegisterForm() {
                 role: 'user',
                 createdAt: serverTimestamp(),
                 l1Count: 0,
+                photoURL: defaultAvatarUri,
             };
 
             const referrerId = mref || ref;
