@@ -1,3 +1,4 @@
+
 'use client'
 
 import Link from 'next/link';
@@ -161,11 +162,11 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                     <div className="w-full flex justify-between items-center px-2">
                         <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
                             <p className="font-semibold">{opponentData?.name ?? "Opponent"}</p>
-                            <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p>
+                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
                         </div>
                         <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
                             <p className="font-semibold">You</p>
-                            <p className="text-2xl font-bold">{formatTime(Math.ceil(p1Time))}</p>
+                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(p1Time))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
                         </div>
                     </div>
                     {children}
