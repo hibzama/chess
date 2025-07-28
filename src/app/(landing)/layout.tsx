@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { LifeBuoy, Phone, Mail } from "lucide-react";
+import { LifeBuoy, Phone, Mail, Megaphone } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 const Logo = () => (
     <svg
@@ -52,10 +53,10 @@ export default function LandingLayout({
                             <Link href="/" className="hover:text-primary">Home</Link>
                             <Link href="/about" className="hover:text-primary">About Us</Link>
                              <DialogTrigger asChild>
-                                <button className="hover:text-primary">Marketing</button>
+                                <button className="hover:text-primary" data-dialog-id="marketing">Marketing</button>
                             </DialogTrigger>
                              <DialogTrigger asChild>
-                                <button className="hover:text-primary">Support</button>
+                                <button className="hover:text-primary" data-dialog-id="support">Support</button>
                             </DialogTrigger>
                         </nav>
                         <div className="flex items-center gap-2">
@@ -72,7 +73,7 @@ export default function LandingLayout({
                     {children}
                 </main>
             </div>
-             <DialogContent>
+             <DialogContent data-dialog-id="support">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
                     <DialogDescription>
@@ -90,6 +91,23 @@ export default function LandingLayout({
                         <a href="mailto:nexbattlehelp@gmail.com"><Mail/> nexbattlehelp@gmail.com</a>
                     </Button>
                 </div>
+            </DialogContent>
+             <DialogContent data-dialog-id="marketing">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2"><Megaphone/> Become a Marketing Partner</DialogTitle>
+                    <DialogDescription>
+                        Supercharge your earnings by joining our official Marketing Team.
+                    </DialogDescription>
+                </DialogHeader>
+                <Card className="bg-primary/5 border-primary/20 mt-4">
+                    <CardContent className="p-6 text-sm space-y-4">
+                        <p>Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.</p>
+                        <p className="text-muted-foreground">If you are a community builder with a vision for growth, we want you on our team. Apply now to get started.</p>
+                         <Button asChild className="w-full">
+                            <Link href="/marketing/register">Apply to be a Marketer</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
             </DialogContent>
         </Dialog>
     )

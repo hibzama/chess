@@ -176,6 +176,17 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+         <Card>
+            <CardHeader>
+                <CardTitle>Ready to Level Up Your Earnings?</CardTitle>
+                <CardDescription>Join our official marketing team to unlock a 20-level deep referral network and higher commission rates. If you're serious about building a large community, this is the next step.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button variant="outline" asChild>
+                    <Link href="/marketing/register">Apply to Join the Marketing Team</Link>
+                </Button>
+            </CardContent>
+        </Card>
       </div>
     </div>
   );
