@@ -23,5 +23,6 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
         return <MainLayout>{children}</MainLayout>
     }
     
-    return <LandingLayout>{children}</LandingLayout>
+    return <>{children}</>
 }
+

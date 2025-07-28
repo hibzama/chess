@@ -36,9 +36,7 @@ export default function RootLayout({
         )}
       >
         <Providers>
-            <ConditionalLayout>
-                {children}
-            </ConditionalLayout>
+            {children}
         </Providers>
       </body>
     </html>
