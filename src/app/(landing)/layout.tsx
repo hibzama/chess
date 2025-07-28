@@ -85,15 +85,17 @@ export default function LandingLayout({
                 }}
             />
             <div 
-                className="absolute inset-0 z-0 opacity-[0.03]"
+                className="absolute inset-0 z-0 opacity-5"
                 style={{
                     backgroundImage: `
-                        repeating-linear-gradient(0deg, transparent, transparent 49px, hsl(var(--primary)) 50px),
-                        repeating-linear-gradient(90deg, transparent, transparent 49px, hsl(var(--primary)) 50px)
+                       linear-gradient(45deg, hsl(var(--primary)) 2px, transparent 2px),
+                       linear-gradient(-45deg, hsl(var(--primary)) 2px, transparent 2px)
                     `,
-                    backgroundSize: '50px 50px'
+                    backgroundSize: '100px 100px',
+                    maskImage: 'linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)'
                 }}
             />
+
 
             <header className="container mx-auto flex h-20 items-center justify-between px-4 md:px-6 relative z-10">
                  <Link href="/" className="flex items-center gap-2 font-bold">
@@ -264,7 +266,5 @@ export default function LandingLayout({
                 {children}
             </main>
         </div>
-    )
+    );
   }
-
-    
