@@ -8,7 +8,7 @@ import { BonusCard } from './bonus-card';
 import Image from 'next/image';
 
 const HeroIcon = () => (
-    <div className="group w-full h-full">
+    <div className="w-full h-full">
         <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full animate-zoom-in-out">
             <defs>
                 <radialGradient id="grad1" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
@@ -31,7 +31,7 @@ const HeroIcon = () => (
                 </pattern>
             </defs>
             
-            <g className="transition-transform duration-300 ease-in-out group-hover:scale-105" transform="translate(100 100) scale(1.4) rotate(15)">
+            <g className="transition-transform duration-300 ease-in-out" transform="translate(100 100) scale(1.4) rotate(15)">
                  <g transform="skewX(-20) scale(1.1)">
                     <rect x="-50" y="-50" width="100" height="100" fill="url(#grad1)" stroke="rgba(255,255,255,0.1)" strokeWidth="1" rx="5" filter="url(#glow)" />
                     <rect x="-50" y="-50" width="100" height="100" fill="url(#chessboard)" stroke="rgba(255,255,255,0.2)" strokeWidth="1" rx="5"/>
