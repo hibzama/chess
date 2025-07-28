@@ -269,19 +269,6 @@ function MultiplayerGamePageContent() {
         const roomRef = doc(db, 'game_rooms', room.id);
 
         try {
-
-            // Presence Check
-            const rtdb = getDatabase();
-            const creatorStatusRef = ref(rtdb, `/status/${room.createdBy.uid}`);
-            const creatorStatusSnapshot = await get(creatorStatusRef);
-            if (!creatorStatusSnapshot.exists() || creatorStatusSnapshot.val().state !== 'online') {
-                await deleteDoc(roomRef);
-                toast({ variant: "destructive", title: "Opponent Offline", description: "The creator is no longer active. This room has been closed." });
-                router.push(`/lobby/${room.gameType}`);
-                setIsJoining(false);
-                return;
-            }
-
             await runTransaction(db, async (transaction) => {
                 const currentRoomDoc = await transaction.get(roomRef);
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
@@ -583,4 +570,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
