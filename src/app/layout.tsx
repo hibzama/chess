@@ -4,12 +4,16 @@ import './globals.css';
 import { Providers } from './providers';
 import { Inter as FontSans } from 'next/font/google';
 import { cn } from '@/lib/utils';
+import ConditionalLayout from './conditional-layout';
 
 const fontSans = FontSans({
   subsets: ['latin'],
   variable: '--font-sans',
 });
 
+// Metadata can't be used in a client component, so we export it from here.
+// Note: This is a static metadata object. For dynamic metadata in a client component,
+// you would need a different approach.
 export const metadata: Metadata = {
   title: 'Nexbattle',
   description: 'Play chess and checkers online with friends.',
@@ -31,7 +35,11 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <Providers>{children}</Providers>
+        <Providers>
+            <ConditionalLayout>
+                {children}
+            </ConditionalLayout>
+        </Providers>
       </body>
     </html>
   );
