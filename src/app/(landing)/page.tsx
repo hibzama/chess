@@ -54,7 +54,7 @@ export default function LandingPage() {
                 </ul>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                     <Button asChild size="lg">
-                        <Link href="/marketing/register">Become a Partner</Link>
+                        <Link href="/register">Register & Play</Link>
                     </Button>
                      <Button asChild size="lg" variant="outline">
                         <Link href="https://jani20001212.itch.io/nebattle" target="_blank" rel="noopener noreferrer"><Download className="mr-2"/> Download APK</Link>
