@@ -188,21 +188,18 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             )}
 
             <div className="lg:hidden w-full space-y-4 mt-4">
-                 {isMultiplayer ? (
-                    <>
-                        <CapturedPieces pieceStyle={equipment?.pieceStyle} />
-                        <Card>
-                            <CardContent className="p-4">
-                                <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
-                                    <Flag className="w-4 h-4 mr-2" />
-                                    Resign
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </>
-                 ) : (
-                    <GameInfo />
-                 )}
+                <GameInfo />
+                <CapturedPieces pieceStyle={equipment?.pieceStyle} />
+                {isMultiplayer && (
+                    <Card>
+                        <CardContent className="p-4">
+                            <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
+                                <Flag className="w-4 h-4 mr-2" />
+                                Resign
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
 
@@ -212,30 +209,27 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
               playerName={opponentData?.name ?? "Opponent"}
               avatarSrc={opponentData?.photoURL}
             />
+            <GameInfo />
             <CapturedPieces pieceStyle={equipment?.pieceStyle} />
-             {isMultiplayer ? (
-                 <>
-                    <Card>
-                        <CardContent className="p-4 space-y-2">
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" className="w-full">
-                                        <MessageSquare className="w-4 h-4 mr-2" /> Game Chat
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80 h-96 p-0 flex flex-col">
-                                    <GameChat onClose={() => {}} />
-                                </PopoverContent>
-                            </Popover>
-                            <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
-                                <Flag className="w-4 h-4 mr-2" />
-                                Resign
-                            </Button>
-                        </CardContent>
-                    </Card>
-                 </>
-             ) : (
-                <GameInfo />
+             {isMultiplayer && (
+                 <Card>
+                    <CardContent className="p-4 space-y-2">
+                         <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="w-full">
+                                    <MessageSquare className="w-4 h-4 mr-2" /> Game Chat
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 h-96 p-0 flex flex-col">
+                                <GameChat onClose={() => {}} />
+                            </PopoverContent>
+                        </Popover>
+                        <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
+                            <Flag className="w-4 h-4 mr-2" />
+                            Resign
+                        </Button>
+                    </CardContent>
+                </Card>
              )}
         </aside>
       </main>

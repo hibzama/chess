@@ -6,9 +6,11 @@ import { useGame } from '@/context/game-context';
 import { Button } from '../ui/button';
 import { useEffect, useState } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { useAuth } from '@/context/auth-context';
 
 export function GameInfo() {
-    const { playerColor, moveCount, resign } = useGame();
+    const { playerColor, moveCount, resign, isMultiplayer, room, user } = useGame();
+    const { userData } = useAuth();
     const [isClient, setIsClient] = useState(false);
     const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
 
@@ -20,6 +22,10 @@ export function GameInfo() {
         setIsResignConfirmOpen(false);
         resign();
     }
+    
+    const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
+    const opponentName = isMultiplayer ? (opponentData?.name ?? 'Opponent') : 'Bot';
+
 
     return (
         <>
@@ -37,16 +43,18 @@ export function GameInfo() {
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Opponent:</span>
-                    <span className="font-medium">Bot</span>
+                    <span className="font-medium">{opponentName}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Total Moves:</span>
                     <span className="font-medium">{isClient ? moveCount : 0}</span>
                 </div>
-                 <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)}>
-                    <Flag className="w-4 h-4 mr-2" />
-                    Resign
-                </Button>
+                 {!isMultiplayer && (
+                    <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)}>
+                        <Flag className="w-4 h-4 mr-2" />
+                        Resign
+                    </Button>
+                 )}
             </CardContent>
         </Card>
          <AlertDialog open={isResignConfirmOpen} onOpenChange={setIsResignConfirmOpen}>
