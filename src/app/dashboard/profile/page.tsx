@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Ban, BrainCircuit, Layers, ShieldQuestion, Users } from 'lucide-react';
+import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Ban, BrainCircuit, Layers, ShieldQuestion, Users, DollarSign } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -29,11 +29,12 @@ type Game = {
     id: string;
     gameType: 'chess' | 'checkers';
     status: 'completed';
-    winner?: { uid: string | null, method: string };
+    winner?: { uid: string | null, method: string, resignerId?: string | null };
     draw?: boolean;
     createdAt: any;
     createdBy: { uid: string, name: string };
     player2?: { uid: string, name: string };
+    wager: number;
 };
 
 type GameStats = {
@@ -78,6 +79,8 @@ export default function ProfilePage() {
     const [selectedAvatar, setSelectedAvatar] = useState<React.FC | null>(null);
     const [worldRank, setWorldRank] = useState<number | null>(null);
     const [avatarTab, setAvatarTab] = useState<'boy' | 'girl'>('boy');
+
+    const USDT_RATE = 310;
 
     const getInitials = () => {
         if (userData) {
@@ -205,10 +208,21 @@ export default function ProfilePage() {
         }
     }
     
-    const getResultForUser = (game: Game) => {
-        if (game.draw) return { text: 'Draw', color: 'text-yellow-400' };
-        if (game.winner?.uid === user?.uid) return { text: 'Win', color: 'text-green-400' };
-        return { text: 'Loss', color: 'text-red-400' };
+     const getResultForUser = (game: Game) => {
+        if (game.draw) {
+            return { text: 'Draw', color: 'text-yellow-400', net: -(game.wager * 0.1) };
+        }
+        if (game.winner?.resignerId) { // Resignation occurred
+             if(game.winner.resignerId === user?.uid) { // I resigned
+                return { text: 'Loss', color: 'text-red-400', net: -(game.wager * 0.25) };
+             } else { // Opponent resigned
+                return { text: 'Win', color: 'text-green-400', net: game.wager * 0.05 };
+             }
+        }
+        if (game.winner?.uid === user?.uid) {
+            return { text: 'Win', color: 'text-green-400', net: game.wager * 0.8 };
+        }
+        return { text: 'Loss', color: 'text-red-400', net: -game.wager };
     }
 
     if (authLoading || statsLoading) {
@@ -338,7 +352,7 @@ export default function ProfilePage() {
                                         <TableHead>Game</TableHead>
                                         <TableHead>Opponent</TableHead>
                                         <TableHead>Result</TableHead>
-                                        <TableHead>Reason</TableHead>
+                                        <TableHead>Return</TableHead>
                                         <TableHead>Date</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -351,7 +365,10 @@ export default function ProfilePage() {
                                                 <TableCell className="capitalize">{game.gameType}</TableCell>
                                                 <TableCell>{opponent?.name || 'Unknown'}</TableCell>
                                                 <TableCell><Badge variant={result.text === 'Win' ? 'default' : result.text === 'Loss' ? 'destructive' : 'secondary'}>{result.text}</Badge></TableCell>
-                                                <TableCell className="capitalize">{game.winner?.method || 'N/A'}</TableCell>
+                                                <TableCell className={cn("font-semibold", result.net > 0 ? "text-green-400" : "text-red-400")}>
+                                                    <div>LKR {result.net.toFixed(2)}</div>
+                                                    <div className="text-xs font-normal text-muted-foreground">~{(result.net / USDT_RATE).toFixed(2)} USDT</div>
+                                                </TableCell>
                                                 <TableCell>{game.createdAt ? format(game.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                                             </TableRow>
                                         )
