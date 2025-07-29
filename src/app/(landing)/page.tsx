@@ -13,7 +13,7 @@ import { redirect } from 'next/navigation';
 const HeroIcon = () => (
     <div className="relative w-full h-full min-h-[300px] md:min-h-[400px] rounded-2xl overflow-hidden shadow-2xl shadow-primary/20">
         <Image
-            src="https://allnews.ltd/wp-content/uploads/2025/07/image_a79f88c3-f09d-4055-905b-810673327b40.png"
+            src="https://i.ibb.co/3k5g7b2/image-a79f88c3-f09d-4055-905b-810673327b40.png"
             alt="Hero Image"
             fill
             className="object-cover animate-zoom-in-out"
