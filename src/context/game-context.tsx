@@ -174,7 +174,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
                     const reason = method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture');
                     creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
+                    // Increment winner's win count
+                    transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
                 }
     
                 const now = serverTimestamp();
@@ -200,21 +202,23 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             });
             return payoutResult;
         } catch (error) {
-            if (String(error) !== 'Payout already processed') {
-                 console.error("Payout Transaction failed:", error);
-            }
-            // If already processed, let's calculate the payout to display correctly.
-             if (String(error) === 'Payout already processed' && winnerDetails.winnerId) {
+            if (String(error).includes('Payout already processed')) {
+                // If payout is done, figure out what to display to the user
                 const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
                 if (roomDoc.exists()) {
                     const roomData = roomDoc.data() as GameRoom;
                     const wager = roomData.wager;
-                    if(winnerDetails.winnerId === user.uid) {
-                        return { myPayout: wager * 1.8 }
+                    if (roomData.winner?.resignerId) { // Resignation
+                        return { myPayout: roomData.winner.resignerId === user.uid ? wager * 0.75 : wager * 1.05 };
+                    } else if (roomData.draw) { // Draw
+                        return { myPayout: wager * 0.9 };
+                    } else if (roomData.winner?.uid === user.uid) { // I won
+                        return { myPayout: wager * 1.8 };
                     }
                 }
-             }
-
+            } else {
+                 console.error("Payout Transaction failed:", error);
+            }
             return { myPayout: 0 };
         }
     }, [user, roomId]);

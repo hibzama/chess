@@ -87,7 +87,7 @@ export default function ProfilePage() {
     }
     
     useEffect(() => {
-        if (!user) return;
+        if (!user || !userData) return;
 
         const fetchGameData = async () => {
             setStatsLoading(true);
@@ -98,35 +98,16 @@ export default function ProfilePage() {
                 where('status', '==', 'completed')
             );
             const gamesSnapshot = await getDocs(gamesQuery);
-
-            let wins = 0;
-            const history: Game[] = [];
-            gamesSnapshot.forEach(doc => {
-                const game = { ...doc.data(), id: doc.id } as Game;
-                if (!game.draw && game.winner?.uid === user.uid) {
-                    wins++;
-                }
-                history.push(game);
-            });
-            
+            const history: Game[] = gamesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Game));
             setGameHistory(history.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
 
-            const allUsersCollection = collection(db, 'users');
-            const allUsersSnapshot = await getDocs(allUsersCollection);
-            const allUsers = allUsersSnapshot.docs.map(doc => {
-                const data = doc.data();
-                const totalWins = data.wins || 0; // Assuming 'wins' is a field on the user doc
-                return { uid: doc.id, wins: totalWins };
-            });
-
-            allUsers.sort((a, b) => b.wins - a.wins);
-            const rank = allUsers.findIndex(u => u.uid === user.uid) + 1;
-            setWorldRank(rank > 0 ? rank : null);
-
-            // Update user's win count in firestore if it's different
-            if(userData?.wins !== wins) {
-                await updateDoc(doc(db, 'users', user.uid), { wins });
-            }
+            // Fetch World Rank
+            const usersWithMoreWinsQuery = query(
+                collection(db, 'users'),
+                where('wins', '>', userData.wins || 0)
+            );
+            const snapshot = await getCountFromServer(usersWithMoreWinsQuery);
+            setWorldRank(snapshot.data().count + 1);
 
             setStatsLoading(false);
         };
@@ -134,11 +115,10 @@ export default function ProfilePage() {
         fetchGameData();
     }, [user, userData]);
 
-     const { chess: chessStats, checkers: checkersStats, totalWins } = useMemo(() => {
-        const stats: { chess: GameStats, checkers: GameStats, totalWins: number } = {
+     const { chess: chessStats, checkers: checkersStats } = useMemo(() => {
+        const stats: { chess: GameStats, checkers: GameStats } = {
             chess: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
             checkers: { played: 0, wins: 0, losses: 0, draws: 0, winRate: 0 },
-            totalWins: 0,
         };
 
         if (!user) return stats;
@@ -155,14 +135,9 @@ export default function ProfilePage() {
             }
 
             stats[statType].played++;
-            if (result === 'win') {
-                stats[statType].wins++;
-                stats.totalWins++;
-            } else if (result === 'loss') {
-                stats[statType].losses++;
-            } else {
-                stats[statType].draws++;
-            }
+            if (result === 'win') stats[statType].wins++;
+            else if (result === 'loss') stats[statType].losses++;
+            else stats[statType].draws++;
         });
 
         if (stats.chess.played > 0) {
@@ -175,6 +150,8 @@ export default function ProfilePage() {
         return stats;
     }, [gameHistory, user]);
     
+    const totalWins = userData?.wins || 0;
+
     const { rank, nextRank, winsToNextLevel, progress } = useMemo(() => {
         const currentRankIndex = ranks.slice().reverse().findIndex(r => totalWins >= r.minWins) ?? (ranks.length - 1);
         const rank = ranks[ranks.length - 1 - currentRankIndex];
@@ -243,7 +220,7 @@ export default function ProfilePage() {
         if (totalPlayed === 0) return 0;
         const totalNonDraws = totalPlayed - (chessStats.draws + checkersStats.draws);
         if (totalNonDraws === 0) return 0;
-        return Math.round((totalWins / totalNonDraws) * 100);
+        return Math.round(((chessStats.wins + checkersStats.wins) / totalNonDraws) * 100);
     }
 
     return (
