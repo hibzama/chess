@@ -21,6 +21,8 @@ export default function DashboardPage() {
     });
     const [statsLoading, setStatsLoading] = useState(true);
 
+    const USDT_RATE = 310;
+
     useEffect(() => {
         if (user) {
             const fetchStats = async () => {
@@ -140,9 +142,12 @@ export default function DashboardPage() {
                          {statsLoading ? (
                             <Skeleton className="h-8 w-3/4" />
                         ) : (
-                            <div className={cn("text-3xl font-bold", card.colorClass)}>LKR {card.value?.toFixed(2) ?? '0.00'}</div>
+                            <div>
+                                <div className={cn("text-3xl font-bold", card.colorClass)}>LKR {card.value?.toFixed(2) ?? '0.00'}</div>
+                                <p className="text-xs text-muted-foreground">~{((card.value ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
+                            </div>
                         )}
-                        <p className="text-xs text-muted-foreground mt-1">{card.description}</p>
+                        <p className="text-xs text-muted-foreground mt-2">{card.description}</p>
                     </CardContent>
                 </Card>
             ))}
