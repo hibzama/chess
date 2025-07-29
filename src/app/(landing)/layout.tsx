@@ -78,7 +78,7 @@ export default function LandingLayout({
              <div 
                 className="absolute inset-0 z-0 opacity-40 animate-zoom-in-out"
                 style={{
-                    backgroundImage: `url(https://allnews.ltd/wp-content/uploads/2025/07/image_c53578c4-bdf8-463e-9f83-91fe04552e6e.png)`,
+                    backgroundImage: `url(https://i.ibb.co/3k5g7b2/image-a79f88c3-f09d-4055-905b-810673327b40.png)`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                 }}
