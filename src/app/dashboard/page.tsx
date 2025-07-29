@@ -111,6 +111,15 @@ export default function DashboardPage() {
     { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "/dashboard/wallet" },
   ];
 
+  const navActions = [
+    { title: "Friends", icon: Users, href: "/dashboard/friends" },
+    { title: "Ranking", icon: BarChart3, href: "/dashboard/rankings" },
+    { title: "Start Earning", icon: DollarSign, href: "/lobby" },
+    { title: "Chat", icon: MessageSquare, href: "/dashboard/chat" },
+    { title: "Refer & Earn", icon: Megaphone, href: "/dashboard/refer-earn" },
+    { title: "Equipment", icon: Gamepad2, href: "/dashboard/equipment" },
+  ];
+
   return (
     <div className="flex flex-col">
       <div className="mb-12">
@@ -154,6 +163,20 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {navActions.map((action) => (
+                <Link href={action.href} key={action.title}>
+                    <Card className="bg-card/50 hover:bg-primary/5 transition-colors cursor-pointer h-full">
+                        <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
+                           <action.icon className="w-7 h-7 text-primary"/>
+                           <span className="text-sm font-medium">{action.title}</span>
+                        </CardContent>
+                    </Card>
+                </Link>
+            ))}
+        </div>
+
       </div>
     </div>
   );
