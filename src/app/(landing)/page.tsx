@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import Link from 'next/link';
@@ -13,7 +12,7 @@ import { redirect } from 'next/navigation';
 const HeroIcon = () => (
     <div className="relative w-full h-full min-h-[300px] md:min-h-[400px] rounded-2xl overflow-hidden shadow-2xl shadow-primary/20">
         <Image
-            src="https://allnews.ltd/wp-content/uploads/2025/07/futuristic-video-game-controller-background-with-text-space_1017-54730.avif"
+            src="https://allnews.ltd/wp-content/uploads/2025/07/video-game-controller-with-bright-neon-light-streaks-computer-gamer-background-3d-octane-render-game-concept-ideas-ai-generative-free-photo.jpg"
             alt="Hero Image"
             fill
             className="object-cover animate-zoom-in-out"
