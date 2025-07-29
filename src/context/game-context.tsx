@@ -163,7 +163,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     creatorPayout = isCreatorResigner ? wager * 0.75 : wager * 1.05;
                     joinerPayout = !isCreatorResigner ? wager * 0.75 : wager * 1.05;
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                 } else if (winnerId === 'draw') { // Draw logic
                     creatorPayout = joinerPayout = wager * 0.9;
                     creatorDesc = `Draw refund vs ${roomData.player2.name}`;
@@ -305,11 +305,19 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 }
             }
 
+            const moveHistory = roomData.moveHistory || [];
+            let moveCount = 0;
+            if (moveHistory.length > 0) {
+                const lastMove = moveHistory[moveHistory.length - 1];
+                moveCount = (lastMove.turn - 1) * 2 + (lastMove.black ? 2 : 1);
+            }
+
             setGameState(prevState => ({
                 ...prevState,
                 playerColor: pColor,
                 boardState: currentBoardState,
-                moveHistory: roomData.moveHistory || [],
+                moveHistory: moveHistory,
+                moveCount: moveCount,
                 currentPlayer: roomData.currentPlayer,
                 capturedByPlayer: isCreator ? roomData.capturedByP2 || [] : roomData.capturedByP1 || [],
                 capturedByBot: isCreator ? roomData.capturedByP1 || [] : roomData.capturedByP2 || [],
