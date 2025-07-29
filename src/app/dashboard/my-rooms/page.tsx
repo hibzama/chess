@@ -32,18 +32,21 @@ type GameRoom = {
 };
 
 const GameRoomCard = ({ room, onCancel, onRejoin }: { room: GameRoom, onCancel: (id: string, wager: number) => void, onRejoin: (id: string) => void }) => {
+    const { user } = useAuth();
+    if (!user) return null;
+    
     return (
         <Card className="bg-card/50">
             <CardContent className="p-4 flex items-center justify-between">
                 <div className="space-y-1">
                     <p className="font-bold text-sm">LKR {room.wager.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">{room.timeControl / 60} min | Created by: {room.createdBy.uid === useAuth().user?.uid ? "You" : room.createdBy.name}</p>
+                    <p className="text-xs text-muted-foreground">{room.timeControl / 60} min | Created by: {room.createdBy.uid === user.uid ? "You" : room.createdBy.name}</p>
                     <p className="text-xs text-muted-foreground">
                         {room.status === 'in-progress' ? `vs ${room.player2?.name}` : `Created ${formatDistanceToNowStrict(room.createdAt.toDate(), { addSuffix: true })}`}
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    {room.status === 'waiting' && room.createdBy.uid === useAuth().user?.uid && (
+                    {room.status === 'waiting' && room.createdBy.uid === user.uid && (
                         <Button variant="destructive" size="sm" onClick={() => onCancel(room.id, room.wager)}>Cancel</Button>
                     )}
                      {room.status === 'in-progress' && (
@@ -99,14 +102,10 @@ export default function MyRoomsPage() {
     const handleCancelRoom = async (roomId: string, wager: number) => {
         if (!user) return;
         const roomRef = doc(db, 'game_rooms', roomId);
-        const userRef = doc(db, 'users', user.uid);
-        const batch = writeBatch(db);
-
+        
         try {
-            batch.delete(roomRef);
-            batch.update(userRef, { balance: increment(wager) });
-            await batch.commit();
-            toast({ title: "Room Cancelled", description: "Your wager has been refunded." });
+            await deleteDoc(roomRef);
+            toast({ title: "Room Cancelled", description: "The room has been removed." });
         } catch (error) {
             console.error("Failed to cancel room:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to cancel the room.' });
@@ -203,4 +202,3 @@ export default function MyRoomsPage() {
         </div>
     );
 }
-
