@@ -37,6 +37,18 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/wp-admin/:path*',
+        destination: '/',
+      },
+      {
+        source: '/wordpress/wp-admin/:path*',
+        destination: '/',
+      },
+    ];
+  },
 };
 
 export default nextConfig;
