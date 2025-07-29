@@ -204,11 +204,13 @@ function MultiplayerGamePageContent() {
     
         try {
             const roomDoc = await getDoc(roomRef);
+            // Only proceed if the room still exists and is waiting
             if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
                 if (!isAutoCancel) router.push('/lobby');
                 return;
             }
     
+            // Just delete the room. No refunds needed as no wager was taken.
             await deleteDoc(roomRef);
     
             if (isAutoCancel) {
