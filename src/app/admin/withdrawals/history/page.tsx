@@ -15,11 +15,13 @@ interface Transaction {
     amount: number;
     status: 'approved' | 'rejected';
     createdAt: any;
+    withdrawalMethod: 'bank' | 'binance';
     withdrawalDetails: {
-        bankName: string;
-        branch: string;
-        accountNumber: string;
-        accountName: string;
+        bankName?: string;
+        branch?: string;
+        accountNumber?: string;
+        accountName?: string;
+        binancePayId?: string;
     };
     user?: { firstName: string; lastName: string; email: string };
 }
@@ -92,12 +94,18 @@ export default function WithdrawalHistoryPage() {
                                 <TableCell>
                                 <Accordion type="single" collapsible className="w-full">
                                         <AccordionItem value="item-1">
-                                            <AccordionTrigger className="py-1">View Details</AccordionTrigger>
+                                            <AccordionTrigger className="py-1 capitalize">{w.withdrawalMethod}</AccordionTrigger>
                                             <AccordionContent className="text-xs space-y-1 pt-2">
-                                                <p><strong>Bank:</strong> {w.withdrawalDetails.bankName}</p>
-                                                <p><strong>Branch:</strong> {w.withdrawalDetails.branch}</p>
-                                                <p><strong>Account #:</strong> {w.withdrawalDetails.accountNumber}</p>
-                                                <p><strong>Name:</strong> {w.withdrawalDetails.accountName}</p>
+                                                {w.withdrawalMethod === 'bank' ? (
+                                                    <>
+                                                        <p><strong>Bank:</strong> {w.withdrawalDetails.bankName}</p>
+                                                        <p><strong>Branch:</strong> {w.withdrawalDetails.branch}</p>
+                                                        <p><strong>Account #:</strong> {w.withdrawalDetails.accountNumber}</p>
+                                                        <p><strong>Name:</strong> {w.withdrawalDetails.accountName}</p>
+                                                    </>
+                                                ) : (
+                                                    <p><strong>PayID:</strong> {w.withdrawalDetails.binancePayId}</p>
+                                                )}
                                             </AccordionContent>
                                         </AccordionItem>
                                     </Accordion>

@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -55,7 +54,7 @@ export default function WalletPage() {
   const [isPostSubmitInfoOpen, setIsPostSubmitInfoOpen] = useState(false);
 
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
-  const [withdrawalMethod, setWithdrawalMethod] = useState('bank');
+  const [withdrawalMethod, setWithdrawalMethod] = useState<'bank' | 'binance'>('bank');
   const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: '', branch: '', accountNumber: '', accountName: '' });
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   
@@ -137,10 +136,22 @@ export default function WalletPage() {
 
   const handleWithdrawalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !withdrawalAmount || Object.values(withdrawalDetails).some(v => v === '')) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all fields.' });
+
+    if (!user || !userData || !withdrawalAmount) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all required fields.' });
       return;
     }
+
+    if (withdrawalMethod === 'bank' && Object.values(withdrawalDetails).some(v => v === '')) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all bank details.' });
+      return;
+    }
+    
+    if (withdrawalMethod === 'binance' && !userData.binancePayId) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You have not set up a Binance PayID on your account.' });
+        return;
+    }
+
     const amountInLKR = parseFloat(withdrawalAmount);
 
     if (amountInLKR < 500) {
@@ -166,15 +177,16 @@ export default function WalletPage() {
         type: 'withdrawal',
         amount: amountInLKR,
         status: 'pending',
-        description: `Withdrawal to ${withdrawalDetails.bankName}`,
         withdrawalMethod,
-        withdrawalDetails,
+        withdrawalDetails: withdrawalMethod === 'bank' ? withdrawalDetails : { binancePayId: userData.binancePayId },
         createdAt: serverTimestamp()
       });
 
       toast({ title: 'Success', description: 'Withdrawal request submitted.' });
       setWithdrawalAmount('');
-      setWithdrawalDetails({ bankName: '', branch: '', accountNumber: '', accountName: '' });
+      if (withdrawalMethod === 'bank') {
+        setWithdrawalDetails({ bankName: '', branch: '', accountNumber: '', accountName: '' });
+      }
 
     } catch (error: any) {
         console.error("Error submitting withdrawal:", error);
@@ -323,6 +335,13 @@ export default function WalletPage() {
                 </CardHeader>
                 <form onSubmit={handleWithdrawalSubmit}>
                     <CardContent className="space-y-4">
+                        <Tabs value={withdrawalMethod} onValueChange={(v) => setWithdrawalMethod(v as any)} className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="bank">Bank Transfer</TabsTrigger>
+                                <TabsTrigger value="binance">Binance Pay</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+
                         <div className="space-y-2">
                             <Label htmlFor="withdrawal-amount">Amount (LKR)</Label>
                             <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 1550" required />
@@ -331,24 +350,42 @@ export default function WalletPage() {
                          <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground">
                             Equivalent in USDT: {(parseFloat(withdrawalAmount) / USDT_RATE || 0).toFixed(2)} USDT
                         </div>
-                        <Separator />
-                        <p className="font-medium text-sm">Bank Details</p>
-                        <div className="space-y-2">
-                            <Label htmlFor="bank-name">Bank Name</Label>
-                            <Input id="bank-name" value={withdrawalDetails.bankName} onChange={e => setWithdrawalDetails({...withdrawalDetails, bankName: e.target.value})} required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="branch">Branch</Label>
-                            <Input id="branch" value={withdrawalDetails.branch} onChange={e => setWithdrawalDetails({...withdrawalDetails, branch: e.target.value})} required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="account-number">Account Number</Label>
-                            <Input id="account-number" value={withdrawalDetails.accountNumber} onChange={e => setWithdrawalDetails({...withdrawalDetails, accountNumber: e.target.value})} required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="account-name">Account Holder Name</Label>
-                            <Input id="account-name" value={withdrawalDetails.accountName} onChange={e => setWithdrawalDetails({...withdrawalDetails, accountName: e.target.value})} required />
-                        </div>
+                        
+                        {withdrawalMethod === 'bank' && (
+                        <>
+                            <Separator />
+                            <p className="font-medium text-sm">Bank Details</p>
+                            <div className="space-y-2">
+                                <Label htmlFor="bank-name">Bank Name</Label>
+                                <Input id="bank-name" value={withdrawalDetails.bankName} onChange={e => setWithdrawalDetails({...withdrawalDetails, bankName: e.target.value})} required={withdrawalMethod === 'bank'} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="branch">Branch</Label>
+                                <Input id="branch" value={withdrawalDetails.branch} onChange={e => setWithdrawalDetails({...withdrawalDetails, branch: e.target.value})} required={withdrawalMethod === 'bank'} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="account-number">Account Number</Label>
+                                <Input id="account-number" value={withdrawalDetails.accountNumber} onChange={e => setWithdrawalDetails({...withdrawalDetails, accountNumber: e.target.value})} required={withdrawalMethod === 'bank'} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="account-name">Account Holder Name</Label>
+                                <Input id="account-name" value={withdrawalDetails.accountName} onChange={e => setWithdrawalDetails({...withdrawalDetails, accountName: e.target.value})} required={withdrawalMethod === 'bank'} />
+                            </div>
+                        </>
+                        )}
+                        {withdrawalMethod === 'binance' && (
+                             <Card className="p-4 bg-card/50 space-y-2">
+                                <Label>Your Binance PayID</Label>
+                                {userData?.binancePayId ? (
+                                    <div className="flex items-center gap-2">
+                                        <Input readOnly value={userData.binancePayId} />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard(userData.binancePayId || '', 'PayID')}><Copy/></Button>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-destructive">You have not set a Binance PayID on your account.</p>
+                                )}
+                             </Card>
+                        )}
                     </CardContent>
                     <CardFooter>
                     <Button type="submit" disabled={submittingWithdrawal}>{submittingWithdrawal ? "Requesting..." : "Request Withdrawal"}</Button>

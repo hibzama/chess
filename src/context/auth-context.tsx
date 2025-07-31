@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -32,6 +31,7 @@ interface UserData {
     lastName: string;
     email: string;
     phone: string;
+    binancePayId?: string;
     balance: number;
     commissionBalance?: number;
     marketingBalance?: number;
