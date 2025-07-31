@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +33,6 @@ export default function RegisterForm() {
             email: { value: string };
             password: { value: string };
             'confirm-password': { value: string };
-            'binance-payid': { value: string };
         };
 
         const firstName = target['first-name'].value;
@@ -41,7 +41,6 @@ export default function RegisterForm() {
         const email = target.email.value;
         const password = target['password'].value;
         const confirmPassword = target['confirm-password'].value;
-        const binancePayId = target['binance-payid'].value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
 
@@ -79,7 +78,7 @@ export default function RegisterForm() {
                 lastName,
                 phone,
                 email,
-                binancePayId,
+                binancePayId: '',
                 balance: initialBalance,
                 commissionBalance: 0,
                 marketingBalance: 0,
@@ -172,10 +171,6 @@ export default function RegisterForm() {
             <div className="grid gap-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input id="phone" type="tel" placeholder="+1 234 567 890" required />
-            </div>
-             <div className="grid gap-2">
-                <Label htmlFor="binance-payid">Binance PayID</Label>
-                <Input id="binance-payid" placeholder="e.g., 123456789" required />
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>

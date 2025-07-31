@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Ban, BrainCircuit, Layers, ShieldQuestion, Users, DollarSign } from 'lucide-react';
+import { ArrowLeft, User, History, Shield, Camera, Swords, Trophy, Handshake, Star, Ban, BrainCircuit, Layers, ShieldQuestion, Users, DollarSign, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,6 +23,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { renderToString } from 'react-dom/server';
 import { boyAvatars, girlAvatars } from '@/components/icons/avatars';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 
 type Game = {
@@ -79,6 +81,8 @@ export default function ProfilePage() {
     const [selectedAvatar, setSelectedAvatar] = useState<React.FC | null>(null);
     const [worldRank, setWorldRank] = useState<number | null>(null);
     const [avatarTab, setAvatarTab] = useState<'boy' | 'girl'>('boy');
+    const [binancePayId, setBinancePayId] = useState(userData?.binancePayId || '');
+    const [savingPayId, setSavingPayId] = useState(false);
 
     const USDT_RATE = 310;
 
@@ -89,6 +93,12 @@ export default function ProfilePage() {
         return '..';
     }
     
+    useEffect(() => {
+        if (userData?.binancePayId) {
+            setBinancePayId(userData.binancePayId);
+        }
+    }, [userData?.binancePayId]);
+
     useEffect(() => {
         if (!user || !userData) return;
 
@@ -205,6 +215,23 @@ export default function ProfilePage() {
             toast({ variant: 'destructive', title: "Error", description: "Failed to send password reset email." });
         } finally {
             setIsSendingReset(false);
+        }
+    }
+
+    const handleSavePayId = async () => {
+        if (!user || !binancePayId.trim()) {
+            toast({ variant: 'destructive', title: "Error", description: "Binance PayID cannot be empty." });
+            return;
+        }
+        setSavingPayId(true);
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            await updateDoc(userDocRef, { binancePayId: binancePayId.trim() });
+            toast({ title: "Success", description: "Binance PayID has been updated." });
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error", description: "Failed to update Binance PayID." });
+        } finally {
+            setSavingPayId(false);
         }
     }
     
@@ -388,6 +415,26 @@ export default function ProfilePage() {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <Card className="bg-card/30">
+                                <CardHeader>
+                                    <CardTitle className="text-lg flex items-center gap-2"><Wallet/> Binance PayID</CardTitle>
+                                    <CardDescription>This ID will be used for all Binance withdrawals.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2 max-w-sm">
+                                        <Label htmlFor="binancePayId">Your Binance PayID</Label>
+                                        <Input
+                                            id="binancePayId"
+                                            value={binancePayId}
+                                            onChange={(e) => setBinancePayId(e.target.value)}
+                                            placeholder="Enter your PayID"
+                                        />
+                                        <Button onClick={handleSavePayId} disabled={savingPayId}>
+                                            {savingPayId ? 'Saving...' : 'Save PayID'}
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                             <Card className="bg-card/30">
                                 <CardHeader>
                                     <CardTitle className="text-lg flex items-center gap-2"><ShieldQuestion/> Password Reset</CardTitle>
                                     <CardDescription>If you wish to change your password, we can send a reset link to your registered email address.</CardDescription>
