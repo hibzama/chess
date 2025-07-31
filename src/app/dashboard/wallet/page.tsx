@@ -57,8 +57,7 @@ export default function WalletPage() {
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [withdrawalMethod, setWithdrawalMethod] = useState<'bank' | 'binance'>('bank');
   const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: '', branch: '', accountNumber: '', accountName: '' });
-  const [binancePayId, setBinancePayId] = useState(userData?.binancePayId || '');
-  const [savingPayId, setSavingPayId] = useState(false);
+  const [binancePayId, setBinancePayId] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   
   const usdtAmount = (parseFloat(depositAmount) / USDT_RATE || 0).toFixed(2);
@@ -67,12 +66,6 @@ export default function WalletPage() {
     navigator.clipboard.writeText(text);
     toast({ title: 'Copied!', description: `${name} copied to clipboard.`});
   }
-
-  useEffect(() => {
-    if (userData?.binancePayId) {
-        setBinancePayId(userData.binancePayId);
-    }
-  }, [userData?.binancePayId])
 
   useEffect(() => {
     if (!user) {
@@ -143,23 +136,6 @@ export default function WalletPage() {
     setIsConfirmRemarkOpen(true);
   }
 
-    const handleSavePayId = async () => {
-        if (!user || !binancePayId.trim()) {
-            toast({ variant: 'destructive', title: "Error", description: "Binance PayID cannot be empty." });
-            return;
-        }
-        setSavingPayId(true);
-        try {
-            const userDocRef = doc(db, 'users', user.uid);
-            await updateDoc(userDocRef, { binancePayId: binancePayId.trim() });
-            toast({ title: "Success", description: "Binance PayID has been saved." });
-        } catch (error) {
-            toast({ variant: 'destructive', title: "Error", description: "Failed to save Binance PayID." });
-        } finally {
-            setSavingPayId(false);
-        }
-    }
-
   const handleWithdrawalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -173,8 +149,8 @@ export default function WalletPage() {
       return;
     }
     
-    if (withdrawalMethod === 'binance' && !userData.binancePayId) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You have not set up a Binance PayID on your account.' });
+    if (withdrawalMethod === 'binance' && !binancePayId) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Please enter your Binance PayID.' });
         return;
     }
 
@@ -204,12 +180,13 @@ export default function WalletPage() {
         amount: amountInLKR,
         status: 'pending',
         withdrawalMethod,
-        withdrawalDetails: withdrawalMethod === 'bank' ? withdrawalDetails : { binancePayId: userData.binancePayId },
+        withdrawalDetails: withdrawalMethod === 'bank' ? withdrawalDetails : { binancePayId },
         createdAt: serverTimestamp()
       });
 
       toast({ title: 'Success', description: 'Withdrawal request submitted.' });
       setWithdrawalAmount('');
+      setBinancePayId('');
       if (withdrawalMethod === 'bank') {
         setWithdrawalDetails({ bankName: '', branch: '', accountNumber: '', accountName: '' });
       }
@@ -401,25 +378,14 @@ export default function WalletPage() {
                         )}
                         {withdrawalMethod === 'binance' && (
                              <Card className="p-4 bg-card/50 space-y-2">
-                                <Label>Your Binance PayID</Label>
-                                {userData?.binancePayId ? (
-                                    <div className="flex items-center gap-2">
-                                        <Input readOnly value={userData.binancePayId} />
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard(userData.binancePayId || '', 'PayID')}><Copy/></Button>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        <p className="text-sm text-muted-foreground">You haven't set a Binance PayID yet. Please add one to enable withdrawals.</p>
-                                        <Input 
-                                            value={binancePayId} 
-                                            onChange={(e) => setBinancePayId(e.target.value)}
-                                            placeholder="Enter your Binance PayID"
-                                        />
-                                        <Button type="button" onClick={handleSavePayId} disabled={savingPayId}>
-                                            {savingPayId ? 'Saving...' : 'Save PayID'}
-                                        </Button>
-                                    </div>
-                                )}
+                                <Label htmlFor="binance-pay-id">Your Binance PayID</Label>
+                                <Input 
+                                    id="binance-pay-id"
+                                    value={binancePayId} 
+                                    onChange={(e) => setBinancePayId(e.target.value)}
+                                    placeholder="Enter your Binance PayID"
+                                    required={withdrawalMethod === 'binance'}
+                                />
                              </Card>
                         )}
                     </CardContent>
