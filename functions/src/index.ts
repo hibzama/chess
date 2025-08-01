@@ -1,7 +1,7 @@
 /**
  * Import function triggers from their respective submodules:
  *
- * import {onCall} from "firebase-functions/v2/https";
+ * import {onCall} from "firebase-functions/v2/onCall";
  * import {onDocumentWritten} from "firebase-functions/v2/firestore";
  *
  * See a full list of supported triggers at https://firebase.google.com/docs/functions
@@ -52,7 +52,8 @@ export const announceNewGame = functions.firestore
       `<b>Player:</b> ${createdBy}\n` +
       `<b>Wager:</b> LKR ${wager.toFixed(2)}\n\n` +
       `Join the battle now!\n` +
-      `<a href="${gameLink}">Click Here to Join Game</a>`;
+      `<a href="${gameLink}">Click Here to Join Game</a>\n\n` +
+      `<i>This room will expire in 3 minutes if no one joins.</i>`;
 
     const telegramApiUrl =
       `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
