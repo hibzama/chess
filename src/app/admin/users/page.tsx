@@ -54,39 +54,6 @@ export default function UsersPage() {
         }
     };
     
-    const handleLoginAsUser = async (uid: string) => {
-        const originalAdminUid = auth.currentUser?.uid;
-        if (!originalAdminUid) {
-            toast({ variant: "destructive", title: 'Error', description: 'Could not identify current admin.' });
-            return;
-        }
-
-        try {
-            const response = await fetch('/api/create-custom-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid, adminUid: originalAdminUid }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to get custom token.');
-            }
-
-            const { token } = await response.json();
-            
-            sessionStorage.setItem('originalAdminUid', originalAdminUid);
-            
-            await signInWithCustomToken(auth, token);
-            toast({ title: "Success", description: `You are now logged in as the user.` });
-            router.push('/dashboard');
-
-        } catch (error: any) {
-            console.error("Error logging in as user:", error);
-            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to log in as user.' });
-        }
-    };
-
     return (
         <Card>
             <CardHeader>
@@ -117,9 +84,6 @@ export default function UsersPage() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
-                                     <Button size="sm" variant="outline" onClick={() => handleLoginAsUser(user.uid)}>
-                                        <LogIn className="mr-2 h-4 w-4"/> Login As
-                                    </Button>
                                     {user.role !== 'admin' && (
                                         <Button size="sm" onClick={() => handleRoleChange(user.uid, 'admin')}>
                                             Make Admin
