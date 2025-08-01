@@ -58,7 +58,7 @@ const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { pers
             </div>
         </button>
         <div className="flex gap-2">
-            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${person.uid}`}><MessageSquare /></Link></Button>}
+            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(person.uid)}`}><MessageSquare /></Link></Button>}
             {actionType !== 'suggestion' && 
                 <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
                      {actionType === 'add' ? <UserPlus /> : <UserMinus />}
@@ -72,6 +72,14 @@ const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { pers
         </div>
     </Card>
 );
+
+const getChatId = (otherUserId: string) => {
+    // This is a placeholder. You'll need to pass the current user's ID
+    // or get it from context to generate the correct chat ID.
+    const currentUserId = "currentUser"; // Replace with actual current user ID
+    return [currentUserId, otherUserId].sort().join('_');
+};
+
 
 const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string, fromName: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (
      <Card className="flex items-center p-4 gap-4">
@@ -144,18 +152,27 @@ export default function FriendsPage() {
     }, [userData]);
 
     const fetchSuggestions = useCallback(async () => {
-        if(!user || !userData) return;
+        if (!user || !userData) return;
+    
+        // Get IDs of current friends and users with pending requests
+        const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
+        const receivedReqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
         
-        const excludeIds = [user.uid, ...(userData.friends || [])];
+        const [sentSnapshot, receivedSnapshot] = await Promise.all([
+            getDocs(sentReqQuery),
+            getDocs(receivedSnapshot)
+        ]);
         
-        if (excludeIds.length === 0) excludeIds.push('dummy-id');
+        const pendingSentIds = sentSnapshot.docs.map(d => d.data().toId);
+        const pendingReceivedIds = receivedSnapshot.docs.map(d => d.data().fromId);
+    
+        const excludeIds = [user.uid, ...(userData.friends || []), ...pendingSentIds, ...pendingReceivedIds];
         
-        const q = query(collection(db, 'users'), where('uid', 'not-in', excludeIds), limit(20));
-        
-        const userDocs = await getDocs(q);
-        
-        const suggestedUsers = userDocs.docs
-            .map(doc => ({...doc.data(), uid: doc.id} as UserProfile));
+        // Fetch all users and filter client-side, as 'not-in' has a 10-item limit.
+        const usersSnapshot = await getDocs(query(collection(db, 'users'), limit(100)));
+        const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
+    
+        const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
         
         setSuggestions(sortUsers(suggestedUsers));
     }, [user, userData]);
