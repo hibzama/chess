@@ -4,81 +4,95 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper functions
-    function isUserAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
     function isAdmin() {
-      // Check if the user has an admin role. Check for existence of role field first.
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Global admin access
-    match /{path=**} {
+    function isUser(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Admins can do anything
+    match /{document=**} {
       allow read, write: if isAdmin();
     }
-
-    // Allow anyone to count users for the bonus card, but not read the documents.
+    
+    // USERS collection
     match /users/{userId} {
-       allow get: if isUserAuthenticated();
-       allow list: if isUserAuthenticated();
-       allow update: if isOwner(userId);
-       allow create: if isUserAuthenticated();
-       allow count: if true;
-    }
-    
-    match /friend_requests/{requestId} {
-        allow read, create, update, delete: if isUserAuthenticated();
-    }
-    
-    match /notifications/{notificationId} {
-        allow read, create, update, delete: if isUserAuthenticated() && isOwner(resource.data.userId);
-    }
-    
-    match /transactions/{transactionId} {
-      allow read: if isUserAuthenticated() && isOwner(resource.data.userId);
-      allow create: if isUserAuthenticated();
-    }
-    
-    match /marketing_applications/{appId} {
-        allow read, create, update: if isUserAuthenticated();
-    }
-    
-    match /chats/{chatId} {
-      allow read, update, delete: if isUserAuthenticated() && request.auth.uid in resource.data.users;
-      allow create: if isUserAuthenticated();
+      // Anyone can count the total number of users for the bonus card
+      allow get: if request.query.keys.size() == 0; // This allows getCountFromServer
       
-      match /messages/{messageId} {
-        allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
+      // Any authenticated user can read public profile data
+      allow read: if isAuthenticated();
+
+      // A user can create their own document and update it.
+      // An admin can also update any user document (covered by global admin rule).
+      allow create, update, delete: if isUser(userId);
     }
     
+    // GAME_ROOMS collection
     match /game_rooms/{roomId} {
-        // Any authenticated user can create a game room
-        allow create: if isUserAuthenticated();
+        // Anyone authenticated can list public, waiting games
+        allow list: if isAuthenticated() && resource.data.isPrivate == false && resource.data.status == 'waiting';
 
-        // Any authenticated user can read public waiting rooms (for the lobby)
-        allow list: if isUserAuthenticated() && resource.data.isPrivate == false && resource.data.status == 'waiting';
+        // A user can create a game room
+        allow create: if isAuthenticated() && request.resource.data.createdBy.uid == request.auth.uid;
+      
+        // Players in the game can read it. Potential joiners can read if it's waiting.
+        allow read: if isAuthenticated() && (request.auth.uid in resource.data.players || resource.data.status == 'waiting');
 
-        // Only players in the game can read the full game room data
-        allow get: if isUserAuthenticated() && request.auth.uid in resource.data.players;
+        // Allow a user to join a waiting game (update status and add to players array)
+        // or allow a player in the game to update it (make a move)
+        allow update: if isAuthenticated() && (
+            (resource.data.status == 'waiting' && !(request.auth.uid in resource.data.players)) ||
+            (request.auth.uid in resource.data.players)
+        );
+        
+        // The creator can delete a waiting room
+        allow delete: if isAuthenticated() && resource.data.createdBy.uid == request.auth.uid && resource.data.status == 'waiting';
 
-        // A second player can join a waiting room
-        allow update: if isUserAuthenticated() && resource.data.status == 'waiting';
-        
-        // Only a player in the game can make updates (moves)
-        allow update: if isUserAuthenticated() && request.auth.uid in resource.data.players && resource.data.status == 'in-progress';
-        
-        // Only the creator can delete a waiting room
-        allow delete: if isUserAuthenticated() && request.auth.uid == resource.data.createdBy.uid && resource.data.status == 'waiting';
-        
-         match /messages/{messageId} {
-            allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+        // Chat messages within a game room
+        match /messages/{messageId} {
+            allow read, write: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
         }
+    }
+    
+    // CHATS collection (direct messages)
+    match /chats/{chatId} {
+        allow read, write: if isAuthenticated() && request.auth.uid in resource.data.users;
+        
+        match /messages/{messageId} {
+             allow read, write: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
+    }
+    
+    // TRANSACTIONS collection
+    match /transactions/{transactionId} {
+        // A user can read their own transactions.
+        // A user can create their own transaction documents (deposit/withdrawal requests).
+        allow read, create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // NOTIFICATIONS collection
+    match /notifications/{notificationId} {
+        allow read, write: if isAuthenticated() && isUser(resource.data.userId);
+    }
+
+    // FRIEND_REQUESTS collection
+    match /friend_requests/{requestId} {
+        allow read, write: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        allow create: if isAuthenticated() && request.resource.data.fromId == request.auth.uid;
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.fromId;
+    }
+
+    // MARKETING_APPLICATIONS collection
+    match /marketing_applications/{appId} {
+        // Anyone can submit an application
+        allow create: if true;
     }
   }
 }
