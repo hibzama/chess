@@ -11,10 +11,11 @@ const firebaseConfig = {
   apiKey: "AIzaSyDjF4Rtr0wcclS87IbT4W2N8g37WOZZEFA",
   authDomain: "mainnextbattle.firebaseapp.com",
   projectId: "mainnextbattle",
-  storageBucket: "mainnextbattle.firebasestorage.app",
+  storageBucket: "mainnextbattle.appspot.com",
   messagingSenderId: "690186872654",
   appId: "1:690186872654:web:3fafecf2e45ba773d4a01f",
-  measurementId: "G-D0KGF0X1QH"
+  measurementId: "G-D0KGF0X1QH",
+  databaseURL: "https://mainnextbattle-default-rtdb.firebaseio.com",
 };
 
 // Initialize Firebase
