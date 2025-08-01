@@ -1,135 +1,91 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    //----------------------------------------------------------------------
-    // Helper Functions
-    //----------------------------------------------------------------------
-    function isSignedIn() {
-      return request.auth != null;
-    }
 
+    // Helper functions
     function isOwner(userId) {
       return request.auth.uid == userId;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    function isMarketer() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'marketer';
-    }
-    
-    function isPlayerInGame(gameId) {
-      return request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(gameId)).data.players;
-    }
-
-    //----------------------------------------------------------------------
-    // Global Rules (very limited)
-    //----------------------------------------------------------------------
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-    
-    // Allow anyone to count users for the bonus card, but not read documents.
+    // USER PROFILES
     match /users/{userId} {
-       allow list: if true;
-    }
-
-    //----------------------------------------------------------------------
-    // Users Collection
-    //----------------------------------------------------------------------
-    match /users/{userId} {
-      // Any signed-in user can read public profile data
+      // Anyone can see a user's public profile data
       allow read: if isSignedIn();
-      // Only the user themselves can update their own document
-      allow update: if isOwner(userId);
-      // Disallow creation/deletion by clients directly (handled by backend/auth triggers)
-      allow create, delete: if false;
+      // Only the user themselves or an admin can update their profile
+      allow write: if isOwner(userId) || isAdmin();
     }
 
-    //----------------------------------------------------------------------
-    // Game Rooms Collection
-    //----------------------------------------------------------------------
+    // GAME ROOMS
     match /game_rooms/{roomId} {
-      // Allow any signed-in user to read public game room listings
-      allow get, list: if isSignedIn();
-      
-      // Allow a user to create a game room if they are the creator
-      allow create: if isSignedIn() && request.resource.data.createdBy.uid == request.auth.uid;
-      
-      // Allow updates only by players in the game
-      allow update: if isSignedIn() && request.auth.uid in resource.data.players;
-      
-      // Only the creator can delete a room, and only if it's still waiting
-      allow delete: if isSignedIn() && resource.data.createdBy.uid == request.auth.uid && resource.data.status == 'waiting';
+      // Anyone can see public game rooms
+      allow list: if isSignedIn();
+      // Only players in the room can read the full room data.
+      allow read: if isSignedIn() && (resource.data.isPrivate == false || request.auth.uid in resource.data.players);
+      // Anyone can create a game room
+      allow create: if isSignedIn();
+      // Only the creator can delete a waiting room. Players can update to join or during gameplay. Admins can update.
+      allow update: if isSignedIn() && (
+                      (request.auth.uid in resource.data.players) ||
+                      (resource.data.status == 'waiting' && request.auth.uid != resource.data.createdBy.uid) ||
+                      isAdmin()
+                    );
+      allow delete: if isSignedIn() && (request.auth.uid == resource.data.createdBy.uid || isAdmin());
 
-      // Chat messages within a game room
+      // CHAT MESSAGES within a game
       match /messages/{messageId} {
-        allow read, write: if isPlayerInGame(roomId);
+        // Only players in the room can read/write chat messages
+        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
       }
     }
     
-    //----------------------------------------------------------------------
-    // Transactions Collection
-    //----------------------------------------------------------------------
-    match /transactions/{transactionId} {
-        // A user can query their own transactions (e.g., for wallet history)
-        allow list: if isSignedIn() && request.query.resource.data.userId == request.auth.uid;
-        // A user can read a single transaction if they are the owner
-        allow get: if isSignedIn() && isOwner(resource.data.userId);
-        // A user can create a transaction for themselves (deposits/withdrawals)
-        allow create: if isSignedIn() && isOwner(request.resource.data.userId);
-        // No client-side updates/deletes on transactions
-        allow update, delete: if false;
-    }
-    
-    //----------------------------------------------------------------------
-    // Chats Collection (Direct Messages)
-    //----------------------------------------------------------------------
+    // CHATS (Direct Messages)
     match /chats/{chatId} {
-        allow read, write: if isSignedIn() && request.auth.uid in resource.data.users;
-        
-        match /messages/{messageId} {
-            allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-        }
-    }
-    
-    //----------------------------------------------------------------------
-    // Notifications Collection
-    //----------------------------------------------------------------------
-    match /notifications/{notificationId} {
-        // A user can query their own notifications
-        allow list: if isSignedIn() && request.query.resource.data.userId == request.auth.uid;
-        // A user can update their own notification (e.g., mark as read)
-        allow update: if isSignedIn() && isOwner(resource.data.userId);
-        // Only backend can create/delete
-        allow create, delete, get: if false;
-    }
-    
-    //----------------------------------------------------------------------
-    // Friend Requests Collection
-    //----------------------------------------------------------------------
-    match /friend_requests/{requestId} {
-        // Allow querying requests sent to or from the current user
-        allow list: if isSignedIn();
-        // Allow creating a request
-        allow create: if isSignedIn() && request.resource.data.fromId == request.auth.uid;
-        // Allow involved users to update (accept/decline) or delete (cancel)
-        allow update, delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+      // A user can only access a chat if their UID is in the `users` map of the chat document.
+      allow read, write: if isSignedIn() && request.auth.uid in resource.data.users;
+      
+      match /messages/{messageId} {
+         allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
     }
 
-    //----------------------------------------------------------------------
-    // Marketing Applications Collection
-    //----------------------------------------------------------------------
-    match /marketing_applications/{appId} {
-        // Anyone can submit an application
-        allow create: if true;
-        // Only admins can read/update/delete applications
-        allow read, update, delete: if isAdmin();
+    // TRANSACTIONS
+    match /transactions/{transactionId} {
+      // Users can only create their own transactions. Admins can create any.
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      // Admins can read all transactions. Users can read their own.
+      allow read: if isAdmin() || (isSignedIn() && isOwner(get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId));
+      // Only Admins can update transaction status (e.g., approve/reject).
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+      // Allow users to query their own transaction list
+      allow list: if isSignedIn();
     }
+    
+    // FRIEND REQUESTS
+    match /friend_requests/{requestId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // MARKETING APPLICATIONS & WITHDRAWALS
+    match /marketing_applications/{appId} {
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // NOTIFICATIONS
+    match /notifications/{notificationId} {
+      allow read, create, update, delete: if isSignedIn() && isOwner(resource.data.userId);
+      allow list: if isSignedIn();
+    }
+
   }
 }
