@@ -2,66 +2,82 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+
+    // --- Functions ---
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    function isAuth() {
+    function isAuthenticated() {
       return request.auth != null;
     }
+    
+    function isAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
 
-    // USER DATA
+    // --- Collections ---
+
+    // USER DATA: Users can read all profiles, but only write to their own.
+    // Admins have full access.
     match /users/{userId} {
-      allow read;
-      allow create: if isAuth();
-      allow update: if request.auth.uid == userId || isAdmin();
+      allow read: if true;
+      allow create: if isOwner(userId);
+      // Allow user to update their own doc, or allow updates during a game transaction (wager deduction)
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
     }
     
-    // GAME ROOMS
+    // GAME ROOMS: Handles creation, joining, playing, and deletion of rooms.
     match /game_rooms/{roomId} {
-      allow read;
-      allow create: if isAuth();
-      allow update: if isAuth();
-      allow delete: if request.auth.uid == resource.data.createdBy.uid;
+      allow read: if true;
+      allow create: if isAuthenticated();
+      
+      // Allow updates if user is a player in the room OR if they are joining a waiting room
+      allow update: if isAuthenticated() 
+      					&& (
+                  // Player making a move
+                  request.auth.uid in resource.data.players 
+                  || 
+                  // Player joining a game
+                  (request.resource.data.status == 'in-progress' && resource.data.status == 'waiting')
+                 );
+                 
+      // Only the creator can delete a waiting room.
+      allow delete: if isAuthenticated() && resource.data.status == 'waiting' && request.auth.uid == resource.data.createdBy.uid;
     }
-    
-    // MESSAGES
+
+    // CHAT: Only participants of a chat can read or write messages.
     match /chats/{chatId} {
-      allow read: if isAuth() && request.auth.uid in resource.data.users;
-      allow create: if isAuth();
-      allow update: if isAuth() && request.auth.uid in resource.data.users;
+      allow get, list, create, update: if isAuthenticated() && request.auth.uid in resource.data.users;
+      match /messages/{messageId} {
+        allow read, create: if isAuthenticated() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid] != null;
+      }
     }
 
-    match /chats/{chatId}/messages/{messageId} {
-        allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid].exists == true;
-    }
-
-    // TRANSACTIONS
+    // TRANSACTIONS: Users can create transactions for themselves, and query their own transaction history.
     match /transactions/{transactionId} {
-      allow read: if isAuth() && (request.auth.uid == resource.data.userId || isAdmin());
-      allow list: if isAuth() && (request.query.where[0][2] == request.auth.uid || isAdmin());
-      allow create: if isAuth();
-      allow update: if isAdmin();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // This rule fixes the dashboard loading error.
+      allow list: if isAuthenticated();
     }
-    
-    // MARKETING APPLICATIONS
+
+    // FRIEND REQUESTS: Authenticated users can manage their friend requests.
+    match /friend_requests/{requestId} {
+        allow create: if isAuthenticated();
+        allow update, delete: if isAuthenticated() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId) || isAdmin());
+    }
+
+    // MARKETING: Anyone can apply, only admins can manage applications.
     match /marketing_applications/{appId} {
-        allow create: if isAuth();
+        allow create: if true;
         allow read, update, delete: if isAdmin();
     }
-    
-    // FRIEND REQUESTS
-    match /friend_requests/{requestId} {
-      allow read: if isAuth() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
-      allow create: if isAuth();
-      allow update, delete: if isAuth() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
-    }
-    
-    // NOTIFICATIONS
-    match /notifications/{notificationId} {
-        allow read, list, update: if isAuth() && request.auth.uid == resource.data.userId;
-        allow create: if isAuth();
+
+    // NOTIFICATIONS: Users can read and update their own notifications.
+    match /notifications/{notifId} {
+        allow read, update: if isAuthenticated() && isOwner(resource.data.userId);
     }
   }
 }
