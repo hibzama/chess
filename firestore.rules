@@ -3,108 +3,91 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
-    function isUserAuthenticated() {
-      return request.auth != null;
+    // Helper functions
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+    
+    function isJoiningGame(requestData) {
+        let gameRoomId = requestData.gameRoomId;
+        let gameRoom = get(/databases/$(database)/documents/game_rooms/$(gameRoomId)).data;
+        let p1Id = gameRoom.createdBy.uid;
+        let p2Id = request.auth.uid;
+        let wager = gameRoom.wager;
 
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        // Check that the write is for the correct amount and players
+        let p1Write = request.resource.data.writes[1];
+        let p2Write = request.resource.data.writes[3];
+
+        return p1Write.update.name == /databases/$(database)/documents/users/$(p1Id) &&
+               p1Write.updateTransforms[0].fieldPath == "balance" &&
+               p1Write.updateTransforms[0].increment.integerValue == -wager &&
+               p2Write.update.name == /databases/$(database)/documents/users/$(p2Id) &&
+               p2Write.updateTransforms[0].fieldPath == "balance" &&
+               p2Write.updateTransforms[0].increment.integerValue == -wager;
     }
 
-    // Function to validate the complex transaction when a player joins a game.
-    function isJoiningGame(roomId) {
-      let room = get(/databases/$(database)/documents/game_rooms/$(roomId)).data;
-      let joinerId = request.auth.uid;
-      let creatorId = room.createdBy.uid;
-
-      // Ensure the transaction is for a valid game room that is waiting for a player.
-      return room.status == 'waiting'
-          && joinerId != creatorId
-          && !exists(/databases/$(database)/documents/users/$(joinerId))
-             || get(/databases/$(database)/documents/users/$(joinerId)).data.balance >= room.wager;
-    }
-
-    // Collection: users
-    match /users/{userId} {
-      allow read: if isUserAuthenticated();
-
-      allow create: if !isUserAuthenticated() || isOwner(userId); // Allow on registration
-
-      allow update: if isOwner(userId) ||
-                     // Allow another user to update balance only when joining a game
-                     (exists(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)) &&
-                      isJoiningGame(request.resource.data.gameRoomId));
-
-      allow delete: if isAdmin();
-    }
-
-    // Collection: game_rooms
-    match /game_rooms/{roomId} {
-      // Any authenticated user can see public game rooms.
-      allow read: if isUserAuthenticated();
-
-      // Users can create a room for themselves.
-      allow create: if isUserAuthenticated() && request.resource.data.createdBy.uid == request.auth.uid;
-
-      // Users can update a room if they are a player in it, or if they are joining it.
-      allow update: if isUserAuthenticated() &&
-                     (request.auth.uid in resource.data.players ||
-                      (request.resource.data.status == 'in-progress' && isJoiningGame(roomId)));
-
-      // Only the creator can delete a waiting room.
-      allow delete: if isUserAuthenticated() && resource.data.status == 'waiting' && request.auth.uid == resource.data.createdBy.uid;
-    }
-
-    // Subcollection: messages within game_rooms
-    match /game_rooms/{roomId}/messages/{messageId} {
-      allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-    }
-
-    // Collection: transactions
-    match /transactions/{transactionId} {
-      // A user can only list their own transactions.
-      allow list: if isUserAuthenticated() && request.query.where.size() > 0 && request.query.where[0][0] == 'userId' && request.query.where[0][2] == request.auth.uid;
-
-      // A user can read their own transaction documents.
-      allow read: if isUserAuthenticated() && isOwner(resource.data.userId);
-
-      // A user can create transactions for themselves, or for others when joining a game.
-      allow create: if isUserAuthenticated() &&
-                     (isOwner(request.resource.data.userId) ||
-                      (request.resource.data.gameRoomId != null &&
-                       isJoiningGame(request.resource.data.gameRoomId)));
-    }
-
-    // All other collections...
+    // Admins can do anything
     match /{document=**} {
       allow read, write: if isAdmin();
     }
-
-    // Specific rules for other collections if needed...
-    match /marketing_applications/{appId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
+    
+    // Users Collection
+    match /users/{userId} {
+      allow read: if request.auth.uid != null;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+    }
+    
+    // Game Rooms
+    match /game_rooms/{roomId} {
+      allow read: if request.auth.uid != null;
+      allow create: if isOwner(request.resource.data.createdBy.uid);
+      allow update: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players ||
+                      (request.resource.data.status == 'in-progress' && get(/databases/$(database)/documents/game_rooms/$(roomId)).data.status == 'waiting');
+      allow delete: if request.auth.uid == get(/databases/$(database)/documents/game_rooms/$(roomId)).data.createdBy.uid;
     }
 
-    match /friend_requests/{reqId} {
-        allow read, create, delete: if isUserAuthenticated();
-        allow update: if isUserAuthenticated() && (request.auth.uid == resource.data.toId || request.auth.uid == resource.data.fromId);
-    }
-
+    // Chats & Messages
     match /chats/{chatId} {
-        allow read, update, create: if isUserAuthenticated() && request.auth.uid in resource.data.users;
+      allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users ||
+                           request.auth.uid in request.resource.data.users;
+      allow update: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      
+      match /messages/{messageId} {
+        allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
     }
-     match /chats/{chatId}/messages/{messageId} {
-        allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+    
+    // Transactions
+    match /transactions/{transactionId} {
+        allow read, list: if isOwner(get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId);
+        allow create: if isOwner(request.resource.data.userId);
     }
-     match /notifications/{notifId} {
-        allow read, list: if isUserAuthenticated() && request.query.where[0][2] == request.auth.uid;
-        allow update, create, delete: if isUserAuthenticated();
+
+    // Friend Requests
+    match /friend_requests/{requestId} {
+        allow read, list: if isOwner(get(/databases/$(database)/documents/friend_requests/$(requestId)).data.toId) || 
+                           isOwner(get(/databases/$(database)/documents/friend_requests/$(requestId)).data.fromId);
+        allow create: if isOwner(request.resource.data.fromId);
+        allow update, delete: if isOwner(get(/databases/$(database)/documents/friend_requests/$(requestId)).data.toId) ||
+                               isOwner(get(/databases/$(database)/documents/friend_requests/$(requestId)).data.fromId);
+    }
+    
+    // Notifications
+    match /notifications/{notificationId} {
+        allow read, list: if isOwner(get(/databases/$(database)/documents/notifications/$(notificationId)).data.userId);
+        allow create: if request.auth != null;
+        allow update: if isOwner(get(/databases/$(database)/documents/notifications/$(notificationId)).data.userId);
+    }
+
+    // Marketing Applications
+    match /marketing_applications/{appId} {
+        allow create; // Anyone can apply
     }
   }
 }
