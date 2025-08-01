@@ -1,11 +1,12 @@
 
+
 'use client';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, BrainCircuit, Layers, DollarSign, Users } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Layers, DollarSign, Users, MessageSquare } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -85,6 +86,27 @@ export default function EarningHomePage() {
                             <a href="https://t.me/nexbattlerooms" target="_blank" rel="noopener noreferrer">
                                 <TelegramIcon className="mr-2 h-5 w-5" />
                                 Join @nexbattlerooms
+                            </a>
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                 <Card className="w-full max-w-4xl mt-8 bg-card/50">
+                    <CardHeader className="items-center text-center">
+                        <CardTitle className="flex items-center gap-2"><Users/> Find player to play games</CardTitle>
+                        <CardDescription>Chat in our groups to find players easily.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <Button asChild size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white">
+                            <a href="https://chat.whatsapp.com/KGvUICFJNgt8tzFcGtVVmr?mode=ac_t" target="_blank" rel="noopener noreferrer">
+                                <MessageSquare className="mr-2 h-5 w-5" />
+                                Join WhatsApp Group
+                            </a>
+                        </Button>
+                         <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
+                            <a href="https://t.me/nexbattlechat" target="_blank" rel="noopener noreferrer">
+                                <TelegramIcon className="mr-2 h-5 w-5" />
+                                Join Telegram Group
                             </a>
                         </Button>
                     </CardContent>
