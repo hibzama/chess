@@ -145,27 +145,42 @@ export default function FriendsPage() {
             setFriends([]);
             return;
         }
-        const friendPromises = userData.friends.map(friendId => getDoc(doc(db, 'users', friendId)));
+        // To avoid race conditions, ensure we have the latest friend list.
+        const currentUserDoc = await getDoc(doc(db, 'users', userData.uid));
+        const currentFriends = currentUserDoc.data()?.friends || [];
+        if (currentFriends.length === 0) {
+            setFriends([]);
+            return;
+        }
+        const friendPromises = currentFriends.map((friendId: string) => getDoc(doc(db, 'users', friendId)));
         const friendDocs = await Promise.all(friendPromises);
         const friendData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
         setFriends(sortUsers(friendData));
     }, [userData]);
     
     useEffect(() => {
-        if (!user || !userData) {
+        if (!user) {
             setLoading(false);
             return;
         }
 
-        const initialLoad = async () => {
-             // Received Requests
+        const unsubscribes: (() => void)[] = [];
+
+        const setupListeners = async () => {
+            setLoading(true);
+
+            // Fetch initial friends list
+            await fetchFriends();
+            
+            // Received Requests Listener
             const reqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
             const unsubscribeReqs = onSnapshot(reqQuery, (snapshot) => {
                 const reqsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as FriendRequest));
                 setRequests(reqsData);
             });
+            unsubscribes.push(unsubscribeReqs);
 
-            // Sent Requests
+            // Sent Requests Listener
             const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
             const unsubscribeSentReqs = onSnapshot(sentReqQuery, async (snapshot) => {
                 const sentReqsDataPromises = snapshot.docs.map(async (d) => {
@@ -181,45 +196,34 @@ export default function FriendsPage() {
                 const sentReqsData = await Promise.all(sentReqsDataPromises);
                 setSentRequests(sentReqsData);
             });
+            unsubscribes.push(unsubscribeSentReqs);
+            
+             // Suggestions listener
+             const usersQuery = query(collection(db, 'users'), limit(100));
+             const unsubscribeUsers = onSnapshot(usersQuery, (usersSnapshot) => {
+                 const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
+                 
+                 // We need to know who NOT to suggest
+                 const friendIds = userData?.friends || [];
+                 const pendingSentIds = sentRequests.map(req => req.toId);
+                 const pendingReceivedIds = requests.map(req => req.fromId);
+                 const excludeIds = [user.uid, ...friendIds, ...pendingSentIds, ...pendingReceivedIds];
+                 
+                 const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
+                 setSuggestions(sortUsers(suggestedUsers));
+             });
+             unsubscribes.push(unsubscribeUsers);
 
-            await fetchFriends();
             setLoading(false);
-
-            // Real-time suggestions
-            const usersQuery = query(collection(db, 'users'), limit(100));
-            const unsubscribeUsers = onSnapshot(usersQuery, async (usersSnapshot) => {
-                const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
-                
-                const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
-                const receivedReqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
-                
-                const [sentSnapshot, receivedSnapshot] = await Promise.all([
-                    getDocs(sentReqQuery),
-                    getDocs(receivedReqQuery)
-                ]);
-        
-                const pendingSentIds = sentSnapshot.docs.map(d => d.data().toId);
-                const pendingReceivedIds = receivedSnapshot.docs.map(d => d.data().fromId);
-
-                const excludeIds = [user.uid, ...(userData.friends || []), ...pendingSentIds, ...pendingReceivedIds];
-                const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
-                setSuggestions(sortUsers(suggestedUsers));
-            });
-
-            return () => {
-                unsubscribeReqs();
-                unsubscribeSentReqs();
-                unsubscribeUsers();
-            };
         };
 
-        const unsubscribe = initialLoad();
+        setupListeners();
         
         return () => {
-            unsubscribe.then(cleanup => cleanup && cleanup());
+            unsubscribes.forEach(unsub => unsub());
         };
 
-    }, [user, userData, fetchFriends]);
+    }, [user, userData?.friends, fetchFriends]);
     
     const handleAddFriend = async (targetId: string, targetName: string) => {
         if(!user || !userData) return;
