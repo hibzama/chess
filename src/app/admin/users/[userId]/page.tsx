@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 type UserProfile = {
     uid: string;
@@ -44,7 +45,7 @@ type Transaction = {
 type Game = {
     id: string;
     gameType: 'chess' | 'checkers';
-    winner?: { uid: string | null };
+    winner?: { uid: string | null, method: string, resignerId?: string | null };
     draw?: boolean;
     createdAt: any;
     createdBy: { uid: string; name: string };
@@ -236,15 +237,39 @@ export default function UserDetailPage() {
     );
 }
 
-const GameHistoryTable = ({ games, userId }: { games: Game[], userId: string }) => (
+const GameHistoryTable = ({ games, userId }: { games: Game[], userId: string }) => {
+    
+    const getResultAndReturn = (game: Game) => {
+        let result = 'Loss';
+        let netReturn = -game.wager;
+        let method = game.winner?.method ? game.winner.method.replace('-', ' ') : 'gameplay';
+
+        if (game.draw) {
+            result = 'Draw';
+            netReturn = game.wager * -0.1;
+        } else if (game.winner?.uid === userId) {
+            result = 'Win';
+            if (game.winner?.resignerId) {
+                netReturn = game.wager * 0.05; // Win by resignation
+            } else {
+                netReturn = game.wager * 0.8; // Standard win
+            }
+        } else if (game.winner?.resignerId === userId) {
+            result = 'Loss'; // Explicitly a loss
+            netReturn = game.wager * -0.25; // Resignation loss
+            method = 'resignation';
+        }
+
+        return { result, netReturn, method };
+    }
+    
+    return (
     <Table>
-        <TableHeader><TableRow><TableHead>Game</TableHead><TableHead>Opponent</TableHead><TableHead>Result</TableHead><TableHead>Wager</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+        <TableHeader><TableRow><TableHead>Game</TableHead><TableHead>Opponent</TableHead><TableHead>Result</TableHead><TableHead>Return (LKR)</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
         <TableBody>
             {games.length > 0 ? games.map(game => {
                 const opponent = game.createdBy.uid === userId ? game.player2 : game.createdBy;
-                let result = 'Loss';
-                if (game.draw) result = 'Draw';
-                else if (game.winner?.uid === userId) result = 'Win';
+                const { result, netReturn, method } = getResultAndReturn(game);
                 return(
                 <TableRow key={game.id}>
                     <TableCell className="capitalize">{game.gameType}</TableCell>
@@ -256,14 +281,18 @@ const GameHistoryTable = ({ games, userId }: { games: Game[], userId: string }) 
                             {result === 'Draw' && <Handshake className="w-3 h-3 mr-1" />}
                             {result}
                         </Badge>
+                         <p className="text-xs text-muted-foreground capitalize mt-1">{method}</p>
                     </TableCell>
-                    <TableCell>LKR {game.wager.toFixed(2)}</TableCell>
+                    <TableCell className={cn("font-semibold", netReturn > 0 ? "text-green-400" : "text-red-400")}>
+                        {netReturn >= 0 ? `+${netReturn.toFixed(2)}` : netReturn.toFixed(2)}
+                    </TableCell>
                     <TableCell>{game.createdAt ? format(game.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                 </TableRow>
             )}) : <TableRow><TableCell colSpan={5} className="text-center">No games played</TableCell></TableRow>}
         </TableBody>
     </Table>
 )
+}
 
 const TransactionTable = ({ transactions }: { transactions: Transaction[] }) => (
     <Table>
