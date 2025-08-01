@@ -38,20 +38,22 @@ export const announceNewGame = functions.firestore
     }
 
     const chatId = "@nexbattlerooms"; // Your Telegram group username
-    const siteUrl = "https://www.nexbattle.com"; // Your website's URL
+    const siteUrl = "https://nexbattle.com"; // Your website's URL
 
     const gameType = roomData.gameType ?
       `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}`
       : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
+    const timeControl = roomData.timeControl ? `${roomData.timeControl / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
     const message =
-      `⚔️ New Public ${gameType} Room! ⚔️\n\n` +
+      `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
       `<b>Player:</b> ${createdBy}\n` +
-      `<b>Wager:</b> LKR ${wager.toFixed(2)}\n\n` +
-      `Join the battle now!\n` +
+      `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
+      `<b>Time:</b> ${timeControl}\n\n` +
+      `<i>Room ID:</i> <code>${roomId}</code>\n\n` +
       `<a href="${gameLink}">Click Here to Join Game</a>\n\n` +
       `<i>This room will expire in 3 minutes if no one joins.</i>`;
 
@@ -62,7 +64,7 @@ export const announceNewGame = functions.firestore
       await axios.post(telegramApiUrl, {
         chat_id: chatId,
         text: message,
-        parse_mode: 'HTML', // Important to allow clickable links
+        parse_mode: 'HTML', // Important to allow clickable links and bold text
       });
       functions.logger.log("Successfully sent message to Telegram.");
     } catch (error) {
