@@ -48,19 +48,11 @@ export default function EarningHomePage() {
                     </Link>
                 </div>
 
-                <div className="text-center mb-8">
+                <div className="text-center mb-12">
                     <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">Earning on Nexbattle</h1>
                     <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">Turn your strategic skills into real rewards. Choose your game to get started.</p>
                 </div>
-                 <div className="w-full max-w-4xl mb-12">
-                    <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
-                        <a href="https://t.me/nexbattlerooms" target="_blank" rel="noopener noreferrer">
-                            <TelegramIcon className="mr-2 h-5 w-5" />
-                            Join Public Rooms Group
-                        </a>
-                    </Button>
-                </div>
-
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
                     {earningOptions.map((option) => (
                          <Card key={option.name} className="bg-card/50 hover:border-primary/50 transition-all flex flex-col">
@@ -82,6 +74,21 @@ export default function EarningHomePage() {
                         </Card>
                     ))}
                 </div>
+
+                <Card className="w-full max-w-4xl mt-8 bg-card/50">
+                    <CardHeader className="items-center text-center">
+                        <CardTitle className="flex items-center gap-2"><TelegramIcon/> Public Rooms Group</CardTitle>
+                        <CardDescription>Join our Telegram channel to see all new public games as they are created!</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
+                            <a href="https://t.me/nexbattlerooms" target="_blank" rel="noopener noreferrer">
+                                <TelegramIcon className="mr-2 h-5 w-5" />
+                                Join @nexbattlerooms
+                            </a>
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
 
             <DialogContent className="max-w-2xl">
