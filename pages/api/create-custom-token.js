@@ -1,10 +1,11 @@
 
 import admin from 'firebase-admin';
 
-// Initialize Firebase Admin SDK
-// This simplified initialization is more robust for this environment.
+// Correctly initialize Firebase Admin SDK
+// This check ensures we don't re-initialize the app.
 if (!admin.apps.length) {
   try {
+    // When deployed, this will automatically use the project's service account.
     admin.initializeApp();
   } catch (error) {
     console.error('Firebase admin initialization error', error.stack);
@@ -23,8 +24,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // To verify the admin, we will check their user document in Firestore.
-    // This is more reliable than custom claims in this context.
     const firestore = admin.firestore();
     const adminUserDoc = await firestore.collection('users').doc(adminUid).get();
 
@@ -32,7 +31,6 @@ export default async function handler(req, res) {
          return res.status(403).json({ error: 'Forbidden: You are not authorized to perform this action.' });
     }
 
-    // Generate custom token for the target user
     const customToken = await admin.auth().createCustomToken(uid);
     res.status(200).json({ token: customToken });
 
