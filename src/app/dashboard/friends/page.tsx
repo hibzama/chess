@@ -277,7 +277,7 @@ export default function FriendsPage() {
         const batch = writeBatch(db);
 
         const requestRef = doc(db, 'friend_requests', requestId);
-        batch.update(requestRef, { status: 'accepted' });
+        batch.delete(requestRef);
 
         const currentUserRef = doc(db, 'users', user.uid);
         batch.update(currentUserRef, { friends: arrayUnion(fromId) });
@@ -310,10 +310,8 @@ export default function FriendsPage() {
     const handleDeclineRequest = async (requestId: string) => {
         setActionLoading(requestId);
          const requestRef = doc(db, 'friend_requests', requestId);
-         const batch = writeBatch(db);
-         batch.update(requestRef, { status: 'declined' });
          try {
-             await batch.commit();
+             await deleteDoc(requestRef);
              toast({ title: "Request Declined" });
          } catch (e) {
             console.error(e);
