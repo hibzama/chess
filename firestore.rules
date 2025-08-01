@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Users can read/write their own data, but other users can only read basic info
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+    
+    // Game rooms can be read by anyone if public, but only by players if private.
+    // Only players can update a game room.
+    match /game_rooms/{roomId} {
+      allow read: if resource.data.isPrivate == false || request.auth.uid in resource.data.players;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth.uid in resource.data.players;
+
+      // Messages within a game room can only be accessed by players of that game
+      match /messages/{messageId} {
+         allow read, create: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      }
+    }
+    
+    // Transactions can only be created by the user, and read by the user or an admin.
+    match /transactions/{transactionId} {
+      allow read: if request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow create: if request.auth.uid == request.resource.data.userId;
+      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Marketing applications can be created by anyone, but only read/updated by admins.
+    match /marketing_applications/{appId} {
+        allow create: if true;
+        allow read, update, delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Friend requests can be managed by the sender or receiver
+    match /friend_requests/{requestId} {
+        allow create: if request.auth.uid == request.resource.data.fromId;
+        allow read, update: if request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId;
+        allow delete: if request.auth.uid == resource.data.fromId;
+    }
+
+    // Chats can only be accessed by the participants
+    match /chats/{chatId} {
+        allow read, update, delete: if request.auth.uid in resource.data.users;
+        match /messages/{messageId} {
+            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
+    }
+
+    // Notifications are private to each user
+    match /notifications/{notificationId} {
+      allow read, update: if request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null;
+    }
+
+  }
+}
