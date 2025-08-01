@@ -13,81 +13,86 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    function getRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
     function isAdmin() {
-      return isSignedIn() && getRole() == 'admin';
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    function isJoiningGame(userId) {
-      let gameRoomCreate = existsAfter(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId));
-      let gameRoomData = getAfter(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)).data;
-      return gameRoomCreate && userId in gameRoomData.players;
+    function isMarketer() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'marketer';
+    }
+    
+    function willJoinGame(roomId) {
+        let game = get(/databases/$(database)/documents/game_rooms/$(roomId)).data;
+        let joiningPlayerId = request.auth.uid;
+        
+        // Ensure the transaction is for a game that is waiting
+        return game.status == 'waiting'
+            && game.createdBy.uid != joiningPlayerId
+            && joiningPlayerId in request.resource.data.players;
     }
 
     // Users Collection
     match /users/{userId} {
-      allow read: if isSignedIn() || isAdmin();
-      allow create: if !isSignedIn(); // Allow user creation during sign-up
-      allow update: if (isOwner(userId) || isAdmin()) || 
-                      (isSignedIn() && isJoiningGame(userId)); // Allow balance updates during game join transaction
+      allow read: if isSignedIn();
+      allow create: if !isSignedIn(); // Allow user creation during signup
+      allow update: if isOwner(userId) || (isSignedIn() && willJoinGame(request.query.gameId)); // Allow user to update own doc, or allow game transaction
       allow delete: if isAdmin();
     }
-    
+
     // Game Rooms Collection
     match /game_rooms/{roomId} {
-      allow read: if isSignedIn() || isAdmin();
-      allow list: if isSignedIn() || isAdmin();
+      allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if (isSignedIn() && resource.data.players.hasAny([request.auth.uid])) || isAdmin();
-      allow delete: if (isSignedIn() && resource.data.createdBy.uid == request.auth.uid) || isAdmin();
+      
+      // Allow update if user is a player in the game room
+      allow update: if isSignedIn() && (request.auth.uid in resource.data.players);
 
-      // Messages Subcollection
-      match /messages/{messageId} {
-        allow read, write: if (isSignedIn() && get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players.hasAny([request.auth.uid])) || isAdmin();
-      }
+      // Only the creator can delete a waiting room
+      allow delete: if isSignedIn() && resource.data.status == 'waiting' && isOwner(resource.data.createdBy.uid);
     }
-
+    
     // Transactions Collection
     match /transactions/{transactionId} {
-        allow read, list: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-        allow create: if isSignedIn() || isAdmin();
+        allow read: if isSignedIn() && isOwner(resource.data.userId);
+        allow list: if isSignedIn() && request.query.where[0][2] == request.auth.uid; // Allow querying own transactions
+        allow create: if isSignedIn(); // Allow creation for wagers, deposits, etc. Handled by client logic.
         allow update, delete: if isAdmin();
     }
     
     // Friend Requests Collection
     match /friend_requests/{requestId} {
-      allow read, list: if (isSignedIn() && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid)) || isAdmin();
-      allow create: if isSignedIn() && request.resource.data.fromId == request.auth.uid;
-      allow update, delete: if (isSignedIn() && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid)) || isAdmin();
+        allow read: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
+        allow list: if isSignedIn() && (request.query.where[0][2] == request.auth.uid || request.query.where[2][2] == request.auth.uid);
+        allow create: if isSignedIn() && isOwner(request.resource.data.fromId);
+        allow update, delete: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
+    }
+    
+    // Marketing Applications Collection
+    match /marketing_applications/{appId} {
+        allow read: if isAdmin();
+        allow list: if isAdmin();
+        allow create: if request.auth == null; // Anyone can apply
+        allow update, delete: if isAdmin();
     }
 
     // Notifications Collection
     match /notifications/{notificationId} {
-        allow read, list: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-        allow create: if isSignedIn(); // Can be created by functions or other users (friend requests)
-        allow update: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+        allow read, list: if isSignedIn() && isOwner(resource.data.userId);
+        allow create: if isSignedIn(); // Server/functions will create these
+        allow update: if isSignedIn() && isOwner(resource.data.userId);
         allow delete: if isAdmin();
     }
     
-    // Chats Collection
+     // Chats & Messages
     match /chats/{chatId} {
-        allow read, update: if (isSignedIn() && request.auth.uid in resource.data.users) || isAdmin();
-        allow create: if isSignedIn(); // Anyone can start a chat
-        allow delete: if isAdmin();
+      allow get: if isSignedIn() && request.auth.uid in resource.data.users;
+      allow list: if isSignedIn() && request.query.where[0][2] == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && request.auth.uid in resource.data.users;
 
-        match /messages/{messageId} {
-            allow read, write: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users) || isAdmin();
-        }
-    }
-
-    // Marketing Applications Collection
-    match /marketing_applications/{appId} {
-        allow read: if isAdmin();
-        allow create: true; // Public can apply
-        allow update, delete: if isAdmin();
+      match /messages/{messageId} {
+        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
     }
   }
 }
