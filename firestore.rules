@@ -1,116 +1,132 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
+  
+    // =================================
+    // Helper Functions
+    // =================================
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    function isUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-    
-    // =====================================================================
-    //  Users Collection
-    // =====================================================================
+    // =================================
+    // Users Collection
+    // =================================
     match /users/{userId} {
-      // READ: Any signed-in user can read any user's profile.
-      allow read: if isSignedIn();
+      // READ: Anyone can read public user profiles.
+      allow get: if isSignedIn();
+
+      // LIST: Authenticated users can list other users for leaderboards, friend suggestions, etc.
+      allow list: if isSignedIn();
 
       // CREATE: A user can only create their own user document.
-      allow create: if isOwner(userId);
+      allow create: if isUser(userId);
 
-      // UPDATE: A user can update their own document.
-      // Or, another user can update their 'friends' list ONLY when accepting a friend request.
-      allow update: if isOwner(userId) || 
-                       (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']));
+      // UPDATE: A user can only update their own document, with exceptions for friend requests.
+      allow update: if isUser(userId)
+                    || (isSignedIn() && get(/databases/$(database)/documents/friend_requests/$(request.resource.data.friends[-1] + '_' + userId)).data.toId == userId) // Accepting friend request
+                    || (isSignedIn() && get(/databases/$(database)/documents/friend_requests/$(userId + '_' + request.resource.data.friends[-1])).data.fromId == userId); // Accepting friend request
     }
 
-    // =====================================================================
-    //  Game Rooms Collection
-    // =====================================================================
+    // =================================
+    // Game Rooms Collection
+    // =================================
     match /game_rooms/{roomId} {
-      // READ: Any signed-in user can read a game room to see lobby details.
-      allow read: if isSignedIn();
-
-      // CREATE: Any signed-in user can create a game room.
-      allow create: if isSignedIn();
+      // READ: Any signed-in user can read a game room's details.
+      allow get: if isSignedIn();
       
-      // UPDATE: 
-      // 1. The creator can update it while it's 'waiting' (e.g., this rule is open but not used in app).
-      // 2. A player can join if it's 'waiting'.
-      // 3. A player in the game can make a move if it's 'in-progress'.
-      allow update: if isSignedIn() && (
-        (resource.data.status == 'waiting' && request.auth.uid == resource.data.createdBy.uid) ||
-        (resource.data.status == 'waiting' && !request.resource.data.players.hasAny(resource.data.players)) ||
-        (resource.data.status == 'in-progress' && request.auth.uid in resource.data.players)
-      );
+      // LIST: Any signed-in user can list public game rooms.
+      allow list: if isSignedIn();
 
-      // DELETE: The creator can delete a room only if it's still 'waiting'.
-      allow delete: if isSignedIn() && resource.data.status == 'waiting' && request.auth.uid == resource.data.createdBy.uid;
+      // CREATE: A user can create a game room for themselves.
+      allow create: if isUser(request.resource.data.createdBy.uid);
+      
+      // UPDATE: A user can update a game room if they are a player in it.
+      allow update: if isSignedIn() && request.auth.uid in resource.data.players;
 
-      // Messages subcollection
-      match /messages/{messageId} {
-        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-      }
+      // DELETE: A user can only delete a room they created if it's still waiting for an opponent.
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.createdBy.uid && resource.data.status == 'waiting';
     }
 
-    // =====================================================================
-    //  Transactions Collection
-    // =====================================================================
+    // =================================
+    // Transactions Collection
+    // =================================
     match /transactions/{transactionId} {
-      // READ: A user can only read their own transactions.
-      allow get: if isSignedIn() && isOwner(get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId);
-      // LIST: A user can list their own transactions for history pages.
-      allow list: if isSignedIn() && request.query.get('where[0].value') == request.auth.uid;
-
-      // CREATE: A user can create their own transaction document.
-      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
-    }
-    
-    // =====================================================================
-    //  Friend Requests Collection
-    // =====================================================================
-    match /friend_requests/{requestId} {
-        // READ: You can read a request if you sent it or received it.
-        allow read: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
-        // CREATE: You can only create a request coming from you.
-        allow create: if isSignedIn() && isOwner(request.resource.data.fromId);
-        // UPDATE: You can only accept/decline a request sent TO you.
-        allow update: if isSignedIn() && isOwner(request.resource.data.toId);
-        // DELETE: You can only cancel a request you sent.
-        allow delete: if isSignedIn() && isOwner(resource.data.fromId);
-    }
-
-    // =====================================================================
-    //  Notifications, Marketing Applications, etc.
-    // =====================================================================
-    match /notifications/{notificationId} {
-        allow read, list: if isSignedIn() && request.query.get('where[0].value') == request.auth.uid;
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && isOwner(resource.data.userId);
-    }
-    
-    match /marketing_applications/{appId} {
-      // Let anyone create an application
-      allow create: if true;
-      // Only signed-in users (admins) can read/update them.
-      allow read, update: if isSignedIn();
-    }
-    
-    match /chats/{chatId} {
-      // You can read/write to a chat if your UID is in the `players` map.
-      allow read, write: if isSignedIn() && request.auth.uid in resource.data.users;
+      // READ/LIST: A user can only read their own transactions.
+      allow get, list: if isSignedIn() && request.auth.uid == resource.data.userId;
       
-      match /messages/{messageId} {
-         allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
+      // CREATE: A user can only create a transaction for themselves.
+      allow create: if isUser(request.resource.data.userId);
+    }
+    
+    // =================================
+    // Friend Requests Collection
+    // =================================
+    match /friend_requests/{requestId} {
+        // READ/LIST: You can read requests sent to you or by you.
+        allow get, list: if isSignedIn() && (isUser(resource.data.toId) || isUser(resource.data.fromId));
+
+        // CREATE: You can only create a request coming from you.
+        allow create: if isUser(request.resource.data.fromId);
+        
+        // UPDATE: You can only update a request sent TO you (to accept/decline it).
+        allow update: if isUser(request.resource.data.toId);
+
+        // DELETE: You can only delete a request you sent.
+        allow delete: if isUser(request.resource.data.fromId);
+    }
+
+    // =================================
+    // Notifications Collection
+    // =================================
+    match /notifications/{notificationId} {
+        // READ/LIST: A user can only read their own notifications.
+        allow get, list: if isSignedIn() && isUser(resource.data.userId);
+        
+        // CREATE: A notification can be created by the system (no client-side creation).
+        allow create: if true; // Managed by backend/functions
+
+        // UPDATE: A user can update their own notifications (e.g., to mark as read).
+        allow update: if isUser(request.resource.data.userId);
+    }
+    
+    // =================================
+    // Chats & Messages Subcollection
+    // =================================
+    match /chats/{chatId} {
+        // READ: You can read a chat if you are a participant.
+        allow get: if isSignedIn() && request.auth.uid in resource.data.users;
+        
+        // LIST: Users can list chats they are part of.
+        allow list: if isSignedIn() && request.auth.uid in request.query.filters[0][2];
+        
+        // CREATE: A chat can be created if the user is one of the two participants.
+        allow create: if isSignedIn() && request.auth.uid in request.resource.data.users;
+        
+        // UPDATE: A user can update a chat if they are a participant.
+        allow update: if isSignedIn() && request.auth.uid in resource.data.users;
+        
+        match /messages/{messageId} {
+            // READ/LIST: You can read messages in a chat you are part of.
+            allow read: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid] != null;
+            
+            // CREATE: You can create a message if you are a participant in the chat.
+            allow create: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid] != null;
+        }
+    }
+    
+     // =================================
+    // Marketing Applications
+    // =================================
+    match /marketing_applications/{appId} {
+        allow create: if true; // Anyone can apply
+        allow read, write: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
   }
 }
