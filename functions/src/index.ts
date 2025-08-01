@@ -17,12 +17,13 @@ admin.initializeApp();
 // This function triggers whenever a new document is created in 'game_rooms'
 export const announceNewGame = functions.firestore
   .document("game_rooms/{roomId}")
-  .onCreate(async (snap) => {
+  .onCreate(async (snap, context) => {
     const roomData = snap.data();
-    const roomId = snap.id; // Get the document ID, which is our Room ID
+    const roomId = context.params.roomId; // Correct way to get wildcard ID
 
     // Exit if the function is triggered with no data, or for a private room
     if (!roomData || roomData.isPrivate === true) {
+      functions.logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
       return null;
     }
 
@@ -38,19 +39,23 @@ export const announceNewGame = functions.firestore
       return null;
     }
 
-    const chatId = "@nexbattlerooms"; // Your Telegram group username
-    const siteUrl = "http://nexbattle.com"; // Your website's URL
+    const chatId = "@Nexbattlepublicrooms"; // Your Telegram group username
+    const siteUrl = "http://nexbattle.com";
 
-    const gameType = roomData.gameType ?
-      `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}`
-      : "Game";
+    // Prepare message components with fallbacks
+    const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
-    const timeControl = roomData.timeControl ? `${roomData.timeControl / 60} min` : "Not set";
+    const timeControlValue = roomData.timeControl;
+    const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
-    const message =
-      `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
+    // Log the variables to ensure they are being read correctly
+    functions.logger.log(`Preparing message for Room ID: ${roomId}`);
+    functions.logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
+
+    // Construct the message string carefully
+    const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
       `<b>Player:</b> ${createdBy}\n` +
       `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
       `<b>Time:</b> ${timeControl}\n\n` +
@@ -65,11 +70,11 @@ export const announceNewGame = functions.firestore
       await axios.post(telegramApiUrl, {
         chat_id: chatId,
         text: message,
-        parse_mode: 'HTML', // Important to allow clickable links and bold text
+        parse_mode: 'HTML',
       });
-      functions.logger.log("Successfully sent message to Telegram.");
-    } catch (error) {
-      functions.logger.error("Error sending message to Telegram:", error);
+      functions.logger.log(`Successfully sent message for Room ID: ${roomId}`);
+    } catch (error: any) {
+      functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
 
     return null;
