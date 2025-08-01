@@ -3,7 +3,6 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { Gift } from 'lucide-react';
 import { collection, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -31,7 +30,6 @@ export function BonusCard() {
   }, []);
 
   const remainingBonuses = Math.max(0, bonusLimit - claimedBonuses);
-  const progressValue = Math.min(100, (claimedBonuses / bonusLimit) * 100);
 
   return (
     <Card className="bg-card/50 border-primary/20">
@@ -40,19 +38,18 @@ export function BonusCard() {
           <Gift className="w-6 h-6 text-yellow-300" />
           <span className="text-yellow-300">{LKR_BONUS} LKR Registration Bonus!</span>
         </CardTitle>
-        <CardDescription>The next {bonusLimit} users get a free bonus to start playing.</CardDescription>
+        <CardDescription>The first {bonusLimit} users get a free bonus to start playing.</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
           <div className="space-y-2">
             <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-1/2" />
           </div>
         ) : (
-          <>
-            <Progress value={progressValue} className="mb-2" />
-            <p className="text-sm text-muted-foreground">{Math.min(claimedBonuses, bonusLimit)} / {bonusLimit} bonuses claimed. {remainingBonuses} remaining in this batch!</p>
-          </>
+          <p className="text-sm text-center text-muted-foreground">
+            <span className="font-bold text-foreground">{Math.min(claimedBonuses, bonusLimit)} / {bonusLimit}</span> bonuses claimed. 
+            <span className="font-bold text-foreground"> {remainingBonuses} remaining!</span>
+          </p>
         )}
       </CardContent>
     </Card>
