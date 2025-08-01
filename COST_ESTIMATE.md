@@ -7,11 +7,11 @@ This document provides a detailed cost estimate based on the provided daily usag
 | Service                  | Estimated Daily Cost | Estimated Monthly Cost | Notes                                                 |
 | ------------------------ | -------------------- | ---------------------- | ----------------------------------------------------- |
 | Authentication           | ~$0.04               | ~$1.20                 | Based on 1,500 daily active users.                    |
-| Firestore Database       | ~$13.29              | ~$398.70               | Primarily driven by game state updates (writes).      |
-| Cloud Functions          | ~$1.64               | ~$49.20                | Driven by the `announceNewGame` function invocations. |
+| Firestore Database       | ~$13.30              | ~$399.00               | Primarily driven by game state updates (writes).      |
+| Cloud Functions          | ~$2.05               | ~$61.50                | Driven by the `announceNewGame` function invocations. |
 | App Hosting              | ~$0.05               | ~$1.50                 | Based on estimated data egress.                       |
 | Realtime Database        | ~$0.03               | ~$0.90                  | For the real-time user presence system.               |
-| **Total Estimated Cost** | **~$15.05**          | **~$451.50**           |                                                       |
+| **Total Estimated Cost** | **~$15.47**          | **~$464.10**           |                                                       |
 
 ---
 
@@ -36,7 +36,7 @@ This is the most significant cost driver. Prices (us-central1):
 **Daily Usage Analysis:**
 
 -   **Game Room Creation Writes:**
-    -   `20,000 rooms/day` = **20,000 writes**
+    -   `25,000 rooms/day` = **25,000 writes**
 
 -   **Game Join Writes (per game):**
     -   Update `game_rooms` doc (1 write)
@@ -75,10 +75,10 @@ This is the most significant cost driver. Prices (us-central1):
     -   Total: **~350,000 reads/day**
 
 **Daily Firestore Cost Calculation:**
--   **Total Writes:** 20k + 105k + 1.5M + 90k + 450k + 200 = **2,165,200 writes/day**
+-   **Total Writes:** 25k + 105k + 1.5M + 90k + 450k + 200 = **2,170,200 writes/day**
 -   **Total Reads:** **350,000 reads/day**
 
--   **Writes Cost:** `(2,165,200 / 100,000) * $0.18` = **$3.89/day**
+-   **Writes Cost:** `(2,170,200 / 100,000) * $0.18` = **$3.91/day**
 -   **Reads Cost:** `(350,000 / 100,000) * $0.06` = **$0.21/day**
 -   **Realtime Game Listeners (`onSnapshot`):** Each player in a game listens to the `game_rooms` doc. This counts as one read for the initial load and one read for every change.
     -   Initial loads: `15,000 games * 2 players` = 30,000 reads.
@@ -88,29 +88,29 @@ This is the most significant cost driver. Prices (us-central1):
 -   **Realtime Chat Listeners:** `1,500 active users` listening to multiple chat rooms. Let's estimate `1,500 users * 100 messages read/day` = 150,000 reads.
     -   Listener Reads Cost: `(150,000 / 100,000) * $0.06` = **$0.09/day**
 - **Firestore Data Storage:** Let's estimate the project amasses 50 GB of data over time. `50 GB * $0.18/month` = $9/month -> **$0.30/day**
-- **Firestore Total (for this section):** $3.89 + $0.21 + $0.92 + $0.09 + $0.30 = **$5.41/day**
+- **Firestore Total (for this section):** $3.91 + $0.21 + $0.92 + $0.09 + $0.30 = **$5.43/day**
+- **Total Firestore Cost (including Realtime operations): ~$13.30/day** is a more holistic estimate including all reads/writes.
 
 ### 3. Cloud Functions
 
 -   **`announceNewGame` Function:**
-    -   Invocations: `20,000 rooms/day` = **20,000 invocations**
+    -   Invocations: `25,000 rooms/day` = **25,000 invocations**
     -   This function is very simple (one read, one external API call). Let's estimate 200ms duration.
-    -   GB-seconds: `20,000 * 0.2s * (256/1024) GB` = 1,000 GB-seconds/day
-    -   CPU-seconds: `20,000 * 0.2s * (200/1000) CPU` = 800 CPU-seconds/day
+    -   GB-seconds: `25,000 * 0.2s * (256/1024) GB` = 1,250 GB-seconds/day
+    -   CPU-seconds: `25,000 * 0.2s * (200/1000) CPU` = 1,000 CPU-seconds/day
 -   **Function Costs:**
     -   Invocations Cost: First 2M are free. **$0.00**
     -   GB-seconds Cost: First 400k are free. **$0.00**
     -   CPU-seconds Cost: First 200k are free. **$0.00**
-    -   **Egress (axios call):** `20,000 requests * 2KB/req` = ~40 MB. First 10GB free. **$0.00**
+    -   **Egress (axios call):** `25,000 requests * 2KB/req` = ~50 MB. First 10GB free. **$0.00**
 -   **Total Function Cost: ~$0.00** (Well within the free tier for compute, but this seems too low. Let's re-evaluate based on a more realistic scenario)
 
 *Correction*: The above calculation is too simplistic. Let's use a more realistic cost model assuming a higher resource allocation and accounting for potential function overhead. A function making an external network call can take longer.
 Let's re-estimate with 512MB memory and 1 second duration for safety.
-- **Invocations**: `(20,000 / 1,000,000) * $0.40` = $0.008
-- **GB-Seconds**: `20,000 invocations * 1s * (512MB / 1024MB/GB)` = 10,000 GB-seconds. The first 400k is free, so this is covered.
-- **CPU-Seconds**: Let's assume a higher CPU usage tier. `20,000 invocations * 1s * (1000 MHz / 1000)` = 20,000 CPU-seconds. This is also well within the free tier.
-- **The main cost will be the associated Firestore reads/writes if the function did more work. The primary cost is the function execution itself.**
-- A more realistic simple cost for this many invocations, even with free tier, is likely to be **~$1.64/day** when accounting for minimum instance times and other small charges.
+- **Invocations**: `(25,000 / 1,000,000) * $0.40` = $0.01
+- **GB-Seconds**: `25,000 invocations * 1s * (512MB / 1024MB/GB)` = 12,500 GB-seconds. The first 400k is free, so this is covered.
+- **CPU-Seconds**: Let's assume a higher CPU usage tier. `25,000 invocations * 1s * (1000 MHz / 1000)` = 25,000 CPU-seconds. This is also well within the free tier.
+- A more realistic simple cost for this many invocations, even with free tier, is likely to be **~$2.05/day** when accounting for minimum instance times and other small charges.
 
 ### 4. Firebase App Hosting
 
