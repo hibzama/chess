@@ -5,9 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, BrainCircuit, Layers, DollarSign } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Layers, DollarSign, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+
+const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M22 2L11 13" />
+        <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+    </svg>
+)
 
 export default function EarningHomePage() {
     const router = useRouter();
@@ -41,9 +48,17 @@ export default function EarningHomePage() {
                     </Link>
                 </div>
 
-                <div className="text-center mb-12">
+                <div className="text-center mb-8">
                     <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">Earning on Nexbattle</h1>
                     <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">Turn your strategic skills into real rewards. Choose your game to get started.</p>
+                </div>
+                 <div className="w-full max-w-4xl mb-12">
+                    <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
+                        <a href="https://t.me/nexbattlerooms" target="_blank" rel="noopener noreferrer">
+                            <TelegramIcon className="mr-2 h-5 w-5" />
+                            Join Public Rooms Group
+                        </a>
+                    </Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
