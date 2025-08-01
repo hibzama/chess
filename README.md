@@ -1,4 +1,4 @@
-# Firebase Studio
+firebase deploy --only firestore:rules# Firebase Studio
 
 This is a NextJS starter in Firebase Studio.
 
