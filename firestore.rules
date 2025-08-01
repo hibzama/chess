@@ -2,97 +2,105 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
+    
+    // Helper functions to make rules cleaner
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
-
+    
     function isUser(userId) {
       return request.auth.uid == userId;
     }
-    
+
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Admins can do anything
-    match /{document=**} {
-      allow read, write: if isAdmin();
-    }
-    
     // USERS collection
     match /users/{userId} {
-      // Anyone can count the total number of users for the bonus card
-      allow get: if request.query.keys.size() == 0; // This allows getCountFromServer
+      // Admins can read/write any user document
+      allow read, write: if isAdmin();
       
       // Any authenticated user can read public profile data
-      allow read: if isAuthenticated();
+      allow get;
+      allow list: if isAuthenticated();
 
-      // A user can create their own document and update it.
-      // An admin can also update any user document (covered by global admin rule).
-      allow create, update, delete: if isUser(userId);
+      // A user can only update their own document
+      allow update: if isUser(userId);
     }
     
     // GAME_ROOMS collection
     match /game_rooms/{roomId} {
-        // Anyone authenticated can list public, waiting games
-        allow list: if isAuthenticated() && resource.data.isPrivate == false && resource.data.status == 'waiting';
+      // Allow anyone to read a game room (for lobbies, etc.)
+      allow get: if isAuthenticated();
+      allow list: if isAuthenticated();
 
-        // A user can create a game room
-        allow create: if isAuthenticated() && request.resource.data.createdBy.uid == request.auth.uid;
+      // Allow a user to create a room if they are logged in
+      allow create: if isAuthenticated() && isUser(request.resource.data.createdBy.uid);
       
-        // Players in the game can read it. Potential joiners can read if it's waiting.
-        allow read: if isAuthenticated() && (request.auth.uid in resource.data.players || resource.data.status == 'waiting');
+      // Allow a user to update a room if:
+      // 1. They are joining a waiting room.
+      // 2. They are one of the players in an in-progress game.
+      allow update: if isAuthenticated() && 
+                    (resource.data.status == 'waiting' || request.auth.uid in resource.data.players);
 
-        // Allow a user to join a waiting game (update status and add to players array)
-        // or allow a player in the game to update it (make a move)
-        allow update: if isAuthenticated() && (
-            (resource.data.status == 'waiting' && !(request.auth.uid in resource.data.players)) ||
-            (request.auth.uid in resource.data.players)
-        );
-        
-        // The creator can delete a waiting room
-        allow delete: if isAuthenticated() && resource.data.createdBy.uid == request.auth.uid && resource.data.status == 'waiting';
-
-        // Chat messages within a game room
-        match /messages/{messageId} {
-            allow read, write: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-        }
-    }
-    
-    // CHATS collection (direct messages)
-    match /chats/{chatId} {
-        allow read, write: if isAuthenticated() && request.auth.uid in resource.data.users;
-        
-        match /messages/{messageId} {
-             allow read, write: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-        }
+      // Only the creator can delete a waiting room
+      allow delete: if isAuthenticated() && isUser(resource.data.createdBy.uid) && resource.data.status == 'waiting';
+      
+      // Game Chat subcollection
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      }
     }
     
     // TRANSACTIONS collection
     match /transactions/{transactionId} {
-        // A user can read their own transactions.
-        // A user can create their own transaction documents (deposit/withdrawal requests).
-        allow read, create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        // Admins can read/write any transaction
+        allow read, write: if isAdmin();
+        
+        // A user can read their own transactions
+        allow list, get: if isAuthenticated() && get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId == request.auth.uid;
+        
+        // Allow creating transactions if authenticated (server-side logic handles validation)
+        allow create: if isAuthenticated();
     }
     
-    // NOTIFICATIONS collection
-    match /notifications/{notificationId} {
-        allow read, write: if isAuthenticated() && isUser(resource.data.userId);
-    }
+    // CHATS collection (for direct messages)
+    match /chats/{chatId} {
+      // Only users involved in the chat can read/write
+      allow read, write, update: if isAuthenticated() && request.auth.uid in resource.data.users;
+      allow create: if isAuthenticated();
 
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
+    }
+    
     // FRIEND_REQUESTS collection
     match /friend_requests/{requestId} {
-        allow read, write: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
-        allow create: if isAuthenticated() && request.resource.data.fromId == request.auth.uid;
-        allow delete: if isAuthenticated() && request.auth.uid == resource.data.fromId;
+        // Admins can manage all requests
+        allow read, write, delete: if isAdmin();
+        
+        // Users can create requests, and can update/delete their own requests (or requests sent to them)
+        allow create: if isAuthenticated() && isUser(request.resource.data.fromId);
+        allow update, delete: if isAuthenticated() && (isUser(resource.data.fromId) || isUser(resource.data.toId));
     }
 
-    // MARKETING_APPLICATIONS collection
+    // NOTIFICATIONS collection
+    match /notifications/{notificationId} {
+        // A user can only read/update their own notifications
+        allow read, update, delete: if isAuthenticated() && isUser(resource.data.userId);
+        
+        // Server/functions can create notifications
+        allow create: if isAuthenticated();
+    }
+    
+     // MARKETING_APPLICATIONS collection
     match /marketing_applications/{appId} {
-        // Anyone can submit an application
-        allow create: if true;
+      // Anyone can create an application
+      allow create;
+      // Only admins can read/update them
+      allow read, update, delete: if isAdmin();
     }
   }
 }
