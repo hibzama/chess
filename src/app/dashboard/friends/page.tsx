@@ -160,7 +160,7 @@ export default function FriendsPage() {
         
         const [sentSnapshot, receivedSnapshot] = await Promise.all([
             getDocs(sentReqQuery),
-            getDocs(receivedSnapshot)
+            getDocs(receivedReqQuery)
         ]);
         
         const pendingSentIds = sentSnapshot.docs.map(d => d.data().toId);
