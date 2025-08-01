@@ -2,9 +2,9 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, rtdb } from '@/lib/firebase';
 import { doc, onSnapshot, serverTimestamp, updateDoc, getDoc } from 'firebase/firestore';
-import { getDatabase, ref, onValue, off, set, onDisconnect, serverTimestamp as rtdbServerTimestamp } from "firebase/database";
+import { ref, onValue, off, set, onDisconnect, serverTimestamp as rtdbServerTimestamp } from "firebase/database";
 
 interface AuthContextType {
   user: User | null;
@@ -86,7 +86,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       // Presence system
-      const rtdb = getDatabase();
       const userStatusDatabaseRef = ref(rtdb, '/status/' + user.uid);
       const userStatusFirestoreRef = doc(db, '/users/' + user.uid);
 

@@ -1,114 +1,67 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
+  
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isAuthenticated() {
+    function isAuth() {
       return request.auth != null;
     }
-    
-    // Check if the current request is part of a game-joining transaction.
-    // This allows a player to update another player's balance during the game setup.
-    function isJoiningGame() {
-        return exists(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)) ||
-               (existsAfter(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)) &&
-                getAfter(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)).data.status == 'in-progress');
-    }
 
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Admins can do anything
-    match /{path=**} {
-      allow read, write: if isAdmin();
-    }
-
-    // USERS Collection
+    // USER DATA
     match /users/{userId} {
-      // Any authenticated user can read any user profile (for profiles, leaderboards etc)
-      allow read: if isAuthenticated();
-      // A user can update their own document, OR an update can happen as part of a game transaction (for wagers/payouts)
-      allow update: if isOwner(userId) || isJoiningGame();
-      // Only the user themselves can delete their account data.
-      allow delete: if isOwner(userId);
-       // Allow user creation by anyone (for registration)
-      allow create: if true;
+      allow read;
+      allow create: if isAuth();
+      allow update: if request.auth.uid == userId || isAdmin();
     }
-
-    // GAME_ROOMS Collection
+    
+    // GAME ROOMS
     match /game_rooms/{roomId} {
-      // Anyone can see public game rooms. Players can always see their own rooms.
-      allow read: if resource.data.isPrivate == false || request.auth.uid in resource.data.players;
-      // Any authenticated user can create a room.
-      allow create: if isAuthenticated();
-      // Allow updates only by players in the game, or if the game is waiting for a player.
-      allow update: if (request.auth.uid in resource.data.players) || (resource.data.status == 'waiting' && isAuthenticated());
-      // Only the creator can delete a waiting room.
-      allow delete: if resource.data.createdBy.uid == request.auth.uid && resource.data.status == 'waiting';
-      
-      // Messages subcollection
-      match /messages/{messageId} {
-        allow read, write: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-      }
+      allow read;
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if request.auth.uid == resource.data.createdBy.uid;
     }
     
-    // TRANSACTIONS Collection
-    match /transactions/{transactionId} {
-        // Users can only list their own transactions
-        allow list: if isAuthenticated() && request.query.where[0][2] == request.auth.uid;
-        // Users can create their own transactions
-        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-        // Admins can update/delete transactions
-        allow update, delete, read: if isAdmin();
-    }
-
-    // FRIEND_REQUESTS Collection
-    match /friend_requests/{requestId} {
-        // Users can query requests sent to them or from them.
-        allow list: if isAuthenticated() && (request.query.where[0][2] == request.auth.uid || request.query.where[2][2] == request.auth.uid);
-        // Users can read requests sent to them or from them.
-        allow read: if isAuthenticated() && (resource.data.toId == request.auth.uid || resource.data.fromId == request.auth.uid);
-        // Users can create requests.
-        allow create: if isAuthenticated() && request.resource.data.fromId == request.auth.uid;
-        // Users can update requests (accept/decline).
-        allow update: if isAuthenticated() && (resource.data.toId == request.auth.uid || resource.data.fromId == request.auth.uid);
-        // The sender can delete (cancel) a pending request.
-        allow delete: if isAuthenticated() && resource.data.fromId == request.auth.uid;
-    }
-
-    // CHATS Collection
+    // MESSAGES
     match /chats/{chatId} {
-        // Only involved users can read/write to a chat document and its messages.
-        match /{document=**} {
-            allow read, write: if request.auth.uid in resource.data.users;
-        }
+      allow read: if isAuth() && request.auth.uid in resource.data.users;
+      allow create: if isAuth();
+      allow update: if isAuth() && request.auth.uid in resource.data.users;
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+        allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid].exists == true;
+    }
+
+    // TRANSACTIONS
+    match /transactions/{transactionId} {
+      allow read: if isAuth() && (request.auth.uid == resource.data.userId || isAdmin());
+      allow list: if isAuth() && (request.query.where[0][2] == request.auth.uid || isAdmin());
+      allow create: if isAuth();
+      allow update: if isAdmin();
     }
     
-    // MARKETING_APPLICATIONS Collection
+    // MARKETING APPLICATIONS
     match /marketing_applications/{appId} {
-        // Anyone can create an application.
-        allow create: if true;
-        // Only admins can read, list, update or delete them.
-        allow read, list, update, delete: if isAdmin();
+        allow create: if isAuth();
+        allow read, update, delete: if isAdmin();
     }
     
-    // NOTIFICATIONS Collection
+    // FRIEND REQUESTS
+    match /friend_requests/{requestId} {
+      allow read: if isAuth() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
+      allow create: if isAuth();
+      allow update, delete: if isAuth() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
+    }
+    
+    // NOTIFICATIONS
     match /notifications/{notificationId} {
-        // A user can only access their own notifications.
-        allow read, list: if isAuthenticated() && ((exists(/databases/$(database)/documents/notifications/$(notificationId)) && resource.data.userId == request.auth.uid) || request.query.where[0][2] == request.auth.uid);
-        allow create: if isAuthenticated(); // For friend requests etc.
-        allow update: if isAuthenticated() && resource.data.userId == request.auth.uid; // To mark as read
-        allow delete: if false; // Don't allow deletion for now
+        allow read, list, update: if isAuth() && request.auth.uid == resource.data.userId;
+        allow create: if isAuth();
     }
   }
 }
