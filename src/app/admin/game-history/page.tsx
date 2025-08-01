@@ -24,10 +24,12 @@ export default function GameHistoryPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const q = query(collection(db, 'game_rooms'), where('status', '==', 'completed'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'game_rooms'), where('status', '==', 'completed'));
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Game));
+            // Sort client-side to avoid needing a composite index
+            history.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
             setGames(history);
             setLoading(false);
         });
