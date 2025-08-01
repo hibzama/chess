@@ -38,7 +38,7 @@ export const announceNewGame = functions.firestore
     }
 
     const chatId = "@nexbattlerooms"; // Your Telegram group username
-    const siteUrl = "https://nexbattle.com"; // Your website's URL
+    const siteUrl = "http://nexbattle.com"; // Your website's URL
 
     const gameType = roomData.gameType ?
       `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}`
