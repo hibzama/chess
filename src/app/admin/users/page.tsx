@@ -117,9 +117,9 @@ export default function UsersPage() {
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
-                                     {/* <Button size="sm" variant="outline" onClick={() => handleLoginAsUser(user.uid)}>
+                                     <Button size="sm" variant="outline" onClick={() => handleLoginAsUser(user.uid)}>
                                         <LogIn className="mr-2 h-4 w-4"/> Login As
-                                    </Button> */}
+                                    </Button>
                                     {user.role !== 'admin' && (
                                         <Button size="sm" onClick={() => handleRoleChange(user.uid, 'admin')}>
                                             Make Admin
