@@ -1,112 +1,87 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper Functions
-    function isSignedIn() {
+    
+    // Helper function to check if the user is authenticated
+    function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
-    function getUserData(userId) {
-        return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
 
-    function getGame(gameId) {
-        return get(/databases/$(database)/documents/game_rooms/$(gameId));
-    }
-
-    function isPlayer(game) {
-        return request.auth.uid in game.data.players;
-    }
-
-    // This function is the key to allowing the "Join Game" transaction.
-    // It verifies that a user can only have their balance updated by another
-    // transaction if it's a valid game wager.
-    function isWagerTransaction(userId) {
-        let gameId = request.resource.data.gameRoomId;
-        let game = getGame(gameId);
-        // Ensure the transaction is for a wager, is part of a valid game, and the user is a player.
-        return request.resource.data.type == 'wager' &&
-               isPlayer(game) &&
-               userId == request.resource.data.userId;
+    // Helper function to get incoming request data
+    function getRequestData() {
+      return request.resource.data;
     }
     
-    // Allow users to read their own documents fully.
-    // Allow any signed-in user to read public profile data.
+    // Helper function to check if a user is a player in a specific game room
+    function isPlayer(gameRoomId) {
+      return get(/databases/$(database)/documents/game_rooms/$(gameRoomId)).data.players.hasAny([request.auth.uid]);
+    }
+
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isOwner(userId);
-      // Allow user to update their own doc.
-      // Also, allow updates to balance if it's part of a valid game transaction
-      // (This is implicitly handled by allowing the transaction write).
-      allow update: if isOwner(userId);
+      // Allow a user to read their own document
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      // Allow anyone to read public user profiles (for profile pages, etc.)
+      allow list: if isAuthenticated();
+      // Allow a user to create their own document
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Allow a user to update their own document
+      allow update: if isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Allow users to list/read their own transactions.
-    // Allow the system to create transactions for wagers and payouts.
+    match /game_rooms/{roomId} {
+      allow get: if isAuthenticated();
+      // Allow any authenticated user to see the list of public games
+      allow list: if isAuthenticated(); 
+      // Allow authenticated users to create a game room
+      allow create: if isAuthenticated();
+      
+      // Allow a player to update a game if it's their turn
+      allow update: if isAuthenticated() && isPlayer(roomId) && resource.data.status != 'completed';
+      
+      // Allow a user to delete their own waiting room
+      allow delete: if isAuthenticated() && resource.data.createdBy.uid == request.auth.uid && resource.data.status == 'waiting';
+    }
+
+    match /game_rooms/{roomId}/messages/{messageId} {
+      allow read, write: if isPlayer(roomId);
+    }
+
     match /transactions/{transactionId} {
-      allow read, list: if isSignedIn() && request.auth.uid == resource.data.userId;
-      // Allow creation of wager transactions during a game join.
-      // The `isWagerTransaction` check is not needed here because the transaction
-      // as a whole is what gets validated by the rules. If the user document
-      // update is allowed, this will be too.
-      allow create: if isSignedIn();
+      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Allow a user to see their own transaction history
+      allow list: if isAuthenticated() && request.query.where.size() > 0 && request.query.where[0][2] == request.auth.uid;
+      // Allow users to create their own transactions
+      allow create: if isAuthenticated() && getRequestData().userId == request.auth.uid;
+      // Allow admins to update any transaction
+      allow update: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
-    
-    // Friend Requests
+
     match /friend_requests/{requestId} {
-        allow read, list: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
-        allow create: if isSignedIn() && request.auth.uid == request.resource.data.fromId;
-        // Allow updates only to accept or decline a request by the recipient.
-        allow update: if isSignedIn() && request.auth.uid == resource.data.toId;
-        allow delete: if isSignedIn() && request.auth.uid == resource.data.fromId;
+      allow read, create: if isAuthenticated();
+      // Allow the recipient to accept/decline, or the sender to cancel (delete)
+      allow update, delete: if isAuthenticated() && (request.auth.uid == resource.data.toId || request.auth.uid == resource.data.fromId);
     }
 
-    // Game Rooms
-    match /game_rooms/{gameId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      // Allow updates only by players in the game.
-      allow update: if isSignedIn() && isPlayer(get(resource.path));
-      // Allow the creator to delete a waiting room.
-      allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid) && resource.data.status == 'waiting';
-      
-      // Messages subcollection
-      match /messages/{messageId} {
-        allow read: if isSignedIn() && isPlayer(getGame(gameId));
-        allow create: if isSignedIn() && isPlayer(getGame(gameId)) && isOwner(request.resource.data.senderId);
-      }
-    }
-    
-    // Marketing applications can be created by anyone.
-    // Read/update should be restricted to admins (handled by application logic).
     match /marketing_applications/{appId} {
-        allow create: if true;
-        allow read, update, delete: if false; // Managed by admin backend
+       // Admins can read/write, users can create
+       allow read, update, delete: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+       allow create: if true; // Open for anyone to apply
     }
     
-    // Chats
-    match /chats/{chatId} {
-      allow read, update: if isSignedIn() && request.auth.uid in resource.data.users;
-      // Creation is handled by application logic when a chat is first started.
-      allow create: if isSignedIn();
-      
-      match /messages/{messageId} {
-        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
-    }
-
-    // Notifications can be read by the user they are for.
     match /notifications/{notificationId} {
-      allow read, list: if isSignedIn() && request.auth.uid == resource.data.userId;
-      allow create: if isSignedIn(); // Can be created by the system/other users
-      allow update: if isSignedIn() && isOwner(resource.data.userId); // Only user can mark as read
+        allow read, list: if isAuthenticated() && request.query.where.size() > 0 && request.query.where[0][2] == request.auth.uid;
+        allow create, update: if isAuthenticated();
+    }
+    
+    match /chats/{chatId} {
+      // A user can read or write to a chat if their UID is in the `users` map keys
+      allow read, write: if isAuthenticated() && resource.data.users[request.auth.uid].exists == true;
+    }
+    
+    match /chats/{chatId}/messages/{messageId} {
+      // A user can read/write messages in a chat they are part of.
+      allow read, write: if isAuthenticated() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid].exists == true;
     }
   }
 }
