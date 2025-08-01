@@ -1,19 +1,11 @@
 
-// This is a placeholder for a serverless function (e.g., Next.js API Route, Firebase Function)
-// In a real application, this logic would be in a secure backend environment.
-
 import admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
+// This simplified initialization is more robust for this environment.
 if (!admin.apps.length) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      }),
-    });
+    admin.initializeApp();
   } catch (error) {
     console.error('Firebase admin initialization error', error.stack);
   }
@@ -31,10 +23,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Verify the requesting user is an admin
-    const adminUserRecord = await admin.auth().getUser(adminUid);
-    if (adminUserRecord.customClaims?.admin !== true) {
-      return res.status(403).json({ error: 'Forbidden: You are not authorized to perform this action.' });
+    // To verify the admin, we will check their user document in Firestore.
+    // This is more reliable than custom claims in this context.
+    const firestore = admin.firestore();
+    const adminUserDoc = await firestore.collection('users').doc(adminUid).get();
+
+    if (!adminUserDoc.exists || adminUserDoc.data().role !== 'admin') {
+         return res.status(403).json({ error: 'Forbidden: You are not authorized to perform this action.' });
     }
 
     // Generate custom token for the target user
