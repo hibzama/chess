@@ -1,9 +1,10 @@
 
+
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -108,6 +109,9 @@ export default function AdminLayout({
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                              <Link href="/admin/withdrawals/history"><SidebarMenuButton tooltip="Withdrawal History"><ArrowDownCircle /><span>Withdrawal History</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                         <SidebarMenuItem>
+                             <Link href="/admin/game-history"><SidebarMenuButton tooltip="Game History"><Swords /><span>Game History</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                              <Link href="/admin/users"><SidebarMenuButton tooltip="Users"><Users /><span>Users</span></SidebarMenuButton></Link>
