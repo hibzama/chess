@@ -150,70 +150,76 @@ export default function FriendsPage() {
         const friendData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
         setFriends(sortUsers(friendData));
     }, [userData]);
-
-    const fetchSuggestions = useCallback(async () => {
-        if (!user || !userData) return;
-    
-        // Get IDs of current friends and users with pending requests
-        const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
-        const receivedReqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
-        
-        const [sentSnapshot, receivedSnapshot] = await Promise.all([
-            getDocs(sentReqQuery),
-            getDocs(receivedReqQuery)
-        ]);
-        
-        const pendingSentIds = sentSnapshot.docs.map(d => d.data().toId);
-        const pendingReceivedIds = receivedSnapshot.docs.map(d => d.data().fromId);
-    
-        const excludeIds = [user.uid, ...(userData.friends || []), ...pendingSentIds, ...pendingReceivedIds];
-        
-        // Fetch all users and filter client-side, as 'not-in' has a 10-item limit.
-        const usersSnapshot = await getDocs(query(collection(db, 'users'), limit(100)));
-        const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
-    
-        const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
-        
-        setSuggestions(sortUsers(suggestedUsers));
-    }, [user, userData]);
     
     useEffect(() => {
-        if (!user) {
+        if (!user || !userData) {
             setLoading(false);
             return;
         }
 
-        // Received Requests
-        const reqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
-        const unsubscribeReqs = onSnapshot(reqQuery, (snapshot) => {
-            const reqsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as FriendRequest));
-            setRequests(reqsData);
-        });
-
-        // Sent Requests
-        const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
-        const unsubscribeSentReqs = onSnapshot(sentReqQuery, async (snapshot) => {
-            const sentReqsDataPromises = snapshot.docs.map(async (d) => {
-                const req = {...d.data(), id: d.id } as FriendRequest;
-                const toUserDoc = await getDoc(doc(db, 'users', req.toId));
-                if (toUserDoc.exists()) {
-                    const toUserData = toUserDoc.data();
-                    req.toName = `${toUserData.firstName} ${toUserData.lastName}`;
-                    req.toAvatar = toUserData.photoURL;
-                }
-                return req;
+        const initialLoad = async () => {
+             // Received Requests
+            const reqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
+            const unsubscribeReqs = onSnapshot(reqQuery, (snapshot) => {
+                const reqsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as FriendRequest));
+                setRequests(reqsData);
             });
-            const sentReqsData = await Promise.all(sentReqsDataPromises);
-            setSentRequests(sentReqsData);
-        });
-        
-        Promise.all([fetchFriends(), fetchSuggestions()]).finally(() => setLoading(false));
 
-        return () => {
-            unsubscribeReqs();
-            unsubscribeSentReqs();
+            // Sent Requests
+            const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
+            const unsubscribeSentReqs = onSnapshot(sentReqQuery, async (snapshot) => {
+                const sentReqsDataPromises = snapshot.docs.map(async (d) => {
+                    const req = {...d.data(), id: d.id } as FriendRequest;
+                    const toUserDoc = await getDoc(doc(db, 'users', req.toId));
+                    if (toUserDoc.exists()) {
+                        const toUserData = toUserDoc.data();
+                        req.toName = `${toUserData.firstName} ${toUserData.lastName}`;
+                        req.toAvatar = toUserData.photoURL;
+                    }
+                    return req;
+                });
+                const sentReqsData = await Promise.all(sentReqsDataPromises);
+                setSentRequests(sentReqsData);
+            });
+
+            await fetchFriends();
+            setLoading(false);
+
+            // Real-time suggestions
+            const usersQuery = query(collection(db, 'users'), limit(100));
+            const unsubscribeUsers = onSnapshot(usersQuery, async (usersSnapshot) => {
+                const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
+                
+                const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
+                const receivedReqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
+                
+                const [sentSnapshot, receivedSnapshot] = await Promise.all([
+                    getDocs(sentReqQuery),
+                    getDocs(receivedReqQuery)
+                ]);
+        
+                const pendingSentIds = sentSnapshot.docs.map(d => d.data().toId);
+                const pendingReceivedIds = receivedSnapshot.docs.map(d => d.data().fromId);
+
+                const excludeIds = [user.uid, ...(userData.friends || []), ...pendingSentIds, ...pendingReceivedIds];
+                const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
+                setSuggestions(sortUsers(suggestedUsers));
+            });
+
+            return () => {
+                unsubscribeReqs();
+                unsubscribeSentReqs();
+                unsubscribeUsers();
+            };
         };
-    }, [user, fetchFriends, fetchSuggestions]);
+
+        const unsubscribe = initialLoad();
+        
+        return () => {
+            unsubscribe.then(cleanup => cleanup && cleanup());
+        };
+
+    }, [user, userData, fetchFriends]);
     
     const handleAddFriend = async (targetId: string, targetName: string) => {
         if(!user || !userData) return;
@@ -471,3 +477,5 @@ export default function FriendsPage() {
         </div>
     )
 }
+
+    
