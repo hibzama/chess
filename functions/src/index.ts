@@ -39,7 +39,7 @@ export const announceNewGame = functions.firestore
       return null;
     }
 
-    const chatId = "@Nexbattlepublicrooms"; // Your Telegram group username
+    const chatId = "@nexbattlerooms"; // Your Telegram group username
     const siteUrl = "http://nexbattle.com";
 
     // Prepare message components with fallbacks
