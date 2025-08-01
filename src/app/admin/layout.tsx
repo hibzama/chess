@@ -84,6 +84,8 @@ export default function AdminLayout({
         )
     }
 
+    const isActive = (path: string) => pathname.startsWith(path);
+
     return (
         <SidebarProvider>
             <Sidebar>
@@ -96,31 +98,34 @@ export default function AdminLayout({
                 <SidebarContent>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/admin"><SidebarMenuButton tooltip="Dashboard" isActive><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
+                            <Link href="/admin"><SidebarMenuButton tooltip="Dashboard" isActive={pathname === '/admin'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <Link href="/admin/deposits/pending"><SidebarMenuButton tooltip="Pending Deposits"><Clock /><span>Pending Deposits</span></SidebarMenuButton></Link>
+                            <Link href="/admin/deposits/pending"><SidebarMenuButton tooltip="Pending Deposits" isActive={isActive('/admin/deposits/pending')}><Clock /><span>Pending Deposits</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <Link href="/admin/withdrawals/pending"><SidebarMenuButton tooltip="Pending Withdrawals"><Clock /><span>Pending Withdrawals</span></SidebarMenuButton></Link>
+                            <Link href="/admin/withdrawals/pending"><SidebarMenuButton tooltip="Pending Withdrawals" isActive={isActive('/admin/withdrawals/pending')}><Clock /><span>Pending Withdrawals</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/deposits/history"><SidebarMenuButton tooltip="Deposit History"><ArrowUpCircle /><span>Deposit History</span></SidebarMenuButton></Link>
+                             <Link href="/admin/deposits/history"><SidebarMenuButton tooltip="Deposit History" isActive={isActive('/admin/deposits/history')}><ArrowUpCircle /><span>Deposit History</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/withdrawals/history"><SidebarMenuButton tooltip="Withdrawal History"><ArrowDownCircle /><span>Withdrawal History</span></SidebarMenuButton></Link>
+                             <Link href="/admin/withdrawals/history"><SidebarMenuButton tooltip="Withdrawal History" isActive={isActive('/admin/withdrawals/history')}><ArrowDownCircle /><span>Withdrawal History</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
-                             <Link href="/admin/game-history"><SidebarMenuButton tooltip="Game History"><Swords /><span>Game History</span></SidebarMenuButton></Link>
+                             <Link href="/admin/game-history"><SidebarMenuButton tooltip="Game History" isActive={isActive('/admin/game-history')}><Swords /><span>Game History</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/users"><SidebarMenuButton tooltip="Users"><Users /><span>Users</span></SidebarMenuButton></Link>
+                             <Link href="/admin/users"><SidebarMenuButton tooltip="Users" isActive={isActive('/admin/users')}><Users /><span>Users</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/marketing/applications"><SidebarMenuButton tooltip="Marketing Applications"><Megaphone /><span>Marketing Apps</span></SidebarMenuButton></Link>
+                             <Link href="/admin/marketing/applications"><SidebarMenuButton tooltip="Marketing Applications" isActive={isActive('/admin/marketing/applications')}><Megaphone /><span>Marketing Apps</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
-                             <Link href="/admin/marketing/withdrawals/pending"><SidebarMenuButton tooltip="Marketing Withdrawals"><Wallet /><span>Marketing Withdrawals</span></SidebarMenuButton></Link>
+                             <Link href="/admin/marketing/withdrawals/pending"><SidebarMenuButton tooltip="Marketing Withdrawals" isActive={isActive('/admin/marketing/withdrawals/pending')}><Wallet /><span>Marketing Withdrawals</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                         <SidebarMenuItem>
+                             <Link href="/admin/marketing/withdrawals/history"><SidebarMenuButton tooltip="Marketing Withdrawals History" isActive={isActive('/admin/marketing/withdrawals/history')}><History /><span>M. Withdraw History</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>

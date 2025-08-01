@@ -1,15 +1,14 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { db, auth } from '@/lib/firebase';
-import { collection, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
-import { signInWithCustomToken } from 'firebase/auth';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldCheck, User, LogIn } from 'lucide-react';
+import { ShieldCheck, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface UserData {
@@ -36,7 +35,8 @@ export default function UsersPage() {
         return () => unsubscribe();
     }, []);
 
-    const handleRoleChange = async (uid: string, newRole: 'admin' | 'user') => {
+    const handleRoleChange = async (e: React.MouseEvent, uid: string, newRole: 'admin' | 'user') => {
+        e.stopPropagation(); // Prevent row click when changing role
         try {
             const userRef = doc(db, 'users', uid);
             await updateDoc(userRef, { role: newRole });
@@ -74,7 +74,7 @@ export default function UsersPage() {
                     </TableHeader>
                     <TableBody>
                         {users.map((user) => (
-                            <TableRow key={user.uid}>
+                            <TableRow key={user.uid} onClick={() => router.push(`/admin/users/${user.uid}`)} className="cursor-pointer">
                                 <TableCell>{user.firstName} {user.lastName}</TableCell>
                                 <TableCell>{user.email}</TableCell>
                                 <TableCell>
@@ -85,8 +85,13 @@ export default function UsersPage() {
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
                                     {user.role !== 'admin' && (
-                                        <Button size="sm" onClick={() => handleRoleChange(user.uid, 'admin')}>
+                                        <Button size="sm" onClick={(e) => handleRoleChange(e, user.uid, 'admin')}>
                                             Make Admin
+                                        </Button>
+                                    )}
+                                     {user.role === 'admin' && (
+                                        <Button size="sm" variant="destructive" onClick={(e) => handleRoleChange(e, user.uid, 'user')}>
+                                            Remove Admin
                                         </Button>
                                     )}
                                 </TableCell>
