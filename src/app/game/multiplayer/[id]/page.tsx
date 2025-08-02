@@ -349,7 +349,7 @@ function MultiplayerGamePageContent() {
         }
     }
 
-    if (isGameLoading) {
+    if (isGameLoading || !room) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -360,9 +360,8 @@ function MultiplayerGamePageContent() {
         )
     }
 
-    // This check is now safe because isGameLoading guarantees room is not null if false
-    const isCreator = room!.createdBy.uid === user?.uid;
-    const equipment = room!.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
+    const isCreator = room.createdBy.uid === user?.uid;
+    const equipment = room.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
     const copyGameId = () => {
         if(!roomId) return;
@@ -370,7 +369,7 @@ function MultiplayerGamePageContent() {
         toast({ title: 'Copied!', description: 'Room ID copied to clipboard. Share it with your friend!' });
     }
 
-    if (room!.status === 'waiting') {
+    if (room.status === 'waiting') {
         if(isCreator) {
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -403,7 +402,7 @@ function MultiplayerGamePageContent() {
                 </div>
             )
         } else {
-            const hasEnoughBalance = userData ? userData.balance >= room!.wager : false;
+            const hasEnoughBalance = userData ? userData.balance >= room.wager : false;
 
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -411,23 +410,23 @@ function MultiplayerGamePageContent() {
                         <CardHeader className="text-center">
                             <div className="flex justify-center mb-4">
                                  <Avatar className="h-20 w-20 border-2 border-primary">
-                                    <AvatarImage src={room!.createdBy.photoURL} />
-                                    <AvatarFallback>{room!.createdBy.name.charAt(0)}</AvatarFallback>
+                                    <AvatarImage src={room.createdBy.photoURL} />
+                                    <AvatarFallback>{room.createdBy.name.charAt(0)}</AvatarFallback>
                                 </Avatar>
                             </div>
-                            <CardTitle className="text-3xl">{room!.createdBy.name} invites you to play!</CardTitle>
+                            <CardTitle className="text-3xl">{room.createdBy.name} invites you to play!</CardTitle>
                             <CardDescription>Review the match details below and join the game.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="grid grid-cols-2 gap-4 text-center">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Game</p>
-                                    <p className="text-lg font-bold capitalize flex items-center justify-center gap-2"><Swords /> {room!.gameType}</p>
+                                    <p className="text-lg font-bold capitalize flex items-center justify-center gap-2"><Swords /> {room.gameType}</p>
                                 </div>
                                  <div>
                                     <p className="text-sm text-muted-foreground">Wager</p>
-                                    <p className="text-lg font-bold">LKR {room!.wager.toFixed(2)}</p>
-                                    <p className="text-xs text-muted-foreground">~{(room!.wager / USDT_RATE).toFixed(2)} USDT</p>
+                                    <p className="text-lg font-bold">LKR {room.wager.toFixed(2)}</p>
+                                    <p className="text-xs text-muted-foreground">~{(room.wager / USDT_RATE).toFixed(2)} USDT</p>
                                 </div>
                             </div>
                             
@@ -435,7 +434,7 @@ function MultiplayerGamePageContent() {
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
-                                        You need at least LKR {room!.wager.toFixed(2)} to join. Your current balance is LKR {userData.balance.toFixed(2)}.
+                                        You need at least LKR {room.wager.toFixed(2)} to join. Your current balance is LKR {userData.balance.toFixed(2)}.
                                     </CardDescription>
                                      <Button asChild variant="destructive">
                                         <Link href="/dashboard/wallet"><Wallet className="mr-2"/> Top Up Wallet</Link>
@@ -464,9 +463,9 @@ function MultiplayerGamePageContent() {
         <>
         {!gameOver && <NavigationGuard />}
          <GameLayout
-            gameType={room!.gameType === 'chess' ? 'Chess' : 'Checkers'}
+            gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
         >
-            {room!.gameType === 'chess' ? (
+            {room.gameType === 'chess' ? (
                  <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
             ) : (
                 <CheckersBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
