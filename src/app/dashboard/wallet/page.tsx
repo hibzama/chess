@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle, Swords, Trophy, Info } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle, Swords, Trophy, Info, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type Transaction = {
     id: string;
@@ -56,7 +57,7 @@ export default function WalletPage() {
 
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [withdrawalMethod, setWithdrawalMethod] = useState<'bank' | 'binance'>('bank');
-  const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: '', branch: '', accountNumber: '', accountName: '' });
+  const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: 'Bank of Ceylon (Boc)', branch: '', accountNumber: '', accountName: '' });
   const [binancePayId, setBinancePayId] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   
@@ -144,7 +145,7 @@ export default function WalletPage() {
       return;
     }
 
-    if (withdrawalMethod === 'bank' && Object.values(withdrawalDetails).some(v => v === '')) {
+    if (withdrawalMethod === 'bank' && (withdrawalDetails.branch === '' || withdrawalDetails.accountNumber === '' || withdrawalDetails.accountName === '')) {
       toast({ variant: 'destructive', title: 'Error', description: 'Please fill all bank details.' });
       return;
     }
@@ -188,7 +189,7 @@ export default function WalletPage() {
       setWithdrawalAmount('');
       setBinancePayId('');
       if (withdrawalMethod === 'bank') {
-        setWithdrawalDetails({ bankName: '', branch: '', accountNumber: '', accountName: '' });
+        setWithdrawalDetails({ bankName: 'Bank of Ceylon (Boc)', branch: '', accountNumber: '', accountName: '' });
       }
 
     } catch (error: any) {
@@ -357,10 +358,16 @@ export default function WalletPage() {
                         {withdrawalMethod === 'bank' && (
                         <>
                             <Separator />
-                            <p className="font-medium text-sm">Bank Details</p>
+                            <Alert>
+                                <Info className="h-4 w-4" />
+                                <AlertTitle>Bank Withdrawals</AlertTitle>
+                                <AlertDescription>
+                                    Please note that bank withdrawals are only processed for <strong>Bank of Ceylon (BOC)</strong> accounts at this time.
+                                </AlertDescription>
+                            </Alert>
                             <div className="space-y-2">
                                 <Label htmlFor="bank-name">Bank Name</Label>
-                                <Input id="bank-name" value={withdrawalDetails.bankName} onChange={e => setWithdrawalDetails({...withdrawalDetails, bankName: e.target.value})} required={withdrawalMethod === 'bank'} />
+                                <Input id="bank-name" value={withdrawalDetails.bankName} readOnly disabled />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="branch">Branch</Label>
@@ -504,3 +511,5 @@ export default function WalletPage() {
     </>
   );
 }
+
+    
