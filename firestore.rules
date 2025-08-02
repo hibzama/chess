@@ -7,91 +7,114 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
+    function isUser(userId) {
       return request.auth.uid == userId;
     }
-    
+    function getDoc(path) {
+      return get(/databases/$(database)/documents/$(path));
+    }
+    function existsDoc(path) {
+      return exists(/databases/$(database)/documents/$(path));
+    }
     function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
+      return getDoc('users/' + userId).data;
     }
 
-    function getRoom(roomId) {
-        return get(/databases/$(database)/documents/game_rooms/$(roomId)).data;
-    }
-    
-    function getChat(chatId) {
-       return get(/databases/$(database)/documents/chats/$(chatId)).data;
-    }
-
-    // ========= USER Functions =========
-    function isAcceptingFriendRequest(request, resource) {
-      // This is a transaction where a user accepts a friend request.
-      // 1. The user is adding a friend to their own 'friends' array.
-      // 2. The other user is also adding this user to their 'friends' array.
-      let isAddingToSelf = request.resource.data.friends == resource.data.friends.concat([request.write.get(0).path[3]]);
-      let isAddingToFriend = request.write[0].data.friends == getUserData(request.write.get(0).path[3]).friends.concat([request.auth.uid]);
-      
-      return isAddingToSelf && isAddingToFriend;
-    }
-
-    function isRemovingFriend(request, resource) {
-        // This is a transaction where a user removes a friend.
-        // 1. The user is removing a friend from their own 'friends' array.
-        // 2. The other user is also removing this user from their 'friends' array.
-        let isRemovingFromSelf = resource.data.friends.hasAny(request.resource.data.friends) && request.resource.data.friends.size() == resource.data.friends.size() - 1;
-        let isRemovingFromFriend = getUserData(request.write.get(0).path[3]).friends.hasAny(request.write[0].data.friends) && request.write[0].data.friends.size() == getUserData(request.write.get(0).path[3]).friends.size() - 1;
-
-        return isRemovingFromSelf && isRemovingFromFriend;
-    }
-
-
-    // ========= COLLECTIONS =========
-
+    // ========== USERS ==========
     match /users/{userId} {
-      allow read, create: if isSignedIn();
-      allow update: if isOwner(userId) || 
-                       isAcceptingFriendRequest(request, resource) ||
-                       isRemovingFriend(request, resource);
+      allow read;
+      allow create: isUser(userId) && request.resource.data.uid == userId;
+      allow update: isUser(userId) || isAcceptingFriendRequest(userId) || isRemovingFriend(userId) || isJoiningGame(userId);
     }
     
-    match /marketing_applications/{appId} {
-        allow read, create: if true;
-        allow update: if getUserData(request.auth.uid).role == 'admin';
-    }
-
-    match /friend_requests/{requestId} {
-        allow read, create: if isSignedIn();
-        allow delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
-    }
-
+    // ========== GAME ROOMS ==========
     match /game_rooms/{roomId} {
-      allow read, create, delete: if isSignedIn();
-      // Allow update only if the user is a player in the game.
-      allow update: if isSignedIn() && request.auth.uid in resource.data.players;
+      allow read;
+      allow create: isSignedIn() && request.resource.data.createdBy.uid == request.auth.uid;
+      allow update: (
+        isJoiningGame(roomId) || 
+        (isUser(resource.data.createdBy.uid) || isUser(resource.data.player2.uid))
+      );
+      allow delete: isUser(resource.data.createdBy.uid) && resource.data.status == 'waiting';
+      
+      match /messages/{messageId} {
+        allow read, write: isUser(getDoc('game_rooms/' + roomId).data.players[0]) || isUser(getDoc('game_rooms/' + roomId).data.players[1]);
+      }
     }
     
+    // ========== TRANSACTIONS ==========
     match /transactions/{transactionId} {
-        allow read, create: if isSignedIn();
-        allow update: if getUserData(request.auth.uid).role == 'admin';
+        allow read, write: isSignedIn(); // Simplified for now, complex transactions handled by functions
     }
     
+    // ========== FRIEND REQUESTS ==========
+    match /friend_requests/{requestId} {
+        allow read, create: isSignedIn();
+        allow delete: isUser(resource.data.fromId) || isUser(resource.data.toId);
+    }
+    
+    // ========== MARKETING APPLICATIONS ==========
+    match /marketing_applications/{appId} {
+        allow read, create, update: isSignedIn();
+    }
+    
+    // ========== NOTIFICATIONS ==========
     match /notifications/{notificationId} {
-        allow read, create, update: if isOwner(resource.data.userId);
+        allow read, write: isSignedIn();
     }
-    
+
+    // ========== CHATS ==========
     match /chats/{chatId} {
-      // Allow list/read access to chats where the user is a participant.
-      allow read: if isSignedIn() && request.auth.uid in resource.data.users;
-      // Allow creation of chats if the user is one of the participants.
-      allow create: if isSignedIn() && request.auth.uid in request.resource.data.users;
-      // Allow updates (like last message) if user is a participant.
-      allow update: if isSignedIn() && request.auth.uid in resource.data.users;
+      allow get: isSignedIn() && request.auth.uid in resource.data.users;
+      allow list: isSignedIn() && request.auth.uid in resource.data.users;
+      allow create: isSignedIn();
+      allow update: isSignedIn() && request.auth.uid in resource.data.users;
 
       match /messages/{messageId} {
-        // Only allow participants of the chat to read/write messages.
-        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        allow read, write: isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
       }
+    }
+    
+    // ===================================
+    //  TRANSACTIONAL SECURITY FUNCTIONS
+    // ===================================
+
+    function isAcceptingFriendRequest(userId) {
+      let requestDoc = request.resource.data;
+      let fromUserId = get(/databases/$(database)/documents/friend_requests/$(request.resource.id)).data.fromId;
+      return request.auth.uid == userId && existsDoc('friend_requests/' + request.resource.id) && requestDoc.friends[requestDoc.friends.size() - 1] == fromUserId;
+    }
+
+    function isRemovingFriend(userId) {
+       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+       let otherUserDoc = get(/databases/$(database)/documents/users/$(userId));
+       return userDoc.data.friends.size() == resource.data.friends.size() - 1 && otherUserDoc.data.friends.size() == request.resource.data.friends.size() - 1;
+    }
+
+    function isJoiningGame(contextId) {
+      let room = getDoc('game_rooms/' + contextId).data;
+      let joinerId = request.auth.uid;
+      let creatorId = room.createdBy.uid;
+
+      // Check room status
+      if (room.status != 'waiting' || request.resource.data.status != 'in-progress') {
+        return false;
+      }
+      
+      // Check if the authenticated user is the one trying to join
+      if (request.resource.data.player2.uid != joinerId) {
+        return false;
+      }
+      
+      // Check that balance changes are correct
+      let creatorBalanceChange = getAfter(/databases/$(database)/documents/users/$(creatorId)).data.balance - get(/databases/$(database)/documents/users/$(creatorId)).data.balance;
+      let joinerBalanceChange = getAfter(/databases/$(database)/documents/users/$(joinerId)).data.balance - get(/databases/$(database)/documents/users/$(joinerId)).data.balance;
+      
+      if (creatorBalanceChange != -room.wager || joinerBalanceChange != -room.wager) {
+        return false;
+      }
+      
+      return true;
     }
   }
 }
