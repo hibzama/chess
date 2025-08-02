@@ -72,6 +72,7 @@ interface GameContextType extends GameState {
     roomWager: number;
     roomOpponentId: string | null;
     room: GameRoom | null;
+    isMounted: boolean;
 }
 
 type Move = { turn: number; white?: string; black?: string };
@@ -118,7 +119,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             capturedByBot: [],
             payoutAmount: null,
             isEnding: false,
-            isGameLoading: isMultiplayer,
+            isGameLoading: true,
             playerPieceCount: gameType === 'chess' ? 16 : 12,
             opponentPieceCount: gameType === 'chess' ? 16 : 12,
         };
@@ -126,7 +127,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [room, setRoom] = useState<GameRoom | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
     
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const gameOverHandledRef = useRef(false);
     
     const updateAndSaveState = useCallback((newState: Partial<GameState>) => {
@@ -308,7 +314,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
                             if (!currentBoard[newRow][newCol]) {
                                 moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
-                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && !currentBoard[jumpRow][jumpCol]) {
+                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && !currentBoard[jumpRow][jumpCol]) {
                                 jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
                             }
                         }
@@ -376,27 +382,26 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
+            if (!isMounted || gameOverHandledRef.current) return;
+
             if (!docSnap.exists()) {
                 updateAndSaveState({ isGameLoading: false });
                 return;
             }
-            if (gameOverHandledRef.current) return;
 
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
 
-            if (roomData.status === 'completed' && !gameOverHandledRef.current) {
+            if (roomData.status === 'completed') {
                 setWinnerRef.current(roomData.winner?.uid || 'draw', roomData.boardState, roomData.winner?.method, roomData.winner?.resignerId);
                 return;
             }
-
-            const isCreator = roomData.createdBy.uid === user.uid;
-
-            // This is the key fix: set loading to false as soon as the game is ready for either player
-            if (roomData.status === 'in-progress' || (roomData.status === 'waiting' && isCreator)) {
+            
+            if (roomData.status === 'in-progress' || roomData.status === 'waiting') {
                 updateAndSaveState({ isGameLoading: false });
             }
-            
+
+            const isCreator = roomData.createdBy.uid === user.uid;
             const myColor = isCreator ? roomData.createdBy.color : (roomData.player2?.color || (roomData.createdBy.color === 'w' ? 'b' : 'w'));
             
             let boardData = roomData.boardState;
@@ -419,7 +424,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         });
 
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, authLoading]);
+    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, isMounted]);
 
     // Timer logic
     useEffect(() => {
@@ -480,7 +485,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, setupGame, switchTurn, setWinner: setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
+    const contextValue = { ...gameState, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isMounted };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 }
@@ -490,5 +495,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
-
-    
