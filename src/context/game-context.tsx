@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
-import { Chess } from 'chess.js';
+import { Chess, Piece as ChessPiece } from 'chess.js';
 
 type PlayerColor = 'w' | 'b';
 type Player = 'p1' | 'p2';
@@ -64,7 +64,6 @@ interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
     switchTurn: (boardState: any, move?: string, capturedPiece?: Piece) => void;
     setWinner: (winnerId: string | 'draw' | null, boardState?: any, method?: GameOverReason, resignerId?: string | null, resignerPieceCount?: number) => void;
-    checkGameOver: (board: any, roomDataForCheck?: GameRoom) => void;
     resetGame: () => void;
     loadGameState: (state: GameState) => void;
     isMounted: boolean;
@@ -159,11 +158,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
                     let resignerRefundRate, winnerPayoutRate;
+                    const pieceCount = resignerPieceCount ?? 0;
 
-                    if (resignerPieceCount !== undefined && resignerPieceCount <= 3) {
+                    if (pieceCount <= 3) {
                         resignerRefundRate = 0.30; // 30%
                         winnerPayoutRate = 1.50; // 150%
-                    } else if (resignerPieceCount !== undefined && resignerPieceCount <= 6) {
+                    } else if (pieceCount <= 6) {
                         resignerRefundRate = 0.50; // 50%
                         winnerPayoutRate = 1.30; // 130%
                     } else {
@@ -204,7 +204,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 transaction.update(roomRef, { 
                     status: 'completed',
-                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId, resignerPieceCount },
+                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId, resignerPieceCount: resignerPieceCount ?? 0 },
                     draw: winnerId === 'draw',
                     payoutTransactionId: payoutTxId 
                 });
@@ -220,13 +220,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const wager = roomData.wager;
                     const winnerData = roomData.winner;
                     if (winnerData?.resignerId) { // Resignation
-                        const resignerPieceCount = winnerData.resignerPieceCount;
+                        const pieceCount = winnerData.resignerPieceCount ?? 0;
                         let resignerRefundRate, winnerPayoutRate;
                         
-                        if (resignerPieceCount !== undefined && resignerPieceCount <= 3) {
+                        if (pieceCount <= 3) {
                             resignerRefundRate = 0.30;
                             winnerPayoutRate = 1.50;
-                        } else if (resignerPieceCount !== undefined && resignerPieceCount <= 6) {
+                        } else if (pieceCount <= 6) {
                             resignerRefundRate = 0.50;
                             winnerPayoutRate = 1.30;
                         } else {
@@ -253,7 +253,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         setGameState(p => ({...p, isEnding: true}));
         
         if (isMultiplayer && roomId && user) {
-            gameOverHandledRef.current = true; 
+            gameOverHandledRef.current = true;
             handlePayout({ winnerId, method, resignerId, resignerPieceCount }).then(({ myPayout }) => {
                 const winnerIsMe = winnerId === user.uid;
                 setGameState(p => ({
@@ -268,18 +268,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method }, boardState);
         }
     }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout]);
-    
-    // Multiplayer state sync
-    useEffect(() => {
-        if (!isMultiplayer || !roomId || !user) {
-            if (!isMounted) setIsMounted(true);
-            return;
-        }
 
+    useEffect(() => {
         const checkGameOver = (board: any, localRoomData: GameRoom) => {
             if (gameOverHandledRef.current) return;
             if (gameType === 'chess') {
-                const tempGame = new Chess(board.fen());
+                const tempGame = new Chess(board.fen);
                 if (tempGame.isGameOver()) {
                     if (tempGame.isCheckmate()) {
                         const loserColor = tempGame.turn();
@@ -287,9 +281,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                             const pData = pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2;
                             return pData?.color !== loserColor;
                         });
-                        setWinner(winnerId || null, { fen: board.fen() }, 'checkmate');
+                        setWinner(winnerId || null, { fen: board.fen }, 'checkmate');
                     } else {
-                        setWinner('draw', { fen: board.fen() }, 'draw');
+                        setWinner('draw', { fen: board.fen }, 'draw');
                     }
                 }
             } else { // Checkers logic
@@ -321,7 +315,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 }
             }
         }
-    
+
+        if (!isMultiplayer || !roomId || !user) {
+            if (!isMounted) setIsMounted(true);
+            return;
+        }
+
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists() || !user || gameOverHandledRef.current) return;
@@ -372,7 +371,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, isMounted, gameType, setWinner, updateAndSaveState, gameState.isEnding]);
 
-
     const loadGameState = useCallback((state: GameState) => { setGameState(state); }, []);
     
     const setupGame = useCallback((color: PlayerColor, time: number, diff: string) => {
@@ -399,7 +397,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const updatePayload: any = { boardState: finalBoardState, currentPlayer: room.currentPlayer === 'w' ? 'b' : 'w', moveHistory: newMoveHistory, turnStartTime: now, p1Time: newP1Time, p2Time: newP2Time };
             if (capturedPiece) { const pieceToStore = { type: capturedPiece.type, color: capturedPiece.color }; if (room.currentPlayer === room.createdBy.color) { updatePayload.capturedByP1 = [...(room.capturedByP1 || []), pieceToStore]; } else { updatePayload.capturedByP2 = [...(room.capturedByP2 || []), pieceToStore]; } }
             await updateDoc(roomRef, updatePayload);
-            // checkGameOver(boardState, {...room, ...updatePayload}); // This was causing a loop
             return;
         }
         const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
@@ -416,33 +413,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const resetGame = useCallback(() => { gameOverHandledRef.current = false; if(typeof window !== 'undefined' && !isMultiplayer) { localStorage.removeItem(storageKey); } const defaultState = getInitialState(); setGameState(defaultState); setRoom(null); }, [isMultiplayer, storageKey, getInitialState]);
     
-    const checkGameOver = useCallback((board: any, roomDataForCheck?: GameRoom) => {
-        const localRoomData = roomDataForCheck || room;
-        if (gameOverHandledRef.current || !localRoomData) return;
-    
-        if (gameType === 'chess') {
-            // Here, `board` is the chess.js game instance.
-            const tempGame = board;
-            if (tempGame.isGameOver()) {
-                if (tempGame.isCheckmate()) {
-                    const loserColor = tempGame.turn();
-                    const winnerId = localRoomData.players.find(pId => {
-                        const pData = pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2;
-                        return pData?.color !== loserColor;
-                    });
-                    setWinner(winnerId || null, { fen: tempGame.fen() }, 'checkmate');
-                } else {
-                    setWinner('draw', { fen: tempGame.fen() }, 'draw');
-                }
-            }
-        } else { // Checkers logic (board is an object { board: [...] })
-            // Checkers logic remains the same
-        }
-    }, [gameType, room, setWinner]);
-
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, isMounted, setupGame, switchTurn, setWinner, checkGameOver, resetGame, loadGameState, isMultiplayer, resign, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
+    const contextValue = { ...gameState, isMounted, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 }
