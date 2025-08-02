@@ -402,8 +402,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             };
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
-            setRoom(roomData);
-
+            
             if (roomData.status === 'waiting' || roomData.status === 'in-progress') {
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
@@ -411,7 +410,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if(gameType === 'checkers' && typeof boardData === 'string') {
                     try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
                 }
-    
+                
+                // Atomically set room and game state together
+                setRoom(roomData);
                 updateAndSaveState({ 
                     playerColor: myColor, 
                     boardState: boardData,
@@ -423,8 +424,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
                     p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
                 });
-    
-                setIsGameLoading(false);
+                setIsGameLoading(false); // Only set loading to false after state is updated
 
             } else if (roomData.status === 'completed' && !gameState.isEnding) {
                  const winnerData = roomData.winner;
