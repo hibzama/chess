@@ -152,15 +152,15 @@ function MultiplayerGamePageContent() {
     const USDT_RATE = 310;
 
     useEffect(() => {
-        if (!user || !userData) {
+        if (!isGameLoading && (!room || !user || !userData)) {
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: "You must be logged in to play.",
+                description: "Could not load game data. Redirecting...",
             });
-            router.push('/login');
+            router.push('/lobby');
         }
-    }, [user, userData, router, toast]);
+    }, [isGameLoading, room, user, userData, router, toast]);
 
      useEffect(() => {
         roomStatusRef.current = room?.status;
@@ -361,15 +361,7 @@ function MultiplayerGamePageContent() {
         }
     }
 
-    const equipment = room?.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
-
-    const copyGameId = () => {
-        if(!roomId) return;
-        navigator.clipboard.writeText(roomId as string);
-        toast({ title: 'Copied!', description: 'Room ID copied to clipboard. Share it with your friend!' });
-    }
-
-    if (isGameLoading) {
+    if (isGameLoading || !room) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -380,7 +372,15 @@ function MultiplayerGamePageContent() {
         )
     }
 
-    if (room?.status === 'waiting') {
+    const equipment = room?.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
+
+    const copyGameId = () => {
+        if(!roomId) return;
+        navigator.clipboard.writeText(roomId as string);
+        toast({ title: 'Copied!', description: 'Room ID copied to clipboard. Share it with your friend!' });
+    }
+
+    if (room.status === 'waiting') {
         if(isCreator) {
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -490,17 +490,17 @@ export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [isGameLoading, setIsGameLoading] = useState(true);
 
     useEffect(() => {
         if (!roomId) {
-            setLoading(false);
+            setIsGameLoading(false);
             router.push('/lobby');
             return;
         }
 
         const fetchGameType = async () => {
-            setLoading(true);
+            setIsGameLoading(true);
             try {
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomSnap = await getDoc(roomRef);
@@ -513,13 +513,13 @@ export default function MultiplayerGamePage() {
                 console.error("Could not fetch game type", e);
                 router.push('/lobby');
             } finally {
-                setLoading(false);
+                setIsGameLoading(false);
             }
         };
         fetchGameType();
     }, [roomId, router]);
     
-    if (loading) {
+    if (isGameLoading) {
          return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
@@ -540,3 +540,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
