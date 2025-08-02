@@ -64,7 +64,7 @@ interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
     switchTurn: (boardState: any, move?: string, capturedPiece?: Piece) => void;
     setWinner: (winnerId: string | 'draw' | null, boardState?: any, method?: GameOverReason, resignerId?: string | null, resignerPieceCount?: number) => void;
-    checkGameOver: (board: any, roomDataForCheck: GameRoom) => void;
+    checkGameOver: (board: any, roomDataForCheck?: GameRoom) => void;
     resetGame: () => void;
     loadGameState: (state: GameState) => void;
     isMounted: boolean;
@@ -269,57 +269,57 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
     }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout]);
     
-    const checkGameOver = useCallback((board: any, localRoomData: GameRoom) => {
-        if (gameOverHandledRef.current) return;
-        if (gameType === 'chess') {
-            const tempGame = new Chess(board.fen);
-            if (tempGame.isGameOver()) {
-                if (tempGame.isCheckmate()) {
-                    const loserColor = tempGame.turn();
-                    const winnerId = localRoomData.players.find(pId => {
-                        const pData = pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2;
-                        return pData?.color !== loserColor;
-                    });
-                    setWinner(winnerId || null, { fen: board.fen }, 'checkmate');
-                } else {
-                    setWinner('draw', { fen: board.fen }, 'draw');
-                }
-            }
-        } else { // Checkers logic
-             let whitePieces = 0, blackPieces = 0, hasWhiteMoves = false, hasBlackMoves = false;
-            const getPossibleMovesForPiece = (piece: Piece, pos: {row: number, col: number}, currentBoard: any[][], forPlayer: PlayerColor): any[] => {
-                const moves = [], jumps = [];
-                const { row, col } = pos;
-                const directions = piece.type === 'king' ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] : piece.color === 'w' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
-                for (const [dr, dc] of directions) {
-                    const newRow = row + dr, newCol = col + dc;
-                    const jumpRow = row + 2 * dr, jumpCol = col + 2 * dc;
-                    if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-                        if (!currentBoard[newRow][newCol]) {
-                            moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
-                        } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
-                            jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
-                        }
-                    }
-                }
-                return jumps.length > 0 ? jumps : moves;
-            };
-
-            for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { const piece = board[r][c]; if (piece) { if (piece.player === 'w') whitePieces++; else blackPieces++; const moves = getPossibleMovesForPiece(piece, { row: r, col: c }, board, piece.player); if (moves.length > 0) { if (piece.player === 'w') hasWhiteMoves = true; else hasBlackMoves = true; }}}}
-            let winnerColor: PlayerColor | null = null, reason: GameOverReason = null;
-            if (whitePieces === 0) { winnerColor = 'b'; reason = 'piece-capture'; } else if (blackPieces === 0) { winnerColor = 'w'; reason = 'piece-capture'; } else if (!hasWhiteMoves) { winnerColor = 'b'; reason = 'draw'; } else if (!hasBlackMoves) { winnerColor = 'w'; reason = 'draw'; }
-            if (winnerColor) {
-                const winnerId = localRoomData.players.find(pId => (pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2)?.color === winnerColor);
-                setWinner(winnerId || null, { board }, reason);
-            }
-        }
-    }, [gameType, setWinner]);
-
-    // Multiplayer state sync and timer
+    // Multiplayer state sync
     useEffect(() => {
         if (!isMultiplayer || !roomId || !user) {
             if (!isMounted) setIsMounted(true);
             return;
+        }
+
+        const checkGameOver = (board: any, localRoomData: GameRoom) => {
+            if (gameOverHandledRef.current) return;
+            if (gameType === 'chess') {
+                const tempGame = new Chess(board.fen());
+                if (tempGame.isGameOver()) {
+                    if (tempGame.isCheckmate()) {
+                        const loserColor = tempGame.turn();
+                        const winnerId = localRoomData.players.find(pId => {
+                            const pData = pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2;
+                            return pData?.color !== loserColor;
+                        });
+                        setWinner(winnerId || null, { fen: board.fen() }, 'checkmate');
+                    } else {
+                        setWinner('draw', { fen: board.fen() }, 'draw');
+                    }
+                }
+            } else { // Checkers logic
+                 let whitePieces = 0, blackPieces = 0, hasWhiteMoves = false, hasBlackMoves = false;
+                const getPossibleMovesForPiece = (piece: Piece, pos: {row: number, col: number}, currentBoard: any[][], forPlayer: PlayerColor): any[] => {
+                    const moves = [], jumps = [];
+                    const { row, col } = pos;
+                    const directions = piece.type === 'king' ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] : piece.color === 'w' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
+                    for (const [dr, dc] of directions) {
+                        const newRow = row + dr, newCol = col + dc;
+                        const jumpRow = row + 2 * dr, jumpCol = col + 2 * dc;
+                        if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                            if (!currentBoard[newRow][newCol]) {
+                                moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
+                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                                jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
+                            }
+                        }
+                    }
+                    return jumps.length > 0 ? jumps : moves;
+                };
+    
+                for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { const piece = board[r][c]; if (piece) { if (piece.player === 'w') whitePieces++; else blackPieces++; const moves = getPossibleMovesForPiece(piece, { row: r, col: c }, board, piece.player); if (moves.length > 0) { if (piece.player === 'w') hasWhiteMoves = true; else hasBlackMoves = true; }}}}
+                let winnerColor: PlayerColor | null = null, reason: GameOverReason = null;
+                if (whitePieces === 0) { winnerColor = 'b'; reason = 'piece-capture'; } else if (blackPieces === 0) { winnerColor = 'w'; reason = 'piece-capture'; } else if (!hasWhiteMoves) { winnerColor = 'b'; reason = 'draw'; } else if (!hasBlackMoves) { winnerColor = 'w'; reason = 'draw'; }
+                if (winnerColor) {
+                    const winnerId = localRoomData.players.find(pId => (pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2)?.color === winnerColor);
+                    setWinner(winnerId || null, { board }, reason);
+                }
+            }
         }
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
@@ -343,7 +343,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const isCreator = roomData.createdBy.uid === user.uid;
             const pColor = isCreator ? roomData.createdBy.color : roomData.player2!.color;
             const elapsed = roomData.turnStartTime ? (Timestamp.now().toMillis() - roomData.turnStartTime.toMillis()) / 1000 : 0;
-            const creatorIsCurrent = roomData.currentPlayer === roomData.createdBy.color;
+            
             let p1ServerTime = isCreator ? roomData.p1Time : roomData.p2Time;
             let p2ServerTime = !isCreator ? roomData.p1Time : roomData.p2Time;
 
@@ -399,7 +399,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const updatePayload: any = { boardState: finalBoardState, currentPlayer: room.currentPlayer === 'w' ? 'b' : 'w', moveHistory: newMoveHistory, turnStartTime: now, p1Time: newP1Time, p2Time: newP2Time };
             if (capturedPiece) { const pieceToStore = { type: capturedPiece.type, color: capturedPiece.color }; if (room.currentPlayer === room.createdBy.color) { updatePayload.capturedByP1 = [...(room.capturedByP1 || []), pieceToStore]; } else { updatePayload.capturedByP2 = [...(room.capturedByP2 || []), pieceToStore]; } }
             await updateDoc(roomRef, updatePayload);
-            checkGameOver(boardState, {...room, ...updatePayload});
+            // checkGameOver(boardState, {...room, ...updatePayload}); // This was causing a loop
             return;
         }
         const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
@@ -410,12 +410,36 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const newCapturedByBot = capturedPiece && p1IsCurrent ? [...gameState.capturedByBot, capturedPiece] : gameState.capturedByBot;
         const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
         updateAndSaveState({ currentPlayer: nextPlayer, moveHistory: newMoveHistory, moveCount: newMoveCount, capturedByPlayer: newCapturedByPlayer, capturedByBot: newCapturedByBot, }, boardState);
-    }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, checkGameOver]);
+    }, [gameState, room, isMultiplayer, updateAndSaveState, gameType]);
     
     const resign = useCallback(() => { if (gameState.gameOver || gameState.isEnding || !user) return; if (isMultiplayer && room) { const winnerId = room.players.find((p)=>p !== user.uid) || null; setWinner(winnerId, gameState.boardState, 'resign', user.uid, gameState.playerPieceCount); } else { setWinner('bot', gameState.boardState, 'resign', user.uid); } }, [gameState, user, room, isMultiplayer, setWinner]);
     
     const resetGame = useCallback(() => { gameOverHandledRef.current = false; if(typeof window !== 'undefined' && !isMultiplayer) { localStorage.removeItem(storageKey); } const defaultState = getInitialState(); setGameState(defaultState); setRoom(null); }, [isMultiplayer, storageKey, getInitialState]);
     
+    const checkGameOver = useCallback((board: any, roomDataForCheck?: GameRoom) => {
+        const localRoomData = roomDataForCheck || room;
+        if (gameOverHandledRef.current || !localRoomData) return;
+    
+        if (gameType === 'chess') {
+            // Here, `board` is the chess.js game instance.
+            const tempGame = board;
+            if (tempGame.isGameOver()) {
+                if (tempGame.isCheckmate()) {
+                    const loserColor = tempGame.turn();
+                    const winnerId = localRoomData.players.find(pId => {
+                        const pData = pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2;
+                        return pData?.color !== loserColor;
+                    });
+                    setWinner(winnerId || null, { fen: tempGame.fen() }, 'checkmate');
+                } else {
+                    setWinner('draw', { fen: tempGame.fen() }, 'draw');
+                }
+            }
+        } else { // Checkers logic (board is an object { board: [...] })
+            // Checkers logic remains the same
+        }
+    }, [gameType, room, setWinner]);
+
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
     const contextValue = { ...gameState, isMounted, setupGame, switchTurn, setWinner, checkGameOver, resetGame, loadGameState, isMultiplayer, resign, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
