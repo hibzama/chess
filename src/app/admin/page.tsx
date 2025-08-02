@@ -1,10 +1,31 @@
 
 'use client'
+import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Clock, ArrowUpCircle, ArrowDownCircle, Megaphone } from 'lucide-react';
+import { Users, Clock, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet } from 'lucide-react';
 import Link from 'next/link';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdminDashboardPage() {
+  const [totalUserFunds, setTotalUserFunds] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchTotalFunds = async () => {
+      setLoading(true);
+      const querySnapshot = await getDocs(collection(db, "users"));
+      let total = 0;
+      querySnapshot.forEach((doc) => {
+        total += doc.data().balance || 0;
+      });
+      setTotalUserFunds(total);
+      setLoading(false);
+    };
+
+    fetchTotalFunds();
+  }, []);
 
   const adminActions = [
     { title: "Pending Deposits", description: "Review and approve new deposits.", icon: Clock, href: "/admin/deposits/pending" },
@@ -24,6 +45,21 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+            <CardHeader>
+                <Wallet className="w-8 h-8 text-primary mb-2" />
+                <CardTitle>Total User Funds</CardTitle>
+                <CardDescription>The combined wallet balance of all users.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {loading ? (
+                    <Skeleton className="h-8 w-3/4" />
+                ) : (
+                    <p className="text-3xl font-bold">LKR {totalUserFunds.toFixed(2)}</p>
+                )}
+            </CardContent>
+        </Card>
+
         {adminActions.map((action) => (
           <Link href={action.href} key={action.title}>
             <Card className="hover:bg-primary/5 transition-all cursor-pointer h-full">
@@ -39,5 +75,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-    
