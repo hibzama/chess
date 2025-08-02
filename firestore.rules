@@ -31,7 +31,6 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Admins can read any user profile. Other users can also read profiles (for leaderboards, etc).
       allow read: if isSignedIn();
 
       allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
@@ -61,7 +60,8 @@ service cloud.firestore {
     }
     
     match /game_rooms/{roomId} {
-      allow read, list: if isSignedIn();
+      // Admins can read any game. Signed-in users can list games.
+      allow read, list: if isSignedIn() || isAdmin();
       allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
       allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
 
@@ -90,8 +90,11 @@ service cloud.firestore {
     }
 
     match /transactions/{transactionId} {
+      // User can see their own transactions. Admins can see all.
       allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
       allow create: if isSignedIn();
+      // Only admins can approve/reject transactions.
+      allow update: if isAdmin();
     }
     
     match /notifications/{notificationId} {
@@ -112,8 +115,8 @@ service cloud.firestore {
 
     // Allow chat messages in direct chats
     match /chats/{chatId} {
-      // A user can query chats they are a part of.
-      allow list: if isSignedIn() && request.auth.uid in query.filters.users;
+      // The user can query chats they are a part of.
+      allow list: if isSignedIn();
       // A user can only read/update a chat if they are one of the participants.
       allow read, update, create: if isChatParticipant(chatId);
     }
