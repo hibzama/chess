@@ -27,7 +27,6 @@ import Image from 'next/image';
 type GameLayoutProps = {
   children: React.ReactNode;
   gameType: 'Chess' | 'Checkers';
-  headerContent?: React.ReactNode;
 };
 
 const GameOverDisplay = () => {
@@ -119,7 +118,7 @@ const GameOverDisplay = () => {
     )
 }
 
-export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
+export default function GameLayout({ children, gameType }: GameLayoutProps) {
   const { isMultiplayer, myTime, opponentTime, gameOver, resign, playerColor, currentPlayer, roomWager, resetGame, room, playerPieceCount, opponentPieceCount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
@@ -200,9 +199,6 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
 
         {/* Center Column */}
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
-            <div className="hidden md:block w-full">
-             {headerContent}
-            </div>
             {gameOver ? (
                 <div className="flex items-center justify-center w-full h-full min-h-[50vh]">
                     <GameOverDisplay />

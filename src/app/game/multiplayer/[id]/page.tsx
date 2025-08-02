@@ -143,7 +143,7 @@ function MultiplayerGamePageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, isGameLoading, room: roomFromContext, myTime, opponentTime } = useGame();
+    const { gameOver, isGameLoading, room: roomFromContext } = useGame();
     const [timeLeft, setTimeLeft] = useState('');
     const [isJoining, setIsJoining] = useState(false);
 
@@ -473,16 +473,6 @@ function MultiplayerGamePageContent() {
         {!gameOver && <NavigationGuard />}
          <GameLayout
             gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
-            headerContent={
-                <div className="text-center w-full max-w-lg mx-auto">
-                    <h1 className="text-3xl font-bold">Multiplayer Match</h1>
-                    <p className="text-muted-foreground">LKR {room.wager.toFixed(2)} Stakes • {room.timeControl / 60} minutes per player</p>
-                    <Alert className="mt-4 text-left border-yellow-300/50 bg-yellow-300/10 text-yellow-300">
-                        <Clock className="w-4 h-4 !text-yellow-300"/>
-                        <AlertTitle className="text-yellow-300">The first player whose timer runs out loses the game. Play quick, manage your time, and win!</AlertTitle>
-                    </Alert>
-                </div>
-            }
         >
             {room.gameType === 'chess' ? (
                  <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
