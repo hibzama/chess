@@ -141,12 +141,11 @@ export default function FriendsPage() {
     }
 
     const fetchFriends = useCallback(async () => {
-        if (!userData || !userData.friends || userData.friends.length === 0) {
+        if (!user) {
             setFriends([]);
             return;
         }
-        // To avoid race conditions, ensure we have the latest friend list.
-        const currentUserDoc = await getDoc(doc(db, 'users', userData.uid));
+        const currentUserDoc = await getDoc(doc(db, 'users', user.uid));
         const currentFriends = currentUserDoc.data()?.friends || [];
         if (currentFriends.length === 0) {
             setFriends([]);
@@ -156,10 +155,10 @@ export default function FriendsPage() {
         const friendDocs = await Promise.all(friendPromises);
         const friendData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
         setFriends(sortUsers(friendData));
-    }, [userData]);
+    }, [user]);
     
     useEffect(() => {
-        if (!user) {
+        if (!user || !userData) {
             setLoading(false);
             return;
         }
@@ -169,7 +168,6 @@ export default function FriendsPage() {
         const setupListeners = async () => {
             setLoading(true);
 
-            // Fetch initial friends list
             await fetchFriends();
             
             // Received Requests Listener
@@ -205,9 +203,9 @@ export default function FriendsPage() {
                  
                  // We need to know who NOT to suggest
                  const friendIds = userData?.friends || [];
-                 const pendingSentIds = sentRequests.map(req => req.toId);
-                 const pendingReceivedIds = requests.map(req => req.fromId);
-                 const excludeIds = [user.uid, ...friendIds, ...pendingSentIds, ...pendingReceivedIds];
+                 const sentRequestIds = sentRequests.map(req => req.toId);
+                 const receivedRequestIds = requests.map(req => req.fromId);
+                 const excludeIds = [user.uid, ...friendIds, ...sentRequestIds, ...receivedRequestIds];
                  
                  const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
                  setSuggestions(sortUsers(suggestedUsers));
@@ -223,7 +221,7 @@ export default function FriendsPage() {
             unsubscribes.forEach(unsub => unsub());
         };
 
-    }, [user, userData?.friends, fetchFriends]);
+    }, [user, userData, fetchFriends]);
     
     const handleAddFriend = async (targetId: string, targetName: string) => {
         if(!user || !userData) return;
@@ -479,5 +477,3 @@ export default function FriendsPage() {
         </div>
     )
 }
-
-    

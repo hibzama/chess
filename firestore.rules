@@ -2,9 +2,9 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
+  
     // Helper Functions
-    function isUserAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
     
@@ -16,80 +16,63 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
-    // marketing_applications: Anyone can create, only admin can manage.
-    match /marketing_applications/{applicationId} {
-      allow read: if request.auth.token.role == 'admin';
-      allow create: if true;
-      allow update, delete: if request.auth.token.role == 'admin';
-    }
-
-    // users: Manage user data and roles
+    // Collection: users
     match /users/{userId} {
-      allow get: if isUserAuthenticated();
-      allow list: if isUserAuthenticated();
-      
-      // A user can create their own document
+      allow read: if isSignedIn();
       allow create: if isOwner(userId);
-      
-      // A user can update their own non-critical data.
-      // Balance and role changes are handled by transactions or admin actions.
-      allow update: if isOwner(userId) && !(request.resource.data.keys().hasAny(['balance', 'commissionBalance', 'marketingBalance', 'role', 'wins']));
+      // Allow updates to own document
+      // Allow specific updates by others (accepting friend request, joining game)
+      allow update: if isOwner(userId) || 
+                   (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends', 'balance', 'marketingBalance', 'l1Count', 'wins', 'lastSeen', 'status']));
+      allow delete: if false; // Users should not be deleted
     }
 
-    // friend_requests: Manage friend requests
-    match /friend_requests/{requestId} {
-      // Allow read/delete only by sender or receiver
-      allow read, delete: if isUserAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
-      // Anyone can create a friend request (send)
-      allow create: if isUserAuthenticated() && request.resource.data.fromId == request.auth.uid;
-      // No direct updates allowed, handled by transactions via client logic
-      allow update: if false; 
-    }
-
-    // game_rooms: Manage game rooms
+    // Collection: game_rooms
     match /game_rooms/{roomId} {
-      allow get: if isUserAuthenticated();
-      allow list: if isUserAuthenticated();
+      allow read: if isSignedIn();
+      allow create: if isOwner(request.resource.data.createdBy.uid);
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid); // Only creator can delete a waiting room
       
-      // Allow creation if the user is authenticated
-      allow create: if isUserAuthenticated() && request.resource.data.createdBy.uid == request.auth.uid;
-      
-      // Allow players in the game to update it.
-      // More specific logic is handled client-side (e.g., only current player can move).
-      allow update: if isUserAuthenticated() && request.auth.uid in resource.data.players;
-
-      // Allow the creator to delete a waiting room
-      allow delete: if isUserAuthenticated() && resource.data.status == 'waiting' && request.auth.uid == resource.data.createdBy.uid;
-
-      // Chat messages within a game
+      // Subcollection: messages
       match /messages/{messageId} {
-        allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+        allow read, write: if isSignedIn() && request.auth.uid in resource.data.players;
       }
     }
     
-    // chats: Manage private chat messages between users
-    match /chats/{chatId} {
-      // Allow read/write if the user is part of the chat
-      allow read, update, create: if isUserAuthenticated() && request.auth.uid in resource.data.users;
-      
-      match /messages/{messageId} {
-        allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
-    }
-
-    // notifications: Users can only see their own notifications
-    match /notifications/{notificationId} {
-      allow read, update: if isOwner(resource.data.userId);
-      allow create: if isUserAuthenticated(); // Allow creation for friend requests etc.
-    }
-    
-    // transactions: Users can see their own, and creation is handled by client logic with security rules.
+    // Collection: transactions
     match /transactions/{transactionId} {
-      allow read, list: if isOwner(resource.data.userId);
-      // Creation is allowed if it's a valid type and meets conditions.
-      allow create: if isUserAuthenticated();
-      // Admin can update status (e.g. approve/reject deposits/withdrawals)
-      allow update: if request.auth.token.role == 'admin';
+      allow read: if isSignedIn() && isOwner(resource.data.userId);
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Collection: friend_requests
+    match /friend_requests/{requestId} {
+        allow read: if isSignedIn();
+        allow create: if isOwner(request.resource.data.fromId);
+        allow delete: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
+    }
+    
+    // Collection: chats
+    match /chats/{chatId} {
+        allow read, update: if isSignedIn() && request.auth.uid in resource.data.users;
+        
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
+    }
+    
+     // Collection: notifications
+    match /notifications/{notificationId} {
+        allow read, update: if isSignedIn() && isOwner(resource.data.userId);
+        allow create: if isSignedIn();
+    }
+
+    // Collection: marketing_applications
+    match /marketing_applications/{appId} {
+        allow create;
+        allow read, update: if isSignedIn() && getUserData(request.auth.uid).role == 'admin';
     }
   }
 }

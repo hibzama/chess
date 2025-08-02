@@ -7,7 +7,6 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db, auth } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
-import { getDatabase, ref, get, serverTimestamp as rtdbServerTimestamp } from "firebase/database";
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -210,7 +209,6 @@ function MultiplayerGamePageContent() {
                 return;
             }
     
-            // Just delete the room. No refunds needed as no wager was taken.
             await deleteDoc(roomRef);
     
             if (isAutoCancel) {
@@ -566,4 +564,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-

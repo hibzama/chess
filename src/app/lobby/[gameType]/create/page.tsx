@@ -49,11 +49,6 @@ export default function CreateGamePage() {
             return;
         }
 
-        if (userData.balance < wagerAmount) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
-            return;
-        }
-
         setIsCreating(true);
         
         try {
