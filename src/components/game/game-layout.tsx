@@ -38,7 +38,8 @@ const GameOverDisplay = () => {
 
     const handleReturn = () => {
         router.push('/dashboard');
-        resetGame();
+        // The resetGame() call is removed from here to prevent premature state clearing.
+        // The state will naturally reset when the user navigates to a new page or starts a new game.
     }
 
     const getWinnerMessage = () => {
@@ -126,6 +127,13 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   
+  useEffect(() => {
+    // Reset the game state when the GameLayout component unmounts (e.g., when navigating away)
+    return () => {
+        resetGame();
+    }
+  }, [resetGame]);
+
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
   const handleResign = () => {
