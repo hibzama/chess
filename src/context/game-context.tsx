@@ -386,54 +386,72 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists()) {
-                if (isGameLoading) { // Only redirect if it was loading, to prevent redirect on room deletion
-                    router.push('/lobby');
-                }
+                 if (isGameLoading) router.push('/lobby');
                 return;
             };
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-            
-            if (roomData.status === 'completed') {
-                if (!gameState.isEnding) {
-                    const winnerData = roomData.winner; const winnerIsMe = winnerData?.uid === user.uid; const iAmResigner = winnerData?.resignerId === user.uid; const wager = roomData.wager || 0; let myPayout = 0;
-                    if (iAmResigner) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 0.30; else if (pieceCount <= 6) myPayout = wager * 0.50; else myPayout = wager * 0.75; }
-                    else if (winnerData?.resignerId) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 1.50; else if (pieceCount <= 6) myPayout = wager * 1.30; else myPayout = wager * 1.05; }
-                    else if (roomData.draw) { myPayout = wager * 0.9; } else if (winnerIsMe) { myPayout = wager * 1.8; }
-                    updateAndSaveState({ boardState: roomData.boardState, gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
+
+            if (
+                roomData.status === 'in-progress' ||
+                (roomData.status === 'waiting' && roomData.players.includes(user.uid)) ||
+                roomData.status === 'completed'
+            ) {
+                 const isPlayerInRoom = roomData.players.includes(user.uid);
+                
+                if (!isPlayerInRoom && roomData.status !== 'waiting') {
+                    router.push('/lobby');
+                    return;
                 }
+
+                const isCreator = roomData.createdBy.uid === user.uid;
+                const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
+                let boardData = roomData.boardState;
+                if(gameType === 'checkers' && typeof boardData === 'string') {
+                    try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
+                }
+
+                updateAndSaveState({ 
+                    playerColor: myColor, 
+                    boardState: boardData,
+                    moveHistory: roomData.moveHistory || [], 
+                    moveCount: roomData.moveHistory?.length || 0,
+                    currentPlayer: roomData.currentPlayer, 
+                    capturedByPlayer: isCreator ? roomData.capturedByP1 : roomData.capturedByP2 || [], 
+                    capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
+                    p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
+                    p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
+                });
+                
+                if (roomData.status === 'completed' && !gameState.isEnding) {
+                    const winnerData = roomData.winner;
+                    const winnerIsMe = winnerData?.uid === user.uid;
+                    const iAmResigner = winnerData?.resignerId === user.uid;
+                    const wager = roomData.wager || 0;
+                    let myPayout = 0;
+                    if (iAmResigner) {
+                        const pieceCount = winnerData.resignerPieceCount ?? 16;
+                        if (pieceCount <= 3) myPayout = wager * 0.30;
+                        else if (pieceCount <= 6) myPayout = wager * 0.50;
+                        else myPayout = wager * 0.75;
+                    } else if (winnerData?.resignerId) {
+                        const pieceCount = winnerData.resignerPieceCount ?? 16;
+                        if (pieceCount <= 3) myPayout = wager * 1.50;
+                        else if (pieceCount <= 6) myPayout = wager * 1.30;
+                        else myPayout = wager * 1.05;
+                    } else if (roomData.draw) {
+                        myPayout = wager * 0.9;
+                    } else if (winnerIsMe) {
+                        myPayout = wager * 1.8;
+                    }
+                    updateAndSaveState({ gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
+                }
+
                 setIsGameLoading(false);
-                return;
+            } else if (roomData.status === 'waiting' && !roomData.players.includes(user.uid)) {
+                setIsGameLoading(false);
             }
-            
-            const isPlayerInRoom = roomData.players.includes(user.uid);
-            
-            if (!isPlayerInRoom && roomData.status !== 'waiting') {
-                router.push('/lobby'); // If game started and I'm not in it, leave.
-                return;
-            }
-
-            const isCreator = roomData.createdBy.uid === user.uid;
-            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
-            let boardData = roomData.boardState;
-            if(gameType === 'checkers' && typeof boardData === 'string') {
-                try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
-            }
-
-            updateAndSaveState({ 
-                playerColor: myColor, 
-                boardState: boardData,
-                moveHistory: roomData.moveHistory || [], 
-                moveCount: roomData.moveHistory?.length || 0,
-                currentPlayer: roomData.currentPlayer, 
-                capturedByPlayer: isCreator ? roomData.capturedByP1 : roomData.capturedByP2 || [], 
-                capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
-                p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
-                p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
-            });
-            setIsGameLoading(false);
-
         });
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, router, isGameLoading]);
@@ -517,3 +535,4 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
+ 

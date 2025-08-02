@@ -148,17 +148,6 @@ function MultiplayerGamePageContent() {
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
-    useEffect(() => {
-        if (!isGameLoading && !gameOver && (!room || !user || !userData)) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not load game data. Redirecting...",
-            });
-            router.push('/lobby');
-        }
-    }, [isGameLoading, room, user, userData, router, toast, gameOver]);
-
 
      useEffect(() => {
         roomStatusRef.current = room?.status;
@@ -371,7 +360,8 @@ function MultiplayerGamePageContent() {
     }
 
     if (!room) {
-        // This case should be handled by the redirect effect, but as a fallback:
+        // This should theoretically not be reached if the provider handles loading correctly,
+        // but it's a safe fallback.
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -500,7 +490,8 @@ export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [isGameLoading, setIsGameLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!roomId) {
@@ -515,19 +506,19 @@ export default function MultiplayerGamePage() {
                 if (roomSnap.exists()) {
                     setGameType(roomSnap.data().gameType);
                 } else {
-                    router.push('/lobby');
+                    setError("This game room does not exist.");
                 }
             } catch (e) {
                 console.error("Could not fetch game type", e);
-                router.push('/lobby');
+                setError("Failed to load the game room.");
             } finally {
-                setIsGameLoading(false);
+                setIsLoading(false);
             }
         };
         fetchGameType();
     }, [roomId, router]);
     
-    if (isGameLoading) {
+    if (isLoading) {
          return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
@@ -537,9 +528,20 @@ export default function MultiplayerGamePage() {
             </div>
         )
     }
+    
+    if (error) {
+        return (
+             <div className="flex items-center justify-center min-h-screen">
+                <div className="text-center">
+                    <p className="text-destructive">{error}</p>
+                    <Button onClick={() => router.push('/lobby')} className="mt-4">Back to Lobby</Button>
+                </div>
+            </div>
+        )
+    }
 
     if (!gameType) {
-        return null; // or a fallback UI, as the effect will redirect
+        return null; // Should be covered by loading/error states
     }
     
     return (
@@ -548,3 +550,4 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+ 
