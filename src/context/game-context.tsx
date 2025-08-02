@@ -297,21 +297,38 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const pColor = isCreator ? roomData.createdBy.color : roomData.player2!.color;
             const elapsed = roomData.turnStartTime ? (Timestamp.now().toMillis() - roomData.turnStartTime.toMillis()) / 1000 : 0;
             
-            let p1ServerTime = isCreator ? roomData.p1Time : roomData.p2Time;
-            let p2ServerTime = !isCreator ? roomData.p1Time : roomData.p2Time;
+            let p1Time, p2Time;
+            const userIsP1 = isCreator;
 
-            if(roomData.currentPlayer === pColor) {
-                 p1ServerTime = Math.max(0, p1ServerTime - elapsed);
+            if (userIsP1) { // Current user is P1 (creator)
+                p1Time = roomData.p1Time;
+                p2Time = roomData.p2Time;
+                if (roomData.currentPlayer === roomData.createdBy.color) { // It's my (P1's) turn
+                    p1Time -= elapsed;
+                } else { // It's opponent's (P2's) turn
+                    p2Time -= elapsed;
+                }
+            } else { // Current user is P2 (joiner)
+                p1Time = roomData.p2Time;
+                p2Time = roomData.p1Time;
+                 if (roomData.currentPlayer === roomData.player2!.color) { // It's my (P2's) turn
+                    p1Time -= elapsed;
+                } else { // It's opponent's (P1's) turn
+                    p2Time -= elapsed;
+                }
             }
 
-            if (p1ServerTime <= 0) {
+            p1Time = Math.max(0, p1Time);
+            p2Time = Math.max(0, p2Time);
+
+            if (p1Time <= 0) {
                  const winnerId = roomData.players.find(p => p !== user.uid);
                  setWinner(winnerId || null, roomData.boardState, 'timeout');
                  return;
             }
-             if (p2ServerTime <= 0) {
-                 const winnerId = roomData.players.find(p => p === user.uid);
-                 setWinner(winnerId || null, roomData.boardState, 'timeout');
+             if (p2Time <= 0) {
+                 const winnerId = user.uid;
+                 setWinner(winnerId, roomData.boardState, 'timeout');
                  return;
             }
 
@@ -319,7 +336,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (gameType === 'checkers' && typeof currentBoardState === 'string') { try { currentBoardState = { board: JSON.parse(currentBoardState) }; } catch (e) { currentBoardState = { board: [] }; } }
             const moveHistory = roomData.moveHistory || [];
             let moveCount = 0; if (moveHistory.length > 0) { const lastMove = moveHistory[moveHistory.length - 1]; moveCount = (lastMove.turn - 1) * 2 + (lastMove.black ? 2 : 1); }
-            updateAndSaveState({ playerColor: pColor, boardState: currentBoardState, moveHistory, moveCount, currentPlayer: roomData.currentPlayer, capturedByPlayer: isCreator ? roomData.capturedByP2 || [] : roomData.capturedByP1 || [], capturedByBot: isCreator ? roomData.capturedByP1 || [] : roomData.capturedByP2 || [], p1Time: p1ServerTime, p2Time: p2ServerTime });
+            updateAndSaveState({ playerColor: pColor, boardState: currentBoardState, moveHistory, moveCount, currentPlayer: roomData.currentPlayer, capturedByPlayer: isCreator ? roomData.capturedByP2 || [] : roomData.capturedByP1 || [], capturedByBot: isCreator ? roomData.capturedByP1 || [] : roomData.capturedByP2 || [], p1Time: p1Time, p2Time: p2Time });
             if (!isMounted) setIsMounted(true);
         });
         return () => unsubscribe();
@@ -391,11 +408,19 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (move) { if (room.currentPlayer === 'w') { newMoveHistory.push({ turn: Math.floor(newMoveHistory.length) + 1, white: move }); } else { const lastMove = newMoveHistory[newMoveHistory.length - 1]; if (lastMove && !lastMove.black) { lastMove.black = move; } else { newMoveHistory.push({ turn: Math.floor(newMoveHistory.length) + 1, black: move }); } } }
             const now = Timestamp.now();
             const elapsedSeconds = room.turnStartTime ? (now.toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
+            
             const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
             const newP1Time = creatorIsCurrent ? room.p1Time - elapsedSeconds : room.p1Time;
             const newP2Time = !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time;
             
-            const updatePayload: any = { boardState: gameType === 'chess' ? boardState.fen : JSON.stringify(boardState.board), currentPlayer: room.currentPlayer === 'w' ? 'b' : 'w', moveHistory: newMoveHistory, turnStartTime: now, p1Time: newP1Time, p2Time: newP2Time };
+            const updatePayload: any = { 
+                boardState: gameType === 'chess' ? boardState.fen : JSON.stringify(boardState.board), 
+                currentPlayer: room.currentPlayer === 'w' ? 'b' : 'w', 
+                moveHistory: newMoveHistory, 
+                turnStartTime: now, 
+                p1Time: newP1Time, 
+                p2Time: newP2Time 
+            };
             if (capturedPiece) { const pieceToStore = { type: capturedPiece.type, color: capturedPiece.color }; if (room.currentPlayer === room.createdBy.color) { updatePayload.capturedByP1 = [...(room.capturedByP1 || []), pieceToStore]; } else { updatePayload.capturedByP2 = [...(room.capturedByP2 || []), pieceToStore]; } }
             await updateDoc(roomRef, updatePayload);
             checkGameOver(boardInstance, room);
