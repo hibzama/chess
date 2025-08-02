@@ -403,16 +403,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             
+            // This is the main state sync. It runs for everyone viewing the room.
+            setRoom(roomData); // Always update the room object.
+            
             if (roomData.status === 'waiting' || roomData.status === 'in-progress') {
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
+                
                 let boardData = roomData.boardState;
                 if(gameType === 'checkers' && typeof boardData === 'string') {
                     try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
                 }
                 
-                // Atomically set room and game state together
-                setRoom(roomData);
                 updateAndSaveState({ 
                     playerColor: myColor, 
                     boardState: boardData,
@@ -424,7 +426,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
                     p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
                 });
-                setIsGameLoading(false); // Only set loading to false after state is updated
+
+                setIsGameLoading(false); // Game is ready to be shown.
 
             } else if (roomData.status === 'completed' && !gameState.isEnding) {
                  const winnerData = roomData.winner;
