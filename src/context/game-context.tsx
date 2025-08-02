@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -64,7 +63,7 @@ interface GameState {
 interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
     switchTurn: (boardState: any, move?: string, capturedPiece?: Piece) => void;
-    setWinner: (winnerId: string | 'draw' | null, boardState?: any, method?: GameOverReason, resignerId?: string | null, resignerPieceCount?: number) => void;
+    setWinner: (winnerId: string | 'draw' | null, boardState?: any, method?: GameOverReason, resignerId?: string | null) => void;
     resetGame: () => void;
     loadGameState: (state: GameState) => void;
     isMounted: boolean;
@@ -79,6 +78,20 @@ type Move = { turn: number; white?: string; black?: string };
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
+const createInitialCheckersBoard = (): (Piece | null)[][] => {
+    const board: (Piece | null)[][] = Array(8).fill(null).map(() => Array(8).fill(null));
+    for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 8; col++) {
+            if ((row + col) % 2 !== 0) { // only on dark squares
+                if (row < 3) board[row][col] = { player: 'b', type: 'pawn' };
+                if (row > 4) board[row][col] = { player: 'w', type: 'pawn' };
+            }
+        }
+    }
+    return board;
+};
+
+
 export const GameProvider = ({ children, gameType }: { children: React.ReactNode, gameType: 'chess' | 'checkers' }) => {
     const { id: roomId } = useParams();
     const router = useRouter();
@@ -88,6 +101,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const storageKey = `game_state_${gameType}`;
     
     const getInitialState = useCallback((): GameState => {
+        const initialBoard = gameType === 'chess' ? new Chess().fen() : { board: createInitialCheckersBoard() };
         const defaultState: GameState = {
             playerColor: 'w',
             timeLimit: 900,
@@ -100,7 +114,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             gameOverReason: null,
             moveHistory: [],
             moveCount: 0,
-            boardState: null,
+            boardState: initialBoard,
             capturedByPlayer: [],
             capturedByBot: [],
             payoutAmount: null,
@@ -127,18 +141,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const gameOverHandledRef = useRef(false);
 
-     const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
+    const updateAndSaveState = useCallback((newState: Partial<GameState>) => {
         setGameState(prevState => {
             const updatedState = { ...prevState, ...newState };
             if (!isMultiplayer && typeof window !== 'undefined') {
-                const stateToSave = { ...updatedState, boardState: boardState || updatedState.boardState };
-                localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+                 localStorage.setItem(storageKey, JSON.stringify(updatedState));
             }
             return updatedState;
         });
     }, [isMultiplayer, storageKey]);
 
-     const handlePayout = useCallback(async (winnerDetails: { winnerId: string | 'draw' | null, method: GameOverReason, resignerId?: string | null, resignerPieceCount?: number }) => {
+
+    const handlePayout = useCallback(async (winnerDetails: { winnerId: string | 'draw' | null, method: GameOverReason, resignerId?: string | null }) => {
         if (!roomId || !user) return { myPayout: 0 };
     
         try {
@@ -154,30 +168,30 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let creatorPayout = 0, joinerPayout = 0;
                 let creatorDesc = '', joinerDesc = '';
                 
-                const { winnerId, method, resignerId, resignerPieceCount = 0 } = winnerDetails;
+                const { winnerId, method, resignerId } = winnerDetails;
     
                  if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
+                    const resignerPieceCount = isCreatorResigner ? (16 - (roomData.capturedByP1?.length || 0)) : (16 - (roomData.capturedByP2?.length || 0));
+
                     let resignerRefundRate, winnerPayoutRate;
                     
-                    const totalPieces = gameType === 'chess' ? 16 : 12;
-                    const opponentPieceCount = totalPieces - (isCreatorResigner ? (roomData.capturedByP2?.length || 0) : (roomData.capturedByP1?.length || 0));
-
-                    if (opponentPieceCount <= 3) { // Opponent has 3 or fewer pieces
-                        resignerRefundRate = 0.30; // 30%
-                        winnerPayoutRate = 1.50; // 150%
-                    } else if (opponentPieceCount <= 6) { // Opponent has 6 or fewer
-                        resignerRefundRate = 0.50; // 50%
-                        winnerPayoutRate = 1.30; // 130%
-                    } else { // Standard resignation
-                        resignerRefundRate = 0.75; // 75%
-                        winnerPayoutRate = 1.05; // 105%
+                    if (resignerPieceCount <= 3) {
+                        resignerRefundRate = 0.30;
+                        winnerPayoutRate = 1.50;
+                    } else if (resignerPieceCount <= 6) {
+                        resignerRefundRate = 0.50;
+                        winnerPayoutRate = 1.30;
+                    } else {
+                        resignerRefundRate = 0.75;
+                        winnerPayoutRate = 1.05;
                     }
 
                     creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                    transaction.update(roomRef, { winner: { resignerPieceCount }});
 
                 } else if (winnerId === 'draw') { // Draw logic
                     creatorPayout = joinerPayout = wager * 0.9;
@@ -207,7 +221,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 transaction.update(roomRef, { 
                     status: 'completed',
-                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId, resignerPieceCount: resignerPieceCount },
+                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId },
                     draw: winnerId === 'draw',
                     payoutTransactionId: payoutTxId 
                 });
@@ -223,7 +237,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const wager = roomData.wager || 0;
                     const winnerData = roomData.winner;
                     if (winnerData?.resignerId) { // Resignation
-                        const pieceCount = winnerData.resignerPieceCount ?? 0;
+                        const pieceCount = winnerData.resignerPieceCount ?? 16;
                         let resignerRefundRate, winnerPayoutRate;
                         
                         if (pieceCount <= 3) {
@@ -251,34 +265,35 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
     }, [user, roomId, gameType]);
 
-    const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerId: string | null = null, resignerPieceCount?: number) => {
+    const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerId: string | null = null) => {
         if (gameOverHandledRef.current) return;
         setGameState(p => ({...p, isEnding: true}));
         
         if (isMultiplayer && roomId && user) {
             gameOverHandledRef.current = true;
-            handlePayout({ winnerId, method, resignerId, resignerPieceCount: resignerPieceCount || 0 }).then(({ myPayout }) => {
+            handlePayout({ winnerId, method, resignerId }).then(({ myPayout }) => {
                 const winnerIsMe = winnerId === user.uid;
-                setGameState(p => ({
-                    ...p, boardState, gameOver: true,
+                updateAndSaveState({ gameOver: true,
                     winner: winnerId === 'draw' ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
                     gameOverReason: method, payoutAmount: myPayout,
-                }));
+                });
             });
         } else {
             gameOverHandledRef.current = true;
             const winner = winnerId === 'bot' ? 'p2' : (winnerId ? 'p1' : 'draw');
-            updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method }, boardState);
+            updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method, boardState });
         }
     }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout]);
 
-    const switchTurn = useCallback((boardInstance: any, move?: string, capturedPiece?: Piece) => {
+    const switchTurn = useCallback((newBoardState: any, move?: string, capturedPiece?: Piece) => {
         if (gameState.gameOver || gameState.isEnding) return;
-
+        
         const checkGameOver = (board: any, localRoomData?: GameRoom) => {
+            // This function is now defined inside switchTurn to have access to its scope
+            // It should not be called from outside.
             if (gameOverHandledRef.current) return;
             if (gameType === 'chess') {
-                const tempGame = new Chess(board.fen);
+                const tempGame = new Chess(board); // board is FEN string here
                 if (tempGame.isGameOver()) {
                     if (tempGame.isCheckmate()) {
                         const loserColor = tempGame.turn();
@@ -311,18 +326,17 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     return jumps.length > 0 ? jumps : moves;
                 };
     
-                for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { const piece = boardInstance.board[r][c]; if (piece) { if (piece.player === 'w') whitePieces++; else blackPieces++; const moves = getPossibleMovesForPiece(piece, { row: r, col: c }, boardInstance.board, piece.player); if (moves.length > 0) { if (piece.player === 'w') hasWhiteMoves = true; else hasBlackMoves = true; }}}}
+                for (let r = 0; r < 8; r++) { for (let c = 0; c < 8; c++) { const piece = newBoardState.board[r][c]; if (piece) { if (piece.player === 'w') whitePieces++; else blackPieces++; const moves = getPossibleMovesForPiece(piece, { row: r, col: c }, newBoardState.board, piece.player); if (moves.length > 0) { if (piece.player === 'w') hasWhiteMoves = true; else hasBlackMoves = true; }}}}
                 let winnerColor: PlayerColor | null = null, reason: GameOverReason = null;
                 if (whitePieces === 0) { winnerColor = 'b'; reason = 'piece-capture'; } else if (blackPieces === 0) { winnerColor = 'w'; reason = 'piece-capture'; } else if (!hasWhiteMoves) { winnerColor = 'b'; reason = 'draw'; } else if (!hasBlackMoves) { winnerColor = 'w'; reason = 'draw'; }
                 if (winnerColor) {
                     const winnerId = isMultiplayer && localRoomData ? localRoomData.players.find(pId => (pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2)?.color === winnerColor) : (winnerColor === 'w' ? 'user' : 'bot');
-                    setWinner(winnerId || null, { board: boardInstance.board }, reason);
+                    setWinner(winnerId || null, newBoardState, reason);
                 }
             }
         }
         
         if (isMultiplayer && room) {
-            const boardState = gameType === 'chess' ? {fen: boardInstance.fen()} : {board: boardInstance.board};
             const roomRef = doc(db, 'game_rooms', room.id);
             let newMoveHistory = [...(room.moveHistory || [])];
             if (move) { if (room.currentPlayer === 'w') { newMoveHistory.push({ turn: Math.floor(newMoveHistory.length) + 1, white: move }); } else { const lastMove = newMoveHistory[newMoveHistory.length - 1]; if (lastMove && !lastMove.black) { lastMove.black = move; } else { newMoveHistory.push({ turn: Math.floor((newMoveHistory.length - 1) / 2) + 1, black: move }); } } }
@@ -334,7 +348,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const newP2Time = room.player2 && !isCreatorTurn ? room.p2Time - elapsedSeconds : room.p2Time;
             
             const updatePayload: any = { 
-                boardState: gameType === 'chess' ? boardState.fen : JSON.stringify(boardState.board), 
+                boardState: newBoardState, 
                 currentPlayer: room.currentPlayer === 'w' ? 'b' : 'w', 
                 moveHistory: newMoveHistory, 
                 turnStartTime: now, 
@@ -343,13 +357,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             };
             if (capturedPiece) { const pieceToStore = { type: capturedPiece.type, color: capturedPiece.color }; if (room.currentPlayer === room.createdBy.color) { updatePayload.capturedByP1 = [...(room.capturedByP1 || []), pieceToStore]; } else { updatePayload.capturedByP2 = [...(room.capturedByP2 || []), pieceToStore]; } }
             updateDoc(roomRef, updatePayload);
-            checkGameOver(boardInstance, room);
+            checkGameOver(newBoardState, room);
             return;
         }
 
         // Single player logic
-        const boardState = gameType === 'chess' ? { fen: boardInstance.fen() } : { board: boardInstance.board };
-        checkGameOver(boardState);
+        updateAndSaveState({boardState: newBoardState}); // Save board first
+        checkGameOver(newBoardState);
         const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
         let newMoveHistory = [...gameState.moveHistory];
         let newMoveCount = gameState.moveCount + 1;
@@ -357,7 +371,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const newCapturedByPlayer = capturedPiece && !p1IsCurrent ? [...gameState.capturedByPlayer, capturedPiece] : gameState.capturedByPlayer;
         const newCapturedByBot = capturedPiece && p1IsCurrent ? [...gameState.capturedByBot, capturedPiece] : gameState.capturedByBot;
         const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
-        updateAndSaveState({ currentPlayer: nextPlayer, moveHistory: newMoveHistory, moveCount: newMoveCount, capturedByPlayer: newCapturedByPlayer, capturedByBot: newCapturedByBot, }, boardState);
+        updateAndSaveState({ currentPlayer: nextPlayer, moveHistory: newMoveHistory, moveCount: newMoveCount, capturedByPlayer: newCapturedByPlayer, capturedByBot: newCapturedByBot });
 
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
@@ -377,10 +391,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (roomData.status === 'completed') {
                 if (!gameState.isEnding) {
                     const winnerData = roomData.winner; const winnerIsMe = winnerData?.uid === user.uid; const iAmResigner = winnerData?.resignerId === user.uid; const wager = roomData.wager || 0; let myPayout = 0;
-                    if (iAmResigner) { const pieceCount = winnerData.resignerPieceCount; if (pieceCount !== undefined && pieceCount <= 3) myPayout = wager * 0.30; else if (pieceCount !== undefined && pieceCount <= 6) myPayout = wager * 0.50; else myPayout = wager * 0.75; }
-                    else if (winnerData?.resignerId) { const pieceCount = winnerData.resignerPieceCount; if (pieceCount !== undefined && pieceCount <= 3) myPayout = wager * 1.50; else if (pieceCount !== undefined && pieceCount <= 6) myPayout = wager * 1.30; else myPayout = wager * 1.05; }
+                    if (iAmResigner) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 0.30; else if (pieceCount <= 6) myPayout = wager * 0.50; else myPayout = wager * 0.75; }
+                    else if (winnerData?.resignerId) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 1.50; else if (pieceCount <= 6) myPayout = wager * 1.30; else myPayout = wager * 1.05; }
                     else if (roomData.draw) { myPayout = wager * 0.9; } else if (winnerIsMe) { myPayout = wager * 1.8; }
-                    setGameState(p => ({...p, boardState: roomData.boardState, gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true }));
+                    updateAndSaveState({ boardState: roomData.boardState, gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
                 }
                 return;
             }
@@ -392,46 +406,58 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
     
             const isCreator = roomData.createdBy.uid === user.uid;
-            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2.color);
+            const myColor = isCreator ? roomData.createdBy.color : roomData.player2.color;
     
             const now = Timestamp.now();
             const elapsedSeconds = roomData.turnStartTime ? (now.toMillis() - roomData.turnStartTime.toMillis()) / 1000 : 0;
     
+            const p1IsCreator = roomData.createdBy.uid === roomData.players[0];
+            const p1Id = p1IsCreator ? roomData.createdBy.uid : roomData.player2.uid;
+            const p2Id = p1IsCreator ? roomData.player2.uid : roomData.createdBy.uid;
+
             let myTime, opponentTime;
-            
-            if (isCreator) {
+            if (user.uid === p1Id) {
                 myTime = roomData.currentPlayer === roomData.createdBy.color ? roomData.p1Time - elapsedSeconds : roomData.p1Time;
-                opponentTime = roomData.player2 && roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
-            } else { // I am the joiner
-                myTime = roomData.player2 && roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
+                opponentTime = roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
+            } else {
+                myTime = roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
                 opponentTime = roomData.currentPlayer === roomData.createdBy.color ? roomData.p1Time - elapsedSeconds : roomData.p1Time;
             }
 
             myTime = Math.max(0, myTime);
             opponentTime = Math.max(0, opponentTime);
 
-            if (myTime <= 0) {
-                 const winnerId = roomData.players.find(p => p !== user.uid);
-                 setWinner(winnerId || null, roomData.boardState, 'timeout');
-                 return;
-            }
-             if (opponentTime <= 0) {
-                 const winnerId = user.uid;
-                 setWinner(winnerId, roomData.boardState, 'timeout');
-                 return;
+            let boardData = roomData.boardState;
+            if(gameType === 'checkers' && typeof boardData === 'string') {
+                try {
+                    boardData = {board: JSON.parse(boardData)};
+                } catch {
+                    boardData = {board: createInitialCheckersBoard()};
+                }
             }
 
-            let currentBoardState = roomData.boardState;
-            if (gameType === 'checkers' && typeof currentBoardState === 'string') { try { currentBoardState = { board: JSON.parse(currentBoardState) }; } catch (e) { currentBoardState = { board: [] }; } }
-            const moveHistory = roomData.moveHistory || [];
-            let moveCount = 0; if (moveHistory.length > 0) { const lastMove = moveHistory[moveHistory.length - 1]; moveCount = (lastMove.turn - 1) * 2 + (lastMove.black ? 2 : 1); }
-            updateAndSaveState({ playerColor: myColor, boardState: currentBoardState, moveHistory, moveCount, currentPlayer: roomData.currentPlayer, capturedByPlayer: myColor === roomData.createdBy.color ? roomData.capturedByP2 || [] : roomData.capturedByP1 || [], capturedByBot: myColor === roomData.createdBy.color ? roomData.capturedByP1 || [] : roomData.capturedByP2 || [], p1Time: myTime, p2Time: opponentTime });
+            const myPlayerNumber = isCreator ? 1 : 2;
+            const capturedByMe = myPlayerNumber === 1 ? roomData.capturedByP1 : roomData.capturedByP2;
+            const capturedByOpponent = myPlayerNumber === 1 ? roomData.capturedByP2 : roomData.capturedByP1;
+
+            updateAndSaveState({ 
+                playerColor: myColor, 
+                boardState: boardData,
+                moveHistory: roomData.moveHistory || [], 
+                moveCount: roomData.moveHistory?.length || 0,
+                currentPlayer: roomData.currentPlayer, 
+                capturedByPlayer: capturedByMe || [], 
+                capturedByBot: capturedByOpponent || [], 
+                p1Time: myTime, 
+                p2Time: opponentTime 
+            });
+
             if (!isMounted) setIsMounted(true);
         });
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, isMounted, gameType, setWinner, updateAndSaveState, gameState.isEnding]);
 
-    const loadGameState = useCallback((state: GameState) => { setGameState(state); }, []);
+    const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
     
     const setupGame = useCallback((color: PlayerColor, time: number, diff: string) => {
         gameOverHandledRef.current = false;
@@ -441,7 +467,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         updateAndSaveState(newState);
     }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
     
-    const resign = useCallback(() => { if (gameState.gameOver || gameState.isEnding || !user) return; if (isMultiplayer && room) { const winnerId = room.players.find((p)=>p !== user.uid) || null; setWinner(winnerId, gameState.boardState, 'resign', user.uid, gameState.playerPieceCount); } else { setWinner('bot', gameState.boardState, 'resign', user.uid); } }, [gameState, user, room, isMultiplayer, setWinner]);
+    const resign = useCallback(() => { 
+        if (gameState.gameOver || gameState.isEnding || !user) return; 
+        if (isMultiplayer && room) { 
+            const winnerId = room.players.find((p)=>p !== user.uid) || null; 
+            setWinner(winnerId, gameState.boardState, 'resign', user.uid); 
+        } else { 
+            setWinner('bot', gameState.boardState, 'resign', user.uid); 
+        } 
+    }, [gameState, user, room, isMultiplayer, setWinner]);
     
     const resetGame = useCallback(() => { gameOverHandledRef.current = false; if(typeof window !== 'undefined' && !isMultiplayer) { localStorage.removeItem(storageKey); } const defaultState = getInitialState(); setGameState(defaultState); setRoom(null); }, [isMultiplayer, storageKey, getInitialState]);
     

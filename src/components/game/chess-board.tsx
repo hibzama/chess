@@ -43,9 +43,9 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
 
 
    useEffect(() => {
-        if (boardState && boardState.fen) {
+        if (boardState) {
             try {
-                const newGame = new Chess(boardState.fen);
+                const newGame = new Chess(boardState);
                 setGame(newGame);
             } catch (e) {
                 console.error("Invalid FEN string in saved state:", e);
@@ -66,10 +66,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
           const move = moves[Math.floor(Math.random() * moves.length)];
           const result = game.move(move);
           if (result) {
-            const newGame = new Chess(game.fen());
-            setGame(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            switchTurn(newGame, result.san, captured);
+            switchTurn(game.fen(), result.san, captured);
           }
         }
       }, 1000); // 1-second delay for bot move
@@ -101,10 +99,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       if (isLegal) {
         const result = game.move(move);
         if (result) {
-            const newGame = new Chess(game.fen());
-            setGame(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            switchTurn(newGame, result.san, captured);
+            switchTurn(game.fen(), result.san, captured);
         }
       }
       setSelectedPiece(null);

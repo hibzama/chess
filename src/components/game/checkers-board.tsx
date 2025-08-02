@@ -31,26 +31,6 @@ const boardThemes: BoardTheme[] = [
     { id: 'ocean', name: 'Ocean', colors: ['#c7d2fe', '#60a5fa'] },
 ];
 
-
-const createInitialBoard = (): Board => {
-    const board: Board = Array(8).fill(null).map(() => Array(8).fill(null));
-    for (let row = 0; row < 8; row++) {
-        for (let col = 0; col < 8; col++) {
-            if ((row + col) % 2 !== 0) { // only on dark squares
-                if (row < 3) board[row][col] = { player: 'b', type: 'pawn' };
-                if (row > 4) board[row][col] = { player: 'w', type: 'pawn' };
-            }
-        }
-    }
-    return board;
-}
-
-
-type CheckersBoardProps = {
-    boardTheme?: string;
-    pieceStyle?: string;
-}
-
 const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) => {
     const pieceColor = piece.player === 'b' ? colors[0] : colors[1];
     
@@ -67,9 +47,13 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
     );
 };
 
+type CheckersBoardProps = {
+    boardTheme?: string;
+    pieceStyle?: string;
+}
+
 export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
-    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted, isMultiplayer, user, roomOpponentId, room } = useGame();
-    const [board, setBoard] = useState<Board>(() => boardState?.board || createInitialBoard());
+    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted, isMultiplayer } = useGame();
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
     const { toast } = useToast();
@@ -80,14 +64,8 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
     const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[0];
     const isFlipped = playerColor === 'b';
     
-    useEffect(() => {
-        if (boardState?.board) {
-            setBoard(boardState.board);
-        } else {
-            setBoard(createInitialBoard());
-        }
-    }, [boardState]);
-    
+    const board = boardState?.board as Board;
+
     const getPossibleMovesForPiece = useCallback((piece: Piece, pos: Position, currentBoard: Board, forPlayer: Player): Move[] => {
         const moves: Move[] = [];
         const jumps: Move[] = [];
@@ -139,6 +117,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
     
     const movePiece = useCallback((move: Move) => {
+        if (!board) return;
         const newBoard = board.map(r => [...r]);
         const piece = newBoard[move.from.row][move.from.col];
         
@@ -163,8 +142,6 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             newBoard[jumpedRow][jumpedCol] = null;
         }
         
-        setBoard(newBoard);
-
         const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
 
         if (moreJumps.length > 0 && (isMultiplayer ? currentPlayer === playerColor : true) ) {
@@ -177,13 +154,15 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             setConsecutiveJumpPiece(null);
             setSelectedPiece(null);
             setPossibleMoves([]);
-            const finalCapturedPiece = captured ? { type: captured.type, color: captured.player } as unknown as Piece : undefined;
-            switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
         }
+        
+        const finalCapturedPiece = captured ? { type: captured.type, color: captured.player } as unknown as Piece : undefined;
+        switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
         
     }, [board, switchTurn, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer]);
 
     const botMove = useCallback(() => {
+        if(!board) return;
         const botMoves = calculateAllMoves(board, currentPlayer);
         if (botMoves.length > 0) {
             const randomMove = botMoves[Math.floor(Math.random() * botMoves.length)];
@@ -193,7 +172,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
 
     useEffect(() => {
-        if(gameOver || !isMounted || isMultiplayer) return;
+        if(gameOver || !isMounted || isMultiplayer || !board) return;
 
         if (consecutiveJumpPiece) {
              const jumps = getPossibleMovesForPiece(board[consecutiveJumpPiece.row][consecutiveJumpPiece.col]!, consecutiveJumpPiece, board, currentPlayer).filter(m => m.isJump);
@@ -221,7 +200,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
 
 
     const handleSquareClick = (row: number, col: number) => {
-        if (currentPlayer !== playerColor || gameOver) return;
+        if (!board || currentPlayer !== playerColor || gameOver) return;
 
         const actualRow = isFlipped ? 7 - row : row;
         const actualCol = isFlipped ? 7 - col : col;
@@ -255,6 +234,8 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             setPossibleMoves([]);
         }
     };
+    
+    if (!board) return null; // Or a loading skeleton
     
     const displayedBoard = isFlipped ? [...board].reverse().map(row => [...row].reverse()) : board;
 
@@ -304,3 +285,4 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         </div>
     );
 }
+
