@@ -285,4 +285,3 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         </div>
     );
 }
-
