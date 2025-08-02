@@ -195,7 +195,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
                     const reason = method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture');
                     creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
+                    joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.player2.name}`;
                     // Increment winner's win count
                     transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
                 }
@@ -281,7 +281,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             });
         } else { // Practice mode
             const winner = winnerId === 'bot' ? 'p2' : (winnerId ? 'p1' : 'draw');
-            updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method, isEnding: false }, boardState);
+            updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method }, boardState);
             gameOverHandledRef.current = true;
         }
     }, [stopTimer, updateAndSaveState, isMultiplayer, roomId, user, gameState.isEnding, handlePayout]);
@@ -527,40 +527,49 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
      // Timer countdown logic
     useEffect(() => {
         stopTimer();
-        if (!isMounted || gameState.gameOver || gameState.isEnding) {
+        if (!isMounted || gameState.gameOver) {
             return;
         }
 
-        const isMyTurn = gameState.currentPlayer === gameState.playerColor;
-        
         const tick = () => {
-            if(gameState.isEnding || gameOverHandledRef.current) { stopTimer(); return; }
+            if (gameState.gameOver || gameOverHandledRef.current) {
+                stopTimer();
+                return;
+            }
 
-            if(isMultiplayer && room && room.status === 'in-progress') {
-                const elapsed = room.turnStartTime ? (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
+            const isMyTurn = gameState.currentPlayer === gameState.playerColor;
+
+            if (isMultiplayer && room && room.status === 'in-progress' && room.turnStartTime) {
+                const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
                 const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
-                const creatorTimeRemaining = room.p1Time - (creatorIsCurrent ? elapsed : 0);
-                const joinerTimeRemaining = room.p2Time - (!creatorIsCurrent ? elapsed : 0);
-                const isCreator = room.createdBy.uid === user?.uid;
                 
-                const myTime = isCreator ? creatorTimeRemaining : joinerTimeRemaining;
-                const opponentTime = !isCreator ? creatorTimeRemaining : joinerTimeRemaining;
-
-                setGameState(p => ({ ...p, p1Time: myTime, p2Time: opponentTime }));
+                const myTime = (room.createdBy.uid === user?.uid) ? 
+                               (creatorIsCurrent ? room.p1Time - elapsed : room.p1Time) :
+                               (!creatorIsCurrent ? room.p2Time - elapsed : room.p2Time);
                 
-                if (myTime <= 0) setWinner(room.player2!.uid, room.boardState, 'timeout');
-                if (opponentTime <= 0) setWinner(room.createdBy.uid, room.boardState, 'timeout');
+                const opponentTime = (room.createdBy.uid === user?.uid) ? 
+                                     (!creatorIsCurrent ? room.p2Time - elapsed : room.p2Time) :
+                                     (creatorIsCurrent ? room.p1Time - elapsed : room.p1Time);
                 
-            } else if (!isMultiplayer) { // Practice mode timer
-                if (isMyTurn) {
-                    const newTime = gameState.p1Time - 1;
-                    if (newTime <= 0) setWinner('bot', gameState.boardState, 'timeout');
-                    else updateAndSaveState({ p1Time: newTime });
+                if (myTime <= 0) {
+                    const winnerId = room.players.find(p => p !== user?.uid) || null;
+                    setWinner(winnerId, room.boardState, 'timeout');
+                } else if (opponentTime <= 0) {
+                    setWinner(user?.uid, room.boardState, 'timeout');
                 } else {
-                    const newTime = gameState.p2Time - 1;
-                    if (newTime <= 0) setWinner(user?.uid || 'p1', gameState.boardState, 'timeout');
-                    else updateAndSaveState({ p2Time: newTime });
+                    setGameState(p => ({...p, p1Time: myTime, p2Time: opponentTime }));
                 }
+
+            } else if (!isMultiplayer) {
+                setGameState(prevState => {
+                    const newP1Time = isMyTurn ? prevState.p1Time - 1 : prevState.p1Time;
+                    const newP2Time = !isMyTurn ? prevState.p2Time - 1 : prevState.p2Time;
+                    
+                    if (newP1Time <= 0) setWinner('bot', prevState.boardState, 'timeout');
+                    if (newP2Time <= 0) setWinner(user?.uid || 'p1', prevState.boardState, 'timeout');
+
+                    return { ...prevState, p1Time: newP1Time, p2Time: newP2Time };
+                });
             }
         };
 
@@ -568,7 +577,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         return () => stopTimer();
     
-    }, [isMounted, gameState.gameOver, gameState.p1Time, gameState.p2Time, stopTimer, updateAndSaveState, isMultiplayer, room, user, setWinner, gameState.isEnding]);
+    }, [isMounted, gameState.gameOver, room, user, setWinner, stopTimer, isMultiplayer, gameState.playerColor, gameState.currentPlayer]);
 
 
     const loadGameState = (state: GameState) => {
