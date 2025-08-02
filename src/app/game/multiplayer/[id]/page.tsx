@@ -348,12 +348,23 @@ function MultiplayerGamePageContent() {
         }
     }
 
-    if (isGameLoading || !room) {
+    if (isGameLoading) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="h-16 w-16 animate-spin text-primary" />
                     <p className="text-muted-foreground">Loading Your Game...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (!room) {
+         return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Preparing room...</p>
                 </div>
             </div>
         )

@@ -397,7 +397,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
             
-            // This is the main fix: Handle state for any valid player in a waiting or active room
             if (roomData.status === 'in-progress' || roomData.status === 'waiting') {
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
@@ -419,6 +418,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 });
     
                 setIsGameLoading(false);
+
             } else if (roomData.status === 'completed' && !gameState.isEnding) {
                  const winnerData = roomData.winner;
                  const winnerIsMe = winnerData?.uid === user.uid;
@@ -526,5 +526,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
-
-    
