@@ -38,17 +38,17 @@ service cloud.firestore {
     // =================================
 
     match /users/{userId} {
-      // Admins can read any user profile. Other users can also read profiles (for leaderboards, etc.).
+      // Any signed-in user can read another user's profile (for leaderboards, friend searches, etc.).
+      // Admins can also read any user document.
       allow read: if isSignedIn();
 
-      // A user can create their own account, or an admin can create one (for marketer approvals).
+      // A user can create their own document, or an admin can create one (for marketer approvals).
       allow create: if isOwner(userId) || isAdmin();
 
       // This complex rule allows a user to update their own profile (but not critical fields),
       // and allows other system processes like friend requests and game transactions to update user documents.
-      // It also now allows an admin to make any update.
+      // Admins are also allowed to make any update.
       allow update: if 
-        (isAdmin()) ||
         (isOwner(userId) && !(
             'balance' in incomingDoc() && incomingDoc().balance != resource.data.balance
           ) && !(
@@ -59,7 +59,7 @@ service cloud.firestore {
         ) ||
         (isSignedIn() && exists(/databases/$(database)/documents/friend_requests/$(request.resource.data.requestId))) ||
         (isSignedIn() && !(userId in incomingDoc().friends) && (userId in resource.data.friends)) ||
-        (isSignedIn() && ('balance' in incomingDoc()));
+        isAdmin();
     }
     
     match /friend_requests/{requestId} {
@@ -70,7 +70,7 @@ service cloud.firestore {
     
     match /game_rooms/{roomId} {
       // Any signed-in user can list public games, and admins can read any game room's details.
-      allow list, read: if isSignedIn() || isAdmin();
+      allow list, read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
       allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
 
@@ -97,9 +97,8 @@ service cloud.firestore {
     }
     
     match /transactions/{transactionId} {
-      // Admins can read/list any transaction. Users can only see their own.
+      // Admins can read/list/update any transaction. Users can only see their own.
       allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
-      // Admins can approve/reject transactions. Users can create their own.
       allow create: if isSignedIn();
       allow update: if isAdmin();
     }
