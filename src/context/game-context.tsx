@@ -191,7 +191,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                     transaction.update(roomRef, { winner: { resignerPieceCount }});
 
                 } else if (winnerId === 'draw') { // Draw logic
@@ -396,11 +396,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-    
-            const isPlayerInRoom = roomData.players.includes(user.uid);
             
+            // This is the main fix: Handle state for any valid player in a waiting or active room
             if (roomData.status === 'in-progress' || roomData.status === 'waiting') {
-                
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
                 let boardData = roomData.boardState;
@@ -420,34 +418,30 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
                 });
     
-                if (roomData.status === 'completed' && !gameState.isEnding) {
-                    const winnerData = roomData.winner;
-                    const winnerIsMe = winnerData?.uid === user.uid;
-                    const iAmResigner = winnerData?.resignerId === user.uid;
-                    const wager = roomData.wager || 0;
-                    let myPayout = 0;
-                    if (iAmResigner) {
-                        const pieceCount = winnerData.resignerPieceCount ?? 16;
-                        if (pieceCount <= 3) myPayout = wager * 0.30;
-                        else if (pieceCount <= 6) myPayout = wager * 0.50;
-                        else myPayout = wager * 0.75;
-                    } else if (winnerData?.resignerId) {
-                        const pieceCount = winnerData.resignerPieceCount ?? 16;
-                        if (pieceCount <= 3) myPayout = wager * 1.50;
-                        else if (pieceCount <= 6) myPayout = wager * 1.30;
-                        else myPayout = wager * 1.05;
-                    } else if (roomData.draw) {
-                        myPayout = wager * 0.9;
-                    } else if (winnerIsMe) {
-                        myPayout = wager * 1.8;
-                    }
-                    updateAndSaveState({ gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
-                }
-                
                 setIsGameLoading(false);
-            } else if (roomData.status === 'completed' && !isPlayerInRoom) {
-                router.push('/lobby');
-                setIsGameLoading(false);
+            } else if (roomData.status === 'completed' && !gameState.isEnding) {
+                 const winnerData = roomData.winner;
+                 const winnerIsMe = winnerData?.uid === user.uid;
+                 const iAmResigner = winnerData?.resignerId === user.uid;
+                 const wager = roomData.wager || 0;
+                 let myPayout = 0;
+                 if (iAmResigner) {
+                     const pieceCount = winnerData.resignerPieceCount ?? 16;
+                     if (pieceCount <= 3) myPayout = wager * 0.30;
+                     else if (pieceCount <= 6) myPayout = wager * 0.50;
+                     else myPayout = wager * 0.75;
+                 } else if (winnerData?.resignerId) {
+                     const pieceCount = winnerData.resignerPieceCount ?? 16;
+                     if (pieceCount <= 3) myPayout = wager * 1.50;
+                     else if (pieceCount <= 6) myPayout = wager * 1.30;
+                     else myPayout = wager * 1.05;
+                 } else if (roomData.draw) {
+                     myPayout = wager * 0.9;
+                 } else if (winnerIsMe) {
+                     myPayout = wager * 1.8;
+                 }
+                 updateAndSaveState({ gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
+                 setIsGameLoading(false);
             }
         });
         return () => unsubscribe();
@@ -532,3 +526,5 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
+
+    
