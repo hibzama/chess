@@ -7,7 +7,7 @@ import { auth } from "@/lib/firebase";
 import { getAuth, sendEmailVerification, signInWithEmailAndPassword } from "firebase/auth";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, Suspense } from "react";
-import { MailCheck } from 'lucide-react';
+import { MailCheck, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 function VerifyEmailContent() {
@@ -71,18 +71,18 @@ function VerifyEmailContent() {
                 </div>
                 <CardTitle className="text-2xl">Verify Your Email</CardTitle>
                 <CardDescription>
-                    A verification link has been sent to <span className="font-bold text-primary">{email}</span>. Please check your inbox and click the link to activate your account.
+                    A verification link has been sent to <span className="font-bold text-primary">{email}</span>. Please check all your email folders (including Primary, Spam, and others) and click the link to activate your account.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <Button className="w-full" onClick={handleResend} disabled={isSending}>
                     {isSending ? "Sending..." : "Resend Verification Email"}
                 </Button>
-                <p className="text-xs text-muted-foreground text-center">
+                <p className="text-xs text-muted-foreground text-center pt-2">
                     If you're having trouble or didn't receive the email, please contact our support team.
                 </p>
                  <Button asChild variant="outline" className="w-full">
-                    <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">Contact Support on Telegram</a>
+                    <a href="https://wa.me/+94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare className="mr-2"/> Contact Support on WhatsApp</a>
                 </Button>
             </CardContent>
             <CardFooter>

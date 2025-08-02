@@ -306,7 +306,7 @@ export default function MainLayout({
                     <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
-                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
+                    <a href="https://wa.me/+94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
                     <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>

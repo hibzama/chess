@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu, DollarSign, Network, Sword } from "lucide-react";
+import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu, DollarSign, Network, Sword, MessageSquare } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -126,9 +126,12 @@ export default function LandingLayout({
                                     Have an issue? Reach out to us through any of the channels below.
                                 </DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-4">
+                             <div className="space-y-4 py-4">
                                 <Button asChild className="w-full justify-start gap-3" variant="outline">
                                     <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
+                                </Button>
+                                <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                    <a href="https://wa.me/+94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
                                 </Button>
                                 <Button asChild className="w-full justify-start gap-3" variant="outline">
                                     <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
@@ -215,6 +218,9 @@ export default function LandingLayout({
                                         <div className="space-y-4 py-4">
                                             <Button asChild className="w-full justify-start gap-3" variant="outline">
                                                 <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
+                                            </Button>
+                                            <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                                <a href="https://wa.me/+94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
                                             </Button>
                                             <Button asChild className="w-full justify-start gap-3" variant="outline">
                                                 <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
