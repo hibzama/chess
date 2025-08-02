@@ -138,30 +138,27 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
   
   const ResignationDialogContent = () => {
-    const isLowPieceCount = playerPieceCount <= 3;
-    const refundPercentage = isLowPieceCount ? 30 : 75;
-    const opponentPayoutPercentage = isLowPieceCount ? 150 : 105;
+    let refundPercentage, opponentPayoutPercentage;
+
+    if (playerPieceCount <= 3) {
+        refundPercentage = 30;
+        opponentPayoutPercentage = 150;
+    } else if (playerPieceCount <= 6) {
+        refundPercentage = 50;
+        opponentPayoutPercentage = 130;
+    } else {
+        refundPercentage = 75;
+        opponentPayoutPercentage = 105;
+    }
+
     const refundAmount = roomWager * (refundPercentage / 100);
     const opponentPayout = roomWager * (opponentPayoutPercentage / 100);
 
-    if (isLowPieceCount) {
-        return (
-            <div>
-                <p className="font-bold text-destructive">Low Piece Count Warning!</p>
-                <p>You have {playerPieceCount} pieces left, and your opponent has {opponentPieceCount}.</p>
-                <p>If you resign now, the special low-piece rule will apply.</p>
-                 <ul className="list-disc pl-5 text-sm mt-2">
-                    <li><span className="font-bold text-destructive">You will receive a {refundPercentage}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
-                    <li><span className="font-bold text-green-500">Your opponent will receive a {opponentPayoutPercentage}% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
-                </ul>
-            </div>
-        )
-    }
-
     return (
-        <div className="space-y-2 text-left pt-4">
-            <div>Resigning will forfeit the match.</div>
-            <ul className="list-disc pl-5 text-sm">
+        <div className="text-left">
+            <p className="font-bold">You currently have {playerPieceCount} pieces, and your opponent has {opponentPieceCount}.</p>
+            <p className="mt-2">Based on your piece count, if you resign now:</p>
+            <ul className="list-disc pl-5 text-sm mt-2 space-y-1">
                 <li><span className="font-bold text-destructive">You will receive a {refundPercentage}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
                 <li><span className="font-bold text-green-500">Your opponent will receive a {opponentPayoutPercentage}% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
             </ul>

@@ -166,19 +166,23 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
-                    const lowPieceResignation = resignerPieceCount !== undefined && resignerPieceCount <= 3;
+                    let resignerRefundRate, winnerPayoutRate;
 
-                    if (lowPieceResignation) {
-                        creatorPayout = isCreatorResigner ? wager * 0.30 : wager * 1.50;
-                        joinerPayout = !isCreatorResigner ? wager * 0.30 : wager * 1.50;
-                        creatorDesc = isCreatorResigner ? `Low-piece Resignation Refund vs ${roomData.player2.name}` : `Low-piece Forfeit Win vs ${roomData.player2.name}`;
-                        joinerDesc = !isCreatorResigner ? `Low-piece Resignation Refund vs ${roomData.createdBy.name}` : `Low-piece Forfeit Win vs ${roomData.createdBy.name}`;
+                    if (resignerPieceCount !== undefined && resignerPieceCount <= 3) {
+                        resignerRefundRate = 0.30; // 30%
+                        winnerPayoutRate = 1.50; // 150%
+                    } else if (resignerPieceCount !== undefined && resignerPieceCount <= 6) {
+                        resignerRefundRate = 0.50; // 50%
+                        winnerPayoutRate = 1.30; // 130%
                     } else {
-                        creatorPayout = isCreatorResigner ? wager * 0.75 : wager * 1.05;
-                        joinerPayout = !isCreatorResigner ? wager * 0.75 : wager * 1.05;
-                        creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
-                        joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                        resignerRefundRate = 0.75; // 75%
+                        winnerPayoutRate = 1.05; // 105%
                     }
+
+                    creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
+                    joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
+                    creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
 
                 } else if (winnerId === 'draw') { // Draw logic
                     creatorPayout = joinerPayout = wager * 0.9;
@@ -219,22 +223,33 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             return payoutResult;
         } catch (error) {
             if (String(error).includes('Payout already processed')) {
-                const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
-                if (roomDoc.exists()) {
+                 const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
+                 if (roomDoc.exists()) {
                     const roomData = roomDoc.data() as GameRoom;
                     const wager = roomData.wager;
                     const winnerData = roomData.winner;
                     if (winnerData?.resignerId) { // Resignation
-                        const lowPieceResignation = winnerData.resignerPieceCount !== undefined && winnerData.resignerPieceCount <= 3;
-                        const resignerPayout = lowPieceResignation ? wager * 0.30 : wager * 0.75;
-                        const winnerPayout = lowPieceResignation ? wager * 1.50 : wager * 1.05;
-                        return { myPayout: winnerData.resignerId === user.uid ? resignerPayout : winnerPayout };
+                        const resignerPieceCount = winnerData.resignerPieceCount;
+                        let resignerRefundRate, winnerPayoutRate;
+                        
+                        if (resignerPieceCount !== undefined && resignerPieceCount <= 3) {
+                            resignerRefundRate = 0.30;
+                            winnerPayoutRate = 1.50;
+                        } else if (resignerPieceCount !== undefined && resignerPieceCount <= 6) {
+                            resignerRefundRate = 0.50;
+                            winnerPayoutRate = 1.30;
+                        } else {
+                            resignerRefundRate = 0.75;
+                            winnerPayoutRate = 1.05;
+                        }
+
+                        return { myPayout: winnerData.resignerId === user.uid ? wager * resignerRefundRate : wager * winnerPayoutRate };
                     } else if (roomData.draw) { // Draw
                         return { myPayout: wager * 0.9 };
                     } else if (winnerData?.uid === user.uid) { // I won
                         return { myPayout: wager * 1.8 };
                     }
-                }
+                 }
             } else {
                  console.error("Payout Transaction failed:", error);
             }
@@ -328,11 +343,23 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let myPayout = 0;
 
                 if (iAmResigner) {
-                    const lowPieceResignation = winnerData.resignerPieceCount !== undefined && winnerData.resignerPieceCount <= 3;
-                    myPayout = lowPieceResignation ? wager * 0.30 : wager * 0.75;
+                    const resignerPieceCount = winnerData.resignerPieceCount;
+                    if (resignerPieceCount !== undefined && resignerPieceCount <= 3) {
+                        myPayout = wager * 0.30;
+                    } else if (resignerPieceCount !== undefined && resignerPieceCount <= 6) {
+                        myPayout = wager * 0.50;
+                    } else {
+                        myPayout = wager * 0.75;
+                    }
                 } else if (winnerData?.resignerId) { // I won by resignation
-                    const lowPieceResignation = winnerData.resignerPieceCount !== undefined && winnerData.resignerPieceCount <= 3;
-                    myPayout = lowPieceResignation ? wager * 1.50 : wager * 1.05;
+                     const resignerPieceCount = winnerData.resignerPieceCount;
+                    if (resignerPieceCount !== undefined && resignerPieceCount <= 3) {
+                        myPayout = wager * 1.50;
+                    } else if (resignerPieceCount !== undefined && resignerPieceCount <= 6) {
+                        myPayout = wager * 1.30;
+                    } else {
+                        myPayout = wager * 1.05;
+                    }
                 } else if (roomData.draw) {
                     myPayout = wager * 0.9;
                 } else if (winnerIsMe) {
@@ -590,7 +617,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         if(typeof window !== 'undefined' && !isMultiplayer) {
           localStorage.removeItem(storageKey);
         }
-        const defaultState: GameState = getInitialState();
+        const defaultState = getInitialState();
         setGameState(defaultState);
         setRoom(null);
         stopTimer();
