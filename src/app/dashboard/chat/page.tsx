@@ -42,7 +42,7 @@ export default function ChatInboxPage() {
         const friendPromises = userData.friends.map(friendId => getDoc(doc(db, 'users', friendId)));
 
         Promise.all(friendPromises).then(friendDocs => {
-            const friendsData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), id: doc.id } as Friend));
+            const friendsData = friendDocs.filter(doc => doc.exists()).map(doc => ({ ...doc.data(), uid: doc.id } as Friend));
             
             const unsubscribes = friendsData.map(friend => {
                 const chatId = getChatId(user.uid, friend.uid);
@@ -96,6 +96,7 @@ export default function ChatInboxPage() {
                         }
                     },
                     createdAt: serverTimestamp(),
+                    lastMessage: null, // Initialize lastMessage field
                 });
                 await batch.commit();
             }
