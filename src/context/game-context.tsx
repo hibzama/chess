@@ -389,13 +389,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (isGameLoading) { // Only redirect if it was loading, to prevent redirect on room deletion
                     router.push('/lobby');
                 }
-                setIsGameLoading(false);
                 return;
             };
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-
+            
             if (roomData.status === 'completed') {
                 if (!gameState.isEnding) {
                     const winnerData = roomData.winner; const winnerIsMe = winnerData?.uid === user.uid; const iAmResigner = winnerData?.resignerId === user.uid; const wager = roomData.wager || 0; let myPayout = 0;
@@ -409,29 +408,32 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
             
             const isPlayerInRoom = roomData.players.includes(user.uid);
-
-            if (isPlayerInRoom || roomData.status === 'waiting') {
-                const isCreator = roomData.createdBy.uid === user.uid;
-                const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
-
-                let boardData = roomData.boardState;
-                if(gameType === 'checkers' && typeof boardData === 'string') {
-                    try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
-                }
-
-                updateAndSaveState({ 
-                    playerColor: myColor, 
-                    boardState: boardData,
-                    moveHistory: roomData.moveHistory || [], 
-                    moveCount: roomData.moveHistory?.length || 0,
-                    currentPlayer: roomData.currentPlayer, 
-                    capturedByPlayer: isCreator ? roomData.capturedByP1 : roomData.capturedByP2 || [], 
-                    capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
-                    p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
-                    p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
-                });
-                setIsGameLoading(false);
+            
+            if (!isPlayerInRoom && roomData.status !== 'waiting') {
+                router.push('/lobby'); // If game started and I'm not in it, leave.
+                return;
             }
+
+            const isCreator = roomData.createdBy.uid === user.uid;
+            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
+            let boardData = roomData.boardState;
+            if(gameType === 'checkers' && typeof boardData === 'string') {
+                try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
+            }
+
+            updateAndSaveState({ 
+                playerColor: myColor, 
+                boardState: boardData,
+                moveHistory: roomData.moveHistory || [], 
+                moveCount: roomData.moveHistory?.length || 0,
+                currentPlayer: roomData.currentPlayer, 
+                capturedByPlayer: isCreator ? roomData.capturedByP1 : roomData.capturedByP2 || [], 
+                capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
+                p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
+                p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
+            });
+            setIsGameLoading(false);
+
         });
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, router, isGameLoading]);
