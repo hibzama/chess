@@ -1,5 +1,4 @@
 
-
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -487,39 +486,60 @@ function MultiplayerGamePageContent() {
 export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [roomExists, setRoomExists] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         const fetchGameType = async () => {
-            if (typeof roomId !== 'string') return;
+            if (typeof roomId !== 'string') {
+                setRoomExists(false);
+                setInitialLoading(false);
+                return;
+            };
             try {
                 const roomRef = doc(db, 'game_rooms', roomId);
                 const roomSnap = await getDoc(roomRef);
                 if (roomSnap.exists()) {
                     setGameType(roomSnap.data().gameType);
+                } else {
+                    setRoomExists(false);
                 }
             } catch (e) {
                 console.error("Could not fetch game type", e);
+                setRoomExists(false);
             } finally {
-                setLoading(false);
+                setInitialLoading(false);
             }
         }
         fetchGameType();
     }, [roomId]);
+    
+    if (!roomExists) {
+        // Using a `useEffect` to redirect after the initial render to avoid server/client mismatch issues.
+        useEffect(() => {
+            router.push('/lobby');
+        }, [router]);
+        return (
+             <div className="flex items-center justify-center min-h-screen">
+                <p>Game room not found. Redirecting...</p>
+            </div>
+        )
+    }
 
-    if (loading) {
+    if (initialLoading) {
          return (
-            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+            <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="h-16 w-16 animate-spin text-primary" />
-                    <p className="text-muted-foreground">Loading Your Game...</p>
+                    <p className="text-muted-foreground">Finding Your Game...</p>
                 </div>
             </div>
         )
     }
     
     if (!gameType) {
-        return <div className="flex items-center justify-center min-h-screen"><p>Game room not found.</p></div>
+        return <div className="flex items-center justify-center min-h-screen"><p>Could not determine game type. Redirecting...</p></div>
     }
     
     return (
@@ -528,3 +548,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    

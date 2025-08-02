@@ -66,7 +66,7 @@ interface GameContextType extends GameState {
     setWinner: (winnerId: string | 'draw' | null, boardState?: any, method?: GameOverReason, resignerId?: string | null) => void;
     resetGame: () => void;
     loadGameState: (state: GameState) => void;
-    isGameLoading: boolean; // Changed from isMounted
+    isGameLoading: boolean;
     isMultiplayer: boolean;
     resign: () => void;
     roomWager: number;
@@ -137,7 +137,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [room, setRoom] = useState<GameRoom | null>(null);
-    const [isGameLoading, setIsGameLoading] = useState(isMultiplayer); // Correctly initialize loading state
+    const [isGameLoading, setIsGameLoading] = useState(true);
     
     const gameOverHandledRef = useRef(false);
 
@@ -315,7 +315,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
                             if (!currentBoard[newRow][newCol]) {
                                 moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
-                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpCol >= 0 && jumpRow < 8 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                                 jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
                             }
                         }
@@ -373,17 +373,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
     useEffect(() => {
-        if (!isMultiplayer || !roomId || !user) {
+        if (!isMultiplayer) {
             setIsGameLoading(false);
             return;
         }
+        if (!roomId || !user) return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists() || !user || gameOverHandledRef.current) {
-                if(isGameLoading) setIsGameLoading(false);
+                setIsGameLoading(false);
                 return;
-            }
+            };
     
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
@@ -396,56 +397,49 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     else if (roomData.draw) { myPayout = wager * 0.9; } else if (winnerIsMe) { myPayout = wager * 1.8; }
                     updateAndSaveState({ boardState: roomData.boardState, gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
                 }
-                 if(isGameLoading) setIsGameLoading(false);
+                setIsGameLoading(false);
                 return;
             }
-    
+
             const isCreator = roomData.createdBy.uid === user.uid;
-            
+            // Show the waiting screen for the creator if status is 'waiting'
+            if (roomData.status === 'waiting' && isCreator) {
+                setIsGameLoading(false);
+                return;
+            }
+
+            // Show join screen for joiner if status is 'waiting'
             if (roomData.status === 'waiting' && !isCreator) {
-                if(isGameLoading) setIsGameLoading(false);
-                return;
-            }
-    
-            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2?.color);
-
-            if (!myColor) {
-                 if(isGameLoading) setIsGameLoading(false);
+                 setIsGameLoading(false);
                 return;
             }
 
-            let boardData = roomData.boardState;
-            if(gameType === 'checkers' && typeof boardData === 'string') {
-                try {
-                    boardData = JSON.parse(boardData);
-                } catch {
-                    boardData = {board: createInitialCheckersBoard()};
+            // For both players, if the game is in-progress, load the game state
+            if (roomData.status === 'in-progress' && roomData.player2) {
+                const myColor = isCreator ? roomData.createdBy.color : roomData.player2.color;
+
+                let boardData = roomData.boardState;
+                if(gameType === 'checkers' && typeof boardData === 'string') {
+                    try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
                 }
+
+                updateAndSaveState({ 
+                    playerColor: myColor, 
+                    boardState: boardData,
+                    moveHistory: roomData.moveHistory || [], 
+                    moveCount: roomData.moveHistory?.length || 0,
+                    currentPlayer: roomData.currentPlayer, 
+                    capturedByPlayer: isCreator ? roomData.capturedByP1 : roomData.capturedByP2 || [], 
+                    capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
+                    p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
+                    p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
+                });
+
+                setIsGameLoading(false);
             }
-
-            const capturedByMe = isCreator ? roomData.capturedByP1 : roomData.capturedByP2;
-            const capturedByOpponent = isCreator ? roomData.capturedByP2 : roomData.capturedByP1;
-            
-            const myTime = isCreator ? roomData.p1Time : roomData.p2Time;
-            const opponentTime = isCreator ? roomData.p2Time : roomData.p1Time;
-
-
-            updateAndSaveState({ 
-                playerColor: myColor, 
-                boardState: boardData,
-                moveHistory: roomData.moveHistory || [], 
-                moveCount: roomData.moveHistory?.length || 0,
-                currentPlayer: roomData.currentPlayer, 
-                capturedByPlayer: capturedByMe || [], 
-                capturedByBot: capturedByOpponent || [],
-                p1Time: myTime,
-                p2Time: opponentTime,
-            });
-
-             if(isGameLoading) setIsGameLoading(false);
         });
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, isGameLoading]);
+    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding]);
 
     // This effect runs the client-side timer for UI updates.
     useEffect(() => {
@@ -515,7 +509,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, isGameLoading, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isMounted: true };
+    const contextValue = { ...gameState, isGameLoading, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 }
@@ -525,3 +519,5 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
+
+    
