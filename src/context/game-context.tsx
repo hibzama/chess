@@ -386,7 +386,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists()) {
-                 if (isGameLoading) router.push('/lobby');
+                 if (isGameLoading) {
+                    router.push('/lobby');
+                 }
                 return;
             };
             
@@ -447,9 +449,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     }
                     updateAndSaveState({ gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
                 }
-
+                
                 setIsGameLoading(false);
             } else if (roomData.status === 'waiting' && !roomData.players.includes(user.uid)) {
+                // This is a player viewing a room they can join
                 setIsGameLoading(false);
             }
         });
@@ -535,4 +538,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
- 

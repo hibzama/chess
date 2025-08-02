@@ -142,8 +142,8 @@ function MultiplayerGamePageContent() {
     const { toast } = useToast();
     const { user, userData } = useAuth();
     const { gameOver, room, isGameLoading } = useGame();
-    const [timeLeft, setTimeLeft] = useState('');
     const [isJoining, setIsJoining] = useState(false);
+    const [timeLeft, setTimeLeft] = useState('');
 
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
@@ -360,8 +360,6 @@ function MultiplayerGamePageContent() {
     }
 
     if (!room) {
-        // This should theoretically not be reached if the provider handles loading correctly,
-        // but it's a safe fallback.
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -490,8 +488,7 @@ export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!roomId) {
@@ -506,19 +503,18 @@ export default function MultiplayerGamePage() {
                 if (roomSnap.exists()) {
                     setGameType(roomSnap.data().gameType);
                 } else {
-                    setError("This game room does not exist.");
+                   // This case is now handled by the provider's listener
                 }
             } catch (e) {
                 console.error("Could not fetch game type", e);
-                setError("Failed to load the game room.");
             } finally {
-                setIsLoading(false);
+                setLoading(false);
             }
         };
         fetchGameType();
     }, [roomId, router]);
     
-    if (isLoading) {
+    if (loading) {
          return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
@@ -529,19 +525,15 @@ export default function MultiplayerGamePage() {
         )
     }
     
-    if (error) {
+    if (!gameType) {
+        // This will show briefly before the provider's redirect logic kicks in if the room is invalid
         return (
              <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
-                    <p className="text-destructive">{error}</p>
-                    <Button onClick={() => router.push('/lobby')} className="mt-4">Back to Lobby</Button>
+                    <p className="text-destructive">Could not load game data. Redirecting...</p>
                 </div>
             </div>
         )
-    }
-
-    if (!gameType) {
-        return null; // Should be covered by loading/error states
     }
     
     return (
@@ -550,4 +542,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
- 
