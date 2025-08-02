@@ -2,25 +2,52 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Clock, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet } from 'lucide-react';
+import { Users, Clock, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, DollarSign } from 'lucide-react';
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdminDashboardPage() {
   const [totalUsers, setTotalUsers] = useState(0);
+  const [gamesLast24h, setGamesLast24h] = useState(0);
+  const [wagersLast24h, setWagersLast24h] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTotalUsers = async () => {
+    const fetchStats = async () => {
       setLoading(true);
-      const querySnapshot = await getDocs(collection(db, "users"));
-      setTotalUsers(querySnapshot.size);
+      
+      // Fetch total users
+      const usersQuerySnapshot = await getDocs(collection(db, "users"));
+      setTotalUsers(usersQuerySnapshot.size);
+
+      // Fetch game stats for last 24 hours
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayTimestamp = Timestamp.fromDate(yesterday);
+
+      const gamesQuery = query(
+        collection(db, "game_rooms"), 
+        where('createdAt', '>=', yesterdayTimestamp),
+        where('status', 'in', ['in-progress', 'completed'])
+      );
+      
+      const gamesSnapshot = await getDocs(gamesQuery);
+      let gameCount = 0;
+      let totalWager = 0;
+      gamesSnapshot.forEach(doc => {
+        gameCount++;
+        totalWager += doc.data().wager || 0;
+      });
+
+      setGamesLast24h(gameCount);
+      setWagersLast24h(totalWager);
+
       setLoading(false);
     };
 
-    fetchTotalUsers();
+    fetchStats();
   }, []);
 
   const adminActions = [
@@ -55,7 +82,37 @@ export default function AdminDashboardPage() {
                 )}
             </CardContent>
         </Card>
+        <Card>
+            <CardHeader>
+                <Swords className="w-8 h-8 text-primary mb-2" />
+                <CardTitle>Games (24h)</CardTitle>
+                <CardDescription>Number of games played in last 24h.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {loading ? (
+                    <Skeleton className="h-8 w-1/2" />
+                ) : (
+                    <p className="text-3xl font-bold">{gamesLast24h}</p>
+                )}
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader>
+                <DollarSign className="w-8 h-8 text-primary mb-2" />
+                <CardTitle>Wagers (24h)</CardTitle>
+                <CardDescription>Total LKR wagered in last 24h.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {loading ? (
+                    <Skeleton className="h-8 w-1/2" />
+                ) : (
+                    <p className="text-3xl font-bold">LKR {wagersLast24h.toFixed(2)}</p>
+                )}
+            </CardContent>
+        </Card>
+      </div>
 
+      <div className="mt-12 grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {adminActions.map((action) => (
           <Link href={action.href} key={action.title}>
             <Card className="hover:bg-primary/5 transition-all cursor-pointer h-full">
