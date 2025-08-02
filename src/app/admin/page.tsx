@@ -47,7 +47,7 @@ export default function AdminDashboardPage() {
         if (validStatuses.includes(gameData.status)) {
             gameCount24h++;
             const wager = gameData.wager || 0;
-            totalWager24h += wager;
+            totalWager24h += wager * 2; // Total wager is from 2 players
             if (gameData.status === 'completed') {
                 totalReturn24h += wager * 1.8; // Total return is always 180% of the wager
             }
@@ -72,7 +72,7 @@ export default function AdminDashboardPage() {
         const gameData = doc.data();
         totalGames++;
         const wager = gameData.wager || 0;
-        totalWagers += wager;
+        totalWagers += wager * 2; // Total wager is from 2 players
         totalReturns += wager * 1.8;
       });
 
