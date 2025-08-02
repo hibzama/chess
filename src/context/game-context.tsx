@@ -379,7 +379,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
-    useEffect(() => {
+     useEffect(() => {
         if (!isMultiplayer) {
             setIsGameLoading(false);
             return;
@@ -402,10 +402,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             };
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
-            
-            // This is the main state sync. It runs for everyone viewing the room.
             setRoom(roomData); // Always update the room object.
             
+            // This is the main state sync. It runs for everyone viewing the room.
             if (roomData.status === 'waiting' || roomData.status === 'in-progress') {
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
