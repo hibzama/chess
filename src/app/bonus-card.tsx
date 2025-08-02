@@ -15,7 +15,7 @@ export function BonusCard() {
           <Gift className="w-6 h-6 text-yellow-300" />
           <span className="text-yellow-300">{LKR_BONUS} LKR Registration Bonus!</span>
         </CardTitle>
-        <CardDescription>The first {bonusLimit} users get a free bonus to start playing.</CardDescription>
+        <CardDescription>The first {bonusLimit} users to register get a free bonus to start playing.</CardDescription>
       </CardHeader>
     </Card>
   );

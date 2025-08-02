@@ -74,7 +74,7 @@ export default function RegisterForm() {
             const userCount = snapshot.data().count;
             
             let initialBalance = 0;
-            if (userCount <= 250) {
+            if (userCount < 250) {
                 initialBalance = 100;
             }
 
