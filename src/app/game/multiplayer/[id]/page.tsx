@@ -1,9 +1,10 @@
+
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -141,7 +142,7 @@ function MultiplayerGamePageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, isGameLoading, room: roomFromContext } = useGame();
+    const { gameOver, room: roomFromContext } = useGame();
     const [timeLeft, setTimeLeft] = useState('');
     const [isJoining, setIsJoining] = useState(false);
 
@@ -151,15 +152,15 @@ function MultiplayerGamePageContent() {
     const USDT_RATE = 310;
 
     useEffect(() => {
-        if (!isGameLoading && (!room || !user || !userData)) {
-             toast({
+        if (!user || !userData) {
+            toast({
                 variant: "destructive",
                 title: "Error",
-                description: "Could not load game data. Redirecting to lobby.",
+                description: "You must be logged in to play.",
             });
-            router.push('/lobby');
+            router.push('/login');
         }
-    }, [isGameLoading, room, user, userData, router, toast]);
+    }, [user, userData, router, toast]);
 
      useEffect(() => {
         roomStatusRef.current = room?.status;
@@ -368,7 +369,7 @@ function MultiplayerGamePageContent() {
         toast({ title: 'Copied!', description: 'Room ID copied to clipboard. Share it with your friend!' });
     }
 
-    if (isGameLoading) {
+    if (!room) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -377,10 +378,6 @@ function MultiplayerGamePageContent() {
                 </div>
             </div>
         )
-    }
-
-    if (!room || !user || !userData) {
-      return null; // The useEffect hook above will handle the redirect.
     }
 
     if (room.status === 'waiting') {
@@ -416,7 +413,7 @@ function MultiplayerGamePageContent() {
                 </div>
             )
         } else {
-            const hasEnoughBalance = userData.balance >= room.wager;
+            const hasEnoughBalance = userData ? userData.balance >= room.wager : false;
 
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -444,7 +441,7 @@ function MultiplayerGamePageContent() {
                                 </div>
                             </div>
                             
-                            {!hasEnoughBalance && (
+                            {!hasEnoughBalance && userData && (
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
@@ -493,16 +490,17 @@ export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         if (!roomId) {
-            setLoading(false);
+            setIsLoading(false);
             router.push('/lobby');
             return;
         }
 
         const fetchGameType = async () => {
+            setIsLoading(true);
             try {
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomSnap = await getDoc(roomRef);
@@ -515,13 +513,13 @@ export default function MultiplayerGamePage() {
                 console.error("Could not fetch game type", e);
                 router.push('/lobby');
             } finally {
-                setLoading(false);
+                setIsLoading(false);
             }
         };
         fetchGameType();
     }, [roomId, router]);
     
-    if (loading) {
+    if (isLoading) {
          return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
@@ -542,3 +540,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
