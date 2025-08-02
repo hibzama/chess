@@ -57,6 +57,8 @@ service cloud.firestore {
         ) ||
         (isSignedIn() && exists(/databases/$(database)/documents/friend_requests/$(request.resource.data.requestId))) ||
         (isSignedIn() && !(userId in incomingDoc().friends) && (userId in resource.data.friends)) ||
+        // Allow admins to update any user document (for balance changes, role changes, etc.)
+        isAdmin() ||
         (isSignedIn() && ('balance' in incomingDoc()));
     }
     
@@ -98,6 +100,8 @@ service cloud.firestore {
       // Admins can read/list any transaction. Users can only see their own.
       allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
       allow create: if isSignedIn();
+      // Only admins can approve/reject transactions (update status).
+      allow update: if isAdmin();
     }
     
     match /notifications/{notificationId} {
