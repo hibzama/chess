@@ -29,16 +29,20 @@ export default function AdminDashboardPage() {
 
       const gamesQuery = query(
         collection(db, "game_rooms"), 
-        where('createdAt', '>=', yesterdayTimestamp),
-        where('status', 'in', ['in-progress', 'completed'])
+        where('createdAt', '>=', yesterdayTimestamp)
       );
       
       const gamesSnapshot = await getDocs(gamesQuery);
       let gameCount = 0;
       let totalWager = 0;
+      const validStatuses = ['in-progress', 'completed'];
+
       gamesSnapshot.forEach(doc => {
-        gameCount++;
-        totalWager += doc.data().wager || 0;
+        const gameData = doc.data();
+        if (validStatuses.includes(gameData.status)) {
+            gameCount++;
+            totalWager += gameData.wager || 0;
+        }
       });
 
       setGamesLast24h(gameCount);
