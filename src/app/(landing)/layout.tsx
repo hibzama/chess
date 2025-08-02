@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu } from "lucide-react";
+import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu, DollarSign, Network, Sword } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DollarSign, Network, Sword } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const Logo = () => (
@@ -49,8 +48,8 @@ export default function LandingLayout({
             icon: Sword,
         },
         {
-            title: "How to Earn",
-            content: "In our Multiplayer Mode, you invest a wager from your wallet into each match. Victorious players receive an 180% return on their investment. Games ending in a draw result in a 90% refund to both players. To ensure fair play, players who resign receive a 75% refund, while their opponent gets a 105% payout.",
+            title: "Multiplayer Rules & Payouts",
+            content: "In Multiplayer Mode, your wager is your investment. A standard win by checkmate, timeout, or capturing all pieces earns you a 180% return. If the game ends in a draw, both players receive a 90% refund. To ensure fair play, if you resign or abandon a match, you still get a 75% refund, while your opponent is rewarded with a 105% payout for their time.",
             icon: DollarSign,
         },
         {

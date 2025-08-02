@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import Link from 'next/link';
@@ -93,12 +92,12 @@ export default function EarningHomePage() {
 
                  <Card className="w-full max-w-4xl mt-8 bg-card/50">
                     <CardHeader className="items-center text-center">
-                        <CardTitle className="flex items-center gap-2"><Users/> Find player to play games</CardTitle>
-                        <CardDescription>Chat in our groups to find players easily.</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Users/> Find Players to Challenge</CardTitle>
+                        <CardDescription>Chat in our community groups to find opponents easily.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Button asChild size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white">
-                            <a href="https://chat.whatsapp.com/KGvUICFJNgt8tzFcGtVVmr?mode=ac_t" target="_blank" rel="noopener noreferrer">
+                            <a href="https://chat.whatsapp.com/KGvUICFJNgt8tzFcGtVVmr" target="_blank" rel="noopener noreferrer">
                                 <MessageSquare className="mr-2 h-5 w-5" />
                                 Join WhatsApp Group
                             </a>
@@ -147,23 +146,19 @@ export default function EarningHomePage() {
                             </div>
                         </div>
 
-                         <h3 className="font-bold text-lg text-primary">The Financial System</h3>
+                         <h3 className="font-bold text-lg text-primary">Payout &amp; Forfeit Rules</h3>
                          <div className="space-y-4 pl-4 border-l-2 border-accent">
                             <div>
-                                <h4 className="font-semibold">The Investment (Stake)</h4>
-                                <p className="text-muted-foreground">When you create or join a game, the wager amount is deducted from your wallet and held by the system until the match concludes. This ensures both players are committed.</p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold">Winner's Reward: 180% Payout</h4>
-                                <p className="text-muted-foreground">If you win by checkmate or the opponent's timer runs out, you receive 180% of your initial stake back. For example, a LKR 100 stake returns LKR 180.</p>
+                                <h4 className="font-semibold">Standard Win: 180% Payout</h4>
+                                <p className="text-muted-foreground">If you win by checkmate, capturing all pieces, or if your opponent runs out of time, you receive 180% of your initial stake back. For example, a LKR 100 stake returns LKR 180.</p>
                             </div>
                              <div>
                                 <h4 className="font-semibold">Draws: 90% Refund</h4>
-                                <p className="text-muted-foreground">If a game ends in a draw, both players receive 90% of their investment back. In a LKR 100 game, you get LKR 90 refunded.</p>
+                                <p className="text-muted-foreground">If a game ends in a draw (e.g., by stalemate or agreement), both players receive 90% of their investment back. In a LKR 100 game, you get LKR 90 refunded.</p>
                             </div>
                              <div>
-                                <h4 className="font-semibold">Forfeits & Abandonment (Fair Play Payouts)</h4>
-                                <p className="text-muted-foreground">If a player resigns or abandons a match, the player who <span className="text-foreground font-semibold">did not leave</span> receives a <span className="text-green-400 font-semibold">105% payout</span>. The player who <span className="text-foreground font-semibold">did leave</span> still gets a <span className="text-yellow-400 font-semibold">75% refund</span>. This discourages abandonment while protecting players from total losses due to disconnections.</p>
+                                <h4 className="font-semibold">Resignation &amp; Abandonment (Fair Play Payouts)</h4>
+                                <p className="text-muted-foreground">To ensure fair play and discourage leaving mid-game, we have a specific payout system for forfeits. If a player resigns or abandons a match (e.g., by closing the app or disconnecting), the player who <span className="text-foreground font-semibold">did not leave</span> receives a <span className="text-green-400 font-semibold">105% payout</span>. The player who <span className="text-foreground font-semibold">did leave</span> still gets a <span className="text-yellow-400 font-semibold">75% refund</span>. This policy discourages abandonment while protecting players from total losses due to unforeseen disconnections.</p>
                             </div>
                         </div>
 
