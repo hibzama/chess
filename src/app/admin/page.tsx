@@ -9,22 +9,18 @@ import { collection, getDocs } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AdminDashboardPage() {
-  const [totalUserFunds, setTotalUserFunds] = useState(0);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTotalFunds = async () => {
+    const fetchTotalUsers = async () => {
       setLoading(true);
       const querySnapshot = await getDocs(collection(db, "users"));
-      let total = 0;
-      querySnapshot.forEach((doc) => {
-        total += doc.data().balance || 0;
-      });
-      setTotalUserFunds(total);
+      setTotalUsers(querySnapshot.size);
       setLoading(false);
     };
 
-    fetchTotalFunds();
+    fetchTotalUsers();
   }, []);
 
   const adminActions = [
@@ -47,15 +43,15 @@ export default function AdminDashboardPage() {
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card>
             <CardHeader>
-                <Wallet className="w-8 h-8 text-primary mb-2" />
-                <CardTitle>Total User Funds</CardTitle>
-                <CardDescription>The combined wallet balance of all users.</CardDescription>
+                <Users className="w-8 h-8 text-primary mb-2" />
+                <CardTitle>Total Users</CardTitle>
+                <CardDescription>The total number of registered players.</CardDescription>
             </CardHeader>
             <CardContent>
                 {loading ? (
-                    <Skeleton className="h-8 w-3/4" />
+                    <Skeleton className="h-8 w-1/2" />
                 ) : (
-                    <p className="text-3xl font-bold">LKR {totalUserFunds.toFixed(2)}</p>
+                    <p className="text-3xl font-bold">{totalUsers}</p>
                 )}
             </CardContent>
         </Card>
