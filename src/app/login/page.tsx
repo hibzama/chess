@@ -32,17 +32,28 @@ export default function LoginPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-      if (!userCredential.user.emailVerified) {
-        await auth.signOut(); // Sign out the user
-        toast({
-          variant: "destructive",
-          title: "Email Not Verified",
-          description: "Please check your inbox and verify your email address before logging in. You can use the link below to resend it.",
-        });
-        setIsLoading(false);
-        return;
+      // --- Email Verification Logic ---
+      if (!user.emailVerified) {
+        // Define a cutoff date. Users created before this date can log in without verification.
+        const verificationCutoffDate = new Date('2024-07-26T00:00:00Z');
+        const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
+
+        // If user is new (created after the cutoff), enforce verification
+        if (creationTime > verificationCutoffDate) {
+            await auth.signOut(); // Sign out the user
+            toast({
+              variant: "destructive",
+              title: "Email Not Verified",
+              description: "Please check your inbox and verify your email address before logging in. You can use the link below to resend it.",
+            });
+            setIsLoading(false);
+            return;
+        }
+        // If the user is old, allow them to log in without verification.
       }
+      // --- End Verification Logic ---
 
       toast({
         title: "Login Successful!",
