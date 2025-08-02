@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldCheck, User } from 'lucide-react';
+import { ShieldCheck, User, CheckCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface UserData {
@@ -17,6 +17,7 @@ interface UserData {
     lastName: string;
     email: string;
     role: 'user' | 'admin' | 'marketer';
+    emailVerified?: boolean;
 }
 
 export default function UsersPage() {
@@ -36,7 +37,7 @@ export default function UsersPage() {
     }, []);
 
     const handleRoleChange = async (e: React.MouseEvent, uid: string, newRole: 'admin' | 'user') => {
-        e.stopPropagation(); // Prevent row click when changing role
+        e.stopPropagation(); 
         try {
             const userRef = doc(db, 'users', uid);
             await updateDoc(userRef, { role: newRole });
@@ -54,6 +55,25 @@ export default function UsersPage() {
         }
     };
     
+    const handleVerifyUser = async (e: React.MouseEvent, uid: string) => {
+        e.stopPropagation();
+        try {
+            const userRef = doc(db, 'users', uid);
+            await updateDoc(userRef, { emailVerified: true });
+            toast({
+                title: 'Success!',
+                description: 'User has been manually verified.',
+            });
+        } catch (error) {
+             console.error("Error verifying user:", error);
+            toast({
+                variant: "destructive",
+                title: 'Error',
+                description: 'Failed to verify user.',
+            });
+        }
+    };
+
     return (
         <Card>
             <CardHeader>
@@ -69,6 +89,7 @@ export default function UsersPage() {
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Role</TableHead>
+                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -83,7 +104,19 @@ export default function UsersPage() {
                                         <span className="capitalize">{user.role}</span>
                                     </Badge>
                                 </TableCell>
+                                 <TableCell>
+                                    {user.emailVerified ? (
+                                        <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-none">Verified</Badge>
+                                    ) : (
+                                        <Badge variant="destructive">Not Verified</Badge>
+                                    )}
+                                </TableCell>
                                 <TableCell className="text-right space-x-2">
+                                     {!user.emailVerified && (
+                                        <Button size="sm" variant="outline" onClick={(e) => handleVerifyUser(e, user.uid)}>
+                                            <CheckCircle className="w-4 h-4 mr-2"/> Verify
+                                        </Button>
+                                    )}
                                     {user.role !== 'admin' && (
                                         <Button size="sm" onClick={(e) => handleRoleChange(e, user.uid, 'admin')}>
                                             Make Admin

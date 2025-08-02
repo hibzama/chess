@@ -101,6 +101,7 @@ export default function RegisterForm() {
                 l1Count: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
+                emailVerified: false, // Explicitly set to false
             };
 
             const referrerId = mref || ref;
@@ -131,6 +132,7 @@ export default function RegisterForm() {
                 description: "A verification link has been sent to your email. Please verify your account before logging in.",
                 duration: 9000,
             });
+            await auth.signOut();
             router.push('/login');
 
         } catch (error: any) {
