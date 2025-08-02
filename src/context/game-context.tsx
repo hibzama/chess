@@ -309,6 +309,31 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         return { p1Count: myPieces, p2Count: opponentPieces };
     }, [gameType, room, user]);
 
+    // Checkers helper function, needed for checkGameOver
+    const getPossibleMovesForPiece = (piece: Piece, pos: {row: number, col: number}, currentBoard: any[][], forPlayer: PlayerColor): any[] => {
+        const moves = [];
+        const jumps = [];
+        const { row, col } = pos;
+        const directions = piece.type === 'king' 
+            ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] 
+            : piece.color === 'w' 
+                ? [[-1, -1], [-1, 1]] 
+                : [[1, -1], [1, 1]];
+
+        for (const [dr, dc] of directions) {
+            const newRow = row + dr, newCol = col + dc;
+            const jumpRow = row + 2 * dr, jumpCol = col + 2 * dc;
+            if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                if (!currentBoard[newRow][newCol]) {
+                    moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
+                } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
+                }
+            }
+        }
+        return jumps.length > 0 ? jumps : moves;
+    };
+    
     const checkGameOver = useCallback((board: any) => {
         if (gameType === 'chess') {
             if (board.isGameOver()) {
@@ -369,37 +394,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
         }
     }, [gameType, isMultiplayer, room, setWinner, gameState.playerColor]);
-    
-    // Checkers helper function, needed for checkGameOver
-    const getPossibleMovesForPiece = (piece: Piece, pos: {row: number, col: number}, currentBoard: any[][], forPlayer: PlayerColor): any[] => {
-        const moves = [];
-        const jumps = [];
-        const { row, col } = pos;
-        const directions = piece.type === 'king' 
-            ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] 
-            : piece.color === 'w' 
-                ? [[-1, -1], [-1, 1]] 
-                : [[1, -1], [1, 1]];
-
-        for (const [dr, dc] of directions) {
-            const newRow = row + dr, newCol = col + dc;
-            const jumpRow = row + 2 * dr, jumpCol = col + 2 * dc;
-            if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
-                if (!currentBoard[newRow][newCol]) {
-                    moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
-                } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
-                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
-                }
-            }
-        }
-        return jumps.length > 0 ? jumps : moves;
-    };
 
 
     // Multiplayer state sync and timer
     useEffect(() => {
         if (!isMultiplayer || !roomId || !user) {
-            setIsMounted(true);
+            if (!isMounted) setIsMounted(true);
             return;
         }
     
@@ -455,7 +455,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             let p1ServerTime = creatorIsCurrent ? Math.max(0, roomData.p1Time - elapsed) : roomData.p1Time;
             let p2ServerTime = !creatorIsCurrent ? Math.max(0, roomData.p2Time - elapsed) : roomData.p2Time;
 
-            // Timeout Check
+            // Timeout Check - moved to setWinner
             if (p1ServerTime <= 0) {
                 setWinner(roomData.player2?.uid || null, roomData.boardState, 'timeout');
                 return;
