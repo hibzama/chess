@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Link from 'next/link';
@@ -117,7 +118,7 @@ const GameOverDisplay = () => {
 }
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame, room } = useGame();
+  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame, room, playerPieceCount, opponentPieceCount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
@@ -135,6 +136,38 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
   
   const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
+  
+  const ResignationDialogContent = () => {
+    const isLowPieceCount = playerPieceCount <= 3;
+    const refundPercentage = isLowPieceCount ? 30 : 75;
+    const opponentPayoutPercentage = isLowPieceCount ? 150 : 105;
+    const refundAmount = roomWager * (refundPercentage / 100);
+    const opponentPayout = roomWager * (opponentPayoutPercentage / 100);
+
+    if (isLowPieceCount) {
+        return (
+            <div>
+                <p className="font-bold text-destructive">Low Piece Count Warning!</p>
+                <p>You have {playerPieceCount} pieces left, and your opponent has {opponentPieceCount}.</p>
+                <p>If you resign now, the special low-piece rule will apply.</p>
+                 <ul className="list-disc pl-5 text-sm mt-2">
+                    <li><span className="font-bold text-destructive">You will receive a {refundPercentage}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
+                    <li><span className="font-bold text-green-500">Your opponent will receive a {opponentPayoutPercentage}% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
+                </ul>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-2 text-left pt-4">
+            <div>Resigning will forfeit the match.</div>
+            <ul className="list-disc pl-5 text-sm">
+                <li><span className="font-bold text-destructive">You will receive a {refundPercentage}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
+                <li><span className="font-bold text-green-500">Your opponent will receive a {opponentPayoutPercentage}% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
+            </ul>
+        </div>
+    )
+  }
 
 
   return (
@@ -241,13 +274,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 <AlertDialogDescription asChild>
                     <div>
                         {isMultiplayer && roomWager > 0 ? (
-                            <div className="space-y-2 text-left pt-4">
-                                <div>Resigning will forfeit the match.</div>
-                                <ul className="list-disc pl-5 text-sm">
-                                    <li><span className="font-bold text-destructive">You will receive a 75% refund</span> of your wager (LKR {(roomWager * 0.75).toFixed(2)}).</li>
-                                    <li><span className="font-bold text-green-500">Your opponent will receive a 105% payout</span> of their wager (LKR {(roomWager * 1.05).toFixed(2)}).</li>
-                                </ul>
-                            </div>
+                           <ResignationDialogContent/>
                         ) : (
                             <div>This is a practice match, so no funds will be lost.</div>
                         )}
