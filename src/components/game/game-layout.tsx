@@ -120,7 +120,7 @@ const GameOverDisplay = () => {
 }
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame, room, playerPieceCount, opponentPieceCount } = useGame();
+  const { isMultiplayer, myTime, opponentTime, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame, room, playerPieceCount, opponentPieceCount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
@@ -141,8 +141,8 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     resign();
   }
 
-  const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
-  const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
+  const isMyTurn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
+  const turnText = isMyTurn ? 'Your Turn' : "Opponent's Turn";
   
   const opponentData = isMultiplayer && room ? (room.createdBy.uid === user?.uid ? room.player2 : room.createdBy) : null;
   
@@ -210,13 +210,13 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             ) : (
                 <>
                     <div className="w-full flex justify-between items-center px-2">
-                        <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
+                        <div className={cn("p-2 rounded-lg text-center", !isMyTurn && "bg-primary")}>
                             <p className="font-semibold">{opponentData?.name ?? "Opponent"}</p>
-                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
+                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(opponentTime))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
                         </div>
-                        <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
+                        <div className={cn("p-2 rounded-lg text-center", isMyTurn && "bg-primary")}>
                             <p className="font-semibold">You</p>
-                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(p1Time))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
+                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(myTime))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
                         </div>
                     </div>
                     {children}

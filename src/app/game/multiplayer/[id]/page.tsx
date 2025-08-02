@@ -143,7 +143,7 @@ function MultiplayerGamePageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, isGameLoading, room: roomFromContext } = useGame();
+    const { gameOver, isGameLoading, room: roomFromContext, myTime, opponentTime } = useGame();
     const [timeLeft, setTimeLeft] = useState('');
     const [isJoining, setIsJoining] = useState(false);
 
@@ -499,6 +499,7 @@ function MultiplayerGamePageContent() {
 export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchGameType = async () => {
@@ -511,12 +512,14 @@ export default function MultiplayerGamePage() {
                 }
             } catch (e) {
                 console.error("Could not fetch game type", e);
+            } finally {
+                setLoading(false);
             }
         }
         fetchGameType();
     }, [roomId]);
 
-    if (!gameType) {
+    if (loading) {
          return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -525,6 +528,10 @@ export default function MultiplayerGamePage() {
                 </div>
             </div>
         )
+    }
+    
+    if (!gameType) {
+        return <div className="flex items-center justify-center min-h-screen"><p>Game room not found.</p></div>
     }
     
     return (

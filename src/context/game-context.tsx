@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -44,8 +43,8 @@ interface GameState {
     playerColor: PlayerColor;
     timeLimit: number;
     difficulty: string;
-    p1Time: number; // User's time
-    p2Time: number; // Opponent's time
+    myTime: number; 
+    opponentTime: number; 
     currentPlayer: PlayerColor;
     gameOver: boolean;
     winner: Winner;
@@ -73,6 +72,7 @@ interface GameContextType extends GameState {
     roomWager: number;
     roomOpponentId: string | null;
     room: GameRoom | null;
+    isMounted: boolean;
 }
 
 type Move = { turn: number; white?: string; black?: string };
@@ -98,7 +98,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const router = useRouter();
     const isMultiplayer = !!roomId;
     const { user } = useAuth();
+    const [isMounted, setIsMounted] = useState(false);
     
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const storageKey = `game_state_${gameType}`;
     
     const getInitialState = useCallback((): GameState => {
@@ -107,8 +112,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             playerColor: 'w',
             timeLimit: 900,
             difficulty: 'intermediate',
-            p1Time: 900,
-            p2Time: 900,
+            myTime: 900,
+            opponentTime: 900,
             currentPlayer: 'w',
             gameOver: false,
             winner: null,
@@ -353,12 +358,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         // Single player logic
         updateAndSaveState({boardState: newBoardState}); // Save board first
         checkGameOver(newBoardState);
-        const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
+        const myIsCurrent = (gameState.playerColor === gameState.currentPlayer);
         let newMoveHistory = [...gameState.moveHistory];
         let newMoveCount = gameState.moveCount + 1;
         if (move) { if (gameState.currentPlayer === 'w') { newMoveHistory.push({ turn: Math.floor((newMoveCount-1) / 2) + 1, white: move }); } else { const lastMoveIndex = newMoveHistory.length - 1; if (lastMoveIndex >= 0 && !newMoveHistory[lastMoveIndex].black) { newMoveHistory[lastMoveIndex] = { ...newMoveHistory[lastMoveIndex], black: move }; } else { newMoveHistory.push({ turn: Math.floor((newMoveCount-1) / 2) + 1, black: move }); } } }
-        const newCapturedByPlayer = capturedPiece && !p1IsCurrent ? [...gameState.capturedByPlayer, capturedPiece] : gameState.capturedByPlayer;
-        const newCapturedByBot = capturedPiece && p1IsCurrent ? [...gameState.capturedByBot, capturedPiece] : gameState.capturedByBot;
+        const newCapturedByPlayer = capturedPiece && !myIsCurrent ? [...gameState.capturedByPlayer, capturedPiece] : gameState.capturedByPlayer;
+        const newCapturedByBot = capturedPiece && myIsCurrent ? [...gameState.capturedByBot, capturedPiece] : gameState.capturedByBot;
         const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
         updateAndSaveState({ currentPlayer: nextPlayer, moveHistory: newMoveHistory, moveCount: newMoveCount, capturedByPlayer: newCapturedByPlayer, capturedByBot: newCapturedByBot });
 
@@ -366,7 +371,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     useEffect(() => {
         if (!isMultiplayer || !roomId) return;
-    
+        if (!user) return; // Wait for user to be loaded
+
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists() || gameOverHandledRef.current) {
@@ -376,33 +382,31 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-    
+
             if (roomData.status === 'completed') {
+                // Final state update on game completion
                 if (!gameState.isEnding) {
                     const winnerData = roomData.winner; const winnerIsMe = winnerData?.uid === user?.uid; const iAmResigner = winnerData?.resignerId === user?.uid; const wager = roomData.wager || 0; let myPayout = 0;
                     if (iAmResigner) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 0.30; else if (pieceCount <= 6) myPayout = wager * 0.50; else myPayout = wager * 0.75; }
                     else if (winnerData?.resignerId) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 1.50; else if (pieceCount <= 6) myPayout = wager * 1.30; else myPayout = wager * 1.05; }
                     else if (roomData.draw) { myPayout = wager * 0.9; } else if (winnerIsMe) { myPayout = wager * 1.8; }
-                    updateAndSaveState({ boardState: roomData.boardState, gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
+                    updateAndSaveState({ boardState: roomData.boardState, gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true, isGameLoading: false });
                 }
                 return;
             }
-    
-            if (roomData.status !== 'in-progress' || !roomData.player2 || !user) {
-                updateAndSaveState({isGameLoading: false});
+            
+             // Don't process updates until P2 has joined
+            if (roomData.status !== 'in-progress' || !roomData.player2) {
+                updateAndSaveState({ isGameLoading: false });
                 return;
             }
-    
+
             const isCreator = roomData.createdBy.uid === user.uid;
             const myColor = isCreator ? roomData.createdBy.color : (roomData.createdBy.color === 'w' ? 'b' : 'w');
             
             let boardData = roomData.boardState;
             if(gameType === 'checkers' && typeof boardData === 'string') {
-                try {
-                    boardData = JSON.parse(boardData);
-                } catch {
-                    boardData = {board: createInitialCheckersBoard()};
-                }
+                try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()}; }
             }
 
             const capturedByMe = isCreator ? roomData.capturedByP1 : roomData.capturedByP2;
@@ -410,8 +414,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             
             const myTime = isCreator ? roomData.p1Time : roomData.p2Time;
             const opponentTime = isCreator ? roomData.p2Time : roomData.p1Time;
-
-
+            
             updateAndSaveState({ 
                 playerColor: myColor, 
                 boardState: boardData,
@@ -419,9 +422,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 moveCount: roomData.moveHistory?.length || 0,
                 currentPlayer: roomData.currentPlayer, 
                 capturedByPlayer: capturedByOpponent || [], 
-                capturedByBot: capturedByMe || [],
-                p1Time: myTime,
-                p2Time: opponentTime,
+                capturedByBot: capturedByMe || [], // 'bot' here means opponent for simplicity
+                myTime,
+                opponentTime,
                 isGameLoading: false,
             });
 
@@ -435,37 +438,27 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
 
         const timerId = setInterval(() => {
-            if (gameOverHandledRef.current) {
-                clearInterval(timerId);
-                return;
-            }
+            if (gameOverHandledRef.current) { clearInterval(timerId); return; }
 
             const now = Date.now();
             const elapsedSeconds = room.turnStartTime ? (now - room.turnStartTime.toMillis()) / 1000 : 0;
+            
             const isMyTurn = gameState.playerColor === room.currentPlayer;
             
-            let myNewTime, opponentNewTime;
-            
-            if (isMyTurn) {
-                myNewTime = gameState.p1Time - elapsedSeconds;
-                opponentNewTime = gameState.p2Time;
-            } else {
-                myNewTime = gameState.p1Time;
-                opponentNewTime = gameState.p2Time - elapsedSeconds;
-            }
+            const myLatestTime = gameState.myTime - (isMyTurn ? elapsedSeconds : 0);
+            const opponentLatestTime = gameState.opponentTime - (!isMyTurn ? elapsedSeconds : 0);
            
-            if (myNewTime <= 0 || opponentNewTime <= 0) {
+            if (myLatestTime <= 0 || opponentLatestTime <= 0) {
                  if (gameOverHandledRef.current) return;
-                const timedOutPlayerId = myNewTime <= 0 ? user?.uid : getOpponentId();
+                const timedOutPlayerId = myLatestTime <= 0 ? user?.uid : getOpponentId();
                 const winnerId = timedOutPlayerId === user?.uid ? getOpponentId() : user?.uid;
                 setWinner(winnerId || null, room.boardState, 'timeout', null);
             }
-
         }, 1000);
 
         return () => clearInterval(timerId);
 
-    }, [isMultiplayer, room, user, setWinner, gameState.gameOver, gameState.isGameLoading, gameState.playerColor, gameState.p1Time, gameState.p2Time]);
+    }, [isMultiplayer, room, user, setWinner, gameState.gameOver, gameState.isGameLoading, gameState.playerColor, gameState.myTime, gameState.opponentTime]);
 
     const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
     
@@ -473,7 +466,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         gameOverHandledRef.current = false;
         if (!isMultiplayer && typeof window !== 'undefined') localStorage.removeItem(storageKey);
         const defaultState = getInitialState();
-        const newState: GameState = { ...defaultState, playerColor: color, timeLimit: time, difficulty: diff, p1Time: time, p2Time: time, isGameLoading: false };
+        const newState: GameState = { ...defaultState, playerColor: color, timeLimit: time, difficulty: diff, myTime: time, opponentTime: time, isGameLoading: false };
         updateAndSaveState(newState);
     }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
     
@@ -491,7 +484,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
+    const contextValue = { ...gameState, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isMounted };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 }
