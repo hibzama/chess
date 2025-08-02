@@ -49,30 +49,15 @@ export default function CreateGamePage() {
             return;
         }
 
-        if (userData.balance < wagerAmount) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
-            return;
-        }
-
         setIsCreating(true);
-        const batch = writeBatch(db);
-
+        
         try {
-            // 1. Deduct wager from user's balance
-            const userRef = doc(db, 'users', user.uid);
-            if(wagerAmount > 0) {
-                batch.update(userRef, {
-                    balance: increment(-wagerAmount)
-                });
-            }
-
-            // Handle random piece color selection
+            
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            // 2. Create the game room document
             const roomData = {
                 gameType,
                 wager: wagerAmount,
@@ -90,20 +75,16 @@ export default function CreateGamePage() {
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
 
-            const roomRef = doc(collection(db, 'game_rooms'));
-            batch.set(roomRef, roomData);
-            
-            await batch.commit();
+            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
 
-            // 4. Navigate to the game room page
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your wager has not been deducted.' });
-             // No need to revert since batch wasn't committed.
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room.' });
+
         } finally {
             setIsCreating(false);
         }
@@ -198,4 +179,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-

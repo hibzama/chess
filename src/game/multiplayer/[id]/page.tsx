@@ -35,11 +35,13 @@ type GameRoom = {
         uid: string;
         name: string;
         color: 'w' | 'b';
+        photoURL?: string;
     };
     player2?: {
         uid: string;
         name: string;
         color: 'w' | 'b';
+        photoURL?: string;
     };
     players: string[];
     createdAt: any;
@@ -168,16 +170,13 @@ function MultiplayerGamePageContent() {
                 
                 if (roomData.status === 'completed') {
                     setRoom(roomData);
-                }
-                // If room is waiting, and we are not the creator, we might be a potential joiner
+                } 
                 else if (roomData.status === 'waiting' && roomData.createdBy.uid !== user.uid) {
                     setRoom(roomData);
                 } 
-                // If room is active, only players should be here
                 else if (roomData.players.includes(user.uid)) {
                     setRoom(roomData);
                 } 
-                // User is not authorized for this room unless it's a private room they are trying to join
                 else if (roomData.isPrivate || roomData.status !== 'waiting') {
                     toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
                     router.push('/lobby');
@@ -204,11 +203,13 @@ function MultiplayerGamePageContent() {
     
         try {
             const roomDoc = await getDoc(roomRef);
+            // Only proceed if the room still exists and is waiting
             if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
                 if (!isAutoCancel) router.push('/lobby');
                 return;
             }
     
+            // Just delete the room. No refunds needed as no wager was taken.
             await deleteDoc(roomRef);
     
             if (isAutoCancel) {
@@ -226,7 +227,6 @@ function MultiplayerGamePageContent() {
     }, [roomId, user, room, router, toast]);
     
 
-    // Timer for room expiration
     useEffect(() => {
         if (room?.status !== 'waiting' || !room.expiresAt || !isCreator) {
             return;
@@ -310,7 +310,7 @@ function MultiplayerGamePageContent() {
                 
                 transaction.update(roomRef, {
                     status: 'in-progress',
-                    player2: { uid: user.uid, name: playersWithData[1].name, color: joinerColor },
+                    player2: { uid: user.uid, name: playersWithData[1].name, color: joinerColor, photoURL: userData.photoURL || '' },
                     players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
