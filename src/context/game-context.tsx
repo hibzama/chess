@@ -127,7 +127,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const gameOverHandledRef = useRef(false);
 
-    const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
+     const updateAndSaveState = useCallback((newState: Partial<GameState>, boardState?: any) => {
         setGameState(prevState => {
             const updatedState = { ...prevState, ...newState };
             if (!isMultiplayer && typeof window !== 'undefined') {
@@ -136,9 +136,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
             return updatedState;
         });
-    }, [storageKey, isMultiplayer]);
+    }, [isMultiplayer, storageKey]);
 
-    const handlePayout = useCallback(async (winnerDetails: { winnerId: string | 'draw' | null, method: GameOverReason, resignerId?: string | null, resignerPieceCount?: number }) => {
+     const handlePayout = useCallback(async (winnerDetails: { winnerId: string | 'draw' | null, method: GameOverReason, resignerId?: string | null, resignerPieceCount?: number }) => {
         if (!roomId || !user) return { myPayout: 0 };
     
         try {
@@ -156,17 +156,20 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 
                 const { winnerId, method, resignerId, resignerPieceCount = 0 } = winnerDetails;
     
-                if (resignerId) { // Resignation logic
+                 if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
                     let resignerRefundRate, winnerPayoutRate;
                     
-                    if (resignerPieceCount <= 3) {
+                    const totalPieces = gameType === 'chess' ? 16 : 12;
+                    const opponentPieceCount = totalPieces - (isCreatorResigner ? (roomData.capturedByP2?.length || 0) : (roomData.capturedByP1?.length || 0));
+
+                    if (opponentPieceCount <= 3) { // Opponent has 3 or fewer pieces
                         resignerRefundRate = 0.30; // 30%
                         winnerPayoutRate = 1.50; // 150%
-                    } else if (resignerPieceCount <= 6) {
+                    } else if (opponentPieceCount <= 6) { // Opponent has 6 or fewer
                         resignerRefundRate = 0.50; // 50%
                         winnerPayoutRate = 1.30; // 130%
-                    } else {
+                    } else { // Standard resignation
                         resignerRefundRate = 0.75; // 75%
                         winnerPayoutRate = 1.05; // 105%
                     }
@@ -246,7 +249,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
             return { myPayout: 0 };
         }
-    }, [user, roomId]);
+    }, [user, roomId, gameType]);
 
     const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerId: string | null = null, resignerPieceCount?: number) => {
         if (gameOverHandledRef.current) return;
@@ -254,7 +257,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         
         if (isMultiplayer && roomId && user) {
             gameOverHandledRef.current = true;
-            handlePayout({ winnerId, method, resignerId, resignerPieceCount: resignerPieceCount ?? 0 }).then(({ myPayout }) => {
+            handlePayout({ winnerId, method, resignerId, resignerPieceCount: resignerPieceCount || 0 }).then(({ myPayout }) => {
                 const winnerIsMe = winnerId === user.uid;
                 setGameState(p => ({
                     ...p, boardState, gameOver: true,
@@ -345,7 +348,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
 
         // Single player logic
-        const boardState = gameType === 'chess' ? {fen: boardInstance.fen()} : {board: boardInstance.board};
+        const boardState = gameType === 'chess' ? { fen: boardInstance.fen() } : { board: boardInstance.board };
+        checkGameOver(boardState);
         const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
         let newMoveHistory = [...gameState.moveHistory];
         let newMoveCount = gameState.moveCount + 1;
@@ -354,7 +358,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const newCapturedByBot = capturedPiece && p1IsCurrent ? [...gameState.capturedByBot, capturedPiece] : gameState.capturedByBot;
         const nextPlayer = gameState.currentPlayer === 'w' ? 'b' : 'w';
         updateAndSaveState({ currentPlayer: nextPlayer, moveHistory: newMoveHistory, moveCount: newMoveCount, capturedByPlayer: newCapturedByPlayer, capturedByBot: newCapturedByBot, }, boardState);
-        checkGameOver(boardInstance);
+
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
     useEffect(() => {
@@ -388,13 +392,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
     
             const isCreator = roomData.createdBy.uid === user.uid;
-            const myColor = isCreator ? roomData.createdBy.color : (roomData.createdBy.color === 'w' ? 'b' : 'w');
+            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2.color);
     
             const now = Timestamp.now();
             const elapsedSeconds = roomData.turnStartTime ? (now.toMillis() - roomData.turnStartTime.toMillis()) / 1000 : 0;
     
-            const isMyTurn = myColor === roomData.currentPlayer;
-            
             let myTime, opponentTime;
             
             if (isCreator) {
