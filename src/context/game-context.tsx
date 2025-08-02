@@ -370,7 +370,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     // Main data listener for multiplayer
     useEffect(() => {
         if (!isMultiplayer || !roomId || !user) {
-            updateAndSaveState({ isGameLoading: false });
+            if (!isMultiplayer) {
+                updateAndSaveState({ isGameLoading: false });
+            }
             return;
         }
 
@@ -391,6 +393,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
 
             const isCreator = roomData.createdBy.uid === user.uid;
+
+            // This is the key fix: set loading to false as soon as the game is ready for either player
+            if (roomData.status === 'in-progress' || (roomData.status === 'waiting' && isCreator)) {
+                updateAndSaveState({ isGameLoading: false });
+            }
+            
             const myColor = isCreator ? roomData.createdBy.color : (roomData.player2?.color || (roomData.createdBy.color === 'w' ? 'b' : 'w'));
             
             let boardData = roomData.boardState;
@@ -409,7 +417,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 currentPlayer: roomData.currentPlayer,
                 capturedByPlayer: capturedByOpponent || [],
                 capturedByBot: capturedByMe || [],
-                isGameLoading: roomData.status === 'waiting' && !isCreator,
             });
         });
 
@@ -429,7 +436,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const now = Date.now();
             const turnStartMillis = room.turnStartTime ? room.turnStartTime.toMillis() : now;
             const elapsedSeconds = (now - turnStartMillis) / 1000;
-            const isMyTurn = gameState.playerColor === room.currentPlayer;
             
             const isCreator = room.createdBy.uid === user?.uid;
             const p1Time = room.p1Time - (room.currentPlayer === room.createdBy.color ? elapsedSeconds : 0);
@@ -486,5 +492,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
-
-    
