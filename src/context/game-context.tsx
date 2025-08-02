@@ -402,7 +402,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 return;
             }
 
-            const isCreator = roomData.createdBy.uid === user.uid;
+            const isCreator = user.uid === roomData.createdBy.uid;
             // Only proceed to update game state if the game is waiting (for creator) or in-progress
             if (roomData.status === 'waiting' && !isCreator) {
                 setIsGameLoading(false);

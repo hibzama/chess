@@ -1,4 +1,3 @@
-
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -151,11 +150,9 @@ function MultiplayerGamePageContent() {
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
-    // This effect handles redirecting the user if critical data is missing.
-    // It is placed at the top level to adhere to the Rules of Hooks.
     useEffect(() => {
         if (!isGameLoading && (!room || !user || !userData)) {
-            toast({
+             toast({
                 variant: "destructive",
                 title: "Error",
                 description: "Could not load game data. Redirecting to lobby.",
@@ -382,7 +379,6 @@ function MultiplayerGamePageContent() {
         )
     }
 
-    // This check is now safe because isGameLoading is false
     if (!room || !user || !userData) {
       return null; // The useEffect hook above will handle the redirect.
     }
@@ -495,37 +491,37 @@ function MultiplayerGamePageContent() {
 
 export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
-    const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [initialLoading, setInitialLoading] = useState(true);
-    const [roomExists, setRoomExists] = useState(true);
     const router = useRouter();
+    const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!roomId) {
+            setLoading(false);
+            router.push('/lobby');
+            return;
+        }
+
         const fetchGameType = async () => {
-            if (typeof roomId !== 'string') {
-                setRoomExists(false);
-                setInitialLoading(false);
-                return;
-            };
             try {
-                const roomRef = doc(db, 'game_rooms', roomId);
+                const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomSnap = await getDoc(roomRef);
                 if (roomSnap.exists()) {
                     setGameType(roomSnap.data().gameType);
                 } else {
-                    setRoomExists(false);
+                    router.push('/lobby');
                 }
             } catch (e) {
                 console.error("Could not fetch game type", e);
-                setRoomExists(false);
+                router.push('/lobby');
             } finally {
-                setInitialLoading(false);
+                setLoading(false);
             }
-        }
+        };
         fetchGameType();
-    }, [roomId]);
+    }, [roomId, router]);
     
-    if (initialLoading) {
+    if (loading) {
          return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
@@ -536,20 +532,8 @@ export default function MultiplayerGamePage() {
         )
     }
 
-    if (!roomExists) {
-        // Using a `useEffect` to redirect after the initial render to avoid server/client mismatch issues.
-        useEffect(() => {
-            router.push('/lobby');
-        }, [router]);
-        return (
-             <div className="flex items-center justify-center min-h-screen">
-                <p>Game room not found. Redirecting...</p>
-            </div>
-        )
-    }
-    
     if (!gameType) {
-        return <div className="flex items-center justify-center min-h-screen"><p>Could not determine game type. Redirecting...</p></div>
+        return null; // or a fallback UI, as the effect will redirect
     }
     
     return (
