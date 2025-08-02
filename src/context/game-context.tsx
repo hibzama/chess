@@ -66,7 +66,7 @@ interface GameContextType extends GameState {
     setWinner: (winnerId: string | 'draw' | null, boardState?: any, method?: GameOverReason, resignerId?: string | null) => void;
     resetGame: () => void;
     loadGameState: (state: GameState) => void;
-    isMounted: boolean;
+    isGameLoading: boolean; // Changed from isMounted
     isMultiplayer: boolean;
     resign: () => void;
     roomWager: number;
@@ -137,7 +137,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [room, setRoom] = useState<GameRoom | null>(null);
-    const [isMounted, setIsMounted] = useState(false);
+    const [isGameLoading, setIsGameLoading] = useState(isMultiplayer); // Correctly initialize loading state
     
     const gameOverHandledRef = useRef(false);
 
@@ -374,13 +374,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     useEffect(() => {
         if (!isMultiplayer || !roomId || !user) {
-            if (!isMounted) setIsMounted(true);
+            setIsGameLoading(false);
             return;
         }
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists() || !user || gameOverHandledRef.current) return;
+            if (!docSnap.exists() || !user || gameOverHandledRef.current) {
+                if(isGameLoading) setIsGameLoading(false);
+                return;
+            }
     
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
@@ -393,16 +396,23 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     else if (roomData.draw) { myPayout = wager * 0.9; } else if (winnerIsMe) { myPayout = wager * 1.8; }
                     updateAndSaveState({ boardState: roomData.boardState, gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
                 }
-                return;
-            }
-    
-            if (roomData.status !== 'in-progress' || !roomData.player2) {
-                if (!isMounted) setIsMounted(true);
+                 if(isGameLoading) setIsGameLoading(false);
                 return;
             }
     
             const isCreator = roomData.createdBy.uid === user.uid;
-            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2.color);
+            
+            if (roomData.status === 'waiting' && !isCreator) {
+                if(isGameLoading) setIsGameLoading(false);
+                return;
+            }
+    
+            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2?.color);
+
+            if (!myColor) {
+                 if(isGameLoading) setIsGameLoading(false);
+                return;
+            }
 
             let boardData = roomData.boardState;
             if(gameType === 'checkers' && typeof boardData === 'string') {
@@ -432,10 +442,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 p2Time: opponentTime,
             });
 
-            if (!isMounted) setIsMounted(true);
+             if(isGameLoading) setIsGameLoading(false);
         });
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, isMounted, gameType, updateAndSaveState, gameState.isEnding]);
+    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, isGameLoading]);
 
     // This effect runs the client-side timer for UI updates.
     useEffect(() => {
@@ -505,7 +515,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, isMounted, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
+    const contextValue = { ...gameState, isGameLoading, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isMounted: true };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 }
