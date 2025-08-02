@@ -120,7 +120,7 @@ const GameOverDisplay = () => {
 }
 
 export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
-  const { isMultiplayer, myTime, opponentTime, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame, room, playerPieceCount, opponentPieceCount } = useGame();
+  const { isMultiplayer, myTime, opponentTime, gameOver, resign, playerColor, currentPlayer, roomWager, resetGame, room, playerPieceCount, opponentPieceCount } = useGame();
   const { user, userData } = useAuth();
   const router = useRouter();
   const USDT_RATE = 310;
@@ -141,7 +141,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     resign();
   }
 
-  const isMyTurn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
+  const isMyTurn = (playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b');
   const turnText = isMyTurn ? 'Your Turn' : "Opponent's Turn";
   
   const opponentData = isMultiplayer && room ? (room.createdBy.uid === user?.uid ? room.player2 : room.createdBy) : null;
@@ -212,11 +212,11 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                     <div className="w-full flex justify-between items-center px-2">
                         <div className={cn("p-2 rounded-lg text-center", !isMyTurn && "bg-primary")}>
                             <p className="font-semibold">{opponentData?.name ?? "Opponent"}</p>
-                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(opponentTime))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
+                            <p className="text-2xl font-bold">{formatTime(Math.ceil(opponentTime))}</p>
                         </div>
                         <div className={cn("p-2 rounded-lg text-center", isMyTurn && "bg-primary")}>
                             <p className="font-semibold">You</p>
-                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(myTime))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
+                            <p className="text-2xl font-bold">{formatTime(Math.ceil(myTime))}</p>
                         </div>
                     </div>
                     {children}

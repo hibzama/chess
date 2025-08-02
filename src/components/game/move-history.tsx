@@ -1,4 +1,5 @@
 
+
 'use client'
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +9,7 @@ import { History } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 
 export default function MoveHistory() {
-  const { moveHistory, isMounted } = useGame();
+  const { moveHistory } = useGame();
   const scrollViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,7 +39,7 @@ export default function MoveHistory() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isMounted && moveHistory.length > 0 ? moveHistory.map((move, index) => (
+                  {moveHistory.length > 0 ? moveHistory.map((move, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{move.turn}</TableCell>
                       <TableCell>{move.white}</TableCell>

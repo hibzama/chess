@@ -72,7 +72,6 @@ interface GameContextType extends GameState {
     roomWager: number;
     roomOpponentId: string | null;
     room: GameRoom | null;
-    isMounted: boolean;
 }
 
 type Move = { turn: number; white?: string; black?: string };
@@ -95,15 +94,9 @@ const createInitialCheckersBoard = (): (Piece | null)[][] => {
 
 export const GameProvider = ({ children, gameType }: { children: React.ReactNode, gameType: 'chess' | 'checkers' }) => {
     const { id: roomId } = useParams();
-    const router = useRouter();
     const isMultiplayer = !!roomId;
     const { user, loading: authLoading } = useAuth();
     
-    const [isMounted, setIsMounted] = useState(false);
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
     const storageKey = `game_state_${gameType}`;
     
     const getInitialState = useCallback((): GameState => {
@@ -369,35 +362,36 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
+    // This is the stable ref for the callback
+    const setWinnerRef = useRef(setWinner);
     useEffect(() => {
-        if (!isMultiplayer || !roomId || !user) {
-            // For non-multiplayer or if essential info is missing, ensure loading is false.
-            if (!isMultiplayer) {
-                 updateAndSaveState({ isGameLoading: false });
-            }
+        setWinnerRef.current = setWinner;
+    }, [setWinner]);
+
+    useEffect(() => {
+        if (!isMultiplayer) {
+            updateAndSaveState({ isGameLoading: false });
             return;
         }
-    
+        if (!roomId || !user) {
+            return;
+        }
+
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists() || gameOverHandledRef.current) {
+            if (!docSnap.exists()) {
                 updateAndSaveState({ isGameLoading: false });
                 return;
             }
-    
+            if (gameOverHandledRef.current) return;
+
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-    
+
             if (roomData.status === 'completed') {
                 gameOverHandledRef.current = true;
             }
 
-            // Only update the state if we have the full player data needed to render.
-            if (roomData.status === 'in-progress' && !roomData.player2) {
-                // Still waiting for player 2 data, keep loading.
-                return;
-            }
-    
             const isCreator = roomData.createdBy.uid === user.uid;
             const myColor = isCreator ? roomData.createdBy.color : (roomData.player2?.color || (roomData.createdBy.color === 'w' ? 'b' : 'w'));
 
@@ -417,17 +411,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 currentPlayer: roomData.currentPlayer,
                 capturedByPlayer: capturedByOpponent || [],
                 capturedByBot: capturedByMe || [],
-                myTime: isCreator ? roomData.p1Time : roomData.p2Time,
-                opponentTime: isCreator ? roomData.p2Time : roomData.p1Time,
+                myTime: isCreator ? roomData.p1Time : (roomData.player2 ? roomData.p2Time : roomData.timeControl),
+                opponentTime: isCreator ? (roomData.player2 ? roomData.p2Time : roomData.timeControl) : roomData.p1Time,
                 isGameLoading: false, // Game is now ready to be displayed
             });
         });
-    
+
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, gameType, updateAndSaveState]);
 
-
-    // This effect handles the client-side timer countdown.
     useEffect(() => {
         if (!isMultiplayer || gameState.gameOver || gameState.isGameLoading || !room || room.status !== 'in-progress') return;
 
@@ -445,19 +437,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const myLatestTime = gameState.myTime - (isMyTurn ? elapsedSeconds : 0);
             const opponentLatestTime = gameState.opponentTime - (!isMyTurn ? elapsedSeconds : 0);
 
-            // Update the UI state without writing to DB
             setGameState(prev => ({...prev, myTime: myLatestTime, opponentTime: opponentLatestTime}));
 
             if (myLatestTime <= 0 || opponentLatestTime <= 0) {
-                if (gameOverHandledRef.current) return;
+                 if (gameOverHandledRef.current) return;
                 const timedOutPlayerId = myLatestTime <= 0 ? user?.uid : getOpponentId();
                 const winnerId = timedOutPlayerId === user?.uid ? getOpponentId() : user?.uid;
-                setWinner(winnerId || null, room.boardState, 'timeout', null);
+                setWinnerRef.current(winnerId || null, room.boardState, 'timeout', null);
             }
         }, 1000);
 
         return () => clearInterval(timerId);
-    }, [isMultiplayer, room, user, setWinner, gameState.gameOver, gameState.isGameLoading, gameState.playerColor, gameState.myTime, gameState.opponentTime]);
+    }, [isMultiplayer, room, user, gameState.gameOver, gameState.isGameLoading, gameState.playerColor, gameState.myTime, gameState.opponentTime]);
 
 
     const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
@@ -484,7 +475,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isMounted };
+    const contextValue = { ...gameState, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 }
