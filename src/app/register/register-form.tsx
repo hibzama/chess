@@ -55,6 +55,17 @@ export default function RegisterForm() {
         }
 
         try {
+            // Fetch IP address
+            let ipAddress = 'unknown';
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                ipAddress = data.ip;
+            } catch (ipError) {
+                console.error("Could not fetch IP address:", ipError);
+            }
+
+
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
@@ -86,6 +97,7 @@ export default function RegisterForm() {
                 createdAt: serverTimestamp(),
                 l1Count: 0,
                 photoURL: defaultAvatarUri,
+                ipAddress: ipAddress,
             };
 
             const referrerId = mref || ref;
