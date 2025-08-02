@@ -1,3 +1,4 @@
+
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -149,6 +150,19 @@ function MultiplayerGamePageContent() {
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
+
+    // This effect handles redirecting the user if critical data is missing.
+    // It is placed at the top level to adhere to the Rules of Hooks.
+    useEffect(() => {
+        if (!isGameLoading && (!room || !user || !userData)) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not load game data. Redirecting to lobby.",
+            });
+            router.push('/lobby');
+        }
+    }, [isGameLoading, room, user, userData, router, toast]);
 
      useEffect(() => {
         roomStatusRef.current = room?.status;
@@ -368,17 +382,9 @@ function MultiplayerGamePageContent() {
         )
     }
 
+    // This check is now safe because isGameLoading is false
     if (!room || !user || !userData) {
-         useEffect(() => {
-            if (!isGameLoading) {
-                router.push('/lobby');
-            }
-        }, [isGameLoading, router]);
-        return (
-            <div className="flex items-center justify-center min-h-screen">
-                 <p className="text-muted-foreground">Could not load game data. Redirecting...</p>
-            </div>
-        )
+      return null; // The useEffect hook above will handle the redirect.
     }
 
     if (room.status === 'waiting') {
