@@ -382,7 +382,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!isMounted || gameOverHandledRef.current) return;
+            if (gameOverHandledRef.current) return;
 
             if (!docSnap.exists()) {
                 updateAndSaveState({ isGameLoading: false });
@@ -397,11 +397,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 return;
             }
             
-            if (roomData.status === 'in-progress' || roomData.status === 'waiting') {
+            // This is the key change: ensure loading is false if the game is ready for *any* player.
+            const isCreator = roomData.createdBy.uid === user.uid;
+            if (roomData.status === 'in-progress' || (isCreator && roomData.status === 'waiting')) {
                 updateAndSaveState({ isGameLoading: false });
             }
 
-            const isCreator = roomData.createdBy.uid === user.uid;
             const myColor = isCreator ? roomData.createdBy.color : (roomData.player2?.color || (roomData.createdBy.color === 'w' ? 'b' : 'w'));
             
             let boardData = roomData.boardState;
@@ -424,7 +425,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         });
 
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, isMounted]);
+    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState]);
 
     // Timer logic
     useEffect(() => {
@@ -495,3 +496,5 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
+
+    
