@@ -97,7 +97,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const { id: roomId } = useParams();
     const router = useRouter();
     const isMultiplayer = !!roomId;
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [isMounted, setIsMounted] = useState(false);
     
     useEffect(() => {
@@ -369,87 +369,65 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
-    // This effect handles the real-time updates from Firestore.
+    // This effect handles both initial loading and real-time updates from Firestore.
     useEffect(() => {
-        if (!isMultiplayer || !roomId || !user) return;
+        if (!isMultiplayer || !roomId || authLoading) return;
+        if (!user) {
+            // If auth is done loading and there's no user, stop loading.
+            if (!authLoading) updateAndSaveState({ isGameLoading: false });
+            return;
+        }
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists() || gameOverHandledRef.current) return;
+            if (!docSnap.exists() || gameOverHandledRef.current) {
+                updateAndSaveState({ isGameLoading: false });
+                return;
+            }
     
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-    
-            const isCreator = roomData.createdBy.uid === user.uid;
-            
-            // Wait for P2 to join before doing full state sync
-            if (roomData.status !== 'in-progress' || !roomData.player2) {
-                // If I am the creator, I can show the waiting screen.
-                if (isCreator) {
-                    updateAndSaveState({ isGameLoading: false });
-                }
-                return;
+
+            // Only proceed if the room is active or waiting for P2 to join
+            if (roomData.status === 'completed') {
+                gameOverHandledRef.current = true;
             }
 
-            // --- Full State Sync ---
-            const myColor = isCreator ? roomData.createdBy.color : roomData.player2.color;
-            let boardData = roomData.boardState;
-            if (gameType === 'checkers' && typeof boardData === 'string') {
-                try { boardData = JSON.parse(boardData); } catch { boardData = { board: createInitialCheckersBoard() }; }
-            }
-            const capturedByMe = isCreator ? roomData.capturedByP1 : roomData.capturedByP2;
-            const capturedByOpponent = isCreator ? roomData.capturedByP2 : roomData.capturedByP1;
+            const isCreator = roomData.createdBy.uid === user.uid;
+            
+            // This is the key logic to assign correct roles, colors, and timers.
+            const myColor = isCreator ? roomData.createdBy.color : roomData.player2?.color;
             const myTime = isCreator ? roomData.p1Time : roomData.p2Time;
             const opponentTime = isCreator ? roomData.p2Time : roomData.p1Time;
 
-            updateAndSaveState({
-                playerColor: myColor,
-                boardState: boardData,
-                moveHistory: roomData.moveHistory || [],
-                moveCount: roomData.moveHistory?.length || 0,
-                currentPlayer: roomData.currentPlayer,
-                capturedByPlayer: capturedByOpponent || [],
-                capturedByBot: capturedByMe || [],
-                myTime,
-                opponentTime,
-                isGameLoading: false, // <-- Game is now ready to be displayed
-            });
-    
-            if (roomData.status === 'completed' && !gameState.isEnding) {
-                const winnerData = roomData.winner;
-                const winnerIsMe = winnerData?.uid === user.uid;
-                const iAmResigner = winnerData?.resignerId === user.uid;
-                const wager = roomData.wager || 0;
-                let myPayout = 0;
-                
-                if (iAmResigner) {
-                    const pieceCount = winnerData.resignerPieceCount ?? 16;
-                    if (pieceCount <= 3) myPayout = wager * 0.30;
-                    else if (pieceCount <= 6) myPayout = wager * 0.50;
-                    else myPayout = wager * 0.75;
-                } else if (winnerData?.resignerId) {
-                    const pieceCount = winnerData.resignerPieceCount ?? 16;
-                    if (pieceCount <= 3) myPayout = wager * 1.50;
-                    else if (pieceCount <= 6) myPayout = wager * 1.30;
-                    else myPayout = wager * 1.05;
-                } else if (roomData.draw) {
-                    myPayout = wager * 0.9;
-                } else if (winnerIsMe) {
-                    myPayout = wager * 1.8;
+            if (myColor) { // Only update state if my color is determined
+                let boardData = roomData.boardState;
+                if (gameType === 'checkers' && typeof boardData === 'string') {
+                    try { boardData = JSON.parse(boardData); } catch { boardData = { board: createInitialCheckersBoard() }; }
                 }
-    
+                const capturedByMe = isCreator ? roomData.capturedByP1 : roomData.capturedByP2;
+                const capturedByOpponent = isCreator ? roomData.capturedByP2 : roomData.capturedByP1;
+
                 updateAndSaveState({
-                    gameOver: true,
-                    winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
-                    gameOverReason: winnerData?.method || null,
-                    payoutAmount: myPayout,
-                    isEnding: true,
+                    playerColor: myColor,
+                    boardState: boardData,
+                    moveHistory: roomData.moveHistory || [],
+                    moveCount: roomData.moveHistory?.length || 0,
+                    currentPlayer: roomData.currentPlayer,
+                    capturedByPlayer: capturedByOpponent || [],
+                    capturedByBot: capturedByMe || [],
+                    myTime: myTime ?? roomData.timeControl,
+                    opponentTime: opponentTime ?? roomData.timeControl,
+                    isGameLoading: false, // Game is now ready to be displayed
                 });
+            } else {
+                 updateAndSaveState({ isGameLoading: roomData.status === 'in-progress' });
             }
         });
     
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding]);
+    }, [isMultiplayer, roomId, user, authLoading, gameType, updateAndSaveState]);
+
 
     // This effect handles the client-side timer countdown.
     useEffect(() => {
@@ -470,7 +448,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const opponentLatestTime = gameState.opponentTime - (!isMyTurn ? elapsedSeconds : 0);
 
             // Update the UI state without writing to DB
-            setGameState(prev => ({...prev, myTime, opponentTime}));
+            setGameState(prev => ({...prev, myTime: myLatestTime, opponentTime: opponentLatestTime}));
 
             if (myLatestTime <= 0 || opponentLatestTime <= 0) {
                 if (gameOverHandledRef.current) return;
