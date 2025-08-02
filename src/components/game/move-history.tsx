@@ -15,7 +15,7 @@ export default function MoveHistory() {
         const { scrollHeight } = scrollViewportRef.current;
         scrollViewportRef.current.scrollTo({ top: scrollHeight, behavior: 'smooth' });
     }
-  }, [moveHistory]);
+  }, [moveHistory.length]);
   
   return (
     <Card className="flex flex-col flex-1">
