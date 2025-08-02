@@ -372,7 +372,7 @@ function MultiplayerGamePageContent() {
 
     if (!room || !user || !userData) {
         return (
-            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+            <div className="flex items-center justify-center min-h-screen">
                  <p className="text-muted-foreground">Could not load game data. Redirecting...</p>
             </div>
         )
