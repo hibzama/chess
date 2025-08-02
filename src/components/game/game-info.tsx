@@ -24,7 +24,7 @@ export function GameInfo() {
         resign();
     }
     
-    const opponentData = isMultiplayer && room ? (room.createdBy.uid === user?.uid ? room.player2 : room.createdBy) : null;
+    const opponentData = isMultiplayer && room && room.player2 ? (room.createdBy.uid === user?.uid ? room.player2 : room.createdBy) : null;
     const opponentName = isMultiplayer ? (opponentData?.name ?? 'Opponent') : 'Bot';
     
     const winnerReturn = roomWager * 1.8;
