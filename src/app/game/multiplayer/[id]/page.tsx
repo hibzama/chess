@@ -158,21 +158,22 @@ function MultiplayerGamePageContent() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
+        const userRef = doc(db, 'users', user.uid);
     
         try {
-            const roomDoc = await getDoc(roomRef);
-            // Only proceed if the room still exists and is waiting
-            if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
-                if (!isAutoCancel) router.push('/lobby');
-                return;
+            const batch = writeBatch(db);
+            // Delete the room
+            batch.delete(roomRef);
+            // Refund the creator's wager
+            if (room.wager > 0) {
+                batch.update(userRef, { balance: increment(room.wager) });
             }
-    
-            await deleteDoc(roomRef);
+            await batch.commit();
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -275,15 +276,17 @@ function MultiplayerGamePageContent() {
         
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
+                    const playerToWager = playersWithData[1]; // Only the joiner wagers now
 
+                    transaction.update(doc(db, 'users', playerToWager.id), { balance: increment(-wagerAmount) });
+                    transaction.set(doc(collection(db, 'transactions')), {
+                        userId: playerToWager.id, type: 'wager', amount: wagerAmount, status: 'completed',
+                        description: `Wager for ${roomData.gameType} game vs ${roomData.createdBy.name}`,
+                        gameRoomId: room.id, createdAt: serverTimestamp()
+                    });
+                    
+                    // --- Commission Logic for both players ---
                     for (const player of playersWithData) {
-                        transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
-                        transaction.set(doc(collection(db, 'transactions')), {
-                            userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${roomData.gameType} game vs ${player.id === creatorDoc.id ? playersWithData[1].name : playersWithData[0].name}`,
-                            gameRoomId: room.id, createdAt: serverTimestamp()
-                        });
-                        
                         // Marketing Chain Commissions (always takes precedence)
                         if (player.data.referralChain?.length > 0) {
                             const marketingCommissionRate = 0.03;
@@ -494,7 +497,6 @@ export default function MultiplayerGamePage() {
                 if (roomSnap.exists()) {
                     setGameType(roomSnap.data().gameType);
                 } else {
-                    // If room doesn't exist, redirect
                     router.push('/lobby');
                 }
             } catch (e) {
