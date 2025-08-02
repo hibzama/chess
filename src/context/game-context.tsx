@@ -312,7 +312,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
                             if (!currentBoard[newRow][newCol]) {
                                 moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
-                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpCol < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                                 jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
                             }
                         }
@@ -331,7 +331,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
         
         if (isMultiplayer && room) {
-            checkGameOver(newBoardState, room);
+            checkGameOver(gameType === 'chess' ? newBoardState : newBoardState.board, room);
             const roomRef = doc(db, 'game_rooms', room.id);
             let newMoveHistory = [...(room.moveHistory || [])];
             if (move) { if (room.currentPlayer === 'w') { newMoveHistory.push({ turn: Math.floor(newMoveHistory.length) + 1, white: move }); } else { const lastMove = newMoveHistory[newMoveHistory.length - 1]; if (lastMove && !lastMove.black) { lastMove.black = move; } else { newMoveHistory.push({ turn: Math.floor((newMoveHistory.length - 1) / 2) + 1, black: move }); } } }
@@ -369,11 +369,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
-    // This effect handles both initial loading and real-time updates from Firestore.
     useEffect(() => {
-        if (!isMultiplayer || !roomId || authLoading) return;
+        if (!isMultiplayer || !roomId) return;
         if (!user) {
-            // If auth is done loading and there's no user, stop loading.
+            // Wait for user to be authenticated
             if (!authLoading) updateAndSaveState({ isGameLoading: false });
             return;
         }
@@ -387,42 +386,48 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-
-            // Only proceed if the room is active or waiting for P2 to join
+    
             if (roomData.status === 'completed') {
                 gameOverHandledRef.current = true;
             }
-
+    
             const isCreator = roomData.createdBy.uid === user.uid;
             
-            // This is the key logic to assign correct roles, colors, and timers.
+            // Wait for player2 to exist before setting colors and times
+            if (roomData.status === 'in-progress' && !roomData.player2) {
+                updateAndSaveState({ isGameLoading: true });
+                return;
+            }
+            
             const myColor = isCreator ? roomData.createdBy.color : roomData.player2?.color;
+            if (!myColor) {
+                // This can happen if P2 joins but their color isn't set yet.
+                // We just wait for the next snapshot.
+                return;
+            }
+            
             const myTime = isCreator ? roomData.p1Time : roomData.p2Time;
             const opponentTime = isCreator ? roomData.p2Time : roomData.p1Time;
 
-            if (myColor) { // Only update state if my color is determined
-                let boardData = roomData.boardState;
-                if (gameType === 'checkers' && typeof boardData === 'string') {
-                    try { boardData = JSON.parse(boardData); } catch { boardData = { board: createInitialCheckersBoard() }; }
-                }
-                const capturedByMe = isCreator ? roomData.capturedByP1 : roomData.capturedByP2;
-                const capturedByOpponent = isCreator ? roomData.capturedByP2 : roomData.capturedByP1;
-
-                updateAndSaveState({
-                    playerColor: myColor,
-                    boardState: boardData,
-                    moveHistory: roomData.moveHistory || [],
-                    moveCount: roomData.moveHistory?.length || 0,
-                    currentPlayer: roomData.currentPlayer,
-                    capturedByPlayer: capturedByOpponent || [],
-                    capturedByBot: capturedByMe || [],
-                    myTime: myTime ?? roomData.timeControl,
-                    opponentTime: opponentTime ?? roomData.timeControl,
-                    isGameLoading: false, // Game is now ready to be displayed
-                });
-            } else {
-                 updateAndSaveState({ isGameLoading: roomData.status === 'in-progress' });
+            let boardData = roomData.boardState;
+            if (gameType === 'checkers' && typeof boardData === 'string') {
+                try { boardData = JSON.parse(boardData); } catch { boardData = { board: createInitialCheckersBoard() }; }
             }
+            const capturedByMe = isCreator ? roomData.capturedByP1 : roomData.capturedByP2;
+            const capturedByOpponent = isCreator ? roomData.capturedByP2 : roomData.capturedByP1;
+
+            updateAndSaveState({
+                playerColor: myColor,
+                boardState: boardData,
+                moveHistory: roomData.moveHistory || [],
+                moveCount: roomData.moveHistory?.length || 0,
+                currentPlayer: roomData.currentPlayer,
+                capturedByPlayer: capturedByOpponent || [],
+                capturedByBot: capturedByMe || [],
+                myTime: myTime ?? roomData.timeControl,
+                opponentTime: opponentTime ?? roomData.timeControl,
+                isGameLoading: false, // Game is now ready to be displayed
+            });
         });
     
         return () => unsubscribe();
