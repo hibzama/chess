@@ -191,7 +191,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
                     transaction.update(roomRef, { winner: { resignerPieceCount }});
 
                 } else if (winnerId === 'draw') { // Draw logic
@@ -387,7 +387,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists()) {
-                if (!gameState.gameOver) { // Prevent redirect after game ends
+                if (!gameState.gameOver) { 
                     router.push('/lobby');
                 }
                 setIsGameLoading(false);
@@ -395,18 +395,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             };
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
+            setRoom(roomData);
     
-            if (roomData.status === 'waiting' || roomData.status === 'in-progress' || roomData.status === 'completed') {
-                const isPlayerInRoom = roomData.players.includes(user.uid);
-    
-                if (!isPlayerInRoom && roomData.status !== 'waiting') {
-                    router.push('/lobby');
-                    setIsGameLoading(false);
-                    return;
-                }
-    
-                setRoom(roomData); // Set room first
-    
+            const isPlayerInRoom = roomData.players.includes(user.uid);
+            
+            if (roomData.status === 'in-progress' || roomData.status === 'waiting') {
+                
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
                 let boardData = roomData.boardState;
@@ -414,7 +408,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
                 }
     
-                // Now update the rest of the state
                 updateAndSaveState({ 
                     playerColor: myColor, 
                     boardState: boardData,
@@ -451,7 +444,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     updateAndSaveState({ gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
                 }
                 
-                setIsGameLoading(false); // Only set loading to false after all state is updated
+                setIsGameLoading(false);
+            } else if (roomData.status === 'completed' && !isPlayerInRoom) {
+                router.push('/lobby');
+                setIsGameLoading(false);
             }
         });
         return () => unsubscribe();
