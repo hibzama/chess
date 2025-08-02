@@ -2,8 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper Functions
+  
     function isSignedIn() {
       return request.auth != null;
     }
@@ -11,108 +10,58 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-
-    function isGettingSelf() {
-      return isSignedIn() && request.auth.uid == resource.data.uid;
-    }
-
-    function isUpdatingSelf() {
-      return isOwner(request.resource.data.uid);
-    }
     
-    function getDoc(path) {
-      return get(/databases/$(database)/documents/$(path));
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
-    function incomingDoc(path) {
-      return request.resource.data[path];
-    }
-    
     match /users/{userId} {
       allow read: if isSignedIn();
-
-      allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
-
-      allow update: if 
-        // Allow user to update their own document, but not change critical fields like role or balance directly.
-        (isOwner(userId) && !(
-            'balance' in request.resource.data && request.resource.data.balance != resource.data.balance
-          ) && !(
-            'marketingBalance' in request.resource.data && request.resource.data.marketingBalance != resource.data.marketingBalance
-          ) && !(
-            'role' in request.resource.data && request.resource.data.role != resource.data.role
-          )
-        ) ||
-        // Allow accepting a friend request (updates both users' friends list)
-        (isSignedIn() && getDoc('friend_requests/' + getDoc('users/' + request.auth.uid).data.requestId).data.fromId == userId) ||
-        // Allow removing a friend (updates both users' friends list)
-        (isSignedIn() && !(userId in incomingDoc('friends')) && (userId in resource.data.friends)) ||
-        // Allow game-related balance updates via transaction
-        (isSignedIn() && ('balance' in request.resource.data));
+      allow create: if !isSignedIn(); // Allow user creation during registration
+      allow update: if isOwner(userId); // Allow users to update their own profile
     }
-    
+
     match /friend_requests/{requestId} {
-      allow read: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
-      allow create: if isSignedIn() && isOwner(request.resource.data.fromId);
-      allow delete: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
+      allow read: if isSignedIn();
+      allow create: if isOwner(request.resource.data.fromId);
+      // Allow the recipient to delete (accept/decline) or the sender to delete (cancel)
+      allow delete: if isOwner(get(/databases/$(database)/documents/friend_requests/$(requestId)).data.toId) || 
+                       isOwner(get(/databases/$(database)/documents/friend_requests/$(requestId)).data.fromId);
     }
-    
-    match /game_rooms/{roomId} {
-      allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
-      allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
 
-      allow update: if isSignedIn() && 
-        // Allow joining a game
-        (
-          !isOwner(resource.data.createdBy.uid) &&
-          resource.data.status == 'waiting' &&
-          request.resource.data.status == 'in-progress' &&
-          request.resource.data.player2.uid == request.auth.uid &&
-          !(request.auth.uid in resource.data.players) &&
-          (request.auth.uid in request.resource.data.players)
-        ) ||
-        // Allow playing a move
-        (
-          (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
-          resource.data.status == 'in-progress' &&
-          request.resource.data.status == 'in-progress'
-        ) ||
-        // Allow game completion update
-        (
-           (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
-          resource.data.status == 'in-progress' &&
-          request.resource.data.status == 'completed'
-        );
+    match /game_rooms/{roomId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(request.resource.data.createdBy.uid);
+      
+      // Allow a player to join (updates status, player2, etc.)
+      allow update: if isSignedIn() && request.resource.data.players[1] == request.auth.uid;
+
+      // Allow the creator to cancel a waiting room
+      allow delete: if isOwner(get(/databases/$(database)/documents/game_rooms/$(roomId)).data.createdBy.uid);
     }
 
     match /transactions/{transactionId} {
-      allow read, list: if isSignedIn() && isOwner(resource.data.userId);
-      allow create: if isSignedIn();
-    }
-    
-    match /notifications/{notificationId} {
-        allow read, list: if isSignedIn() && isOwner(resource.data.userId);
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && isOwner(resource.data.userId);
-    }
-    
-    match /marketing_applications/{appId} {
-        allow create; 
-        allow read, update, delete: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-     // Allow chat messages within a game room
-    match /game_rooms/{roomId}/messages/{messageId} {
-      allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      // Users can only read their own transactions
+      allow read: if isSignedIn() && isOwner(get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId);
+      // Allow creation of transactions if the user is the one the transaction is for
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
     }
 
-    // Allow chat messages in direct chats
-    match /chats/{chatId} {
-      allow read, update, create: if isSignedIn() && request.auth.uid in resource.data.users;
+    match /marketing_applications/{appId} {
+        allow create: if !isSignedIn(); // Public application form
+        // Admins can read/write
+        allow read, write: if isSignedIn() && getUserData(request.auth.uid).role == 'admin';
     }
-    match /chats/{chatId}/messages/{messageId} {
-      allow read, create: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid].exists == true;
+
+    match /notifications/{notificationId} {
+        // Users can only read their own notifications
+        allow read, update: if isSignedIn() && isOwner(get(/databases/$(database)/documents/notifications/$(notificationId)).data.userId);
+        allow create: if isSignedIn();
+    }
+    
+    // Default deny all other collections
+    match /{path=**} {
+      allow read, write: if false;
     }
   }
 }
