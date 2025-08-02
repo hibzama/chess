@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -69,6 +69,9 @@ export default function RegisterForm() {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
+            // Send verification email
+            await sendEmailVerification(user);
+
             const usersCollection = collection(db, "users");
             const snapshot = await getCountFromServer(usersCollection);
             const userCount = snapshot.data().count;
@@ -123,15 +126,12 @@ export default function RegisterForm() {
 
             await setDoc(doc(db, "users", user.uid), userData);
             
-            const LKR_BONUS = 100;
-            const USDT_RATE = 310;
-            const USDT_BONUS = (LKR_BONUS / USDT_RATE).toFixed(2);
-
             toast({
-                title: "Success!",
-                description: `Your account has been created.${initialBalance > 0 ? ` A ${USDT_BONUS} USDT bonus has been added to your account!` : ''}`,
+                title: "Registration Successful!",
+                description: "A verification link has been sent to your email. Please verify your account before logging in.",
+                duration: 9000,
             });
-            router.push('/dashboard');
+            router.push('/login');
 
         } catch (error: any) {
             console.error("Error signing up:", error);
