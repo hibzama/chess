@@ -143,10 +143,11 @@ function MultiplayerGamePageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, isGameLoading, room } = useGame();
+    const { gameOver, isGameLoading, room: roomFromContext } = useGame();
     const [timeLeft, setTimeLeft] = useState('');
     const [isJoining, setIsJoining] = useState(false);
 
+    const room = roomFromContext;
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
@@ -358,7 +359,7 @@ function MultiplayerGamePageContent() {
         toast({ title: 'Copied!', description: 'Room ID copied to clipboard. Share it with your friend!' });
     }
 
-    if (isGameLoading || !user || !userData) {
+    if (isGameLoading) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -369,7 +370,16 @@ function MultiplayerGamePageContent() {
         )
     }
 
-    if (room?.status === 'waiting') {
+    if (!room || !user || !userData) {
+        // Fallback or redirect if essential data is missing after loading
+        return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+                 <p className="text-muted-foreground">Could not load game data. Redirecting...</p>
+            </div>
+        )
+    }
+
+    if (room.status === 'waiting') {
         if(isCreator) {
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -403,7 +413,7 @@ function MultiplayerGamePageContent() {
             )
         } else {
             // This is the joiner's view
-            const hasEnoughBalance = userData.balance >= (room.wager || 0);
+            const hasEnoughBalance = userData.balance >= room.wager;
 
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -523,5 +533,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    

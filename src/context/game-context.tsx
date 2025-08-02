@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -102,7 +103,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const getInitialState = useCallback((): GameState => {
         const initialBoard = gameType === 'chess' ? new Chess().fen() : { board: createInitialCheckersBoard() };
-        const defaultState: GameState = {
+        return {
             playerColor: 'w',
             timeLimit: 900,
             difficulty: 'intermediate',
@@ -123,18 +124,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             playerPieceCount: gameType === 'chess' ? 16 : 12,
             opponentPieceCount: gameType === 'chess' ? 16 : 12,
         };
-        if(isMultiplayer) return defaultState;
-        try {
-            const savedState = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
-            if (savedState) {
-                const parsed = JSON.parse(savedState);
-                return { ...defaultState, ...parsed, gameOver: false, winner: null, isEnding: false, isGameLoading: false };
-            }
-        } catch (error) {
-            console.error("Failed to parse game state from localStorage", error);
-        }
-        return defaultState;
-    }, [storageKey, isMultiplayer, gameType]);
+    }, [isMultiplayer, gameType]);
 
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [room, setRoom] = useState<GameRoom | null>(null);
@@ -172,7 +162,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                  if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
-                    const resignerPieceCount = isCreatorResigner ? (16 - (roomData.capturedByP1?.length || 0)) : (16 - (roomData.capturedByP2?.length || 0));
+                    const p1PieceCount = 16 - (roomData.capturedByP2?.length || 0)
+                    const p2PieceCount = 16 - (roomData.capturedByP1?.length || 0)
+                    const resignerPieceCount = isCreatorResigner ? p1PieceCount : p2PieceCount;
 
                     let resignerRefundRate, winnerPayoutRate;
                     
@@ -373,21 +365,21 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
     useEffect(() => {
-        if (!isMultiplayer || !roomId || !user) {
-            updateAndSaveState({isGameLoading: false});
-            return;
-        }
+        if (!isMultiplayer || !roomId) return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists() || !user || gameOverHandledRef.current) return;
+            if (!docSnap.exists() || gameOverHandledRef.current) {
+                if(!docSnap.exists()){ updateAndSaveState({ isGameLoading: false }); }
+                return;
+            }
     
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
     
             if (roomData.status === 'completed') {
                 if (!gameState.isEnding) {
-                    const winnerData = roomData.winner; const winnerIsMe = winnerData?.uid === user.uid; const iAmResigner = winnerData?.resignerId === user.uid; const wager = roomData.wager || 0; let myPayout = 0;
+                    const winnerData = roomData.winner; const winnerIsMe = winnerData?.uid === user?.uid; const iAmResigner = winnerData?.resignerId === user?.uid; const wager = roomData.wager || 0; let myPayout = 0;
                     if (iAmResigner) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 0.30; else if (pieceCount <= 6) myPayout = wager * 0.50; else myPayout = wager * 0.75; }
                     else if (winnerData?.resignerId) { const pieceCount = winnerData.resignerPieceCount ?? 16; if (pieceCount <= 3) myPayout = wager * 1.50; else if (pieceCount <= 6) myPayout = wager * 1.30; else myPayout = wager * 1.05; }
                     else if (roomData.draw) { myPayout = wager * 0.9; } else if (winnerIsMe) { myPayout = wager * 1.8; }
@@ -396,14 +388,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 return;
             }
     
-            if (roomData.status !== 'in-progress' || !roomData.player2) {
+            if (roomData.status !== 'in-progress' || !roomData.player2 || !user) {
                 updateAndSaveState({isGameLoading: false});
                 return;
             }
     
             const isCreator = roomData.createdBy.uid === user.uid;
-            const myColor = isCreator ? roomData.createdBy.color : roomData.player2.color;
-
+            const myColor = isCreator ? roomData.createdBy.color : (roomData.createdBy.color === 'w' ? 'b' : 'w');
+            
             let boardData = roomData.boardState;
             if(gameType === 'checkers' && typeof boardData === 'string') {
                 try {
@@ -437,7 +429,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding]);
 
-    // This effect runs the client-side timer for UI updates.
     useEffect(() => {
         if (!isMultiplayer || gameState.gameOver || !room || room.status !== 'in-progress' || gameState.isGameLoading) {
             return;
@@ -453,26 +444,19 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const elapsedSeconds = room.turnStartTime ? (now - room.turnStartTime.toMillis()) / 1000 : 0;
             const isMyTurn = gameState.playerColor === room.currentPlayer;
             
-            let myTime, opponentTime;
+            let myNewTime, opponentNewTime;
             
             if (isMyTurn) {
-                myTime = gameState.p1Time - elapsedSeconds;
-                opponentTime = gameState.p2Time;
+                myNewTime = gameState.p1Time - elapsedSeconds;
+                opponentNewTime = gameState.p2Time;
             } else {
-                myTime = gameState.p1Time;
-                opponentTime = gameState.p2Time - elapsedSeconds;
+                myNewTime = gameState.p1Time;
+                opponentNewTime = gameState.p2Time - elapsedSeconds;
             }
-
-            // This is a UI-only update
-            setGameState(prev => ({
-                ...prev,
-                p1Time: Math.max(0, prev.p1Time - (isMyTurn ? elapsedSeconds : 0)),
-                p2Time: Math.max(0, prev.p2Time - (!isMyTurn ? elapsedSeconds : 0))
-            }));
            
-            if (myTime <= 0 || opponentTime <= 0) {
+            if (myNewTime <= 0 || opponentNewTime <= 0) {
                  if (gameOverHandledRef.current) return;
-                const timedOutPlayerId = myTime <= 0 ? user?.uid : getOpponentId();
+                const timedOutPlayerId = myNewTime <= 0 ? user?.uid : getOpponentId();
                 const winnerId = timedOutPlayerId === user?.uid ? getOpponentId() : user?.uid;
                 setWinner(winnerId || null, room.boardState, 'timeout', null);
             }
@@ -481,7 +465,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         return () => clearInterval(timerId);
 
-    }, [isMultiplayer, room, gameState.gameOver, gameState.p1Time, gameState.p2Time, gameState.playerColor, user, setWinner, gameState.isGameLoading]);
+    }, [isMultiplayer, room, user, setWinner, gameState.gameOver, gameState.isGameLoading, gameState.playerColor, gameState.p1Time, gameState.p2Time]);
 
     const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
     
