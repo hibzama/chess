@@ -1,8 +1,7 @@
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess, Piece as ChessPiece } from 'chess.js';
@@ -25,8 +24,8 @@ interface GameRoom {
     p1Time: number; // Stored as seconds remaining at last turn
     p2Time: number; // Stored as seconds remaining at last turn
     turnStartTime: Timestamp;
-    createdBy: { uid: string; color: PlayerColor; name: string; };
-    player2?: { uid: string; color: PlayerColor, name: string; };
+    createdBy: { uid: string; color: PlayerColor; name: string; photoURL?: string; };
+    player2?: { uid: string; color: PlayerColor, name: string; photoURL?: string; };
     players: string[];
     status: 'waiting' | 'in-progress' | 'completed';
     winner?: {
@@ -37,6 +36,7 @@ interface GameRoom {
     };
     draw?: boolean;
     payoutTransactionId?: string; // To ensure idempotency
+    expiresAt: Timestamp;
 }
 
 interface GameState {
@@ -386,7 +386,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists() || !user || gameOverHandledRef.current) {
-                if (!docSnap.exists()) router.push('/lobby');
+                if (!docSnap.exists() && isGameLoading) { 
+                     router.push('/lobby');
+                }
                 setIsGameLoading(false);
                 return;
             };
@@ -406,11 +408,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 return;
             }
             
-            const isCreator = roomData.createdBy.uid === user.uid;
+            // This is the key logic change. If the user is viewing a room they can join, stop loading.
+            if (roomData.status === 'waiting' && !roomData.players.includes(user.uid)) {
+                 setIsGameLoading(false);
+                 return;
+            }
             
-            // This is the key condition. The game is not "loading" if the player is in the room
-            // and the room is waiting or in progress.
             if (roomData.players.includes(user.uid) && (roomData.status === 'waiting' || roomData.status === 'in-progress')) {
+                const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
 
                 let boardData = roomData.boardState;
@@ -433,7 +438,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
         });
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, router]);
+    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, router, isGameLoading]);
 
 
     // This effect runs the client-side timer for UI updates.
