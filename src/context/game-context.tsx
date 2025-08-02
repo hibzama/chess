@@ -182,7 +182,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.player2.name}`;
 
                 } else if (winnerId === 'draw') { // Draw logic
                     creatorPayout = joinerPayout = wager * 0.9;
@@ -286,7 +286,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [stopTimer, updateAndSaveState, isMultiplayer, roomId, user, gameState.isEnding, handlePayout]);
 
     const calculatePieceCounts = useCallback((boardState: any) => {
-        if (!user || !room) return { p1Count: 0, p2Count: 0 };
+        if (!user || !room || !boardState) return { p1Count: 0, p2Count: 0 };
     
         const myColor = room.createdBy.uid === user.uid ? room.createdBy.color : room.player2!.color;
         const opponentColor = myColor === 'w' ? 'b' : 'w';

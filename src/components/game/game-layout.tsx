@@ -32,11 +32,12 @@ type GameLayoutProps = {
 
 const GameOverDisplay = () => {
     const { user } = useAuth();
-    const { winner, gameOverReason, isMultiplayer, payoutAmount, room } = useGame();
+    const { winner, gameOverReason, isMultiplayer, payoutAmount, room, resetGame } = useGame();
     const router = useRouter();
     const USDT_RATE = 310;
 
     const handleReturn = () => {
+        resetGame();
         router.push('/dashboard');
     }
 
