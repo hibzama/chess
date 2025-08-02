@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -455,13 +454,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             let p1ServerTime = creatorIsCurrent ? Math.max(0, roomData.p1Time - elapsed) : roomData.p1Time;
             let p2ServerTime = !creatorIsCurrent ? Math.max(0, roomData.p2Time - elapsed) : roomData.p2Time;
 
-            // Timeout Check - moved to setWinner
-            if (p1ServerTime <= 0) {
-                setWinner(roomData.player2?.uid || null, roomData.boardState, 'timeout');
-                return;
-            }
-             if (p2ServerTime <= 0) {
-                setWinner(roomData.createdBy.uid, roomData.boardState, 'timeout');
+            if ((creatorIsCurrent && p1ServerTime <= 0) || (!creatorIsCurrent && p2ServerTime <= 0)) {
+                if (!gameOverHandledRef.current) {
+                    const winnerId = creatorIsCurrent ? roomData.player2?.uid : roomData.createdBy.uid;
+                    setWinner(winnerId || null, roomData.boardState, 'timeout');
+                }
                 return;
             }
             
@@ -496,7 +493,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         return () => unsubscribe();
     
-    }, [isMultiplayer, roomId, user, isMounted, gameType, calculatePieceCounts, setWinner]);
+    }, [isMultiplayer, roomId, user, isMounted, gameType, calculatePieceCounts, checkGameOver, setWinner]);
 
     const loadGameState = (state: GameState) => {
         setGameState(state);
