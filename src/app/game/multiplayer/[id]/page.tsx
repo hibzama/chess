@@ -143,9 +143,7 @@ function MultiplayerGamePageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver } = useGame();
-    const [room, setRoom] = useState<GameRoom | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { gameOver, isGameLoading, room } = useGame();
     const [timeLeft, setTimeLeft] = useState('');
     const [isJoining, setIsJoining] = useState(false);
 
@@ -156,46 +154,7 @@ function MultiplayerGamePageContent() {
      useEffect(() => {
         roomStatusRef.current = room?.status;
     }, [room?.status]);
-
-    useEffect(() => {
-        if (!roomId || !user) {
-             setLoading(false);
-            return;
-        }
-        
-        const roomRef = doc(db, 'game_rooms', roomId as string);
-        const unsubscribe = onSnapshot(roomRef, async (docSnap) => {
-            if (docSnap.exists()) {
-                const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
-                
-                if (roomData.status === 'completed') {
-                    setRoom(roomData);
-                } 
-                else if (roomData.status === 'waiting' && roomData.createdBy.uid !== user.uid) {
-                    setRoom(roomData);
-                } 
-                else if (roomData.players.includes(user.uid)) {
-                    setRoom(roomData);
-                } 
-                else if (roomData.isPrivate || roomData.status !== 'waiting') {
-                    toast({ variant: 'destructive', title: 'Not Authorized', description: 'You are not a player in this room.' });
-                    router.push('/lobby');
-                    return;
-                } else {
-                    setRoom(roomData);
-                }
-            } else {
-                if (roomStatusRef.current !== 'completed') {
-                    toast({ title: 'Room Closed', description: "This game room no longer exists." });
-                }
-                router.push('/lobby');
-            }
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [roomId, user, router, toast]);
-
+    
     const handleCancelRoom = useCallback(async (isAutoCancel = false) => {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
@@ -399,7 +358,7 @@ function MultiplayerGamePageContent() {
         toast({ title: 'Copied!', description: 'Room ID copied to clipboard. Share it with your friend!' });
     }
 
-    if (loading || !room || !user || !userData) {
+    if (isGameLoading || !user || !userData) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -410,7 +369,7 @@ function MultiplayerGamePageContent() {
         )
     }
 
-    if (room.status === 'waiting') {
+    if (room?.status === 'waiting') {
         if(isCreator) {
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -444,7 +403,7 @@ function MultiplayerGamePageContent() {
             )
         } else {
             // This is the joiner's view
-            const hasEnoughBalance = userData.balance >= room.wager;
+            const hasEnoughBalance = userData.balance >= (room.wager || 0);
 
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -564,3 +523,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
