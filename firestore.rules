@@ -6,7 +6,6 @@ service cloud.firestore {
     // =================================
     // Helper Functions
     // =================================
-
     function isSignedIn() {
       return request.auth != null;
     }
@@ -14,31 +13,38 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
+
     function getDoc(path) {
       return get(/databases/$(database)/documents/$(path));
     }
-
+    
     function incomingDoc() {
       return request.resource.data;
     }
-    
+
     function isAdmin() {
       return isSignedIn() && getDoc('users/' + request.auth.uid).data.role == 'admin';
+    }
+
+    function isChatParticipant(chatId) {
+      // Use this for get/write operations where resource is available
+      return request.auth.uid in resource.data.users;
+    }
+    
+    function isChatParticipantInList(chatId) {
+      // Use this for list operations where resource is not available
+      return request.auth.uid in chatId.split('_');
     }
 
     // =================================
     // Collections
     // =================================
-
     match /users/{userId} {
-      allow read: if isSignedIn() || isAdmin();
+      allow read: if isSignedIn();
 
       allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
 
       allow update: if 
-        // Admin can update any user
-        isAdmin() ||
         // Allow user to update their own document, but not change critical fields like role or balance directly.
         (isOwner(userId) && !(
             'balance' in incomingDoc() && incomingDoc().balance != resource.data.balance
@@ -63,7 +69,11 @@ service cloud.firestore {
     }
     
     match /game_rooms/{roomId} {
-      allow read, list: if isSignedIn();
+      // Admins can read any game, users can read games they are in.
+      allow get: if isAdmin() || (isSignedIn() && request.auth.uid in resource.data.players);
+      // Anyone can query public rooms.
+      allow list: if isSignedIn();
+
       allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
       allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
 
@@ -79,30 +89,28 @@ service cloud.firestore {
         ) ||
         // Allow playing a move
         (
-          (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
+          (isOwner(resource.data.createdBy.uid) || (resource.data.player2 != null && isOwner(resource.data.player2.uid))) &&
           resource.data.status == 'in-progress' &&
           request.resource.data.status == 'in-progress'
         ) ||
         // Allow game completion update
         (
-           (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
+           (isOwner(resource.data.createdBy.uid) || (resource.data.player2 != null && isOwner(resource.data.player2.uid))) &&
           resource.data.status == 'in-progress' &&
           request.resource.data.status == 'completed'
         );
     }
 
     match /transactions/{transactionId} {
-      // User can see their own transactions. Admins can see all.
-      allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
-      // Users can create their own transactions (deposits, wagers etc)
-      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
-      // Only admins can approve/reject transactions.
-      allow update: if isAdmin();
+      // Admins can read any transaction. Users can only read their own.
+      allow read, list: if isSignedIn() && (isAdmin() || isOwner(resource.data.userId));
+      allow create: if isSignedIn();
     }
     
     match /notifications/{notificationId} {
-        allow read, list, update: if isSignedIn() && isOwner(resource.data.userId);
+        allow read, list: if isSignedIn() && isOwner(resource.data.userId);
         allow create: if isSignedIn();
+        allow update: if isSignedIn() && isOwner(resource.data.userId);
     }
     
     match /marketing_applications/{appId} {
@@ -110,21 +118,21 @@ service cloud.firestore {
         allow read, update, delete: if isAdmin();
     }
     
-    // Allow chat messages within a game room
+     // Allow chat messages within a game room
     match /game_rooms/{roomId}/messages/{messageId} {
       allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
     }
 
-    // Rules for direct user-to-user chat
+    // Allow chat messages in direct chats
     match /chats/{chatId} {
-        // A user can only access/query chats they are a part of.
-        // The chat ID is a composite of two user IDs, sorted, e.g., 'uid1_uid2'.
-        allow read, write, list, create: if isSignedIn() && request.auth.uid in chatId.split('_');
+      // The user can query chats they are a part of.
+      allow list: if isSignedIn() && isChatParticipantInList(chatId);
+      // A user can only read/update a chat if they are one of the participants.
+      allow read, update, create: if isSignedIn() && isChatParticipant(chatId);
+    }
 
-        match /messages/{messageId} {
-            // A user can only read/write messages in a chat they are a part of.
-            allow read, create: if isSignedIn() && request.auth.uid in chatId.split('_');
-        }
+    match /chats/{chatId}/messages/{messageId} {
+      allow read, create: if isSignedIn() && isChatParticipant(chatId);
     }
   }
 }
