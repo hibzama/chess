@@ -72,6 +72,7 @@ interface GameContextType extends GameState {
     roomWager: number;
     roomOpponentId: string | null;
     room: GameRoom | null;
+    isMounted: boolean;
 }
 
 type Move = { turn: number; white?: string; black?: string };
@@ -95,7 +96,7 @@ const createInitialCheckersBoard = (): (Piece | null)[][] => {
 export const GameProvider = ({ children, gameType }: { children: React.ReactNode, gameType: 'chess' | 'checkers' }) => {
     const { id: roomId } = useParams();
     const isMultiplayer = !!roomId;
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     
     const storageKey = `game_state_${gameType}`;
     
@@ -126,8 +127,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [room, setRoom] = useState<GameRoom | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
     
     const gameOverHandledRef = useRef(false);
+
+     useEffect(() => {
+        setIsMounted(true);
+    }, []);
     
     const updateAndSaveState = useCallback((newState: Partial<GameState>) => {
         setGameState(prevState => {
@@ -335,7 +341,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (gameOverHandledRef.current) return;
+            if (gameOverHandledRef.current || !isMounted) return;
 
             if (!docSnap.exists()) {
                 updateAndSaveState({ isGameLoading: false });
@@ -346,7 +352,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             setRoom(roomData);
 
             if (roomData.status === 'completed') {
-                setWinnerRef.current(roomData.winner?.uid || 'draw', roomData.boardState, roomData.winner?.method, roomData.winner?.resignerId);
+                setWinner(roomData.winner?.uid || 'draw', roomData.boardState, roomData.winner?.method, roomData.winner?.resignerId);
                 return;
             }
             
@@ -378,7 +384,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         });
 
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType]);
+    }, [isMultiplayer, roomId, user, gameType, isMounted, updateAndSaveState, setWinner]);
 
     // Timer logic
     useEffect(() => {
@@ -439,7 +445,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room };
+    const contextValue = { ...gameState, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isMounted };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 }
