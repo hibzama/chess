@@ -159,12 +159,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
                     let resignerRefundRate, winnerPayoutRate;
-                    const pieceCount = resignerPieceCount;
-
-                    if (pieceCount <= 3) {
+                    
+                    if (resignerPieceCount <= 3) {
                         resignerRefundRate = 0.30; // 30%
                         winnerPayoutRate = 1.50; // 150%
-                    } else if (pieceCount <= 6) {
+                    } else if (resignerPieceCount <= 6) {
                         resignerRefundRate = 0.50; // 50%
                         winnerPayoutRate = 1.30; // 130%
                     } else {
@@ -205,7 +204,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 transaction.update(roomRef, { 
                     status: 'completed',
-                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId, resignerPieceCount: resignerPieceCount ?? 0 },
+                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId, resignerPieceCount: resignerPieceCount },
                     draw: winnerId === 'draw',
                     payoutTransactionId: payoutTxId 
                 });
@@ -272,11 +271,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const switchTurn = useCallback((boardInstance: any, move?: string, capturedPiece?: Piece) => {
         if (gameState.gameOver || gameState.isEnding) return;
-        
+
         const checkGameOver = (board: any, localRoomData?: GameRoom) => {
             if (gameOverHandledRef.current) return;
             if (gameType === 'chess') {
-                 const tempGame = board;
+                const tempGame = new Chess(board.fen);
                 if (tempGame.isGameOver()) {
                     if (tempGame.isCheckmate()) {
                         const loserColor = tempGame.turn();
@@ -284,9 +283,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                             const pData = pId === localRoomData.createdBy.uid ? localRoomData.createdBy : localRoomData.player2;
                             return pData?.color !== loserColor;
                         }) : (loserColor === 'b' ? 'user' : 'bot');
-                        setWinner(winnerId || null, { fen: board.fen() }, 'checkmate');
+                        setWinner(winnerId || null, { fen: board.fen }, 'checkmate');
                     } else {
-                        setWinner('draw', { fen: board.fen() }, 'draw');
+                        setWinner('draw', { fen: board.fen }, 'draw');
                     }
                 }
             } else { // Checkers logic
@@ -327,9 +326,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const now = Timestamp.now();
             const elapsedSeconds = room.turnStartTime ? (now.toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
             
-            const isCreator = room.createdBy.uid === user?.uid;
-            const newP1Time = room.currentPlayer === room.createdBy.color ? room.p1Time - elapsedSeconds : room.p1Time;
-            const newP2Time = room.player2 && room.currentPlayer === room.player2.color ? room.p2Time - elapsedSeconds : room.p2Time;
+            const isCreatorTurn = room.currentPlayer === room.createdBy.color;
+            const newP1Time = isCreatorTurn ? room.p1Time - elapsedSeconds : room.p1Time;
+            const newP2Time = room.player2 && !isCreatorTurn ? room.p2Time - elapsedSeconds : room.p2Time;
             
             const updatePayload: any = { 
                 boardState: gameType === 'chess' ? boardState.fen : JSON.stringify(boardState.board), 
@@ -345,6 +344,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             return;
         }
 
+        // Single player logic
         const boardState = gameType === 'chess' ? {fen: boardInstance.fen()} : {board: boardInstance.board};
         const p1IsCurrent = (gameState.playerColor === gameState.currentPlayer);
         let newMoveHistory = [...gameState.moveHistory];
@@ -393,16 +393,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const now = Timestamp.now();
             const elapsedSeconds = roomData.turnStartTime ? (now.toMillis() - roomData.turnStartTime.toMillis()) / 1000 : 0;
     
+            const isMyTurn = myColor === roomData.currentPlayer;
+            
             let myTime, opponentTime;
-    
-            if (myColor === roomData.createdBy.color) { // I am the creator
+            
+            if (isCreator) {
                 myTime = roomData.currentPlayer === roomData.createdBy.color ? roomData.p1Time - elapsedSeconds : roomData.p1Time;
-                opponentTime = roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
+                opponentTime = roomData.player2 && roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
             } else { // I am the joiner
-                myTime = roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
+                myTime = roomData.player2 && roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
                 opponentTime = roomData.currentPlayer === roomData.createdBy.color ? roomData.p1Time - elapsedSeconds : roomData.p1Time;
             }
-    
+
             myTime = Math.max(0, myTime);
             opponentTime = Math.max(0, opponentTime);
 

@@ -148,21 +148,16 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   
   const ResignationDialogContent = () => {
     let refundPercentage, opponentPayoutPercentage;
-    const totalPieces = playerPieceCount + opponentPieceCount;
-    
-    // Determine who has more pieces, ignoring draws.
-    const hasAdvantage = opponentPieceCount > playerPieceCount;
-    const hasDisadvantage = playerPieceCount > opponentPieceCount;
 
-    if (hasAdvantage) { // If opponent has more pieces, you get a higher refund
-        refundPercentage = 75;
-        opponentPayoutPercentage = 105;
-    } else if (hasDisadvantage) { // If you have more pieces, you get a lower refund
+    if (playerPieceCount <= 3) {
         refundPercentage = 30;
         opponentPayoutPercentage = 150;
-    } else { // Equal pieces
+    } else if (playerPieceCount <= 6) {
         refundPercentage = 50;
         opponentPayoutPercentage = 130;
+    } else {
+        refundPercentage = 75;
+        opponentPayoutPercentage = 105;
     }
 
 
