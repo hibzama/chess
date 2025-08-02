@@ -1,3 +1,4 @@
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -377,7 +378,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             setIsGameLoading(false);
             return;
         }
-
+    
         if (!roomId || !user) {
             setIsGameLoading(false);
             return;
@@ -386,34 +387,34 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists()) {
-                 if (isGameLoading) {
+                if (!gameState.gameOver) { // Prevent redirect after game ends
                     router.push('/lobby');
-                 }
+                }
+                setIsGameLoading(false);
                 return;
             };
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
-            setRoom(roomData);
-
-            if (
-                roomData.status === 'in-progress' ||
-                (roomData.status === 'waiting' && roomData.players.includes(user.uid)) ||
-                roomData.status === 'completed'
-            ) {
-                 const isPlayerInRoom = roomData.players.includes(user.uid);
-                
+    
+            if (roomData.status === 'waiting' || roomData.status === 'in-progress' || roomData.status === 'completed') {
+                const isPlayerInRoom = roomData.players.includes(user.uid);
+    
                 if (!isPlayerInRoom && roomData.status !== 'waiting') {
                     router.push('/lobby');
+                    setIsGameLoading(false);
                     return;
                 }
-
+    
+                setRoom(roomData); // Set room first
+    
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
                 let boardData = roomData.boardState;
                 if(gameType === 'checkers' && typeof boardData === 'string') {
                     try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
                 }
-
+    
+                // Now update the rest of the state
                 updateAndSaveState({ 
                     playerColor: myColor, 
                     boardState: boardData,
@@ -425,7 +426,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
                     p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
                 });
-                
+    
                 if (roomData.status === 'completed' && !gameState.isEnding) {
                     const winnerData = roomData.winner;
                     const winnerIsMe = winnerData?.uid === user.uid;
@@ -450,14 +451,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     updateAndSaveState({ gameOver: true, winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'), gameOverReason: winnerData?.method || null, payoutAmount: myPayout, isEnding: true });
                 }
                 
-                setIsGameLoading(false);
-            } else if (roomData.status === 'waiting' && !roomData.players.includes(user.uid)) {
-                // This is a player viewing a room they can join
-                setIsGameLoading(false);
+                setIsGameLoading(false); // Only set loading to false after all state is updated
             }
         });
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, router, isGameLoading]);
+    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, router, gameState.gameOver]);
 
 
     // This effect runs the client-side timer for UI updates.

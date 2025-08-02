@@ -149,8 +149,7 @@ function MultiplayerGamePageContent() {
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
-
-     useEffect(() => {
+    useEffect(() => {
         roomStatusRef.current = room?.status;
     }, [room?.status]);
     
