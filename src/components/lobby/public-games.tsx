@@ -20,6 +20,7 @@ type GameRoom = {
     createdBy: { name: string; uid: string; };
     createdAt: Timestamp;
     expiresAt: Timestamp;
+    status: 'waiting' | 'in-progress' | 'completed';
 };
 
 const USDT_RATE = 310;
@@ -34,14 +35,14 @@ export default function PublicGames({ gameType }: { gameType: string }) {
             collection(db, 'game_rooms'), 
             where('gameType', '==', gameType),
             where('isPrivate', '==', false),
-            where('status', '==', 'waiting')
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const now = Timestamp.now();
             const fetchedRooms = snapshot.docs
                 .map(doc => ({ ...doc.data(), id: doc.id } as GameRoom))
-                .filter(room => room.expiresAt > now); // Filter client-side
+                // Filter for waiting status and expiry client-side
+                .filter(room => room.status === 'waiting' && room.expiresAt > now); 
 
             const sortedRooms = fetchedRooms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
             setRooms(sortedRooms);
