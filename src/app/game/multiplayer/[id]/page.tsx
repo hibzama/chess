@@ -142,12 +142,10 @@ function MultiplayerGamePageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, room: roomFromContext, isGameLoading } = useGame();
+    const { gameOver, room, isGameLoading } = useGame();
     const [timeLeft, setTimeLeft] = useState('');
     const [isJoining, setIsJoining] = useState(false);
 
-    const room = roomFromContext;
-    const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
@@ -197,7 +195,7 @@ function MultiplayerGamePageContent() {
     
 
     useEffect(() => {
-        if (room?.status !== 'waiting' || !room.expiresAt || !isCreator) {
+        if (!room || room?.status !== 'waiting' || !room.expiresAt || room.createdBy.uid !== user?.uid) {
             return;
         }
 
@@ -218,11 +216,11 @@ function MultiplayerGamePageContent() {
 
         return () => clearInterval(interval);
 
-    }, [room, isCreator, handleCancelRoom]);
+    }, [room, user, handleCancelRoom]);
 
 
     const handleJoinGame = async () => {
-        if (!user || !userData || !room || isCreator) return;
+        if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
         if(userData.balance < room.wager) {
             toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have enough balance to join this game."});
@@ -361,7 +359,7 @@ function MultiplayerGamePageContent() {
         }
     }
 
-    if (isGameLoading || !room) {
+    if (isGameLoading) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -372,6 +370,18 @@ function MultiplayerGamePageContent() {
         )
     }
 
+    if (!room) {
+        // This case should be handled by the redirect effect, but as a fallback:
+        return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+                <div className="flex flex-col items-center gap-4">
+                    <p className="text-muted-foreground">Preparing room...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    const isCreator = room?.createdBy.uid === user?.uid;
     const equipment = room?.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
     const copyGameId = () => {
@@ -490,17 +500,17 @@ export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [isGameLoading, setIsGameLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!roomId) {
-            setIsGameLoading(false);
+            setLoading(false);
             router.push('/lobby');
             return;
         }
 
         const fetchGameType = async () => {
-            setIsGameLoading(true);
+            setLoading(true);
             try {
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomSnap = await getDoc(roomRef);
@@ -513,13 +523,13 @@ export default function MultiplayerGamePage() {
                 console.error("Could not fetch game type", e);
                 router.push('/lobby');
             } finally {
-                setIsGameLoading(false);
+                setLoading(false);
             }
         };
         fetchGameType();
     }, [roomId, router]);
     
-    if (isGameLoading) {
+    if (loading) {
          return (
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
@@ -540,5 +550,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
