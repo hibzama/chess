@@ -238,7 +238,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const wager = roomData.wager || 0;
                     const winnerData = roomData.winner;
                     if (winnerData?.resignerId) { // Resignation
-                        const pieceCount = winnerData.resignerPieceCount || 0;
+                        const pieceCount = winnerData.resignerPieceCount ?? 16;
                         let resignerRefundRate, winnerPayoutRate;
                         
                         if (pieceCount <= 3) {
@@ -395,7 +395,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             };
             
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
-            setRoom(roomData);
+            setRoom(roomData); // Set room data first
             
             if (roomData.status === 'in-progress' || roomData.status === 'waiting') {
                 const isCreator = roomData.createdBy.uid === user.uid;
