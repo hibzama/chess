@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, room, checkGameOver } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, room } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -68,15 +68,14 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
           if (result) {
             const newGame = new Chess(game.fen());
             setGame(newGame);
-            checkGameOver(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            switchTurn({ fen: newGame.fen() }, result.san, captured);
+            switchTurn(newGame, result.san, captured);
           }
         }
       }, 1000); // 1-second delay for bot move
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer, game, gameOver, playerColor, switchTurn, checkGameOver, isMounted, isMultiplayer]);
+  }, [currentPlayer, game, gameOver, playerColor, switchTurn, isMounted, isMultiplayer]);
 
 
   const getSquareFromIndices = (row: number, col: number): Square => {
@@ -104,9 +103,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         if (result) {
             const newGame = new Chess(game.fen());
             setGame(newGame);
-            checkGameOver(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            switchTurn({ fen: newGame.fen() }, result.san, captured);
+            switchTurn(newGame, result.san, captured);
         }
       }
       setSelectedPiece(null);

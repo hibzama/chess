@@ -68,7 +68,7 @@ const PieceComponent = ({ piece, colors }: { piece: Piece, colors: string[] }) =
 };
 
 export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
-    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted, isMultiplayer, user, roomOpponentId, room, checkGameOver } = useGame();
+    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted, isMultiplayer, user, roomOpponentId, room } = useGame();
     const [board, setBoard] = useState<Board>(() => boardState?.board || createInitialBoard());
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
@@ -164,7 +164,6 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
         }
         
         setBoard(newBoard);
-        checkGameOver(newBoard);
 
         const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
 
@@ -182,7 +181,7 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
         }
         
-    }, [board, switchTurn, checkGameOver, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer]);
+    }, [board, switchTurn, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer]);
 
     const botMove = useCallback(() => {
         const botMoves = calculateAllMoves(board, currentPlayer);
