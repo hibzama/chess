@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -153,12 +154,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let creatorPayout = 0, joinerPayout = 0;
                 let creatorDesc = '', joinerDesc = '';
                 
-                const { winnerId, method, resignerId, resignerPieceCount } = winnerDetails;
+                const { winnerId, method, resignerId, resignerPieceCount = 0 } = winnerDetails;
     
                 if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
                     let resignerRefundRate, winnerPayoutRate;
-                    const pieceCount = resignerPieceCount ?? 0;
+                    const pieceCount = resignerPieceCount;
 
                     if (pieceCount <= 3) {
                         resignerRefundRate = 0.30; // 30%
@@ -275,7 +276,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const checkGameOver = (board: any, localRoomData?: GameRoom) => {
             if (gameOverHandledRef.current) return;
             if (gameType === 'chess') {
-                const tempGame = board;
+                 const tempGame = board;
                 if (tempGame.isGameOver()) {
                     if (tempGame.isCheckmate()) {
                         const loserColor = tempGame.turn();
@@ -326,6 +327,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const now = Timestamp.now();
             const elapsedSeconds = room.turnStartTime ? (now.toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
             
+            const isCreator = room.createdBy.uid === user?.uid;
             const newP1Time = room.currentPlayer === room.createdBy.color ? room.p1Time - elapsedSeconds : room.p1Time;
             const newP2Time = room.player2 && room.currentPlayer === room.player2.color ? room.p2Time - elapsedSeconds : room.p2Time;
             
@@ -386,17 +388,17 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
     
             const isCreator = roomData.createdBy.uid === user.uid;
-            const myColor = isCreator ? roomData.createdBy.color : roomData.player2.color;
+            const myColor = isCreator ? roomData.createdBy.color : (roomData.createdBy.color === 'w' ? 'b' : 'w');
     
             const now = Timestamp.now();
             const elapsedSeconds = roomData.turnStartTime ? (now.toMillis() - roomData.turnStartTime.toMillis()) / 1000 : 0;
     
             let myTime, opponentTime;
     
-            if (isCreator) {
+            if (myColor === roomData.createdBy.color) { // I am the creator
                 myTime = roomData.currentPlayer === roomData.createdBy.color ? roomData.p1Time - elapsedSeconds : roomData.p1Time;
                 opponentTime = roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
-            } else {
+            } else { // I am the joiner
                 myTime = roomData.currentPlayer === roomData.player2.color ? roomData.p2Time - elapsedSeconds : roomData.p2Time;
                 opponentTime = roomData.currentPlayer === roomData.createdBy.color ? roomData.p1Time - elapsedSeconds : roomData.p1Time;
             }
@@ -419,7 +421,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (gameType === 'checkers' && typeof currentBoardState === 'string') { try { currentBoardState = { board: JSON.parse(currentBoardState) }; } catch (e) { currentBoardState = { board: [] }; } }
             const moveHistory = roomData.moveHistory || [];
             let moveCount = 0; if (moveHistory.length > 0) { const lastMove = moveHistory[moveHistory.length - 1]; moveCount = (lastMove.turn - 1) * 2 + (lastMove.black ? 2 : 1); }
-            updateAndSaveState({ playerColor: myColor, boardState: currentBoardState, moveHistory, moveCount, currentPlayer: roomData.currentPlayer, capturedByPlayer: isCreator ? roomData.capturedByP2 || [] : roomData.capturedByP1 || [], capturedByBot: isCreator ? roomData.capturedByP1 || [] : roomData.capturedByP2 || [], p1Time: myTime, p2Time: opponentTime });
+            updateAndSaveState({ playerColor: myColor, boardState: currentBoardState, moveHistory, moveCount, currentPlayer: roomData.currentPlayer, capturedByPlayer: myColor === roomData.createdBy.color ? roomData.capturedByP2 || [] : roomData.capturedByP1 || [], capturedByBot: myColor === roomData.createdBy.color ? roomData.capturedByP1 || [] : roomData.capturedByP2 || [], p1Time: myTime, p2Time: opponentTime });
             if (!isMounted) setIsMounted(true);
         });
         return () => unsubscribe();
