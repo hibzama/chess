@@ -315,7 +315,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
                             if (!currentBoard[newRow][newCol]) {
                                 moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
-                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpCol >= 0 && jumpRow < 8 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                                 jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
                             }
                         }
@@ -337,7 +337,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             checkGameOver(newBoardState, room);
             const roomRef = doc(db, 'game_rooms', room.id);
             let newMoveHistory = [...(room.moveHistory || [])];
-            if (move) { if (room.currentPlayer === 'w') { newMoveHistory.push({ turn: Math.floor(newMoveHistory.length) + 1, white: move }); } else { const lastMove = newMoveHistory[newMoveHistory.length - 1]; if (lastMove && !lastMove.black) { lastMove.black = move; } else { newMoveHistory.push({ turn: Math.floor((newMove.length - 1) / 2) + 1, black: move }); } } }
+            if (move) { if (room.currentPlayer === 'w') { newMoveHistory.push({ turn: Math.floor(newMoveHistory.length) + 1, white: move }); } else { const lastMove = newMoveHistory[newMoveHistory.length - 1]; if (lastMove && !lastMove.black) { lastMove.black = move; } else { newMoveHistory.push({ turn: Math.floor((newMoveHistory.length - 1) / 2) + 1, black: move }); } } }
             const now = Timestamp.now();
             const elapsedSeconds = room.turnStartTime ? (now.toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
             
@@ -373,14 +373,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [gameState, room, isMultiplayer, updateAndSaveState, gameType, setWinner, user]);
 
     useEffect(() => {
-        if (!isMultiplayer) {
+        if (!isMultiplayer || !roomId || !user) {
             setIsGameLoading(false);
             return;
         }
-        if (!roomId || !user) {
-            setIsGameLoading(false);
-            return
-        };
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
@@ -515,5 +511,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
-
-    
