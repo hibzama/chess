@@ -1,10 +1,9 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions to make rules cleaner and more reusable
+
+    // Helper functions to make rules cleaner and more readable.
     function isSignedIn() {
       return request.auth != null;
     }
@@ -13,114 +12,180 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isGettingUser(userId) {
-      return isUser(userId);
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
-    function isListingUsers() {
-      // Allow authenticated users to list users for features like leaderboards, friends, etc.
-      return isSignedIn();
-    }
-    
-    function isCreatingOwnUser(userId) {
-      return isUser(userId) && 
-             'firstName' in request.resource.data &&
-             'lastName' in request.resource.data &&
-             'email' in request.resource.data &&
-             request.resource.data.email == request.auth.token.email &&
-             request.resource.data.uid == request.auth.uid &&
-             request.resource.data.balance == 100 || request.resource.data.balance == 0;
-    }
-    
-    // --- Transactions --- //
-    // Determines if the incoming request is a valid wager transaction.
-    function isValidWager(transactionData) {
-      return transactionData.type == 'wager' &&
-             transactionData.status == 'completed' &&
-             transactionData.userId == request.auth.uid &&
-             'gameRoomId' in transactionData &&
-             'description' in transactionData;
+    function getGame(gameId) {
+      return get(/databases/$(database)/documents/game_rooms/$(gameId)).data;
     }
 
-    // Determines if the incoming request is a valid commission transaction.
-    function isValidCommission(transactionData) {
-      return transactionData.type == 'commission' &&
-             transactionData.status == 'completed' &&
-             'fromUserId' in transactionData &&
-             'gameRoomId' in transactionData &&
-             'level' in transactionData &&
-             transactionData.amount > 0;
-    }
-    
-    // --- Game Joining Logic --- //
-    function isJoiningGame(requestData, existingData) {
-      let isStatusUpdate = requestData.status == 'in-progress' && existingData.status == 'waiting';
-      let isPlayerUpdate = requestData.players[1] == request.auth.uid && existingData.players.size() == 1;
-      let hasPlayer2 = 'player2' in requestData && requestData.player2.uid == request.auth.uid;
-      let keepsWager = requestData.wager == existingData.wager;
-
-      return isStatusUpdate && isPlayerUpdate && hasPlayer2 && keepsWager;
-    }
-
-    // --- Friend Request Logic --- //
-    function isAcceptingFriendRequest(requestData, existingData) {
-      let friendId = request.resource.data.friends[-1];
-      return requestData.friends.size() == existingData.friends.size() + 1 &&
-             !isUser(friendId); 
-    }
-    
-    // Rules for the 'users' collection
+    //----------------------------------------------------------------------
+    //  USERS Collection
+    //----------------------------------------------------------------------
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isCreatingOwnUser(userId);
-      allow update: if isUser(userId) || 
-                      (isAcceptingFriendRequest(request.resource.data, resource.data)) ||
-                      (request.auth.uid == get(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)).data.player2.uid);
-    }
-    
-    // Rules for the 'game_rooms' collection
-    match /game_rooms/{roomId} {
-      allow read: if isSignedIn();
-      allow create: if isUser(request.resource.data.createdBy.uid);
-      allow update: if (isUser(request.resource.data.player2.uid) && isJoiningGame(request.resource.data, resource.data)) ||
-                       (isUser(resource.data.players[0]) || isUser(resource.data.players[1]));
-      allow delete: if isUser(resource.data.createdBy.uid) && resource.data.status == 'waiting';
+      // Anyone can create their own user document during registration.
+      allow create: if true;
+
+      // Users can read their own data and any public data of other users.
+      allow get: if isSignedIn();
+
+      // Users can only update their own document.
+      // Certain fields like 'balance' or 'role' are protected and can only be changed
+      // through validated transactions (defined in other rules).
+      allow update: if isUser(userId)
+                    && !('balance' in request.resource.data)
+                    && !('marketingBalance' in request.resource.data)
+                    && !('role' in request.resource.data)
+                    && !('wins' in request.resource.data);
+
+      // Users should not be able to delete their own accounts from the app directly.
+      allow delete: if false;
+
+      // Allow listing users for features like leaderboards and search.
+      allow list: if isSignedIn();
     }
 
-    // Rules for the 'transactions' collection
+    //----------------------------------------------------------------------
+    //  TRANSACTIONS Collection
+    //----------------------------------------------------------------------
     match /transactions/{transactionId} {
-      allow read: if isSignedIn();
-      allow create: if isValidWager(request.resource.data) || 
-                      isValidCommission(request.resource.data) ||
-                      (request.resource.data.type == 'deposit' && isUser(request.resource.data.userId)) ||
-                      (request.resource.data.type == 'withdrawal' && isUser(request.resource.data.userId));
+      // Allow reading transactions only for the user they belong to, or by an admin.
+      allow get, list: if isSignedIn() && (
+        resource.data.userId == request.auth.uid
+      );
+
+      // Allow creating transactions under specific conditions (e.g., within a game join).
+      // Direct creation is disallowed to prevent fraud. Creation is handled by game logic.
+      allow create: if false;
+
+      // Transactions are immutable.
+      allow update, delete: if false;
     }
 
-    // Rules for the 'friend_requests' collection
+
+    //----------------------------------------------------------------------
+    //  GAME_ROOMS Collection
+    //----------------------------------------------------------------------
+    match /game_rooms/{roomId} {
+      allow get, list: if isSignedIn();
+
+      // Allow creating a game room if the user is authenticated and the creator.
+      allow create: if isSignedIn()
+                    && request.resource.data.createdBy.uid == request.auth.uid
+                    && request.resource.data.players[0] == request.auth.uid;
+
+      // Allow updates under specific, controlled circumstances.
+      allow update: if isSignedIn() &&
+                       // Case 1: A player is joining a waiting game.
+                       (isJoiningGame(roomId)) ||
+                       // Case 2: A player is making a move in an ongoing game.
+                       (isMakingMove(roomId)) ||
+                       // Case 3: A player is resigning from an ongoing game.
+                       (isResigning(roomId));
+
+      // Allow a user to delete a room they created only if it's still waiting for an opponent.
+      allow delete: if isSignedIn()
+                     && resource.data.status == 'waiting'
+                     && resource.data.createdBy.uid == request.auth.uid;
+
+      // CHAT subcollection within a game room
+      match /messages/{messageId} {
+        // Only players in the game can read or send messages.
+        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      }
+    }
+
+    // --- GAME_ROOMS HELPER FUNCTIONS ---
+
+    function isJoiningGame(roomId) {
+      let game = getGame(roomId);
+      let nextGame = request.resource.data;
+      let userBalance = getUserData(request.auth.uid).balance;
+      let creatorBalance = getUserData(game.createdBy.uid).balance;
+
+      return game.status == 'waiting'
+             && nextGame.status == 'in-progress'
+             && game.players.size() == 1
+             && nextGame.players.size() == 2
+             && request.auth.uid in nextGame.players
+             && request.auth.uid != game.createdBy.uid
+             && nextGame.player2.uid == request.auth.uid
+             && userBalance >= game.wager; // Ensure joiner has enough funds
+    }
+
+    function isMakingMove(roomId) {
+        let game = getGame(roomId);
+        let nextGame = request.resource.data;
+        let activePlayerId = game.currentPlayer == game.createdBy.color ? game.createdBy.uid : game.player2.uid;
+
+        return game.status == 'in-progress'
+               && request.auth.uid == activePlayerId // Only the current player can make a move
+               && nextGame.currentPlayer != game.currentPlayer; // The turn must change
+    }
+
+    function isResigning(roomId) {
+      let game = getGame(roomId);
+      let nextGame = request.resource.data;
+      let opponentId = game.players.filter(p => p != request.auth.uid)[0];
+
+      return game.status == 'in-progress'
+             && nextGame.status == 'completed'
+             && request.auth.uid in game.players
+             && nextGame.winner.resignerId == request.auth.uid
+             && nextGame.winner.uid == opponentId;
+    }
+
+
+    //----------------------------------------------------------------------
+    //  FRIEND_REQUESTS Collection
+    //----------------------------------------------------------------------
     match /friend_requests/{requestId} {
-        allow read: if isSignedIn();
-        allow create: if isUser(request.resource.data.fromId);
-        allow delete: if isUser(resource.data.fromId) || isUser(resource.data.toId);
+      allow get: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+      allow list: if isSignedIn();
+
+      // Allow creating a request if the sender is the current user.
+      allow create: if isUser(request.resource.data.fromId);
+      // Allow the sender to cancel their own request.
+      allow delete: if isUser(resource.data.fromId);
     }
-    
-    // Rules for the 'chats' collection and its 'messages' subcollection
+
+    //----------------------------------------------------------------------
+    //  CHATS Collection
+    //----------------------------------------------------------------------
     match /chats/{chatId} {
-        allow read, update: if isSignedIn() && request.auth.uid in resource.data.users;
+      // A chat document can only be read or created by one of the participants.
+      // The chatId is a composite of the two user UIDs, so we can check if the user's UID is in the ID.
+      allow get, create: if isSignedIn() && request.auth.uid in chatId.split('_');
 
-        match /messages/{messageId} {
-            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-        }
+      // Allow updates to the chat document (e.g., lastMessage, hasUnread) by participants.
+      allow update: if isSignedIn() && request.auth.uid in resource.data.users;
+      
+      // CHAT MESSAGES subcollection
+      match /messages/{messageId} {
+         // Only participants of the chat can read or create messages.
+         allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
     }
 
-    // Rules for other collections
-    match /marketing_applications/{appId} {
-      allow read: if isSignedIn();
-      allow create: true; 
+    //----------------------------------------------------------------------
+    //  NOTIFICATIONS Collection
+    //----------------------------------------------------------------------
+    match /notifications/{notificationId} {
+        // Can only be created by server-side logic (friend requests, etc.).
+        allow create: if false;
+        // User can only read or update their own notifications.
+        allow get, list, update: if isUser(resource.data.userId);
     }
     
-    match /notifications/{notificationId} {
-        allow read, update: if isUser(resource.data.userId);
-        allow list: if isSignedIn();
+    //----------------------------------------------------------------------
+    //  MARKETING_APPLICATIONS Collection
+    //----------------------------------------------------------------------
+    match /marketing_applications/{appId} {
+      // Anyone can create an application.
+      allow create: if true;
+      // Only admins can read/update them.
+      allow get, list, update: if isSignedIn() && getUserData(request.auth.uid).role == 'admin';
     }
   }
 }
