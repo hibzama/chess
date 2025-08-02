@@ -23,15 +23,16 @@ type Friend = {
     lastSeen?: any;
 }
 
+const getChatId = (uid1: string, uid2: string) => {
+    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+};
+
+
 export default function ChatInboxPage() {
     const { user, userData } = useAuth();
     const router = useRouter();
     const [friendsWithChatStatus, setFriendsWithChatStatus] = useState<Friend[]>([]);
     const [loading, setLoading] = useState(true);
-
-    const getChatId = (uid1: string, uid2: string) => {
-        return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
-    }
 
     useEffect(() => {
         if (!user || !userData?.friends || userData.friends.length === 0) {
