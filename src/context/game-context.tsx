@@ -1,4 +1,3 @@
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -315,7 +314,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
                             if (!currentBoard[newRow][newCol]) {
                                 moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
-                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpCol >= 0 && jumpRow < 8 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                            } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
                                 jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
                             }
                         }
@@ -382,7 +381,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists() || !user || gameOverHandledRef.current) {
-                setIsGameLoading(false);
+                if(!docSnap.exists()){
+                    setIsGameLoading(false);
+                }
                 return;
             };
     
@@ -402,41 +403,31 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
 
             const isCreator = roomData.createdBy.uid === user.uid;
-            // Show the waiting screen for the creator if status is 'waiting'
-            if (roomData.status === 'waiting' && isCreator) {
-                setIsGameLoading(false);
-                return;
-            }
-
-            // Show join screen for joiner if status is 'waiting'
+            // Only proceed to update game state if the game is waiting (for creator) or in-progress
             if (roomData.status === 'waiting' && !isCreator) {
-                 setIsGameLoading(false);
+                setIsGameLoading(false);
                 return;
             }
 
-            // For both players, if the game is in-progress, load the game state
-            if (roomData.status === 'in-progress' && roomData.player2) {
-                const myColor = isCreator ? roomData.createdBy.color : roomData.player2.color;
+            const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
 
-                let boardData = roomData.boardState;
-                if(gameType === 'checkers' && typeof boardData === 'string') {
-                    try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
-                }
-
-                updateAndSaveState({ 
-                    playerColor: myColor, 
-                    boardState: boardData,
-                    moveHistory: roomData.moveHistory || [], 
-                    moveCount: roomData.moveHistory?.length || 0,
-                    currentPlayer: roomData.currentPlayer, 
-                    capturedByPlayer: isCreator ? roomData.capturedByP1 : roomData.capturedByP2 || [], 
-                    capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
-                    p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
-                    p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
-                });
-
-                setIsGameLoading(false);
+            let boardData = roomData.boardState;
+            if(gameType === 'checkers' && typeof boardData === 'string') {
+                try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
             }
+
+            updateAndSaveState({ 
+                playerColor: myColor, 
+                boardState: boardData,
+                moveHistory: roomData.moveHistory || [], 
+                moveCount: roomData.moveHistory?.length || 0,
+                currentPlayer: roomData.currentPlayer, 
+                capturedByPlayer: isCreator ? roomData.capturedByP1 : roomData.capturedByP2 || [], 
+                capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
+                p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
+                p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
+            });
+            setIsGameLoading(false);
         });
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding]);
@@ -519,5 +510,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
-
-    

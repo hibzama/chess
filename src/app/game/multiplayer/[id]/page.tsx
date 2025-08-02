@@ -1,4 +1,3 @@
-
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -370,6 +369,11 @@ function MultiplayerGamePageContent() {
     }
 
     if (!room || !user || !userData) {
+         useEffect(() => {
+            if (!isGameLoading) {
+                router.push('/lobby');
+            }
+        }, [isGameLoading, router]);
         return (
             <div className="flex items-center justify-center min-h-screen">
                  <p className="text-muted-foreground">Could not load game data. Redirecting...</p>
@@ -515,6 +519,17 @@ export default function MultiplayerGamePage() {
         fetchGameType();
     }, [roomId]);
     
+    if (initialLoading) {
+         return (
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Finding Your Game...</p>
+                </div>
+            </div>
+        )
+    }
+
     if (!roomExists) {
         // Using a `useEffect` to redirect after the initial render to avoid server/client mismatch issues.
         useEffect(() => {
@@ -523,17 +538,6 @@ export default function MultiplayerGamePage() {
         return (
              <div className="flex items-center justify-center min-h-screen">
                 <p>Game room not found. Redirecting...</p>
-            </div>
-        )
-    }
-
-    if (initialLoading) {
-         return (
-            <div className="flex items-center justify-center min-h-screen">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-16 w-16 animate-spin text-primary" />
-                    <p className="text-muted-foreground">Finding Your Game...</p>
-                </div>
             </div>
         )
     }
@@ -548,5 +552,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
