@@ -514,7 +514,7 @@ export default function MultiplayerGamePage() {
             <div className="flex items-center justify-center min-h-screen">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="h-16 w-16 animate-spin text-primary" />
-                    <p className="text-muted-foreground">Finding Your Game...</p>
+                    <p className="text-muted-foreground">Loading Your Game...</p>
                 </div>
             </div>
         )
