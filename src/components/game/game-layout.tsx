@@ -144,29 +144,34 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
   
-  const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
+  const opponentData = isMultiplayer && room ? (room.createdBy.uid === user?.uid ? room.player2 : room.createdBy) : null;
   
   const ResignationDialogContent = () => {
     let refundPercentage, opponentPayoutPercentage;
+    const totalPieces = playerPieceCount + opponentPieceCount;
+    
+    // Determine who has more pieces, ignoring draws.
+    const hasAdvantage = opponentPieceCount > playerPieceCount;
+    const hasDisadvantage = playerPieceCount > opponentPieceCount;
 
-    if (playerPieceCount <= 3) {
-        refundPercentage = 30;
-        opponentPayoutPercentage = 150;
-    } else if (playerPieceCount <= 6) {
-        refundPercentage = 50;
-        opponentPayoutPercentage = 130;
-    } else {
+    if (hasAdvantage) { // If opponent has more pieces, you get a higher refund
         refundPercentage = 75;
         opponentPayoutPercentage = 105;
+    } else if (hasDisadvantage) { // If you have more pieces, you get a lower refund
+        refundPercentage = 30;
+        opponentPayoutPercentage = 150;
+    } else { // Equal pieces
+        refundPercentage = 50;
+        opponentPayoutPercentage = 130;
     }
+
 
     const refundAmount = roomWager * (refundPercentage / 100);
     const opponentPayout = roomWager * (opponentPayoutPercentage / 100);
 
     return (
         <div className="text-left">
-            <p className="font-bold">You currently have {playerPieceCount} pieces, and your opponent has {opponentPieceCount}.</p>
-            <p className="mt-2">Based on your piece count, if you resign now:</p>
+            <p className="mt-2">Based on the current board state:</p>
             <ul className="list-disc pl-5 text-sm mt-2 space-y-1">
                 <li><span className="font-bold text-destructive">You will receive a {refundPercentage}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
                 <li><span className="font-bold text-green-500">Your opponent will receive a {opponentPayoutPercentage}% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
