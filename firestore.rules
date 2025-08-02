@@ -3,72 +3,112 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // Helper functions
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // USER DATA
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isGettingSelf() {
+      return isOwner(resource.data.uid);
+    }
+    
+    function isUpdatingSelf(userId) {
+        return isOwner(userId);
+    }
+
+    // USER documents
     match /users/{userId} {
-      // Allow anyone to read user profiles (for seeing opponent names, rankings, etc.)
-      allow read: if true;
-      
-      // Allow users to update their own document.
-      // Allow other users to update this user's document ONLY IF they are accepting a friend request
-      // or if it's a valid game-related balance update (handled implicitly by transaction rules).
-      allow update: if isAuthenticated() && (
-        request.auth.uid == userId
-      );
-
-      // A user can only be created via the registration process.
-      allow create: if !isAuthenticated();
+      // Anyone can read public user profiles
+      allow get: if true;
+      // Any authenticated user can list users (for suggestions, etc)
+      allow list: if isAuthenticated();
+      // Users can only create their own user document
+      allow create: if isOwner(userId);
+      // Users can only update their own document, but cannot change their role or balances.
+      allow update: if isOwner(userId)
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.balance == resource.data.balance
+                    && request.resource.data.marketingBalance == resource.data.marketingBalance;
     }
 
-    // FRIEND REQUESTS
+    // FRIEND REQUESTS documents
     match /friend_requests/{requestId} {
-      // Allow reading if the user is the sender or receiver of the request.
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
-
-      // Allow creating a request if the sender is the authenticated user.
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.fromId;
-      
-      // Allow deleting (accepting/declining/cancelling) a request if the user is the sender or receiver.
-      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        // Can read if you are the sender or receiver
+        allow get: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        // Can list if you are the sender or receiver
+        allow list: if isAuthenticated();
+        // Can create if you are the sender
+        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.fromId;
+        // Can delete if you are the sender (cancel) or receiver (decline)
+        allow delete: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
     }
-
-    // GAME ROOMS
+    
+    // GAME ROOMS documents
     match /game_rooms/{roomId} {
-      // Anyone can read game rooms to see them in the lobby.
-      allow read: if true;
-      
-      // Allow creating a room if authenticated.
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy.uid;
-
-      // Allow updating a room if the user is one of the players.
-      // This covers all in-game moves and status changes.
-      allow update: if isAuthenticated() && request.auth.uid in resource.data.players;
-      
-      // Allow a user to delete their own waiting room.
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy.uid && resource.data.status == 'waiting';
+        // Any authenticated user can view game rooms (for lobbies)
+        allow get, list: if isAuthenticated();
+        // Authenticated users can create rooms
+        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.createdBy.uid;
+        // Players in the game can update it
+        allow update: if isAuthenticated() && request.auth.uid in resource.data.players;
+        // The creator can delete a waiting room
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.createdBy.uid && resource.data.status == 'waiting';
+        
+        // Messages subcollection
+        match /messages/{messageId} {
+            allow read, write: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+        }
     }
 
-    // TRANSACTIONS (Wagers, Payouts, Commissions, etc.)
+    // TRANSACTIONS documents
     match /transactions/{transactionId} {
-      // Only the user associated with the transaction can read it.
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      
-      // Allow creating any transaction as long as the user is authenticated and the transaction belongs to them.
-      // The validity of the transaction (e.g., sufficient funds for a wager) is handled by the client-side transaction logic
-      // which is now implicitly allowed because all individual writes in the transaction will pass.
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
-      
-      // Transactions should not be updatable or deletable by users.
-      allow update, delete: if false;
+        // Users can only read or create their own transactions. No updates/deletes.
+        allow get, list: if isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.uid == request.auth.uid;
+        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.userId;
+        allow update, delete: if false;
+    }
+    
+    // NOTIFICATIONS documents
+    match /notifications/{notificationId} {
+      allow get, list, update: if isAuthenticated() && isOwner(resource.data.userId);
+      allow create: if isAuthenticated(); // Allow backend functions to create notifications
+    }
+    
+    // MARKETING APPLICATIONS documents
+    match /marketing_applications/{applicationId} {
+      // Anyone can apply
+      allow create: if true;
+      // Only authenticated users can see their own application
+      allow get: if isAuthenticated() && request.auth.uid == resource.data.uid;
+      // No one can list/update/delete from the client
+      allow list, update, delete: if false;
     }
 
-    // All other collections...
-    match /{path=**} {
-      allow read, write: if false;
-    }
+    // Allow batched writes for specific scenarios
+    match /{path=**}/documents {
+      allow write: if
+        // Allow accepting a friend request (deletes request, updates both users)
+        (request.writes[0].path.matches('friend_requests/.*')
+         && request.writes[0].method == 'delete'
+         && request.auth.uid == get(request.writes[0].path).data.toId // you are the receiver
+         && request.writes.size() == 3
+         && request.writes[1].path.matches('users/.*')
+         && request.writes[2].path.matches('users/.*'))
+        ||
+        // Allow removing a friend (updates both users)
+        (request.writes.size() == 2
+         && request.writes[0].path.matches('users/.*')
+         && request.writes[1].path.matches('users/.*')
+         && (isOwner(request.writes[0].path.basename()) || isOwner(request.writes[1].path.basename())))
+        ||
+        // Allow joining a game (updates game, both users, and creates 2 wager transactions)
+        (request.writes.size() >= 3 && request.writes.size() <= 5 // Can be up to 5 with commissions
+         && request.writes[0].path.matches('game_rooms/.*')
+         && request.auth.uid == request.writes[0].data.player2.uid) // you are the joiner
   }
+}
 }
