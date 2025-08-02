@@ -65,6 +65,7 @@ interface GameContextType extends GameState {
     setupGame: (color: PlayerColor, time: number, diff: string) => void;
     switchTurn: (boardState: any, move?: string, capturedPiece?: Piece) => void;
     setWinner: (winnerId: string | 'draw' | null, boardState: any, method?: GameOverReason, resignerId?: string | null, resignerPieceCount?: number) => void;
+    checkGameOver: (board: any) => void;
     resetGame: () => void;
     loadGameState: (state: GameState) => void;
     isMounted: boolean;
@@ -317,6 +318,92 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         return { p1Count: myPieces, p2Count: opponentPieces };
     }, [gameType, room, user]);
 
+    const checkGameOver = useCallback((board: any) => {
+        if (gameType === 'chess') {
+            if (board.isGameOver()) {
+                if (board.isCheckmate()) {
+                    let winnerId: string | null = null;
+                    if (isMultiplayer && room && room.player2) {
+                        const loserColor = board.turn();
+                        const creatorIsWinner = room.createdBy.color !== loserColor;
+                        winnerId = creatorIsWinner ? room.createdBy.uid : room.player2.uid;
+                    } else {
+                        const winnerColor = board.turn() === 'w' ? 'b' : 'w';
+                        winnerId = gameState.playerColor === winnerColor ? 'p1' : 'bot';
+                    }
+                    setWinner(winnerId, { fen: board.fen() }, 'checkmate');
+                } else {
+                    setWinner('draw', { fen: board.fen() }, 'draw');
+                }
+            }
+        } else { // Checkers
+            let whitePieces = 0;
+            let blackPieces = 0;
+            let hasWhiteMoves = false;
+            let hasBlackMoves = false;
+        
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const piece = board[r][c];
+                    if (piece) {
+                        if (piece.player === 'w') whitePieces++;
+                        else blackPieces++;
+                        
+                        const moves = getPossibleMovesForPiece(piece, { row: r, col: c }, board, piece.player);
+                        if (moves.length > 0) {
+                            if (piece.player === 'w') hasWhiteMoves = true;
+                            else hasBlackMoves = true;
+                        }
+                    }
+                }
+            }
+        
+            let winnerColor: PlayerColor | null = null;
+            let reason: GameOverReason = null;
+        
+            if (whitePieces === 0) { winnerColor = 'b'; reason = 'piece-capture'; } 
+            else if (blackPieces === 0) { winnerColor = 'w'; reason = 'piece-capture'; } 
+            else if (!hasWhiteMoves) { winnerColor = 'b'; reason = 'draw'; }
+            else if (!hasBlackMoves) { winnerColor = 'w'; reason = 'draw'; }
+        
+            if (winnerColor) {
+                let winnerId: string | null = null;
+                if (isMultiplayer && room?.player2) {
+                    if (room.createdBy.color === winnerColor) winnerId = room.createdBy.uid;
+                    else winnerId = room.player2.uid;
+                } else {
+                     winnerId = (gameState.playerColor === winnerColor) ? 'p1' : 'bot';
+                }
+                setWinner(winnerId, { board }, reason);
+            }
+        }
+    }, [gameType, isMultiplayer, room, setWinner, gameState.playerColor]);
+    
+    // Checkers helper function, needed for checkGameOver
+    const getPossibleMovesForPiece = (piece: Piece, pos: {row: number, col: number}, currentBoard: any[][], forPlayer: PlayerColor): any[] => {
+        const moves = [];
+        const jumps = [];
+        const { row, col } = pos;
+        const directions = piece.type === 'king' 
+            ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] 
+            : piece.color === 'w' 
+                ? [[-1, -1], [-1, 1]] 
+                : [[1, -1], [1, 1]];
+
+        for (const [dr, dc] of directions) {
+            const newRow = row + dr, newCol = col + dc;
+            const jumpRow = row + 2 * dr, jumpCol = col + 2 * dc;
+            if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8) {
+                if (!currentBoard[newRow][newCol]) {
+                    moves.push({ from: pos, to: { row: newRow, col: newCol }, isJump: false });
+                } else if (currentBoard[newRow][newCol]?.player !== forPlayer && jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8 && !currentBoard[jumpRow][jumpCol]) {
+                    jumps.push({ from: pos, to: { row: jumpRow, col: jumpCol }, isJump: true });
+                }
+            }
+        }
+        return jumps.length > 0 ? jumps : moves;
+    };
+
 
     // Multiplayer state sync
     useEffect(() => {
@@ -446,52 +533,42 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         const isMyTurn = gameState.currentPlayer === gameState.playerColor;
         
-        if(!isMultiplayer) { // Practice mode timer
-            intervalRef.current = setInterval(() => {
-                if(gameState.isEnding || gameOverHandledRef.current) { stopTimer(); return; }
-                if (isMyTurn) {
-                    const newTime = gameState.p1Time - 1;
-                    if (newTime <= 0) {
-                        setWinner('bot', gameState.boardState, 'timeout');
-                    } else {
-                        updateAndSaveState({ p1Time: newTime });
-                    }
-                } else {
-                    const newTime = gameState.p2Time - 1;
-                    if (newTime <= 0) {
-                        setWinner(user?.uid || 'p1', gameState.boardState, 'timeout');
-                    } else {
-                         updateAndSaveState({ p2Time: newTime });
-                    }
-                }
-            }, 1000);
-        } else if (room && room.status === 'in-progress') { // Multiplayer mode timer
-             intervalRef.current = setInterval(() => {
-                if(gameState.isEnding || gameOverHandledRef.current) { stopTimer(); return; }
-                const elapsed = room.turnStartTime ? (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
-                
-                const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
-                const isCreator = room.createdBy.uid === user?.uid;
+        const tick = () => {
+            if(gameState.isEnding || gameOverHandledRef.current) { stopTimer(); return; }
 
+            if(isMultiplayer && room && room.status === 'in-progress') {
+                const elapsed = room.turnStartTime ? (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
+                const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
                 const creatorTimeRemaining = room.p1Time - (creatorIsCurrent ? elapsed : 0);
                 const joinerTimeRemaining = room.p2Time - (!creatorIsCurrent ? elapsed : 0);
+                const isCreator = room.createdBy.uid === user?.uid;
                 
-                const p1Time = isCreator ? creatorTimeRemaining : joinerTimeRemaining;
-                const p2Time = !isCreator ? creatorTimeRemaining : joinerTimeRemaining;
+                const myTime = isCreator ? creatorTimeRemaining : joinerTimeRemaining;
+                const opponentTime = !isCreator ? creatorTimeRemaining : joinerTimeRemaining;
 
-                setGameState(p => ({ ...p, p1Time, p2Time }));
-
-                if (creatorTimeRemaining <= 0 && room.player2?.uid) {
-                    setWinner(room.player2.uid, room.boardState, 'timeout');
-                } else if (joinerTimeRemaining <= 0) {
-                     setWinner(room.createdBy.uid, room.boardState, 'timeout');
+                setGameState(p => ({ ...p, p1Time: myTime, p2Time: opponentTime }));
+                
+                if (myTime <= 0) setWinner(room.player2!.uid, room.boardState, 'timeout');
+                if (opponentTime <= 0) setWinner(room.createdBy.uid, room.boardState, 'timeout');
+                
+            } else if (!isMultiplayer) { // Practice mode timer
+                if (isMyTurn) {
+                    const newTime = gameState.p1Time - 1;
+                    if (newTime <= 0) setWinner('bot', gameState.boardState, 'timeout');
+                    else updateAndSaveState({ p1Time: newTime });
+                } else {
+                    const newTime = gameState.p2Time - 1;
+                    if (newTime <= 0) setWinner(user?.uid || 'p1', gameState.boardState, 'timeout');
+                    else updateAndSaveState({ p2Time: newTime });
                 }
-             }, 1000)
-        }
+            }
+        };
+
+        intervalRef.current = setInterval(tick, 1000);
     
         return () => stopTimer();
     
-    }, [isMounted, gameState.gameOver, gameState.currentPlayer, gameState.playerColor, stopTimer, setWinner, gameState.boardState, isMultiplayer, room, user, updateAndSaveState, gameState.isEnding, gameState.p1Time, gameState.p2Time]);
+    }, [isMounted, gameState.gameOver, gameState.p1Time, gameState.p2Time, stopTimer, updateAndSaveState, isMultiplayer, room, user, setWinner, gameState.isEnding]);
 
 
     const loadGameState = (state: GameState) => {
@@ -624,7 +701,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     };
 
     const getOpponentId = () => {
-        if (!user || !room || !room.players) return null;
+        if (!user || !room || !room.players || !room.player2) return null;
         return room.players.find(p => p !== user.uid) || null;
     }
 
@@ -634,6 +711,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         setupGame,
         switchTurn,
         setWinner,
+        checkGameOver,
         resetGame,
         loadGameState,
         isMultiplayer,

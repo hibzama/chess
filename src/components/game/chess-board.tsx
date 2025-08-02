@@ -35,7 +35,7 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, room } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, room, checkGameOver } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -57,27 +57,6 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
    }, [boardState]);
 
 
-  const checkGameOver = useCallback(() => {
-    if (game.isGameOver()) {
-        const fen = game.fen();
-        if (game.isCheckmate()) {
-            let winnerId: string | null = null;
-            if (isMultiplayer && room && room.player2) {
-                const loserColor = game.turn(); // The player whose turn it is, is checkmated.
-                const creatorIsWinner = room.createdBy.color !== loserColor;
-                winnerId = creatorIsWinner ? room.createdBy.uid : room.player2.uid;
-            } else { // Practice mode
-                const winnerColor = game.turn() === 'w' ? 'b' : 'w';
-                winnerId = playerColor === winnerColor ? 'p1' : 'bot';
-            }
-            setWinner(winnerId, { fen }, 'checkmate');
-        } else {
-            setWinner('draw', { fen }, 'draw');
-        }
-    }
-}, [game, setWinner, playerColor, isMultiplayer, room]);
-
-
   // Bot logic
   useEffect(() => {
     if (!isMultiplayer && !gameOver && currentPlayer !== playerColor && isMounted) {
@@ -89,8 +68,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
           if (result) {
             const newGame = new Chess(game.fen());
             setGame(newGame);
+            checkGameOver(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            checkGameOver();
             switchTurn({ fen: newGame.fen() }, result.san, captured);
           }
         }
@@ -125,8 +104,8 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
         if (result) {
             const newGame = new Chess(game.fen());
             setGame(newGame);
+            checkGameOver(newGame);
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
-            checkGameOver();
             switchTurn({ fen: newGame.fen() }, result.san, captured);
         }
       }
