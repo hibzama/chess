@@ -1,4 +1,3 @@
-
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -150,7 +149,7 @@ function MultiplayerGamePageContent() {
     const USDT_RATE = 310;
 
     useEffect(() => {
-        if (!isGameLoading && (!room || !user || !userData)) {
+        if (!isGameLoading && (!room || !user || !userData) && !gameOver) {
             toast({
                 variant: "destructive",
                 title: "Error",
@@ -158,7 +157,8 @@ function MultiplayerGamePageContent() {
             });
             router.push('/lobby');
         }
-    }, [isGameLoading, room, user, userData, router, toast]);
+    }, [isGameLoading, room, user, userData, router, toast, gameOver]);
+
 
      useEffect(() => {
         roomStatusRef.current = room?.status;

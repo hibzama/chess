@@ -1,7 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess, Piece as ChessPiece } from 'chess.js';
@@ -385,14 +385,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
-            if (!docSnap.exists() || !user || gameOverHandledRef.current) {
-                if (!docSnap.exists() && isGameLoading) { 
-                     router.push('/lobby');
+            if (!docSnap.exists()) {
+                if (isGameLoading) { // Only redirect if it was loading, to prevent redirect on room deletion
+                    router.push('/lobby');
                 }
                 setIsGameLoading(false);
                 return;
             };
-    
+            
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
 
@@ -408,13 +408,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 return;
             }
             
-            // This is the key logic change. If the user is viewing a room they can join, stop loading.
-            if (roomData.status === 'waiting' && !roomData.players.includes(user.uid)) {
-                 setIsGameLoading(false);
-                 return;
-            }
-            
-            if (roomData.players.includes(user.uid) && (roomData.status === 'waiting' || roomData.status === 'in-progress')) {
+            const isPlayerInRoom = roomData.players.includes(user.uid);
+
+            if (isPlayerInRoom || roomData.status === 'waiting') {
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
 
