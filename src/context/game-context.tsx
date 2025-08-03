@@ -185,12 +185,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                  if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
-                    const totalPieces = gameType === 'chess' ? 16 : 12;
-                    const resignerPieceCount = isCreatorResigner ? (totalPieces - (roomData.capturedByP2?.length || 0)) : (totalPieces - (roomData.capturedByP1?.length || 0));
-
-                    const winnerPayoutRate = 1.05;
                     const resignerRefundRate = 0.75;
-                    
+                    const winnerPayoutRate = 1.05;
+
                     if (isCreatorResigner) {
                         creatorPayout = wager * resignerRefundRate;
                         joinerPayout = wager * winnerPayoutRate;
@@ -198,11 +195,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         creatorPayout = wager * winnerPayoutRate;
                         joinerPayout = wager * resignerRefundRate;
                     }
-
+                    
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
-                    transaction.update(roomRef, { 'winner.resignerPieceCount': resignerPieceCount });
-
                 } else if (winnerId === 'draw') { // Draw logic
                     creatorPayout = joinerPayout = wager * 0.9;
                     creatorDesc = `Draw refund vs ${roomData.player2.name}`;
