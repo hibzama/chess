@@ -122,7 +122,7 @@ const ResignationDialogContent = ({ roomWager, playerPieceCount }: { roomWager: 
     if (playerPieceCount >= 1 && playerPieceCount <= 3) {
         refundPercentage = 30;
         opponentPayoutPercentage = 150;
-    } else if (playerPieceCount >= 4 && playerPieceCount <= 6) {
+    } else if (playerPieceCount > 3 && playerPieceCount <= 6) {
         refundPercentage = 50;
         opponentPayoutPercentage = 130;
     } else { // 7+ pieces
@@ -134,9 +134,9 @@ const ResignationDialogContent = ({ roomWager, playerPieceCount }: { roomWager: 
     const opponentPayout = roomWager * (opponentPayoutPercentage / 100);
 
     return (
-        <div className="text-left">
-            <p className="mt-2">Based on the current board state ({playerPieceCount} pieces left):</p>
-            <ul className="list-disc pl-5 text-sm mt-2 space-y-1">
+        <div className="space-y-2 text-left pt-4">
+            <div>Resigning will forfeit the match. Based on the current board state ({playerPieceCount} pieces left):</div>
+            <ul className="list-disc pl-5 text-sm">
                 <li><span className="font-bold text-destructive">You will receive a {refundPercentage}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
                 <li><span className="font-bold text-green-500">Your opponent will receive a {opponentPayoutPercentage}% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
             </ul>
