@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 
@@ -334,6 +334,89 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         const newState: GameState = { ...defaultState, playerColor: color, timeLimit: time, difficulty: diff, p1Time: time, p2Time: time };
         updateAndSaveState(newState);
     }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
+
+    const switchTurn = useCallback(async (boardState: any, move?: string, capturedPiece?: Piece) => {
+        if (gameState.gameOver || gameState.isEnding) return;
+
+        const updateLogic = (prevState: GameState) => {
+            const p1IsCurrent = prevState.playerColor === prevState.currentPlayer;
+            let newMoveHistory = [...prevState.moveHistory];
+            let newMoveCount = prevState.moveCount + 1;
+            
+            if (move) {
+                if (prevState.currentPlayer === 'w') {
+                    newMoveHistory.push({ turn: Math.floor((newMoveCount - 1) / 2) + 1, white: move });
+                } else {
+                    const lastMoveIndex = newMoveHistory.length - 1;
+                    if (lastMoveIndex >= 0 && !newMoveHistory[lastMoveIndex].black) {
+                        newMoveHistory[lastMoveIndex] = { ...newMoveHistory[lastMoveIndex], black: move };
+                    } else {
+                        newMoveHistory.push({ turn: Math.floor((newMoveCount - 1) / 2) + 1, black: move });
+                    }
+                }
+            }
+
+            const newCapturedByPlayer = capturedPiece && !p1IsCurrent ? [...prevState.capturedByPlayer, capturedPiece] : prevState.capturedByPlayer;
+            const newCapturedByBot = capturedPiece && p1IsCurrent ? [...prevState.capturedByBot, capturedPiece] : prevState.capturedByBot;
+
+            const nextPlayer = prevState.currentPlayer === 'w' ? 'b' : 'w';
+
+            return {
+                ...prevState,
+                boardState,
+                currentPlayer: nextPlayer,
+                moveHistory: newMoveHistory,
+                moveCount: newMoveCount,
+                capturedByPlayer: newCapturedByPlayer,
+                capturedByBot: newCapturedByBot,
+            };
+        };
+
+        if (isMultiplayer && room) {
+            const roomRef = doc(db, 'game_rooms', room.id);
+            const now = Timestamp.now();
+            const elapsedSeconds = room.turnStartTime ? (now.toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
+            const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
+
+            const newP1Time = creatorIsCurrent ? room.p1Time - elapsedSeconds : room.p1Time;
+            const newP2Time = !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time;
+
+            let finalBoardState = boardState;
+            if (gameType === 'checkers' && boardState.board) {
+                finalBoardState = JSON.stringify(boardState.board);
+            }
+
+            const updatedGameState = updateLogic(gameState);
+            
+            const updatePayload: any = {
+                boardState: finalBoardState,
+                currentPlayer: updatedGameState.currentPlayer,
+                moveHistory: updatedGameState.moveHistory,
+                turnStartTime: now,
+                p1Time: newP1Time,
+                p2Time: newP2Time,
+            };
+
+            if (capturedPiece) {
+                const pieceToStore = { type: capturedPiece.type, color: capturedPiece.color };
+                if (room.currentPlayer === room.createdBy.color) { // Creator captured a piece
+                    updatePayload.capturedByP1 = [...(room.capturedByP1 || []), pieceToStore];
+                } else { // Joiner captured a piece
+                    updatePayload.capturedByP2 = [...(room.capturedByP2 || []), pieceToStore];
+                }
+            }
+
+            await updateDoc(roomRef, updatePayload);
+        } else {
+            setGameState(prevState => {
+                const newState = updateLogic(prevState);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(storageKey, JSON.stringify(newState));
+                }
+                return newState;
+            });
+        }
+    }, [gameState, isMultiplayer, room, gameType, storageKey]);
     
     const resign = useCallback(() => { 
         if (gameState.gameOver || gameState.isEnding || !user) return; 
@@ -345,7 +428,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         } 
     }, [gameState, user, room, isMultiplayer, setWinner]);
     
-    const resetGame = useCallback(() => { gameOverHandledRef.current = false; if(typeof window !== 'undefined' && !isMultiplayer) { localStorage.removeItem(storageKey); } const defaultState = getInitialState(); setGameState(defaultState); setRoom(null); }, [isMultiplayer, storageKey, getInitialState]);
+    const resetGame = useCallback(() => { 
+        gameOverHandledRef.current = false; 
+        if(typeof window !== 'undefined' && !isMultiplayer) { 
+            localStorage.removeItem(storageKey); 
+        } 
+        const defaultState = getInitialState(); 
+        setGameState(defaultState); 
+        setRoom(null); 
+    }, [isMultiplayer, storageKey, getInitialState]);
     
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
@@ -359,5 +450,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
-
-    
