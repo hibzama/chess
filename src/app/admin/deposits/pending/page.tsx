@@ -71,37 +71,41 @@ export default function PendingDepositsPage() {
                 // --- Bonus Logic ---
                 const bonusRef = doc(db, 'settings', 'depositBonus');
                 const bonusSnap = await getDoc(bonusRef);
+                
                 if (bonusSnap.exists()) {
                     const bonusData = bonusSnap.data() as DepositBonus;
-                    const bonusIsActive = bonusData.isActive && bonusData.startTime;
-                    const bonusExpiry = bonusIsActive ? bonusData.startTime!.toMillis() + (bonusData.durationHours * 60 * 60 * 1000) : 0;
-                    const isExpired = Date.now() > bonusExpiry;
+                    const bonusIsActive = bonusData.isActive === true;
                     
-                    const canClaim = bonusIsActive && 
-                                     !isExpired &&
-                                     (bonusData.claimedBy?.length || 0) < bonusData.maxUsers && 
-                                     !bonusData.claimedBy?.includes(userId);
-                    
-                    if (canClaim && amount >= bonusData.minDeposit && amount <= bonusData.maxDeposit) {
-                        const bonusAmount = amount * (bonusData.percentage / 100);
-                        totalAmountToCredit += bonusAmount;
+                    if (bonusIsActive) {
+                        const hasStartTime = !!bonusData.startTime;
+                        const bonusExpiry = hasStartTime ? bonusData.startTime!.toMillis() + (bonusData.durationHours * 60 * 60 * 1000) : 0;
+                        const isExpired = hasStartTime ? Date.now() > bonusExpiry : false; // If no start time, it can't be expired.
                         
-                        batch.update(bonusRef, {
-                            claimedBy: arrayUnion(userId)
-                        });
+                        const canClaim = !isExpired && 
+                                         (bonusData.claimedBy?.length || 0) < bonusData.maxUsers && 
+                                         !bonusData.claimedBy?.includes(userId);
                         
-                        // Create a separate transaction record for the bonus
-                         const bonusTransactionRef = doc(collection(db, 'transactions'));
-                         batch.set(bonusTransactionRef, {
-                            userId,
-                            type: 'bonus',
-                            amount: bonusAmount,
-                            status: 'completed',
-                            description: `${bonusData.percentage}% Deposit Bonus`,
-                            createdAt: serverTimestamp()
-                         });
-                         
-                        toastDescription = `Deposit of LKR ${amount.toFixed(2)} approved with a bonus of LKR ${bonusAmount.toFixed(2)}!`;
+                        if (canClaim && amount >= bonusData.minDeposit && amount <= bonusData.maxDeposit) {
+                            const bonusAmount = amount * (bonusData.percentage / 100);
+                            totalAmountToCredit += bonusAmount;
+                            
+                            batch.update(bonusRef, {
+                                claimedBy: arrayUnion(userId)
+                            });
+                            
+                            // Create a separate transaction record for the bonus
+                             const bonusTransactionRef = doc(collection(db, 'transactions'));
+                             batch.set(bonusTransactionRef, {
+                                userId,
+                                type: 'bonus',
+                                amount: bonusAmount,
+                                status: 'completed',
+                                description: `${bonusData.percentage}% Deposit Bonus`,
+                                createdAt: serverTimestamp()
+                             });
+                             
+                            toastDescription = `Deposit of LKR ${amount.toFixed(2)} approved with a bonus of LKR ${bonusAmount.toFixed(2)}!`;
+                        }
                     }
                 }
                 // --- End Bonus Logic ---
