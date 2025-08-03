@@ -5,6 +5,7 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
+import { Chess } from 'chess.js';
 
 type PlayerColor = 'w' | 'b';
 type Player = 'p1' | 'p2';
@@ -461,7 +462,43 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 capturedByBot: newCapturedByBot,
             };
         };
+        
+        const updatedGameState = updateLogic(gameState);
+        
+        // --- Check for Game Over Conditions ---
+        if (gameType === 'chess') {
+            const game = new Chess(boardState);
+            const opponentId = room?.players.find(p => p !== user?.uid);
+            if (game.isCheckmate()) {
+                setWinner(user!.uid, boardState, 'checkmate');
+                return;
+            } else if (game.isDraw()) {
+                setWinner('draw', boardState, 'draw');
+                return;
+            }
+        } else if (gameType === 'checkers') {
+            const board = boardState.board as ({player: PlayerColor} | null)[][];
+            let whitePieces = 0;
+            let blackPieces = 0;
+            board.forEach(row => row.forEach(piece => {
+                if (piece) {
+                    if (piece.player === 'w') whitePieces++;
+                    else if (piece.player === 'b') blackPieces++;
+                }
+            }));
+            
+            if (whitePieces === 0) {
+                 const winnerId = room?.players.find(p => room.createdBy.uid === p ? room.createdBy.color === 'b' : room.player2?.color === 'b');
+                setWinner(winnerId!, boardState, 'piece-capture');
+                return;
+            } else if (blackPieces === 0) {
+                 const winnerId = room?.players.find(p => room.createdBy.uid === p ? room.createdBy.color === 'w' : room.player2?.color === 'w');
+                 setWinner(winnerId!, boardState, 'piece-capture');
+                return;
+            }
+        }
 
+        // If game is not over, proceed with turn switch
         if (isMultiplayer && room) {
             const roomRef = doc(db, 'game_rooms', room.id);
             const now = Timestamp.now();
@@ -475,8 +512,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (gameType === 'checkers' && boardState.board) {
                 finalBoardStateForFirestore = JSON.stringify(boardState.board);
             }
-
-            const updatedGameState = updateLogic(gameState);
             
             const updatePayload: any = {
                 boardState: finalBoardStateForFirestore,
@@ -499,14 +534,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             await updateDoc(roomRef, updatePayload);
         } else {
             setGameState(prevState => {
-                const newState = updateLogic(prevState);
                 if (typeof window !== 'undefined') {
-                    localStorage.setItem(storageKey, JSON.stringify(newState));
+                    localStorage.setItem(storageKey, JSON.stringify(updatedGameState));
                 }
-                return newState;
+                return updatedGameState;
             });
         }
-    }, [gameState, isMultiplayer, room, gameType, storageKey]);
+    }, [gameState, isMultiplayer, room, gameType, storageKey, setWinner, user]);
     
 
     const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
