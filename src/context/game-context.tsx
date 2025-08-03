@@ -1,3 +1,4 @@
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -275,7 +276,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         }
     }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout]);
 
-    // This is now the single source of truth for multiplayer state.
+    // Multiplayer state sync
     useEffect(() => {
         if (!isMultiplayer || !roomId || !user) {
             setIsGameLoading(false);
@@ -291,8 +292,43 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
-            
+
             // This logic runs for ANY user observing the room.
+             if (roomData.status === 'completed' && !gameOverHandledRef.current) {
+                gameOverHandledRef.current = true;
+                const winnerIsMe = roomData.winner?.uid === user.uid;
+                const iAmResigner = roomData.winner?.resignerId === user.uid;
+                const wager = roomData.wager || 0;
+                let myPayout = 0;
+
+                if (iAmResigner) {
+                    const pieceCount = roomData.winner?.resignerPieceCount ?? (gameType === 'chess' ? 16 : 12);
+                    if(pieceCount <= 3) myPayout = wager * 0.3;
+                    else if (pieceCount <= 6) myPayout = wager * 0.5;
+                    else myPayout = wager * 0.75;
+                } else if (roomData.winner?.resignerId) {
+                    const pieceCount = roomData.winner?.resignerPieceCount ?? (gameType === 'chess' ? 16 : 12);
+                    if(pieceCount <= 3) myPayout = wager * 1.5;
+                    else if (pieceCount <= 6) myPayout = wager * 1.3;
+                    else myPayout = wager * 1.05;
+                } else if (roomData.draw) {
+                    myPayout = wager * 0.9;
+                } else if (winnerIsMe) {
+                    myPayout = wager * 1.8;
+                }
+                
+                setGameState(prevState => ({
+                    ...prevState,
+                    boardState: roomData.boardState,
+                    gameOver: true,
+                    winner: roomData.draw ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
+                    gameOverReason: roomData.winner?.method || null,
+                    payoutAmount: myPayout,
+                }));
+                return;
+            }
+
+
             if (roomData.status === 'waiting' || roomData.status === 'in-progress') {
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
@@ -312,7 +348,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     capturedByPlayer: isCreator ? (roomData.capturedByP2 || []) : (roomData.capturedByP1 || []),
                     capturedByBot: isCreator ? (roomData.capturedByP1 || []) : (roomData.capturedByP2 || []), // Using bot for opponent
                     p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
-                    p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
+                    p2Time: !isCreator ? roomData.p1Time : roomData.p2Time,
                     playerPieceCount: (gameType === 'chess' ? 16 : 12) - (isCreator ? (roomData.capturedByP2?.length || 0) : (roomData.capturedByP1?.length || 0)),
                     opponentPieceCount: (gameType === 'chess' ? 16 : 12) - (isCreator ? (roomData.capturedByP1?.length || 0) : (roomData.capturedByP2?.length || 0)),
                 }));
@@ -446,6 +482,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
 export const useGame = () => {
     const context = useContext(GameContext);
-    if (!context) { throw new Error('useGame must be used within a GameProvider'); }
+    if (!context) {
+        throw new Error('useGame must be used within a GameProvider');
+    }
     return context;
-}
+};
+
+    
