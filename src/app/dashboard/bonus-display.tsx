@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gift, Wallet } from 'lucide-react';
+import { Gift, Wallet, Users } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 
@@ -13,6 +13,7 @@ interface DepositBonus {
     percentage: number;
     minDeposit: number;
     maxDeposit: number;
+    maxUsers: number;
     isActive: boolean;
     durationHours: number;
     startTime?: Timestamp;
@@ -97,7 +98,8 @@ export default function BonusDisplay() {
           <span className="text-yellow-300">Limited Time: {bonus.percentage}% Deposit Bonus!</span>
         </CardTitle>
         <CardDescription className="text-foreground/80">
-          Get a {bonus.percentage}% bonus on any deposit between LKR {bonus.minDeposit.toFixed(2)} (~{minUsdt} USDT) and LKR {bonus.maxDeposit.toFixed(2)} (~{maxUsdt} USDT). Don't miss out!
+          Get a {bonus.percentage}% bonus on any deposit between LKR {bonus.minDeposit.toFixed(2)} (~{minUsdt} USDT) and LKR {bonus.maxDeposit.toFixed(2)} (~{maxUsdt} USDT). 
+          This offer is available for the first {bonus.maxUsers} players. Don't miss out!
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4">

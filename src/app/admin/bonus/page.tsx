@@ -71,13 +71,16 @@ export default function BonusPage() {
             if(bonus.isActive && !initialIsActive) {
                 bonusPayload.startTime = serverTimestamp();
             } else if (!bonus.isActive) {
-                bonusPayload.startTime = null; // Clear start time if not active
+                bonusPayload.startTime = undefined; // Use undefined to remove field on update
             }
+
 
             await setDoc(bonusRef, bonusPayload, { merge: true });
             
             // Update the initial state after a successful save
-            setInitialIsActive(bonus.isActive || false);
+            if (bonus.isActive !== undefined) {
+                setInitialIsActive(bonus.isActive);
+            }
 
             toast({
                 title: 'Success!',
@@ -132,7 +135,6 @@ export default function BonusPage() {
                      <div className="space-y-2">
                         <Label htmlFor="maxUsers" className="flex items-center gap-2"><Users/> Max Users</Label>
                         <Input id="maxUsers" type="number" value={bonus.maxUsers || 0} onChange={(e) => handleChange('maxUsers', e.target.value)} />
-                         <p className="text-sm text-muted-foreground">{(bonus.claimedBy || []).length} / {bonus.maxUsers || 0} claimed</p>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="minDeposit" className="flex items-center gap-2"><DollarSign/> Minimum Deposit (LKR)</Label>
