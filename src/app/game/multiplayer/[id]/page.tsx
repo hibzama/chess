@@ -1,3 +1,4 @@
+
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -14,7 +15,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import GameChat from '@/components/game/game-chat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-
 
 // Game Components
 import ChessBoard from '@/components/game/chess-board';
@@ -137,16 +137,15 @@ function NavigationGuard() {
     )
 }
 
-function MultiplayerGamePageContent() {
+function MultiplayerGame() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, isGameLoading } = useGame();
+    const { gameOver, isGameLoading, room } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
-    const { room } = useGame();
-
+    
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
@@ -453,7 +452,6 @@ function MultiplayerGamePageContent() {
         }
     }
 
-
     return (
         <>
         {!gameOver && <NavigationGuard />}
@@ -483,7 +481,6 @@ function MultiplayerGamePageContent() {
 export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const { isGameLoading } = useGame();
 
     useEffect(() => {
         const fetchGameType = async () => {
@@ -501,7 +498,7 @@ export default function MultiplayerGamePage() {
         fetchGameType();
     }, [roomId]);
 
-    if (!gameType || isGameLoading) {
+    if (!gameType) {
          return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -514,7 +511,7 @@ export default function MultiplayerGamePage() {
     
     return (
          <GameProvider gameType={gameType}>
-            <MultiplayerGamePageContent />
+            <MultiplayerGame />
         </GameProvider>
     )
 }
