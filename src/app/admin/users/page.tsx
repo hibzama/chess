@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldCheck, User, CheckCircle } from 'lucide-react';
+import { ShieldCheck, User, CheckCircle, Wallet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface UserData {
@@ -18,6 +18,7 @@ interface UserData {
     email: string;
     role: 'user' | 'admin' | 'marketer';
     emailVerified?: boolean;
+    balance?: number;
 }
 
 export default function UsersPage() {
@@ -89,6 +90,7 @@ export default function UsersPage() {
                             <TableHead>Name</TableHead>
                             <TableHead>Email</TableHead>
                             <TableHead>Role</TableHead>
+                            <TableHead>Balance</TableHead>
                              <TableHead>Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -103,6 +105,12 @@ export default function UsersPage() {
                                         {user.role === 'admin' ? <ShieldCheck className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5"/> }
                                         <span className="capitalize">{user.role}</span>
                                     </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex items-center gap-2">
+                                        <Wallet className="w-4 h-4 text-muted-foreground"/>
+                                        <span>LKR {(user.balance || 0).toFixed(2)}</span>
+                                    </div>
                                 </TableCell>
                                  <TableCell>
                                     {user.emailVerified ? (
