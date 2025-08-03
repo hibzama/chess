@@ -232,29 +232,12 @@ function MultiplayerGame() {
                 if (!creatorDoc.exists() || !joinerDoc.exists()) {
                     throw new Error("One of the players does not exist");
                 }
-        
+
                 const playersWithData = [
                     { id: creatorDoc.id, data: creatorDoc.data(), name: roomData.createdBy.name },
                     { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
                 ];
                 
-                const allReferrerIds = new Set<string>();
-                playersWithData.forEach(p => {
-                    if (p.data.referredBy) allReferrerIds.add(p.data.referredBy);
-                    if (p.data.referralChain) p.data.referralChain.forEach((id: string) => allReferrerIds.add(id));
-                });
-    
-                const referrerDocs = await Promise.all(
-                    Array.from(allReferrerIds).map(id => transaction.get(doc(db, 'users', id)))
-                );
-    
-                const referrerDataMap = new Map<string, DocumentData>();
-                referrerDocs.forEach(docSnap => {
-                    if (docSnap.exists()) {
-                        referrerDataMap.set(docSnap.id, docSnap.data());
-                    }
-                });
-
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
@@ -268,7 +251,6 @@ function MultiplayerGame() {
         
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-                    // Wager is deducted from both players upon joining
                     for (const player of playersWithData) {
                         transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
@@ -277,14 +259,12 @@ function MultiplayerGame() {
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
-                        // --- Commission Logic for both players ---
-                        // Marketing Chain Commissions (always takes precedence)
-                        if (player.data.referralChain?.length > 0) {
+                        // --- Commission Logic ---
+                        if (player.data.referralChain && player.data.referralChain.length > 0) {
                             const marketingCommissionRate = 0.03;
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
                                 const commissionAmount = wagerAmount * marketingCommissionRate;
-
                                 transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
                                 transaction.set(doc(collection(db, 'transactions')), {
                                     userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
@@ -292,14 +272,11 @@ function MultiplayerGame() {
                                     level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
                                 });
                             }
-                        }
-
-                        // Direct L1 Commissions (can happen in addition to marketing chain)
-                        if (player.data.referredBy) {
+                        } else if (player.data.referredBy) {
                             const l1ReferrerId = player.data.referredBy;
-                            const l1ReferrerData = referrerDataMap.get(l1ReferrerId);
-                            
-                             if (l1ReferrerData) {
+                            const referrerDoc = await transaction.get(doc(db, 'users', l1ReferrerId));
+                            if (referrerDoc.exists()) {
+                                const l1ReferrerData = referrerDoc.data();
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
@@ -309,12 +286,8 @@ function MultiplayerGame() {
                                 const l1Commission = wagerAmount * rank.l1Rate;
         
                                 if (l1Commission > 0) {
-                                    if (l1ReferrerData.role === 'marketer') {
-                                        transaction.update(doc(db, 'users', l1ReferrerId), { marketingBalance: increment(l1Commission) });
-                                    } else {
-                                        transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
-                                    }
-                                    
+                                    const commissionBalanceType = l1ReferrerData.role === 'marketer' ? 'marketingBalance' : 'balance';
+                                    transaction.update(doc(db, 'users', l1ReferrerId), { [commissionBalanceType]: increment(l1Commission) });
                                     transaction.set(doc(collection(db, 'transactions')), {
                                         userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
                                         description: `L1 Commission from ${player.name}`, fromUserId: player.id,
@@ -515,5 +488,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
