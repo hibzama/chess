@@ -53,7 +53,7 @@ type CheckersBoardProps = {
 }
 
 export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_black' }: CheckersBoardProps) {
-    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted, isMultiplayer } = useGame();
+    const { playerColor, switchTurn, setWinner, gameOver, currentPlayer, boardState, isMounted, isMultiplayer, updateAndSaveState } = useGame();
     const [selectedPiece, setSelectedPiece] = useState<Position | null>(null);
     const [possibleMoves, setPossibleMoves] = useState<Move[]>([]);
     const { toast } = useToast();
@@ -142,24 +142,26 @@ export default function CheckersBoard({ boardTheme = 'ocean', pieceStyle = 'red_
             newBoard[jumpedRow][jumpedCol] = null;
         }
         
+        const finalCapturedPiece = captured ? { type: captured.type, color: captured.player } as unknown as Piece : undefined;
         const moreJumps = move.isJump ? getPossibleMovesForPiece(piece, move.to, newBoard, piece.player).filter(m => m.isJump) : [];
 
-        if (moreJumps.length > 0 && (isMultiplayer ? currentPlayer === playerColor : true) ) {
+        if (moreJumps.length > 0) {
+            // There's a consecutive jump, so don't switch turns.
+            // Just update the board state and set up for the next jump.
             setConsecutiveJumpPiece(move.to);
-            if (piece.player === playerColor) { 
-                setSelectedPiece(move.to);
-                setPossibleMoves(moreJumps);
-            }
+            setSelectedPiece(move.to);
+            setPossibleMoves(moreJumps);
+            // This is a local state update, not a full `switchTurn`.
+            updateAndSaveState({ boardState: { board: newBoard }});
         } else {
+            // No more jumps, switch the turn.
             setConsecutiveJumpPiece(null);
             setSelectedPiece(null);
             setPossibleMoves([]);
+            switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
         }
         
-        const finalCapturedPiece = captured ? { type: captured.type, color: captured.player } as unknown as Piece : undefined;
-        switchTurn({ board: newBoard }, moveNotation, finalCapturedPiece);
-        
-    }, [board, switchTurn, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer]);
+    }, [board, switchTurn, getPossibleMovesForPiece, playerColor, currentPlayer, isMultiplayer, updateAndSaveState]);
 
     const botMove = useCallback(() => {
         if(!board) return;
