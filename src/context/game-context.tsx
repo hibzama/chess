@@ -181,6 +181,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let creatorDesc = '', joinerDesc = '';
                 
                 const { winnerId, method, resignerDetails } = winnerDetails;
+                const winnerObject: GameRoom['winner'] = { uid: null, method };
     
                 if (resignerDetails) { // Resignation logic
                     const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
@@ -201,6 +202,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                    
+                    winnerObject.uid = roomData.players.find(p => p !== resignerDetails.id) || null;
+                    winnerObject.resignerId = resignerDetails.id;
+                    winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+
                 } else if (winnerId === 'draw') { // Draw logic
                     creatorPayout = joinerPayout = wager * 0.9;
                     creatorDesc = `Draw refund vs ${roomData.player2.name}`;
@@ -213,6 +219,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
                     transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
+                    winnerObject.uid = winnerId;
                 }
     
                 const now = serverTimestamp();
@@ -229,7 +236,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 transaction.update(roomRef, { 
                     status: 'completed',
-                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId: resignerDetails?.id || null, resignerPieceCount: resignerDetails?.pieceCount },
+                    winner: winnerObject,
                     draw: winnerId === 'draw',
                     payoutTransactionId: payoutTxId 
                 });
@@ -581,6 +588,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
-
-    
-
