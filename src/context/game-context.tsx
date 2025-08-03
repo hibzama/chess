@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -187,17 +188,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const totalPieces = gameType === 'chess' ? 16 : 12;
                     const resignerPieceCount = isCreatorResigner ? (totalPieces - (roomData.capturedByP2?.length || 0)) : (totalPieces - (roomData.capturedByP1?.length || 0));
 
-                    const winnerPayoutRate = 1.30;
-                    let resignerRefundRate;
+                    const winnerPayoutRate = 1.05;
+                    const resignerRefundRate = 0.75;
                     
-                    if (resignerPieceCount >= 6) {
-                        resignerRefundRate = 0.50; // 50% for 6+ pieces
-                    } else if (resignerPieceCount >= 3) {
-                        resignerRefundRate = 0.40; // 40% for 3-5 pieces
-                    } else { 
-                        resignerRefundRate = 0.20; // 20% for 1-2 pieces
-                    }
-
                     if (isCreatorResigner) {
                         creatorPayout = wager * resignerRefundRate;
                         joinerPayout = wager * winnerPayoutRate;
@@ -254,15 +247,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const wager = roomData.wager || 0;
                     const winnerData = roomData.winner;
                     if (winnerData?.resignerId) { // Resignation
-                        const pieceCount = winnerData.resignerPieceCount ?? (gameType === 'chess' ? 16 : 12);
-                        const winnerPayoutRate = 1.30;
-                        let resignerRefundRate;
-                        
-                        if (pieceCount >= 6) resignerRefundRate = 0.50;
-                        else if (pieceCount >= 3) resignerRefundRate = 0.40;
-                        else resignerRefundRate = 0.20;
-
-                        return { myPayout: winnerData.resignerId === user.uid ? wager * resignerRefundRate : wager * winnerPayoutRate };
+                        return { myPayout: winnerData.resignerId === user.uid ? wager * 0.75 : wager * 1.05 };
                     } else if (roomData.draw) { // Draw
                         return { myPayout: wager * 0.9 };
                     } else if (winnerData?.uid === user.uid) { // I won
@@ -321,12 +306,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let myPayout = 0;
 
                  if (iAmResigner) {
-                    const pieceCount = roomData.winner?.resignerPieceCount ?? (gameType === 'chess' ? 16 : 12);
-                    if(pieceCount >= 6) myPayout = wager * 0.50;
-                    else if (pieceCount >= 3) myPayout = wager * 0.40;
-                    else myPayout = wager * 0.20;
+                    myPayout = wager * 0.75;
                 } else if (roomData.winner?.resignerId) {
-                    myPayout = wager * 1.30;
+                    myPayout = wager * 1.05;
                 } else if (roomData.draw) {
                     myPayout = wager * 0.9;
                 } else if (winnerIsMe) {

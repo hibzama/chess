@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -145,11 +146,11 @@ export default function ProfilePage() {
             else stats[statType].draws++;
         });
 
-        if (stats.chess.played > 0) {
-            stats.chess.winRate = Math.round((stats.chess.wins / (stats.chess.played - stats.chess.draws)) * 100) || 0;
+        if (stats.chess.played > 0 && (stats.chess.played - stats.chess.draws > 0)) {
+            stats.chess.winRate = Math.round((stats.chess.wins / (stats.chess.played - stats.chess.draws)) * 100);
         }
-        if (stats.checkers.played > 0) {
-            stats.checkers.winRate = Math.round((stats.checkers.wins / (stats.checkers.played - stats.checkers.draws)) * 100) || 0;
+        if (stats.checkers.played > 0 && (stats.checkers.played - stats.checkers.draws > 0)) {
+            stats.checkers.winRate = Math.round((stats.checkers.wins / (stats.checkers.played - stats.checkers.draws)) * 100);
         }
 
         return stats;
@@ -233,9 +234,8 @@ export default function ProfilePage() {
     
     const overallWinRate = () => {
         const totalPlayed = chessStats.played + checkersStats.played;
-        if (totalPlayed === 0) return 0;
         const totalNonDraws = totalPlayed - (chessStats.draws + checkersStats.draws);
-        if (totalNonDraws === 0) return 0;
+        if (totalNonDraws <= 0) return 0;
         return Math.round(((chessStats.wins + checkersStats.wins) / totalNonDraws) * 100);
     }
 
@@ -407,3 +407,4 @@ export default function ProfilePage() {
         </div>
     );
 }
+

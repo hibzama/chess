@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import Link from 'next/link';
@@ -116,27 +117,16 @@ const GameOverDisplay = () => {
     )
 }
 
-const ResignationDialogContent = ({ roomWager, playerPieceCount }: { roomWager: number, playerPieceCount: number}) => {
-    const opponentPayoutPercentage = 130;
-    let refundPercentage;
-
-    if (playerPieceCount >= 6) {
-        refundPercentage = 50;
-    } else if (playerPieceCount >= 3) {
-        refundPercentage = 40;
-    } else {
-        refundPercentage = 20;
-    }
-
-    const refundAmount = roomWager * (refundPercentage / 100);
-    const opponentPayout = roomWager * (opponentPayoutPercentage / 100);
+const ResignationDialogContent = ({ roomWager }: { roomWager: number }) => {
+    const refundAmount = roomWager * 0.75;
+    const opponentPayout = roomWager * 1.05;
 
     return (
         <div className="space-y-2 text-left pt-4">
-            <div>Resigning will forfeit the match. Based on the current board state ({playerPieceCount} pieces left):</div>
+            <div>Resigning will forfeit the match.</div>
             <ul className="list-disc pl-5 text-sm">
-                <li><span className="font-bold text-destructive">You will receive a {refundPercentage}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
-                <li><span className="font-bold text-green-500">Your opponent will receive a {opponentPayoutPercentage}% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
+                <li><span className="font-bold text-destructive">You will receive a 75% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
+                <li><span className="font-bold text-green-500">Your opponent will receive a 105% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
             </ul>
         </div>
     )
@@ -265,7 +255,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 <AlertDialogDescription asChild>
                     <div>
                         {isMultiplayer && roomWager > 0 ? (
-                           <ResignationDialogContent roomWager={roomWager} playerPieceCount={playerPieceCount} />
+                           <ResignationDialogContent roomWager={roomWager} />
                         ) : (
                             <div>This is a practice match, so no funds will be lost.</div>
                         )}
