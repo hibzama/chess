@@ -3,52 +3,49 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
+    // Allow users to read/write their own data.
+    // Allow admins to read/update any user's data.
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
-      allow read: if isAdmin();
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    match /marketing_applications/{appId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if isAdmin();
-    }
-    
-    match /transactions/{transactionId} {
-       allow create: if request.auth.uid == request.resource.data.userId;
-       allow read, update, delete: if isAdmin() || request.auth.uid == resource.data.userId;
-    }
-    
-    match /game_rooms/{roomId} {
-       allow read, create: if request.auth != null;
-       allow update: if request.auth.uid in resource.data.players;
-       allow delete: if request.auth.uid == resource.data.createdBy.uid || isAdmin();
+    // Allow admins to read and write to the settings collection for features like the deposit bonus.
+    match /settings/{docId} {
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    match /chats/{chatId} {
-      allow read, update: if request.auth.uid in resource.data.users;
-      
-      match /messages/{messageId} {
-        allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
+    // Public read for game rooms, but only authenticated users can write (create, join, update).
+    match /game_rooms/{roomId} {
+      allow read: if true;
+      allow write: if request.auth != null;
     }
     
-    match /friend_requests/{requestId} {
-      allow read, create, delete: if request.auth.uid == request.resource.data.fromId || request.auth.uid == request.resource.data.toId;
+    // Allow anyone to submit a marketing application, but only admins can read them.
+    match /marketing_applications/{appId} {
+      allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow create: if request.auth != null; // Anyone can apply
+      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'; // Admin updates status
     }
-    
+
+    // Allow reads/writes to chat messages only for users who are part of that chat.
+    match /chats/{chatId}/{message=**} {
+      allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+    }
+
+    // Allow authenticated users to write transactions (deposits, withdrawals, etc.).
+    // Allow admins to read all transactions.
+    match /transactions/{transactionId} {
+       allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' 
+                  || request.auth.uid == resource.data.userId;
+       allow create: if request.auth.uid == request.resource.data.userId;
+       allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Notifications can be read/updated by the user they are for.
     match /notifications/{notificationId} {
-       allow read, update: if request.auth.uid == resource.data.userId;
-       allow create: if request.auth != null; // Server/functions should have more fine-grained control
-    }
-    
-    match /settings/{settingId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
+        allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
+        allow create: if request.auth != null;
     }
   }
 }
