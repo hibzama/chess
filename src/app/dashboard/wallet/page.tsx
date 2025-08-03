@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle, Swords, Trophy, Info, AlertTriangle } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, Clock, CheckCircle2, XCircle, Banknote, History, Copy, User, MessageCircle, Swords, Trophy, Info, AlertTriangle, Gift } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,7 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type Transaction = {
     id: string;
-    type: 'deposit' | 'withdrawal' | 'wager' | 'payout' | 'commission' | 'commission_transfer';
+    type: 'deposit' | 'withdrawal' | 'wager' | 'payout' | 'commission' | 'commission_transfer' | 'bonus';
     amount: number;
     status: 'pending' | 'approved' | 'rejected' | 'completed';
     createdAt: any;
@@ -238,6 +238,7 @@ export default function WalletPage() {
         case 'wager': return <Swords className="w-5 h-5 text-orange-500" />;
         case 'payout': return <Trophy className="w-5 h-5 text-yellow-500" />;
         case 'commission_transfer': return <DollarSign className="w-5 h-5 text-blue-500" />;
+        case 'bonus': return <Gift className="w-5 h-5 text-pink-500" />;
         default: return <DollarSign className="w-5 h-5 text-gray-500" />;
     }
   }

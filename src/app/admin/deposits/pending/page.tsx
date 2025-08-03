@@ -65,9 +65,8 @@ export default function PendingDepositsPage() {
                 const userDoc = await getDoc(userRef);
                 if (!userDoc.exists()) throw new Error("User not found");
 
-                let totalDepositAmount = amount;
-                let bonusAmount = 0;
-                let bonusDescription = `Deposit approved.`;
+                let totalAmountToCredit = amount;
+                let toastDescription = `Deposit of LKR ${amount.toFixed(2)} approved.`;
 
                 // --- Bonus Logic ---
                 const bonusRef = doc(db, 'settings', 'depositBonus');
@@ -80,41 +79,41 @@ export default function PendingDepositsPage() {
                     
                     const canClaim = bonusIsActive && 
                                      !isExpired &&
-                                     bonusData.claimedBy.length < bonusData.maxUsers && 
-                                     !bonusData.claimedBy.includes(userId);
+                                     (bonusData.claimedBy?.length || 0) < bonusData.maxUsers && 
+                                     !bonusData.claimedBy?.includes(userId);
                     
                     if (canClaim && amount >= bonusData.minDeposit && amount <= bonusData.maxDeposit) {
-                        bonusAmount = amount * (bonusData.percentage / 100);
-                        totalDepositAmount += bonusAmount;
+                        const bonusAmount = amount * (bonusData.percentage / 100);
+                        totalAmountToCredit += bonusAmount;
                         
                         batch.update(bonusRef, {
                             claimedBy: arrayUnion(userId)
                         });
                         
-                        // Create a transaction record for the bonus
+                        // Create a separate transaction record for the bonus
                          const bonusTransactionRef = doc(collection(db, 'transactions'));
                          batch.set(bonusTransactionRef, {
                             userId,
-                            type: 'deposit',
+                            type: 'bonus',
                             amount: bonusAmount,
                             status: 'completed',
                             description: `${bonusData.percentage}% Deposit Bonus`,
                             createdAt: serverTimestamp()
                          });
                          
-                        bonusDescription = `Deposit approved with a bonus of LKR ${bonusAmount.toFixed(2)}!`;
+                        toastDescription = `Deposit of LKR ${amount.toFixed(2)} approved with a bonus of LKR ${bonusAmount.toFixed(2)}!`;
                     }
                 }
                 // --- End Bonus Logic ---
 
-                batch.update(userRef, { balance: increment(totalDepositAmount) });
+                batch.update(userRef, { balance: increment(totalAmountToCredit) });
                 
                 toast({
                     title: 'Success!',
-                    description: bonusDescription,
+                    description: toastDescription,
                 });
 
-            } else {
+            } else { // 'rejected'
                  toast({
                     title: 'Success!',
                     description: `Deposit has been rejected.`,
