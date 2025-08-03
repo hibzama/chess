@@ -1,5 +1,4 @@
 
-
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -26,7 +25,8 @@ type GameRoom = {
 const USDT_RATE = 310;
 
 export default function PublicGames({ gameType }: { gameType: string }) {
-    const [rooms, setRooms] = useState<GameRoom[]>([]);
+    const [allWaitingRooms, setAllWaitingRooms] = useState<GameRoom[]>([]);
+    const [displayedRooms, setDisplayedRooms] = useState<GameRoom[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -35,17 +35,13 @@ export default function PublicGames({ gameType }: { gameType: string }) {
             collection(db, 'game_rooms'), 
             where('gameType', '==', gameType),
             where('isPrivate', '==', false),
+            where('status', '==', 'waiting')
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const now = Timestamp.now();
-            const fetchedRooms = snapshot.docs
-                .map(doc => ({ ...doc.data(), id: doc.id } as GameRoom))
-                // Filter for waiting status and expiry client-side
-                .filter(room => room.status === 'waiting' && room.expiresAt > now); 
-
+            const fetchedRooms = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as GameRoom));
             const sortedRooms = fetchedRooms.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-            setRooms(sortedRooms);
+            setAllWaitingRooms(sortedRooms);
             setLoading(false);
         }, (error) => {
             console.error("Error fetching public games:", error);
@@ -54,6 +50,19 @@ export default function PublicGames({ gameType }: { gameType: string }) {
 
         return () => unsubscribe();
     }, [gameType]);
+
+    useEffect(() => {
+        const intervalId = setInterval(() => {
+            const now = Timestamp.now();
+            setDisplayedRooms(allWaitingRooms.filter(room => room.expiresAt.toMillis() > now.toMillis()));
+        }, 1000); // Re-filter every second
+
+        // Initial filter run
+        const now = Timestamp.now();
+        setDisplayedRooms(allWaitingRooms.filter(room => room.expiresAt.toMillis() > now.toMillis()));
+
+        return () => clearInterval(intervalId);
+    }, [allWaitingRooms]);
 
     const handleJoin = (roomId: string) => {
         router.push(`/game/multiplayer/${roomId}`);
@@ -90,7 +99,7 @@ export default function PublicGames({ gameType }: { gameType: string }) {
                                     </div>
                                 </TableCell>
                             </TableRow>
-                        ) : rooms.length > 0 ? rooms.map(room => (
+                        ) : displayedRooms.length > 0 ? displayedRooms.map(room => (
                             <TableRow key={room.id}>
                                 <TableCell className="font-medium">{room.createdBy.name}</TableCell>
                                 <TableCell>
