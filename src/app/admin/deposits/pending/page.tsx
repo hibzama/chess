@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, writeBatch, serverTimestamp, arrayUnion, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,12 @@ export default function PendingDepositsPage() {
                 const bonusSnap = await getDoc(bonusRef);
                 if (bonusSnap.exists()) {
                     const bonusData = bonusSnap.data() as DepositBonus;
-                    const canClaim = bonusData.isActive && 
+                    const bonusIsActive = bonusData.isActive && bonusData.startTime;
+                    const bonusExpiry = bonusIsActive ? bonusData.startTime!.toMillis() + (bonusData.durationHours * 60 * 60 * 1000) : 0;
+                    const isExpired = Date.now() > bonusExpiry;
+                    
+                    const canClaim = bonusIsActive && 
+                                     !isExpired &&
                                      bonusData.claimedBy.length < bonusData.maxUsers && 
                                      !bonusData.claimedBy.includes(userId);
                     
@@ -180,5 +185,3 @@ export default function PendingDepositsPage() {
         </Card>
     );
 }
-
-    

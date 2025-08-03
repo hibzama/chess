@@ -2,14 +2,14 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Gift, Percent, Users, DollarSign } from 'lucide-react';
+import { Gift, Percent, Users, DollarSign, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export interface DepositBonus {
@@ -20,6 +20,8 @@ export interface DepositBonus {
     maxUsers: number;
     claimedBy: string[];
     isActive: boolean;
+    durationHours: number;
+    startTime?: Timestamp;
     createdAt?: any;
     updatedAt?: any;
 }
@@ -33,17 +35,21 @@ export default function BonusPage() {
         maxUsers: 100,
         claimedBy: [],
         isActive: false,
+        durationHours: 24,
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const { toast } = useToast();
+    const [wasActive, setWasActive] = useState(false);
 
     useEffect(() => {
         const fetchBonus = async () => {
             const bonusRef = doc(db, 'settings', 'depositBonus');
             const bonusSnap = await getDoc(bonusRef);
             if (bonusSnap.exists()) {
-                setBonus(bonusSnap.data() as DepositBonus);
+                const data = bonusSnap.data() as DepositBonus;
+                setBonus(data);
+                setWasActive(data.isActive);
             }
             setLoading(false);
         };
@@ -54,11 +60,21 @@ export default function BonusPage() {
         setSaving(true);
         try {
             const bonusRef = doc(db, 'settings', 'depositBonus');
-            await setDoc(bonusRef, { 
-                ...bonus,
-                updatedAt: serverTimestamp(),
-                createdAt: bonus.createdAt || serverTimestamp() // Set createdAt only if it doesn't exist
-            }, { merge: true });
+            
+            let bonusPayload: Partial<DepositBonus> = {
+                 ...bonus,
+                 updatedAt: serverTimestamp(),
+                 createdAt: bonus.createdAt || serverTimestamp() 
+            }
+
+            // If the bonus is being activated now, set its start time.
+            if(bonus.isActive && !wasActive) {
+                bonusPayload.startTime = serverTimestamp();
+            }
+
+            await setDoc(bonusRef, bonusPayload, { merge: true });
+
+            setWasActive(bonus.isActive);
 
             toast({
                 title: 'Success!',
@@ -73,8 +89,7 @@ export default function BonusPage() {
     };
     
     const handleChange = (field: keyof DepositBonus, value: any) => {
-        // Ensure numeric fields are stored as numbers
-        const isNumericField = ['percentage', 'minDeposit', 'maxDeposit', 'maxUsers'].includes(field);
+        const isNumericField = ['percentage', 'minDeposit', 'maxDeposit', 'maxUsers', 'durationHours'].includes(field);
         setBonus(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
     };
 
@@ -107,6 +122,10 @@ export default function BonusPage() {
                         <Label htmlFor="percentage" className="flex items-center gap-2"><Percent/> Bonus Percentage</Label>
                         <Input id="percentage" type="number" value={bonus.percentage} onChange={(e) => handleChange('percentage', e.target.value)} />
                     </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="durationHours" className="flex items-center gap-2"><Clock/> Bonus Duration (in hours)</Label>
+                        <Input id="durationHours" type="number" value={bonus.durationHours} onChange={(e) => handleChange('durationHours', e.target.value)} />
+                    </div>
                      <div className="space-y-2">
                         <Label htmlFor="maxUsers" className="flex items-center gap-2"><Users/> Max Users</Label>
                         <Input id="maxUsers" type="number" value={bonus.maxUsers} onChange={(e) => handleChange('maxUsers', e.target.value)} />
@@ -131,5 +150,3 @@ export default function BonusPage() {
         </Card>
     )
 }
-
-    
