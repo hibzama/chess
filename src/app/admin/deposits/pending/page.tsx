@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, writeBatch, serverTimestamp, arrayUnion, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, writeBatch, serverTimestamp, arrayUnion, Timestamp, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,7 @@ export default function PendingDepositsPage() {
         const transactionRef = doc(db, 'transactions', transactionId);
 
         try {
-            batch.update(transactionRef, { status: newStatus });
+            batch.update(transactionRef, { status: newStatus, description: `Deposit ${newStatus}.` });
 
             if (newStatus === 'approved') {
                 const userRef = doc(db, 'users', userId);
@@ -107,8 +107,7 @@ export default function PendingDepositsPage() {
                 }
                 // --- End Bonus Logic ---
 
-                const newBalance = (userDoc.data().balance || 0) + totalDepositAmount;
-                batch.update(userRef, { balance: newBalance });
+                batch.update(userRef, { balance: increment(totalDepositAmount) });
                 
                 toast({
                     title: 'Success!',
