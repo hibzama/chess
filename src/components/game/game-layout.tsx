@@ -143,6 +143,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
   const { user, userData } = useAuth();
   const router = useRouter();
   const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   
   const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
@@ -234,14 +235,14 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
              {isMultiplayer && (
                  <Card>
                     <CardContent className="p-4 space-y-2">
-                         <Popover>
+                         <Popover open={isChatOpen} onOpenChange={setIsChatOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className="w-full">
                                     <MessageSquare className="w-4 h-4 mr-2" /> Game Chat
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80 h-96 p-0 flex flex-col">
-                                <GameChat onClose={() => {}} />
+                                <GameChat onClose={() => setIsChatOpen(false)} />
                             </PopoverContent>
                         </Popover>
                         <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
@@ -276,7 +277,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </AlertDialog>
 
      {isMultiplayer && !gameOver && (
-         <Popover>
+         <Popover open={isChatOpen} onOpenChange={setIsChatOpen}>
             <PopoverTrigger asChild>
                 <button className="fixed bottom-24 right-6 w-16 h-16 bg-primary rounded-full flex items-center justify-center text-primary-foreground shadow-lg hover:bg-primary/90 transition-transform hover:scale-105 z-40 lg:hidden">
                     <MessageSquare className="w-8 h-8"/>
@@ -284,7 +285,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 </button>
             </PopoverTrigger>
             <PopoverContent side="top" align="end" className="w-80 h-96 p-0 flex flex-col mr-4 mb-2">
-                 <GameChat onClose={() => {}} />
+                 <GameChat onClose={() => setIsChatOpen(false)} />
             </PopoverContent>
          </Popover>
       )}
