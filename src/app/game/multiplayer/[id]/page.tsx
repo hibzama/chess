@@ -228,7 +228,7 @@ function MultiplayerGame() {
                 // --- PRE-READ ALL NECESSARY DATA ---
                 const playersWithData = [
                     { id: creatorRef.id, name: roomData.createdBy.name },
-                    { id: joinerRef.id, name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
+                    { id: joinerRef.id, name: `${userData.firstName} ${userData.lastName}` }
                 ];
                 
                 const playerDocReads = playersWithData.map(p => transaction.get(doc(db, 'users', p.id)));
@@ -247,12 +247,20 @@ function MultiplayerGame() {
                 if ((playerFullData[0].data?.balance || 0) < roomData.wager) {
                     throw new Error("Creator has insufficient funds.");
                 }
-
-                // Pre-fetch referrer data for all players if they have one
+                 // Pre-fetch referrer data for all players if they have one
                 const referrerReadsMap = new Map<string, Promise<DocumentData>>();
                 playerFullData.forEach(p => {
+                    // Check for regular referrer
                     if (p.data.referredBy && !referrerReadsMap.has(p.data.referredBy)) {
                         referrerReadsMap.set(p.data.referredBy, transaction.get(doc(db, 'users', p.data.referredBy)));
+                    }
+                    // Check for marketer chain
+                    if (p.data.referralChain && p.data.referralChain.length > 0) {
+                        p.data.referralChain.forEach((marketerId: string) => {
+                            if (!referrerReadsMap.has(marketerId)) {
+                                referrerReadsMap.set(marketerId, transaction.get(doc(db, 'users', marketerId)));
+                            }
+                        })
                     }
                 });
 
@@ -295,6 +303,7 @@ function MultiplayerGame() {
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
                                 const commissionAmount = wagerAmount * marketingCommissionRate;
+                                // Pay to marketingBalance for marketers
                                 transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
                                 transaction.set(doc(collection(db, 'transactions')), {
                                     userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
@@ -316,6 +325,7 @@ function MultiplayerGame() {
                                 const l1Commission = wagerAmount * rank.l1Rate;
         
                                 if (l1Commission > 0) {
+                                    // Pay to main balance for regular users
                                     transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
                                     transaction.set(doc(collection(db, 'transactions')), {
                                         userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
@@ -517,3 +527,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
