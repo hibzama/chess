@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db, storage } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
@@ -67,6 +67,20 @@ export default function WalletPage() {
     navigator.clipboard.writeText(text);
     toast({ title: 'Copied!', description: `${name} copied to clipboard.`});
   }
+
+  const withdrawalFeePercentage = 5;
+  const withdrawalFee = useMemo(() => {
+      const amount = parseFloat(withdrawalAmount);
+      if (isNaN(amount) || amount <= 0) return 0;
+      return amount * (withdrawalFeePercentage / 100);
+  }, [withdrawalAmount]);
+
+  const finalWithdrawalAmount = useMemo(() => {
+      const amount = parseFloat(withdrawalAmount);
+      if (isNaN(amount) || amount <= 0) return 0;
+      return amount - withdrawalFee;
+  }, [withdrawalAmount, withdrawalFee]);
+
 
   useEffect(() => {
     if (!user) {
@@ -155,14 +169,14 @@ export default function WalletPage() {
         return;
     }
 
-    const amountInLKR = parseFloat(withdrawalAmount);
+    const requestedAmount = parseFloat(withdrawalAmount);
 
-    if (amountInLKR < 500) {
+    if (requestedAmount < 500) {
         toast({ variant: 'destructive', title: 'Error', description: 'Minimum withdrawal amount is LKR 500.' });
         return;
     }
 
-    if(userData && userData.balance < amountInLKR) {
+    if(userData && userData.balance < requestedAmount) {
         toast({ variant: 'destructive', title: 'Error', description: 'Insufficient balance.' });
         return;
     }
@@ -170,15 +184,16 @@ export default function WalletPage() {
     setSubmittingWithdrawal(true);
     try {
         const userRef = doc(db, 'users', user.uid);
-        // Immediately deduct balance
+        // Immediately deduct balance for the full requested amount
         await updateDoc(userRef, {
-            balance: increment(-amountInLKR)
+            balance: increment(-requestedAmount)
         });
 
+      // The amount in the transaction is the amount the user will receive after the fee.
       await addDoc(collection(db, 'transactions'), {
         userId: user.uid,
         type: 'withdrawal',
-        amount: amountInLKR,
+        amount: finalWithdrawalAmount,
         status: 'pending',
         withdrawalMethod,
         withdrawalDetails: withdrawalMethod === 'bank' ? withdrawalDetails : { binancePayId },
@@ -199,7 +214,7 @@ export default function WalletPage() {
         // Revert balance deduction if firestore update fails
         const userRef = doc(db, 'users', user.uid);
         await updateDoc(userRef, {
-            balance: increment(amountInLKR)
+            balance: increment(requestedAmount)
         });
 
     } finally {
@@ -347,14 +362,31 @@ export default function WalletPage() {
                         </Tabs>
 
                         <div className="space-y-2">
-                            <Label htmlFor="withdrawal-amount">Amount (LKR)</Label>
+                            <Label htmlFor="withdrawal-amount">Amount to Withdraw (LKR)</Label>
                             <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 1550" required />
                              <p className="text-xs text-muted-foreground pt-1">Minimum withdrawal amount: 500 LKR</p>
                         </div>
-                         <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground">
-                            Equivalent in USDT: {(parseFloat(withdrawalAmount) / USDT_RATE || 0).toFixed(2)} USDT
+                         
+                        <Alert variant="destructive">
+                             <Info className="h-4 w-4" />
+                            <AlertTitle>Withdrawal Fee</AlertTitle>
+                            <AlertDescription>
+                                A {withdrawalFeePercentage}% fee is applied to all withdrawals.
+                            </AlertDescription>
+                        </Alert>
+                         
+                        <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground space-y-2">
+                            <div className="flex justify-between">
+                                <span>Fee ({withdrawalFeePercentage}%):</span>
+                                <span className="font-medium text-foreground">- LKR {withdrawalFee.toFixed(2)}</span>
+                            </div>
+                            <Separator/>
+                            <div className="flex justify-between font-bold">
+                                <span>You will receive:</span>
+                                <span className="text-foreground">LKR {finalWithdrawalAmount.toFixed(2)}</span>
+                            </div>
                         </div>
-                        
+
                         {withdrawalMethod === 'bank' && (
                         <>
                             <Separator />
@@ -511,5 +543,3 @@ export default function WalletPage() {
     </>
   );
 }
-
-    
