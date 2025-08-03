@@ -118,11 +118,8 @@ export default function WalletPage() {
 
     try {
         const amountInLKR = parseFloat(depositAmount);
-        const batch = writeBatch(db);
-
-        // Create the main deposit transaction
-        const depositRef = doc(collection(db, 'transactions'));
-        batch.set(depositRef, {
+       
+        await addDoc(collection(db, 'transactions'), {
             userId: user.uid,
             type: 'deposit',
             amount: amountInLKR,
@@ -132,37 +129,6 @@ export default function WalletPage() {
             createdAt: serverTimestamp()
         });
       
-        // Check for an active bonus and create a pending bonus transaction if eligible
-        const bonusRef = doc(db, 'settings', 'depositBonus');
-        const bonusSnap = await getDoc(bonusRef);
-        if (bonusSnap.exists()) {
-            const bonusData = bonusSnap.data() as DepositBonus;
-            const now = Date.now();
-            const bonusIsActive = bonusData.isActive && 
-                                  bonusData.startTime && 
-                                  (bonusData.startTime.toMillis() + (bonusData.durationHours * 3600 * 1000)) > now;
-
-            const claimedBy = bonusData.claimedBy || [];
-            const alreadyClaimed = claimedBy.includes(user.uid);
-            const amountEligible = amountInLKR >= bonusData.minDeposit && amountInLKR <= bonusData.maxDeposit;
-
-            if (bonusIsActive && !alreadyClaimed && amountEligible) {
-                const bonusAmount = amountInLKR * (bonusData.percentage / 100);
-                const pendingBonusRef = doc(collection(db, 'transactions'));
-                batch.set(pendingBonusRef, {
-                    userId: user.uid,
-                    type: 'bonus',
-                    amount: bonusAmount,
-                    status: 'pending',
-                    description: `${bonusData.percentage}% Deposit Bonus`,
-                    createdAt: serverTimestamp(),
-                });
-                batch.update(bonusRef, { claimedBy: arrayUnion(user.uid) });
-            }
-        }
-
-        await batch.commit();
-
         toast({ title: 'Success', description: 'Deposit request submitted for review.' });
         setDepositAmount('');
         setIsPostSubmitInfoOpen(true);
@@ -490,8 +456,7 @@ export default function WalletPage() {
                                         <div className="flex items-center gap-2">
                                             {getTransactionIcon(tx.type)}
                                             <div>
-                                                <span className="capitalize font-medium">{tx.type.replace('_', ' ')}</span>
-                                                {tx.description && <p className="text-xs text-muted-foreground">{tx.description}</p>}
+                                                <span className="capitalize font-medium">{tx.description || tx.type.replace('_', ' ')}</span>
                                             </div>
                                         </div>
                                         <div>

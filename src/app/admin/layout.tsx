@@ -103,9 +103,6 @@ export default function AdminLayout({
                         <SidebarMenuItem>
                             <Link href="/admin/deposits/pending"><SidebarMenuButton tooltip="Pending Deposits" isActive={isActive('/admin/deposits/pending')}><Clock /><span>Pending Deposits</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
-                         <SidebarMenuItem>
-                             <Link href="/admin/bonus/pending"><SidebarMenuButton tooltip="Pending Bonuses" isActive={isActive('/admin/bonus/pending')}><Gift /><span>Pending Bonuses</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
                         <SidebarMenuItem>
                             <Link href="/admin/withdrawals/pending"><SidebarMenuButton tooltip="Pending Withdrawals" isActive={isActive('/admin/withdrawals/pending')}><Clock /><span>Pending Withdrawals</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
