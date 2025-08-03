@@ -198,7 +198,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.player2.name}`;
-                    transaction.update(roomRef, { winner: { resignerPieceCount }});
+                    transaction.update(roomRef, { winner: { ...roomData.winner, resignerPieceCount }});
 
                 } else if (winnerId === 'draw') { // Draw logic
                     creatorPayout = joinerPayout = wager * 0.9;
@@ -228,7 +228,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 transaction.update(roomRef, { 
                     status: 'completed',
-                    winner: { uid: winnerId !== 'draw' ? winnerId : null, method, resignerId },
+                    winner: { ...roomData.winner, uid: winnerId !== 'draw' ? winnerId : null, method, resignerId },
                     draw: winnerId === 'draw',
                     payoutTransactionId: payoutTxId 
                 });
@@ -315,7 +315,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const getPossibleMovesForPiece = (piece: Piece, pos: {row: number, col: number}, currentBoard: any[][], forPlayer: PlayerColor): any[] => {
                     const moves = [], jumps = [];
                     const { row, col } = pos;
-                    const directions = piece.type === 'king' ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] : piece.color === 'w' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
+                    const directions = piece.type === 'king' ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] : piece.player === 'w' ? [[-1, -1], [-1, 1]] : [[1, -1], [1, 1]];
                     for (const [dr, dc] of directions) {
                         const newRow = row + dr, newCol = col + dc;
                         const jumpRow = row + 2 * dr, jumpCol = col + 2 * dc;
@@ -384,37 +384,39 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             setIsGameLoading(false);
             return;
         }
-    
         if (!roomId || !user) {
+            router.push('/lobby');
             setIsGameLoading(false);
             return;
         }
-    
+
         const roomRef = doc(db, 'game_rooms', roomId as string);
         const unsubscribe = onSnapshot(roomRef, (docSnap) => {
             if (!docSnap.exists()) {
-                if (!gameState.gameOver) { 
+                if (!gameOverHandledRef.current) {
                     router.push('/lobby');
                 }
                 setRoom(null);
                 setIsGameLoading(false);
                 return;
-            };
-            
+            }
+
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
-            setRoom(roomData); // Always update the room object.
             
             // This is the main state sync. It runs for everyone viewing the room.
-            if (roomData.status === 'waiting' || roomData.status === 'in-progress') {
-                const isCreator = roomData.createdBy.uid === user.uid;
+            if (roomData.status === 'waiting' || (roomData.status === 'in-progress' && !gameState.gameOver)) {
+                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
-                
+
                 let boardData = roomData.boardState;
                 if(gameType === 'checkers' && typeof boardData === 'string') {
                     try { boardData = JSON.parse(boardData); } catch { boardData = {board: createInitialCheckersBoard()};}
                 }
                 
-                updateAndSaveState({ 
+                setRoom(roomData); // Set room first
+
+                setGameState(prev => ({
+                    ...prev,
                     playerColor: myColor, 
                     boardState: boardData,
                     moveHistory: roomData.moveHistory || [], 
@@ -424,10 +426,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     capturedByBot: isCreator ? roomData.capturedByP2 : roomData.capturedByP1 || [],
                     p1Time: isCreator ? roomData.p1Time : roomData.p2Time,
                     p2Time: isCreator ? roomData.p2Time : roomData.p1Time,
-                });
+                }));
 
                 setIsGameLoading(false); // Game is ready to be shown.
-
             } else if (roomData.status === 'completed' && !gameState.isEnding) {
                  const winnerData = roomData.winner;
                  const winnerIsMe = winnerData?.uid === user.uid;
@@ -453,8 +454,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                  setIsGameLoading(false);
             }
         });
+
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, gameType, updateAndSaveState, gameState.isEnding, router, gameState.gameOver]);
+    }, [isMultiplayer, roomId, user, gameType, router]);
 
 
     // This effect runs the client-side timer for UI updates.
@@ -535,3 +537,5 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 }
+
+    

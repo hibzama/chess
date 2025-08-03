@@ -59,91 +59,12 @@ type GameRoom = {
     payoutTransactionId?: string;
 };
 
-function NavigationGuard() {
-    const { resign, gameOver } = useGame();
-    const router = useRouter();
-    const [showConfirm, setShowConfirm] = useState(false);
-    const [nextUrl, setNextUrl] = useState<string | null>(null);
-
-    const handleConfirm = useCallback(() => {
-        if(nextUrl) {
-            router.push(nextUrl);
-        } else {
-            router.back();
-        }
-        resign(); 
-    }, [resign, nextUrl, router]);
-
-    const handleCancel = useCallback(() => {
-        setNextUrl(null);
-        setShowConfirm(false);
-    }, []);
-
-    const handleAnchorClick = useCallback((e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      const anchor = target.closest('a');
-
-      if (anchor && anchor.href && anchor.target !== '_blank') {
-        const url = new URL(anchor.href);
-        if(url.pathname.startsWith('/game/multiplayer')) return;
-
-        e.preventDefault();
-        setNextUrl(anchor.href);
-        setShowConfirm(true);
-      }
-    }, []);
-
-     useEffect(() => {
-        if(gameOver) return;
-
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            e.preventDefault();
-            e.returnValue = '';
-        };
-
-        const handlePopState = (e: PopStateEvent) => {
-            e.preventDefault();
-            history.pushState(null, '', window.location.href); 
-            setShowConfirm(true);
-        };
-    
-        history.pushState(null, '', window.location.href);
-        window.addEventListener('popstate', handlePopState);
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        document.addEventListener('click', handleAnchorClick, true);
-    
-        return () => {
-          window.removeEventListener('popstate', handlePopState);
-          window.removeEventListener('beforeunload', handleBeforeUnload);
-          document.removeEventListener('click', handleAnchorClick, true);
-        };
-      }, [gameOver, handleAnchorClick]);
-
-
-    return (
-        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center gap-2"><AlertTriangle/> Leave Game?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Leaving this page will forfeit the match. This is treated as a resignation. Are you sure you want to leave?
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={handleCancel}>Stay in Game</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirm}>Leave & Resign</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    )
-}
-
 function MultiplayerGamePageContent() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, room, isGameLoading } = useGame();
+    const { gameOver, room, isGameLoading, playerColor } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
 
@@ -464,7 +385,6 @@ function MultiplayerGamePageContent() {
 
     return (
         <>
-        {!gameOver && <NavigationGuard />}
          <GameLayout
             gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
         >
@@ -530,3 +450,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
