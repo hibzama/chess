@@ -64,7 +64,7 @@ function VerifyEmailContent() {
                         Resend Verification Email
                     </Button>
                     <Button variant="outline" className="w-full" asChild>
-                        <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer">
+                        <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
                             Contact Support on WhatsApp
                         </a>
                     </Button>

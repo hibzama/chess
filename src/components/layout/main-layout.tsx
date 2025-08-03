@@ -303,10 +303,10 @@ export default function MainLayout({
             </DialogHeader>
             <div className="space-y-4 py-4">
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
-                    <a href="tel:+94742974001"><Phone /> +94 74 297 4001</a>
+                    <a href="tel:+94704894587"><Phone /> +94 70 489 4587</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
-                    <a href="https://wa.me/+94742974001" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
+                    <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
                 </Button>
                 <Button asChild className="w-full justify-start gap-3" variant="outline">
                     <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>

@@ -479,7 +479,7 @@ export default function WalletPage() {
                                             </div>
                                             <div className="flex gap-2">
                                                 <Button size="sm" asChild className="w-full bg-green-600 hover:bg-green-700">
-                                                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer">
+                                                    <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
                                                         <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
                                                     </a>
                                                 </Button>
@@ -531,7 +531,7 @@ export default function WalletPage() {
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-col sm:space-x-0 gap-2">
                 <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-                    <a href="https://wa.me/94742974001" target="_blank" rel="noopener noreferrer">
+                    <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
                         <MessageCircle className="mr-2 h-4 w-4" /> Send to WhatsApp
                     </a>
                 </Button>
