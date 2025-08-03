@@ -174,7 +174,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     } else if (resignerPieceCount > 3 && resignerPieceCount <= 6) {
                         resignerRefundRate = 0.50;
                         winnerPayoutRate = 1.30;
-                    } else { // 7+ pieces (or 6+ as per user request)
+                    } else { 
                         resignerRefundRate = 0.75;
                         winnerPayoutRate = 1.05;
                     }
@@ -393,17 +393,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         };
     }, [isMounted, gameState.gameOver, room, user, updateAndSaveState, setWinner]);
 
-
-    const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
-    
-    const setupGame = useCallback((color: PlayerColor, time: number, diff: string) => {
-        gameOverHandledRef.current = false;
-        if (!isMultiplayer && typeof window !== 'undefined') localStorage.removeItem(storageKey);
-        const defaultState = getInitialState();
-        const newState: GameState = { ...defaultState, playerColor: color, timeLimit: time, difficulty: diff, p1Time: time, p2Time: time };
-        updateAndSaveState(newState);
-    }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
-
     const switchTurn = useCallback(async (boardState: any, move?: string, capturedPiece?: Piece) => {
         if (gameState.gameOver || gameState.isEnding) return;
 
@@ -486,6 +475,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             });
         }
     }, [gameState, isMultiplayer, room, gameType, storageKey]);
+    
+
+    const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
+    
+    const setupGame = useCallback((color: PlayerColor, time: number, diff: string) => {
+        gameOverHandledRef.current = false;
+        if (!isMultiplayer && typeof window !== 'undefined') localStorage.removeItem(storageKey);
+        const defaultState = getInitialState();
+        const newState: GameState = { ...defaultState, playerColor: color, timeLimit: time, difficulty: diff, p1Time: time, p2Time: time };
+        updateAndSaveState(newState);
+    }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
+
     
     const resign = useCallback(() => { 
         if (gameState.gameOver || gameState.isEnding || !user) return; 

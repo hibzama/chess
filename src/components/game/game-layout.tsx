@@ -125,7 +125,7 @@ const ResignationDialogContent = ({ roomWager, playerPieceCount }: { roomWager: 
     } else if (playerPieceCount > 3 && playerPieceCount <= 6) {
         refundPercentage = 50;
         opponentPayoutPercentage = 130;
-    } else { // 7+ pieces
+    } else { // 6+ pieces
         refundPercentage = 75;
         opponentPayoutPercentage = 105;
     }
