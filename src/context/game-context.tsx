@@ -164,7 +164,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                  if (resignerId) { // Resignation logic
                     const isCreatorResigner = resignerId === roomData.createdBy.uid;
                     const totalPieces = gameType === 'chess' ? 16 : 12;
-                    const resignerPieceCount = isCreatorResigner ? (totalPieces - (roomData.capturedByP1?.length || 0)) : (totalPieces - (roomData.capturedByP2?.length || 0));
+                    const resignerPieceCount = isCreatorResigner ? (totalPieces - (roomData.capturedByP2?.length || 0)) : (totalPieces - (roomData.capturedByP1?.length || 0));
 
                     let resignerRefundRate, winnerPayoutRate;
                     
@@ -515,12 +515,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const contextValue = { ...gameState, isMounted, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isGameLoading };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
-};
+}
 
 export const useGame = () => {
     const context = useContext(GameContext);
-    if (!context) {
-        throw new Error('useGame must be used within a GameProvider');
-    }
+    if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
