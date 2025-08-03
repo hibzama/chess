@@ -226,39 +226,45 @@ function MultiplayerGame() {
                 const joinerRef = doc(db, 'users', user.uid);
         
                 // --- PRE-READ ALL NECESSARY DATA ---
-                const [creatorDoc, joinerDoc] = await Promise.all([
-                    transaction.get(creatorRef),
-                    transaction.get(joinerRef)
-                ]);
-        
-                if (!creatorDoc.exists() || !joinerDoc.exists()) {
+                const playersWithData = [
+                    { id: creatorRef.id, name: roomData.createdBy.name },
+                    { id: joinerRef.id, name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
+                ];
+                
+                const playerDocReads = playersWithData.map(p => transaction.get(doc(db, 'users', p.id)));
+                const playerDocs = await Promise.all(playerDocReads);
+
+                if (!playerDocs[0].exists() || !playerDocs[1].exists()) {
                     throw new Error("One of the players does not exist");
                 }
+                
+                const playerFullData = playerDocs.map((doc, i) => ({
+                    id: playersWithData[i].id,
+                    name: playersWithData[i].name,
+                    data: doc.data()
+                }));
 
-                if ((creatorDoc.data()?.balance || 0) < roomData.wager) {
+                if ((playerFullData[0].data?.balance || 0) < roomData.wager) {
                     throw new Error("Creator has insufficient funds.");
                 }
 
-                const playersWithData = [
-                    { id: creatorDoc.id, data: creatorDoc.data(), name: roomData.createdBy.name },
-                    { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
-                ];
-                
                 // Pre-fetch referrer data for all players if they have one
-                const referrerReads: Promise<DocumentData>[] = [];
-                playersWithData.forEach(p => {
-                    if (p.data.referredBy) {
-                        referrerReads.push(transaction.get(doc(db, 'users', p.data.referredBy)));
-                    }
-                })
-
-                const referrerDocs = await Promise.all(referrerReads);
-                const referrersDataMap = new Map();
-                referrerDocs.forEach(refDoc => {
-                    if (refDoc.exists()) {
-                        referrersDataMap.set(refDoc.id, refDoc.data());
+                const referrerReadsMap = new Map<string, Promise<DocumentData>>();
+                playerFullData.forEach(p => {
+                    if (p.data.referredBy && !referrerReadsMap.has(p.data.referredBy)) {
+                        referrerReadsMap.set(p.data.referredBy, transaction.get(doc(db, 'users', p.data.referredBy)));
                     }
                 });
+
+                const referrerResults = await Promise.all(referrerReadsMap.values());
+                const referrersDataMap = new Map();
+                let i = 0;
+                for(const key of referrerReadsMap.keys()){
+                    if(referrerResults[i].exists()){
+                        referrersDataMap.set(key, referrerResults[i].data());
+                    }
+                    i++;
+                }
 
                 // --- ALL READS ARE DONE. START WRITES. ---
 
@@ -267,7 +273,7 @@ function MultiplayerGame() {
                 
                 transaction.update(roomRef, {
                     status: 'in-progress',
-                    player2: { uid: user.uid, name: playersWithData[1].name, color: joinerColor, photoURL: userData.photoURL || '' },
+                    player2: { uid: user.uid, name: playerFullData[1].name, color: joinerColor, photoURL: userData.photoURL || '' },
                     players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
@@ -275,16 +281,16 @@ function MultiplayerGame() {
         
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-                    for (const player of playersWithData) {
+                    for (const player of playerFullData) {
                         transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${roomData.gameType} game vs ${player.id === creatorDoc.id ? playersWithData[1].name : playersWithData[0].name}`,
+                            description: `Wager for ${roomData.gameType} game vs ${player.id === playerFullData[0].id ? playerFullData[1].name : playerFullData[0].name}`,
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
                         // --- Commission Logic ---
-                        if (player.data.role === 'marketer' && player.data.referralChain && player.data.referralChain.length > 0) {
+                        if (player.data.referralChain && player.data.referralChain.length > 0) { // Referred by Marketer
                             const marketingCommissionRate = 0.03;
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
@@ -296,9 +302,7 @@ function MultiplayerGame() {
                                     level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
                                 });
                             }
-                        }
-
-                        if (player.data.referredBy) {
+                        } else if (player.data.referredBy) { // Referred by regular user
                             const l1ReferrerId = player.data.referredBy;
                             const l1ReferrerData = referrersDataMap.get(l1ReferrerId);
                             
@@ -312,8 +316,7 @@ function MultiplayerGame() {
                                 const l1Commission = wagerAmount * rank.l1Rate;
         
                                 if (l1Commission > 0) {
-                                    const commissionBalanceType = l1ReferrerData.role === 'marketer' ? 'marketingBalance' : 'balance';
-                                    transaction.update(doc(db, 'users', l1ReferrerId), { [commissionBalanceType]: increment(l1Commission) });
+                                    transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
                                     transaction.set(doc(collection(db, 'transactions')), {
                                         userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
                                         description: `L1 Commission from ${player.name}`, fromUserId: player.id,
