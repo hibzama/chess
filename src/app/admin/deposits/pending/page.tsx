@@ -2,13 +2,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import type { DepositBonus } from '../../bonus/page';
+import { useRouter } from 'next/navigation';
+
 
 interface Transaction {
     id: string;
@@ -17,13 +20,15 @@ interface Transaction {
     status: 'pending' | 'approved' | 'rejected';
     createdAt: any;
     depositMethod: 'bank' | 'binance';
-    user?: { firstName: string; lastName: string; email: string; phone: string; };
+    user?: { firstName: string; lastName:string; email: string; phone: string; };
 }
 
 export default function PendingDepositsPage() {
     const [deposits, setDeposits] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
+    const router = useRouter();
+
 
     useEffect(() => {
         const q = query(collection(db, 'transactions'), where('type', '==', 'deposit'), where('status', '==', 'pending'));
@@ -58,20 +63,62 @@ export default function PendingDepositsPage() {
             if (newStatus === 'approved') {
                 const userRef = doc(db, 'users', userId);
                 const userDoc = await getDoc(userRef);
-                if (userDoc.exists()) {
-                    const newBalance = (userDoc.data().balance || 0) + amount;
-                    batch.update(userRef, { balance: newBalance });
-                } else {
-                    throw new Error("User not found");
+                if (!userDoc.exists()) throw new Error("User not found");
+
+                let totalDepositAmount = amount;
+                let bonusAmount = 0;
+                let bonusDescription = `Deposit approved.`;
+
+                // --- Bonus Logic ---
+                const bonusRef = doc(db, 'settings', 'depositBonus');
+                const bonusSnap = await getDoc(bonusRef);
+                if (bonusSnap.exists()) {
+                    const bonusData = bonusSnap.data() as DepositBonus;
+                    const canClaim = bonusData.isActive && 
+                                     bonusData.claimedBy.length < bonusData.maxUsers && 
+                                     !bonusData.claimedBy.includes(userId);
+                    
+                    if (canClaim && amount >= bonusData.minDeposit && amount <= bonusData.maxDeposit) {
+                        bonusAmount = amount * (bonusData.percentage / 100);
+                        totalDepositAmount += bonusAmount;
+                        
+                        batch.update(bonusRef, {
+                            claimedBy: arrayUnion(userId)
+                        });
+                        
+                        // Create a transaction record for the bonus
+                         const bonusTransactionRef = doc(collection(db, 'transactions'));
+                         batch.set(bonusTransactionRef, {
+                            userId,
+                            type: 'deposit',
+                            amount: bonusAmount,
+                            status: 'completed',
+                            description: `${bonusData.percentage}% Deposit Bonus`,
+                            createdAt: serverTimestamp()
+                         });
+                         
+                        bonusDescription = `Deposit approved with a bonus of LKR ${bonusAmount.toFixed(2)}!`;
+                    }
                 }
+                // --- End Bonus Logic ---
+
+                const newBalance = (userDoc.data().balance || 0) + totalDepositAmount;
+                batch.update(userRef, { balance: newBalance });
+                
+                toast({
+                    title: 'Success!',
+                    description: bonusDescription,
+                });
+
+            } else {
+                 toast({
+                    title: 'Success!',
+                    description: `Deposit has been rejected.`,
+                });
             }
             
             await batch.commit();
 
-            toast({
-                title: 'Success!',
-                description: `Deposit has been ${newStatus}.`,
-            });
         } catch (error) {
             console.error(`Error updating deposit status:`, error);
             toast({
@@ -109,7 +156,9 @@ export default function PendingDepositsPage() {
                         {deposits.map((deposit) => (
                             <TableRow key={deposit.id}>
                                 <TableCell>
-                                    <div className="font-medium">{deposit.user?.firstName} {deposit.user?.lastName}</div>
+                                    <Button variant="link" className="p-0 h-auto" onClick={() => router.push(`/admin/users/${deposit.userId}`)}>
+                                        <div className="font-medium text-left">{deposit.user?.firstName} {deposit.user?.lastName}</div>
+                                    </Button>
                                     <div className="text-sm text-muted-foreground">{deposit.user?.email}</div>
                                     <div className="text-sm text-muted-foreground">{deposit.user?.phone}</div>
                                 </TableCell>
@@ -131,3 +180,5 @@ export default function PendingDepositsPage() {
         </Card>
     );
 }
+
+    

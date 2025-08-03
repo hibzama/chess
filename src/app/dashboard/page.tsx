@@ -1,4 +1,5 @@
 
+
 'use client'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
+import BonusDisplay from './bonus-display';
 
 export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
@@ -123,13 +125,15 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="flex flex-col">
-      <div className="mb-12">
+    <div className="flex flex-col gap-8">
+      <div className="mb-4">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-2">Welcome to the Arena</h1>
         <p className="text-muted-foreground md:text-lg">
           Your journey to becoming a grandmaster starts now. Choose your game and make your move.
         </p>
       </div>
+
+       <BonusDisplay />
 
       <div className="grid gap-6">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -186,3 +190,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
