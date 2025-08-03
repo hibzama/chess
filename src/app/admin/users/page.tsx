@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ShieldCheck, User, CheckCircle, Wallet } from 'lucide-react';
+import { ShieldCheck, User, CheckCircle, Wallet, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface UserData {
@@ -56,21 +56,21 @@ export default function UsersPage() {
         }
     };
     
-    const handleVerifyUser = async (e: React.MouseEvent, uid: string) => {
+    const handleVerificationChange = async (e: React.MouseEvent, uid: string, shouldVerify: boolean) => {
         e.stopPropagation();
         try {
             const userRef = doc(db, 'users', uid);
-            await updateDoc(userRef, { emailVerified: true });
+            await updateDoc(userRef, { emailVerified: shouldVerify });
             toast({
                 title: 'Success!',
-                description: 'User has been manually verified.',
+                description: `User verification status has been updated.`,
             });
         } catch (error) {
-             console.error("Error verifying user:", error);
+             console.error("Error changing verification status:", error);
             toast({
                 variant: "destructive",
                 title: 'Error',
-                description: 'Failed to verify user.',
+                description: 'Failed to change verification status.',
             });
         }
     };
@@ -120,9 +120,13 @@ export default function UsersPage() {
                                     )}
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
-                                     {!user.emailVerified && (
-                                        <Button size="sm" variant="outline" onClick={(e) => handleVerifyUser(e, user.uid)}>
-                                            <CheckCircle className="w-4 h-4 mr-2"/> Verify
+                                     {user.emailVerified ? (
+                                        <Button size="sm" variant="destructive" onClick={(e) => handleVerificationChange(e, user.uid, false)}>
+                                            <ShieldAlert className="w-4 h-4 mr-2"/> Force Verify
+                                        </Button>
+                                    ) : (
+                                        <Button size="sm" variant="outline" onClick={(e) => handleVerificationChange(e, user.uid, true)}>
+                                            <CheckCircle className="w-4 h-4 mr-2"/> Allow Login
                                         </Button>
                                     )}
                                     {user.role !== 'admin' && (

@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { getDoc, doc } from "firebase/firestore";
 
@@ -34,7 +34,31 @@ export default function LoginPage() {
       const user = userCredential.user;
 
       const userDoc = await getDoc(doc(db, 'users', user.uid));
+      
+      if (!userDoc.exists()) {
+          throw new Error("User data not found.");
+      }
+      
       const userData = userDoc.data();
+
+      // Check for forced verification
+      if (userData.emailVerified === false) {
+          if (user.emailVerified === false) {
+            // Send a new verification email just in case
+            await sendEmailVerification(user);
+            // Redirect to the verification page
+            router.push(`/verify-email?email=${email}`);
+            toast({
+                title: "Verification Required",
+                description: "Please check your email to verify your account before logging in.",
+            });
+            return;
+          } else {
+            // User has verified through Firebase, but admin hasn't re-enabled. For now, let's let them in.
+            // A more strict system could keep them out.
+          }
+      }
+
 
       toast({
         title: "Login Successful!",
