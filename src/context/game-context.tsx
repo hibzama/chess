@@ -179,8 +179,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                         winnerPayoutRate = 1.05;
                     }
 
-                    creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
-                    joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * winnerPayoutRate;
+                    if (isCreatorResigner) {
+                        creatorPayout = wager * resignerRefundRate;
+                        joinerPayout = wager * winnerPayoutRate;
+                    } else {
+                        creatorPayout = wager * winnerPayoutRate;
+                        joinerPayout = wager * resignerRefundRate;
+                    }
+
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
                     transaction.update(roomRef, { 'winner.resignerPieceCount': resignerPieceCount });
@@ -513,10 +519,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const contextValue = { ...gameState, isMounted, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isGameLoading };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
-}
+};
 
 export const useGame = () => {
     const context = useContext(GameContext);
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
+
+    
