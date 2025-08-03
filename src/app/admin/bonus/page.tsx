@@ -27,7 +27,7 @@ export interface DepositBonus {
 }
 
 export default function BonusPage() {
-    const [bonus, setBonus] = useState<DepositBonus>({
+    const [bonus, setBonus] = useState<Partial<DepositBonus>>({
         id: 'main_bonus',
         percentage: 10,
         minDeposit: 1000,
@@ -120,24 +120,24 @@ export default function BonusPage() {
                  <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <Label htmlFor="percentage" className="flex items-center gap-2"><Percent/> Bonus Percentage</Label>
-                        <Input id="percentage" type="number" value={bonus.percentage} onChange={(e) => handleChange('percentage', e.target.value)} />
+                        <Input id="percentage" type="number" value={bonus.percentage || 0} onChange={(e) => handleChange('percentage', e.target.value)} />
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="durationHours" className="flex items-center gap-2"><Clock/> Bonus Duration (in hours)</Label>
-                        <Input id="durationHours" type="number" value={bonus.durationHours} onChange={(e) => handleChange('durationHours', e.target.value)} />
+                        <Input id="durationHours" type="number" value={bonus.durationHours || 0} onChange={(e) => handleChange('durationHours', e.target.value)} />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="maxUsers" className="flex items-center gap-2"><Users/> Max Users</Label>
-                        <Input id="maxUsers" type="number" value={bonus.maxUsers} onChange={(e) => handleChange('maxUsers', e.target.value)} />
-                         <p className="text-sm text-muted-foreground">{bonus.claimedBy.length} / {bonus.maxUsers} claimed</p>
+                        <Input id="maxUsers" type="number" value={bonus.maxUsers || 0} onChange={(e) => handleChange('maxUsers', e.target.value)} />
+                         <p className="text-sm text-muted-foreground">{(bonus.claimedBy || []).length} / {bonus.maxUsers || 0} claimed</p>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="minDeposit" className="flex items-center gap-2"><DollarSign/> Minimum Deposit (LKR)</Label>
-                        <Input id="minDeposit" type="number" value={bonus.minDeposit} onChange={(e) => handleChange('minDeposit', e.target.value)} />
+                        <Input id="minDeposit" type="number" value={bonus.minDeposit || 0} onChange={(e) => handleChange('minDeposit', e.target.value)} />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="maxDeposit" className="flex items-center gap-2"><DollarSign/> Maximum Deposit (LKR)</Label>
-                        <Input id="maxDeposit" type="number" value={bonus.maxDeposit} onChange={(e) => handleChange('maxDeposit', e.target.value)} />
+                        <Input id="maxDeposit" type="number" value={bonus.maxDeposit || 0} onChange={(e) => handleChange('maxDeposit', e.target.value)} />
                     </div>
                 </div>
 
