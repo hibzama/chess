@@ -1,9 +1,9 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db, storage } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -20,6 +20,8 @@ import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { DepositBonus } from '@/app/admin/bonus/page';
+
 
 type Transaction = {
     id: string;
@@ -41,6 +43,121 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
         <path d="M22 2L15 22L11 13L2 9L22 2Z" />
     </svg>
 )
+
+const BonusClaimCard = () => {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [bonus, setBonus] = useState<DepositBonus | null>(null);
+    const [eligibleDeposit, setEligibleDeposit] = useState<Transaction | null>(null);
+    const [isClaiming, setIsClaiming] = useState(false);
+    
+    useEffect(() => {
+        const bonusRef = doc(db, 'settings', 'depositBonus');
+        const unsubscribeBonus = onSnapshot(bonusRef, (doc) => {
+            if (doc.exists() && doc.data().isActive) {
+                setBonus(doc.data() as DepositBonus);
+            } else {
+                setBonus(null);
+            }
+        });
+        return () => unsubscribeBonus();
+    }, []);
+
+    useEffect(() => {
+        if (!bonus || !user) {
+            setEligibleDeposit(null);
+            return;
+        }
+
+        const bonusExpiry = bonus.startTime ? bonus.startTime.toMillis() + (bonus.durationHours * 60 * 60 * 1000) : 0;
+        const isExpired = bonus.startTime ? Date.now() > bonusExpiry : false;
+
+        if (isExpired || bonus.claimedBy?.includes(user.uid)) {
+            setEligibleDeposit(null);
+            return;
+        }
+        
+        const q = query(
+            collection(db, 'transactions'),
+            where('userId', '==', user.uid),
+            where('type', '==', 'deposit'),
+            where('status', '==', 'approved'),
+            where('createdAt', '>=', bonus.startTime || new Timestamp(0,0)),
+            where('amount', '>=', bonus.minDeposit),
+            where('amount', '<=', bonus.maxDeposit),
+            orderBy('createdAt', 'desc'),
+            limit(1)
+        );
+        
+        const unsubscribeDeposits = onSnapshot(q, (snapshot) => {
+            if (!snapshot.empty) {
+                setEligibleDeposit(snapshot.docs[0].data() as Transaction);
+            } else {
+                setEligibleDeposit(null);
+            }
+        });
+
+        return () => unsubscribeDeposits();
+    }, [bonus, user]);
+
+    const handleClaimBonus = async () => {
+        if (!user || !bonus || !eligibleDeposit) return;
+        setIsClaiming(true);
+
+        const bonusAmount = eligibleDeposit.amount * (bonus.percentage / 100);
+        const batch = writeBatch(db);
+        const userRef = doc(db, 'users', user.uid);
+        const bonusSettingsRef = doc(db, 'settings', 'depositBonus');
+        const bonusTransactionRef = doc(collection(db, 'transactions'));
+        
+        try {
+            batch.update(userRef, { balance: increment(bonusAmount) });
+            batch.update(bonusSettingsRef, { claimedBy: arrayUnion(user.uid) });
+            batch.set(bonusTransactionRef, {
+                userId: user.uid,
+                type: 'bonus',
+                amount: bonusAmount,
+                status: 'completed',
+                description: `${bonus.percentage}% Deposit Bonus`,
+                createdAt: serverTimestamp()
+            });
+
+            await batch.commit();
+            toast({ title: 'Success!', description: `LKR ${bonusAmount.toFixed(2)} bonus has been added to your wallet.`});
+        } catch (error) {
+            console.error("Error claiming bonus:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not claim bonus.'});
+        } finally {
+            setIsClaiming(false);
+        }
+    }
+
+    if (!bonus || !eligibleDeposit) {
+        return null;
+    }
+
+    const bonusAmount = eligibleDeposit.amount * (bonus.percentage / 100);
+
+    return (
+        <Card className="bg-gradient-to-r from-primary/10 via-card to-accent/10 border-primary/20 animate-in fade-in-50">
+            <CardHeader>
+                 <CardTitle className="text-lg flex items-center gap-2">
+                    <Gift className="w-6 h-6 text-yellow-300" />
+                    <span className="text-yellow-300">You have a bonus available!</span>
+                </CardTitle>
+                <CardDescription className="text-foreground/80">
+                   You've earned a {bonus.percentage}% bonus of LKR {bonusAmount.toFixed(2)} on your recent deposit.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button className="w-full" onClick={handleClaimBonus} disabled={isClaiming}>
+                    {isClaiming ? 'Claiming...' : 'Claim Your Bonus Now'}
+                </Button>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 export default function WalletPage() {
   const { user, userData, loading: authLoading } = useAuth();
@@ -272,6 +389,8 @@ export default function WalletPage() {
             )}
         </CardContent>
       </Card>
+      
+      <BonusClaimCard />
 
       <Tabs defaultValue="deposit" className="w-full">
         <TabsList className="grid w-full grid-cols-3">

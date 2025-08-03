@@ -56,68 +56,23 @@ export default function PendingDepositsPage() {
     const handleTransaction = async (transactionId: string, userId: string, amount: number, newStatus: 'approved' | 'rejected') => {
         const batch = writeBatch(db);
         const transactionRef = doc(db, 'transactions', transactionId);
+        const userRef = doc(db, 'users', userId);
 
         try {
-            batch.update(transactionRef, { status: newStatus, description: `Deposit ${newStatus}.` });
-
             if (newStatus === 'approved') {
-                const userRef = doc(db, 'users', userId);
-                const userDoc = await getDoc(userRef);
-                if (!userDoc.exists()) throw new Error("User not found");
-
-                let totalAmountToCredit = amount;
-                let toastDescription = `Deposit of LKR ${amount.toFixed(2)} approved.`;
-
-                // --- Bonus Logic ---
-                const bonusRef = doc(db, 'settings', 'depositBonus');
-                const bonusSnap = await getDoc(bonusRef);
-                
-                if (bonusSnap.exists()) {
-                    const bonusData = bonusSnap.data() as DepositBonus;
-                    const bonusIsActive = bonusData.isActive === true;
-                    
-                    if (bonusIsActive) {
-                        const hasStartTime = !!bonusData.startTime;
-                        const bonusExpiry = hasStartTime ? bonusData.startTime!.toMillis() + (bonusData.durationHours * 60 * 60 * 1000) : 0;
-                        const isExpired = hasStartTime ? Date.now() > bonusExpiry : false; // If no start time, it can't be expired.
-                        
-                        const canClaim = !isExpired && 
-                                         (bonusData.claimedBy?.length || 0) < bonusData.maxUsers && 
-                                         !bonusData.claimedBy?.includes(userId);
-                        
-                        if (canClaim && amount >= bonusData.minDeposit && amount <= bonusData.maxDeposit) {
-                            const bonusAmount = amount * (bonusData.percentage / 100);
-                            totalAmountToCredit += bonusAmount;
-                            
-                            batch.update(bonusRef, {
-                                claimedBy: arrayUnion(userId)
-                            });
-                            
-                            // Create a separate transaction record for the bonus
-                             const bonusTransactionRef = doc(collection(db, 'transactions'));
-                             batch.set(bonusTransactionRef, {
-                                userId,
-                                type: 'bonus',
-                                amount: bonusAmount,
-                                status: 'completed',
-                                description: `${bonusData.percentage}% Deposit Bonus`,
-                                createdAt: serverTimestamp()
-                             });
-                             
-                            toastDescription = `Deposit of LKR ${amount.toFixed(2)} approved with a bonus of LKR ${bonusAmount.toFixed(2)}!`;
-                        }
-                    }
-                }
-                // --- End Bonus Logic ---
-
-                batch.update(userRef, { balance: increment(totalAmountToCredit) });
+                batch.update(userRef, { balance: increment(amount) });
+                batch.update(transactionRef, { 
+                    status: newStatus, 
+                    description: `Deposit ${newStatus}.` 
+                });
                 
                 toast({
                     title: 'Success!',
-                    description: toastDescription,
+                    description: `Deposit of LKR ${amount.toFixed(2)} approved. The user can now claim any eligible bonus from their wallet.`,
                 });
 
             } else { // 'rejected'
+                 batch.update(transactionRef, { status: newStatus });
                  toast({
                     title: 'Success!',
                     description: `Deposit has been rejected.`,
