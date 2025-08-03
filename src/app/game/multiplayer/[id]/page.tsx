@@ -64,7 +64,7 @@ function MultiplayerGamePageContent() {
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, room, isGameLoading, playerColor } = useGame();
+    const { gameOver, room, isGameLoading } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
 
@@ -79,22 +79,14 @@ function MultiplayerGamePageContent() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
     
         try {
-            const batch = writeBatch(db);
-            // Delete the room
-            batch.delete(roomRef);
-            // Refund the creator's wager
-            if (room.wager > 0) {
-                batch.update(userRef, { balance: increment(room.wager) });
-            }
-            await batch.commit();
+            await deleteDoc(roomRef);
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -197,8 +189,9 @@ function MultiplayerGamePageContent() {
         
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-                    const playerToWager = playersWithData[1]; // Only the joiner wagers now
-
+                    // Joiner only wagers
+                    const playerToWager = playersWithData[1]; 
+                    
                     transaction.update(doc(db, 'users', playerToWager.id), { balance: increment(-wagerAmount) });
                     transaction.set(doc(collection(db, 'transactions')), {
                         userId: playerToWager.id, type: 'wager', amount: wagerAmount, status: 'completed',
@@ -239,7 +232,6 @@ function MultiplayerGamePageContent() {
                                 const l1Commission = wagerAmount * rank.l1Rate;
         
                                 if (l1Commission > 0) {
-                                    // Payout depends on referrer's role
                                     if (l1ReferrerData.role === 'marketer') {
                                         transaction.update(doc(db, 'users', l1ReferrerId), { marketingBalance: increment(l1Commission) });
                                     } else {
@@ -273,7 +265,7 @@ function MultiplayerGamePageContent() {
         }
     }
 
-    if (isGameLoading || !room) {
+    if (isGameLoading) {
         return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -283,6 +275,8 @@ function MultiplayerGamePageContent() {
             </div>
         )
     }
+
+    if (!room) return null;
 
     const isCreator = room.createdBy.uid === user?.uid;
     const equipment = room.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
