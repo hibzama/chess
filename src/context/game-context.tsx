@@ -166,17 +166,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const totalPieces = gameType === 'chess' ? 16 : 12;
                     const resignerPieceCount = isCreatorResigner ? (totalPieces - (roomData.capturedByP2?.length || 0)) : (totalPieces - (roomData.capturedByP1?.length || 0));
 
-                    let resignerRefundRate, winnerPayoutRate;
+                    const winnerPayoutRate = 1.30;
+                    let resignerRefundRate;
                     
-                    if (resignerPieceCount >= 1 && resignerPieceCount <= 3) {
-                        resignerRefundRate = 0.30;
-                        winnerPayoutRate = 1.50;
-                    } else if (resignerPieceCount > 3 && resignerPieceCount <= 6) {
-                        resignerRefundRate = 0.50;
-                        winnerPayoutRate = 1.30;
+                    if (resignerPieceCount >= 6) {
+                        resignerRefundRate = 0.50; // 50% for 6+ pieces
+                    } else if (resignerPieceCount >= 3) {
+                        resignerRefundRate = 0.40; // 40% for 3-5 pieces
                     } else { 
-                        resignerRefundRate = 0.75;
-                        winnerPayoutRate = 1.05;
+                        resignerRefundRate = 0.20; // 20% for 1-2 pieces
                     }
 
                     if (isCreatorResigner) {
@@ -236,15 +234,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const winnerData = roomData.winner;
                     if (winnerData?.resignerId) { // Resignation
                         const pieceCount = winnerData.resignerPieceCount ?? (gameType === 'chess' ? 16 : 12);
-                        let resignerRefundRate, winnerPayoutRate;
+                        const winnerPayoutRate = 1.30;
+                        let resignerRefundRate;
                         
-                        if (pieceCount >= 1 && pieceCount <= 3) {
-                            resignerRefundRate = 0.30; winnerPayoutRate = 1.50;
-                        } else if (pieceCount > 3 && pieceCount <= 6) {
-                            resignerRefundRate = 0.50; winnerPayoutRate = 1.30;
-                        } else {
-                            resignerRefundRate = 0.75; winnerPayoutRate = 1.05;
-                        }
+                        if (pieceCount >= 6) resignerRefundRate = 0.50;
+                        else if (pieceCount >= 3) resignerRefundRate = 0.40;
+                        else resignerRefundRate = 0.20;
 
                         return { myPayout: winnerData.resignerId === user.uid ? wager * resignerRefundRate : wager * winnerPayoutRate };
                     } else if (roomData.draw) { // Draw
@@ -306,14 +301,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
                  if (iAmResigner) {
                     const pieceCount = roomData.winner?.resignerPieceCount ?? (gameType === 'chess' ? 16 : 12);
-                    if(pieceCount >= 1 && pieceCount <= 3) myPayout = wager * 0.3;
-                    else if (pieceCount > 3 && pieceCount <= 6) myPayout = wager * 0.5;
-                    else myPayout = wager * 0.75;
+                    if(pieceCount >= 6) myPayout = wager * 0.50;
+                    else if (pieceCount >= 3) myPayout = wager * 0.40;
+                    else myPayout = wager * 0.20;
                 } else if (roomData.winner?.resignerId) {
-                    const pieceCount = roomData.winner?.resignerPieceCount ?? (gameType === 'chess' ? 16 : 12);
-                    if(pieceCount >= 1 && pieceCount <= 3) myPayout = wager * 1.5;
-                    else if (pieceCount > 3 && pieceCount <= 6) myPayout = wager * 1.3;
-                    else myPayout = wager * 1.05;
+                    myPayout = wager * 1.30;
                 } else if (roomData.draw) {
                     myPayout = wager * 0.9;
                 } else if (winnerIsMe) {
@@ -526,5 +518,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
-
-    

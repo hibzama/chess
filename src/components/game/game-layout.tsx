@@ -117,17 +117,15 @@ const GameOverDisplay = () => {
 }
 
 const ResignationDialogContent = ({ roomWager, playerPieceCount }: { roomWager: number, playerPieceCount: number}) => {
-    let refundPercentage, opponentPayoutPercentage;
+    const opponentPayoutPercentage = 130;
+    let refundPercentage;
 
-    if (playerPieceCount >= 1 && playerPieceCount <= 3) {
-        refundPercentage = 30;
-        opponentPayoutPercentage = 150;
-    } else if (playerPieceCount > 3 && playerPieceCount <= 6) {
+    if (playerPieceCount >= 6) {
         refundPercentage = 50;
-        opponentPayoutPercentage = 130;
-    } else { // 6+ pieces
-        refundPercentage = 75;
-        opponentPayoutPercentage = 105;
+    } else if (playerPieceCount >= 3) {
+        refundPercentage = 40;
+    } else {
+        refundPercentage = 20;
     }
 
     const refundAmount = roomWager * (refundPercentage / 100);
@@ -297,5 +295,3 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </>
   );
 }
-
-    
