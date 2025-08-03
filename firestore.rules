@@ -93,8 +93,7 @@ service cloud.firestore {
            (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
           resource.data.status == 'in-progress' &&
           request.resource.data.status == 'completed'
-        ) || 
-        isAdmin();
+        );
     }
     
     match /transactions/{transactionId} {
@@ -128,11 +127,9 @@ service cloud.firestore {
             allow read, create: if isSignedIn() && request.auth.uid in chatId.split('_');
         }
     }
-
+    
     match /settings/{docId} {
-      // Allow any signed-in user to read settings (for bonus display).
       allow read: if isSignedIn();
-      // Only allow admins to change settings.
       allow write: if isAdmin();
     }
   }
