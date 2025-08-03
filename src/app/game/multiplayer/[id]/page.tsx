@@ -1,4 +1,3 @@
-
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -59,15 +58,96 @@ type GameRoom = {
     payoutTransactionId?: string;
 };
 
+function NavigationGuard() {
+    const { resign, gameOver } = useGame();
+    const router = useRouter();
+    const [showConfirm, setShowConfirm] = useState(false);
+    const [nextUrl, setNextUrl] = useState<string | null>(null);
+
+    const handleConfirm = useCallback(() => {
+        if(nextUrl) {
+            router.push(nextUrl);
+        } else {
+            router.back();
+        }
+        resign(); 
+    }, [resign, nextUrl, router]);
+
+    const handleCancel = useCallback(() => {
+        setNextUrl(null);
+        setShowConfirm(false);
+    }, []);
+
+    const handleAnchorClick = useCallback((e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+
+      if (anchor && anchor.href && anchor.target !== '_blank') {
+        const url = new URL(anchor.href);
+        if(url.pathname.startsWith('/game/multiplayer')) return;
+
+        e.preventDefault();
+        setNextUrl(anchor.href);
+        setShowConfirm(true);
+      }
+    }, []);
+
+     useEffect(() => {
+        if(gameOver) return;
+
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = '';
+        };
+
+        const handlePopState = (e: PopStateEvent) => {
+            e.preventDefault();
+            history.pushState(null, '', window.location.href); 
+            setShowConfirm(true);
+        };
+    
+        history.pushState(null, '', window.location.href);
+        window.addEventListener('popstate', handlePopState);
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('click', handleAnchorClick, true);
+    
+        return () => {
+          window.removeEventListener('popstate', handlePopState);
+          window.removeEventListener('beforeunload', handleBeforeUnload);
+          document.removeEventListener('click', handleAnchorClick, true);
+        };
+      }, [gameOver, handleAnchorClick]);
+
+
+    return (
+        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2"><AlertTriangle/> Leave Game?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Leaving this page will forfeit the match. This is treated as a resignation. Are you sure you want to leave?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={handleCancel}>Stay in Game</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirm}>Leave & Resign</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    )
+}
+
 function MultiplayerGamePageContent() {
     const { id: roomId } = useParams();
     const router = useRouter();
     const { toast } = useToast();
     const { user, userData } = useAuth();
-    const { gameOver, room, isGameLoading } = useGame();
+    const { gameOver, isGameLoading } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
+    const { room } = useGame();
 
+    const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
@@ -189,18 +269,16 @@ function MultiplayerGamePageContent() {
         
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-                    // Joiner only wagers
-                    const playerToWager = playersWithData[1]; 
-                    
-                    transaction.update(doc(db, 'users', playerToWager.id), { balance: increment(-wagerAmount) });
-                    transaction.set(doc(collection(db, 'transactions')), {
-                        userId: playerToWager.id, type: 'wager', amount: wagerAmount, status: 'completed',
-                        description: `Wager for ${roomData.gameType} game vs ${roomData.createdBy.name}`,
-                        gameRoomId: room.id, createdAt: serverTimestamp()
-                    });
-                    
-                    // --- Commission Logic for both players ---
+                    // Wager is deducted from both players upon joining
                     for (const player of playersWithData) {
+                        transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
+                        transaction.set(doc(collection(db, 'transactions')), {
+                            userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
+                            description: `Wager for ${roomData.gameType} game vs ${player.id === creatorDoc.id ? playersWithData[1].name : playersWithData[0].name}`,
+                            gameRoomId: room.id, createdAt: serverTimestamp()
+                        });
+                        
+                        // --- Commission Logic for both players ---
                         // Marketing Chain Commissions (always takes precedence)
                         if (player.data.referralChain?.length > 0) {
                             const marketingCommissionRate = 0.03;
@@ -276,9 +354,8 @@ function MultiplayerGamePageContent() {
         )
     }
 
-    if (!room) return null;
+    if (!room || !user || !userData) return null;
 
-    const isCreator = room.createdBy.uid === user?.uid;
     const equipment = room.gameType === 'chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
 
     const copyGameId = () => {
@@ -320,7 +397,7 @@ function MultiplayerGamePageContent() {
                 </div>
             )
         } else {
-            const hasEnoughBalance = userData ? userData.balance >= room.wager : false;
+            const hasEnoughBalance = userData.balance >= room.wager;
 
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -348,7 +425,7 @@ function MultiplayerGamePageContent() {
                                 </div>
                             </div>
                             
-                            {!hasEnoughBalance && userData && (
+                            {!hasEnoughBalance && (
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
@@ -379,8 +456,19 @@ function MultiplayerGamePageContent() {
 
     return (
         <>
+        {!gameOver && <NavigationGuard />}
          <GameLayout
             gameType={room.gameType === 'chess' ? 'Chess' : 'Checkers'}
+            headerContent={
+                <div className="text-center w-full max-w-lg mx-auto">
+                    <h1 className="text-3xl font-bold">Multiplayer Match</h1>
+                    <p className="text-muted-foreground">LKR {room.wager.toFixed(2)} Stakes • {room.timeControl / 60} minutes per player</p>
+                    <Alert className="mt-4 text-left border-yellow-300/50 bg-yellow-300/10 text-yellow-300">
+                        <Clock className="w-4 h-4 !text-yellow-300"/>
+                        <AlertTitle className="text-yellow-300">The first player whose timer runs out loses the game. Play quick, manage your time, and win!</AlertTitle>
+                    </Alert>
+                </div>
+            }
         >
             {room.gameType === 'chess' ? (
                  <ChessBoard boardTheme={equipment?.boardTheme} pieceStyle={equipment?.pieceStyle} />
@@ -394,38 +482,28 @@ function MultiplayerGamePageContent() {
 
 export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
-    const router = useRouter();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { isGameLoading } = useGame();
 
     useEffect(() => {
-        if (!roomId) {
-            router.push('/lobby');
-            return;
-        }
-
         const fetchGameType = async () => {
+            if (typeof roomId !== 'string') return;
             try {
-                const roomRef = doc(db, 'game_rooms', roomId as string);
+                const roomRef = doc(db, 'game_rooms', roomId);
                 const roomSnap = await getDoc(roomRef);
                 if (roomSnap.exists()) {
                     setGameType(roomSnap.data().gameType);
-                } else {
-                    router.push('/lobby');
                 }
             } catch (e) {
                 console.error("Could not fetch game type", e);
-                router.push('/lobby');
-            } finally {
-                setLoading(false);
             }
-        };
+        }
         fetchGameType();
-    }, [roomId, router]);
-    
-    if (loading) {
+    }, [roomId]);
+
+    if (!gameType || isGameLoading) {
          return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="h-16 w-16 animate-spin text-primary" />
                     <p className="text-muted-foreground">Loading Your Game...</p>
@@ -434,15 +512,9 @@ export default function MultiplayerGamePage() {
         )
     }
     
-    if (!gameType) {
-        return null;
-    }
-    
     return (
          <GameProvider gameType={gameType}>
             <MultiplayerGamePageContent />
         </GameProvider>
     )
 }
-
-    

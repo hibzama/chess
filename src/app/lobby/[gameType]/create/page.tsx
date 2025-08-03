@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,9 +47,9 @@ export default function CreateGamePage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Minimum investment amount is LKR 10.' });
             return;
         }
-        
+
         if (userData.balance < wagerAmount) {
-            toast({ variant: 'destructive', title: 'Insufficient Funds', description: 'You do not have enough balance to create this room.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
 
@@ -57,26 +57,21 @@ export default function CreateGamePage() {
         const batch = writeBatch(db);
 
         try {
-            // Deduct wager from user's balance and log transaction
+            // 1. Deduct wager from user's balance
             const userRef = doc(db, 'users', user.uid);
-            batch.update(userRef, { balance: increment(-wagerAmount) });
-            
-            const transactionRef = doc(collection(db, 'transactions'));
-            batch.set(transactionRef, {
-                userId: user.uid,
-                type: 'wager',
-                amount: wagerAmount,
-                status: 'completed',
-                description: `Wager for created ${gameName} game`,
-                createdAt: serverTimestamp()
-            });
+            if(wagerAmount > 0) {
+                batch.update(userRef, {
+                    balance: increment(-wagerAmount)
+                });
+            }
 
-            // Create the game room document
+            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
+            // 2. Create the game room document
             const roomData = {
                 gameType,
                 wager: wagerAmount,
@@ -93,22 +88,40 @@ export default function CreateGamePage() {
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
+
             const roomRef = doc(collection(db, 'game_rooms'));
             batch.set(roomRef, roomData);
+            
+            // 3. Create a transaction log for the wager
+            if(wagerAmount > 0) {
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'wager',
+                    amount: wagerAmount,
+                    status: 'completed',
+                    description: `Wager for ${gameName} game`,
+                    gameRoomId: roomRef.id,
+                    createdAt: serverTimestamp()
+                });
+            }
             
             await batch.commit();
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
 
+            // 4. Navigate to the game room page
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your wager has been refunded if it was deducted.' });
-            // Attempt to refund wager if batch commit failed partially or after deduction.
-            // This is a fallback and might not always be necessary if the batch is atomic.
-            const userRef = doc(db, 'users', user.uid);
-            updateDoc(userRef, { balance: increment(wagerAmount) });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your wager has been refunded.' });
+            
+            // Revert balance deduction if room creation fails
+             if (wagerAmount > 0) {
+                 const userRef = doc(db, 'users', user.uid);
+                 await updateDoc(userRef, { balance: increment(wagerAmount) });
+             }
 
         } finally {
             setIsCreating(false);
@@ -204,5 +217,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-
-    

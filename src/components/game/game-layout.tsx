@@ -1,5 +1,3 @@
-
-
 'use client'
 
 import Link from 'next/link';
@@ -27,18 +25,17 @@ import Image from 'next/image';
 type GameLayoutProps = {
   children: React.ReactNode;
   gameType: 'Chess' | 'Checkers';
+  headerContent?: React.ReactNode;
 };
 
 const GameOverDisplay = () => {
     const { user } = useAuth();
-    const { winner, gameOverReason, isMultiplayer, payoutAmount, room, resetGame } = useGame();
+    const { winner, gameOverReason, isMultiplayer, payoutAmount, room } = useGame();
     const router = useRouter();
     const USDT_RATE = 310;
 
     const handleReturn = () => {
         router.push('/dashboard');
-        // The resetGame() call is removed from here to prevent premature state clearing.
-        // The state will naturally reset when the user navigates to a new page or starts a new game.
     }
 
     const getWinnerMessage = () => {
@@ -118,34 +115,7 @@ const GameOverDisplay = () => {
     )
 }
 
-export default function GameLayout({ children, gameType }: GameLayoutProps) {
-  const { isMultiplayer, myTime, opponentTime, gameOver, resign, playerColor, currentPlayer, roomWager, resetGame, room, playerPieceCount, opponentPieceCount } = useGame();
-  const { user, userData } = useAuth();
-  const router = useRouter();
-  const USDT_RATE = 310;
-  const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  
-  useEffect(() => {
-    // Reset the game state when the GameLayout component unmounts (e.g., when navigating away)
-    return () => {
-        resetGame();
-    }
-  }, [resetGame]);
-
-  const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
-
-  const handleResign = () => {
-    setIsResignConfirmOpen(false);
-    resign();
-  }
-
-  const isMyTurn = (playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b');
-  const turnText = isMyTurn ? 'Your Turn' : "Opponent's Turn";
-  
-  const opponentData = isMultiplayer && room ? (room.createdBy.uid === user?.uid ? room.player2 : room.createdBy) : null;
-  
-  const ResignationDialogContent = () => {
+const ResignationDialogContent = ({ roomWager, playerPieceCount }: { roomWager: number, playerPieceCount: number}) => {
     let refundPercentage, opponentPayoutPercentage;
 
     if (playerPieceCount <= 3) {
@@ -159,7 +129,6 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
         opponentPayoutPercentage = 105;
     }
 
-
     const refundAmount = roomWager * (refundPercentage / 100);
     const opponentPayout = roomWager * (opponentPayoutPercentage / 100);
 
@@ -172,7 +141,25 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
             </ul>
         </div>
     )
+}
+
+export default function GameLayout({ children, gameType, headerContent }: GameLayoutProps) {
+  const { isMultiplayer, p1Time, p2Time, gameOver, resign, playerColor, currentPlayer, isMounted, roomWager, resetGame, room, playerPieceCount } = useGame();
+  const { user, userData } = useAuth();
+  const router = useRouter();
+  const [isResignConfirmOpen, setIsResignConfirmOpen] = useState(false);
+  
+  const equipment = gameType === 'Chess' ? userData?.equipment?.chess : userData?.equipment?.checkers;
+
+  const handleResign = () => {
+    setIsResignConfirmOpen(false);
+    resign();
   }
+
+  const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
+  const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
+  
+  const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
 
 
   return (
@@ -199,6 +186,9 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
 
         {/* Center Column */}
         <div className="flex flex-col items-center justify-center min-h-0 gap-4">
+            <div className="hidden md:block w-full">
+             {headerContent}
+            </div>
             {gameOver ? (
                 <div className="flex items-center justify-center w-full h-full min-h-[50vh]">
                     <GameOverDisplay />
@@ -206,13 +196,13 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
             ) : (
                 <>
                     <div className="w-full flex justify-between items-center px-2">
-                        <div className={cn("p-2 rounded-lg text-center", !isMyTurn && "bg-primary")}>
+                        <div className={cn("p-2 rounded-lg text-center", !isP1Turn && "bg-primary")}>
                             <p className="font-semibold">{opponentData?.name ?? "Opponent"}</p>
-                            <p className="text-2xl font-bold">{formatTime(Math.ceil(opponentTime))}</p>
+                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(p2Time))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
                         </div>
-                        <div className={cn("p-2 rounded-lg text-center", isMyTurn && "bg-primary")}>
+                        <div className={cn("p-2 rounded-lg text-center", isP1Turn && "bg-primary")}>
                             <p className="font-semibold">You</p>
-                            <p className="text-2xl font-bold">{formatTime(Math.ceil(myTime))}</p>
+                            {isMounted ? <p className="text-2xl font-bold">{formatTime(Math.ceil(p1Time))}</p> : <Skeleton className="h-8 w-24 mt-1"/>}
                         </div>
                     </div>
                     {children}
@@ -276,7 +266,7 @@ export default function GameLayout({ children, gameType }: GameLayoutProps) {
                 <AlertDialogDescription asChild>
                     <div>
                         {isMultiplayer && roomWager > 0 ? (
-                           <ResignationDialogContent/>
+                           <ResignationDialogContent roomWager={roomWager} playerPieceCount={playerPieceCount} />
                         ) : (
                             <div>This is a practice match, so no funds will be lost.</div>
                         )}
