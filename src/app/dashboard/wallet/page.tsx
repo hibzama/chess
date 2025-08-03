@@ -117,58 +117,64 @@ export default function WalletPage() {
     setIsConfirmRemarkOpen(false);
 
     try {
-      const amountInLKR = parseFloat(depositAmount);
-      const batch = writeBatch(db);
+        const amountInLKR = parseFloat(depositAmount);
+        const batch = writeBatch(db);
 
-      // Create the main deposit transaction
-      const depositRef = doc(collection(db, 'transactions'));
-      batch.set(depositRef, {
-        userId: user.uid,
-        type: 'deposit',
-        amount: amountInLKR,
-        status: 'pending',
-        description: `${depositMethod === 'binance' ? 'Binance' : 'Bank'} Deposit`,
-        depositMethod,
-        createdAt: serverTimestamp()
-      });
+        // Create the main deposit transaction
+        const depositRef = doc(collection(db, 'transactions'));
+        batch.set(depositRef, {
+            userId: user.uid,
+            type: 'deposit',
+            amount: amountInLKR,
+            status: 'pending',
+            description: `${depositMethod === 'binance' ? 'Binance' : 'Bank'} Deposit`,
+            depositMethod,
+            createdAt: serverTimestamp()
+        });
       
-      // Check for an active bonus and create a pending bonus transaction if eligible
-      const bonusRef = doc(db, 'settings', 'depositBonus');
-      const bonusSnap = await getDoc(bonusRef);
-      if (bonusSnap.exists()) {
-          const bonusData = bonusSnap.data() as DepositBonus;
-          const bonusIsActive = bonusData.isActive && bonusData.startTime && (bonusData.startTime.toMillis() + (bonusData.durationHours * 3600 * 1000)) > Date.now();
-          const alreadyClaimed = bonusData.claimedBy?.includes(user.uid);
-          const amountEligible = amountInLKR >= bonusData.minDeposit && amountInLKR <= bonusData.maxDeposit;
+        // Check for an active bonus and create a pending bonus transaction if eligible
+        const bonusRef = doc(db, 'settings', 'depositBonus');
+        const bonusSnap = await getDoc(bonusRef);
+        if (bonusSnap.exists()) {
+            const bonusData = bonusSnap.data() as DepositBonus;
+            const now = Date.now();
+            const bonusIsActive = bonusData.isActive && 
+                                  bonusData.startTime && 
+                                  (bonusData.startTime.toMillis() + (bonusData.durationHours * 3600 * 1000)) > now;
 
-          if (bonusIsActive && !alreadyClaimed && amountEligible) {
-            const bonusAmount = amountInLKR * (bonusData.percentage / 100);
-            const pendingBonusRef = doc(collection(db, 'transactions'));
-            batch.set(pendingBonusRef, {
-                userId: user.uid,
-                type: 'bonus',
-                amount: bonusAmount,
-                status: 'pending',
-                description: `${bonusData.percentage}% Deposit Bonus`,
-                createdAt: serverTimestamp(),
-            });
-            batch.update(bonusRef, { claimedBy: arrayUnion(user.uid) });
-          }
-      }
+            const claimedBy = bonusData.claimedBy || [];
+            const alreadyClaimed = claimedBy.includes(user.uid);
+            const amountEligible = amountInLKR >= bonusData.minDeposit && amountInLKR <= bonusData.maxDeposit;
 
-      await batch.commit();
+            if (bonusIsActive && !alreadyClaimed && amountEligible) {
+                const bonusAmount = amountInLKR * (bonusData.percentage / 100);
+                const pendingBonusRef = doc(collection(db, 'transactions'));
+                batch.set(pendingBonusRef, {
+                    userId: user.uid,
+                    type: 'bonus',
+                    amount: bonusAmount,
+                    status: 'pending',
+                    description: `${bonusData.percentage}% Deposit Bonus`,
+                    createdAt: serverTimestamp(),
+                });
+                batch.update(bonusRef, { claimedBy: arrayUnion(user.uid) });
+            }
+        }
 
-      toast({ title: 'Success', description: 'Deposit request submitted for review.' });
-      setDepositAmount('');
-      setIsPostSubmitInfoOpen(true);
+        await batch.commit();
+
+        toast({ title: 'Success', description: 'Deposit request submitted for review.' });
+        setDepositAmount('');
+        setIsPostSubmitInfoOpen(true);
 
     } catch (error) {
-      console.error("Error submitting deposit:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit deposit request.' });
+        console.error("Error submitting deposit:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit deposit request. Please try again.' });
     } finally {
-      setSubmittingDeposit(false);
+        setSubmittingDeposit(false);
     }
   };
+
 
   const handleInitiateDeposit = (e: React.FormEvent) => {
     e.preventDefault();
