@@ -24,6 +24,7 @@ export default function BonusDisplay() {
   const [countdown, setCountdown] = useState('');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  const USDT_RATE = 310;
 
   useEffect(() => {
     const bonusRef = doc(db, 'settings', 'depositBonus');
@@ -84,6 +85,9 @@ export default function BonusDisplay() {
   if (!bonus) {
     return null;
   }
+  
+  const minUsdt = (bonus.minDeposit / USDT_RATE).toFixed(2);
+  const maxUsdt = (bonus.maxDeposit / USDT_RATE).toFixed(2);
 
   return (
     <Card className="bg-gradient-to-r from-primary/10 via-card to-accent/10 border-primary/20 animate-in fade-in-50">
@@ -93,7 +97,7 @@ export default function BonusDisplay() {
           <span className="text-yellow-300">Limited Time: {bonus.percentage}% Deposit Bonus!</span>
         </CardTitle>
         <CardDescription className="text-foreground/80">
-          Get a {bonus.percentage}% bonus on any deposit between LKR {bonus.minDeposit.toFixed(2)} and LKR {bonus.maxDeposit.toFixed(2)}. Don't miss out!
+          Get a {bonus.percentage}% bonus on any deposit between LKR {bonus.minDeposit.toFixed(2)} (~{minUsdt} USDT) and LKR {bonus.maxDeposit.toFixed(2)} (~{maxUsdt} USDT). Don't miss out!
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4">
