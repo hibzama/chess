@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake } from 'lucide-react';
+import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,10 @@ type UserProfile = {
     friends?: string[];
     wins?: number;
     createdAt: any;
+    address?: string;
+    city?: string;
+    country?: string;
+    gender?: string;
 };
 
 type Transaction = {
@@ -161,16 +165,17 @@ export default function UserDetailPage() {
 
             <Card>
                 <CardHeader>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-start gap-4">
                         <Avatar className="h-16 w-16">
                             <AvatarImage src={user.photoURL} />
                             <AvatarFallback>{getInitials(user.firstName, user.lastName)}</AvatarFallback>
                         </Avatar>
-                        <div>
+                        <div className="grid gap-1 flex-1">
                             <CardTitle className="text-3xl">{user.firstName} {user.lastName}</CardTitle>
-                            <CardDescription>{user.email} | {user.phone}</CardDescription>
-                            <Badge variant={user.role === 'marketer' ? 'secondary' : 'outline'} className="mt-2 capitalize">{user.role}</Badge>
+                            <CardDescription className="capitalize">{user.email} | {user.phone} | {user.gender}</CardDescription>
+                            <CardDescription className="flex items-center gap-2 pt-2"><Home className="w-4 h-4" /> {user.address}, {user.city}, {user.country}</CardDescription>
                         </div>
+                        <Badge variant={user.role === 'marketer' ? 'secondary' : 'outline'} className="capitalize">{user.role}</Badge>
                     </div>
                 </CardHeader>
             </Card>

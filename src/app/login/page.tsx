@@ -33,24 +33,8 @@ export default function LoginPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // Check for Firestore document to get custom claims like emailVerified
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.data();
-
-      // --- Email Verification Logic ---
-      if (!user.emailVerified && !userData?.emailVerified) { // Check both Firebase Auth and Firestore
-        // Define a cutoff date. Users created before this date can log in without verification.
-        const verificationCutoffDate = new Date('2024-07-26T00:00:00Z');
-        const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
-
-        // If user is new (created after the cutoff), enforce verification
-        if (creationTime > verificationCutoffDate) {
-            await auth.signOut(); // Sign out the user
-            router.push(`/verify-email?email=${encodeURIComponent(email)}`);
-            return;
-        }
-      }
-      // --- End Verification Logic ---
 
       toast({
         title: "Login Successful!",

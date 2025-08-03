@@ -8,13 +8,14 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
 import { boyAvatars, girlAvatars } from "@/components/icons/avatars";
 import { renderToString } from "react-dom/server";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 
 export default function RegisterForm() {
@@ -22,6 +23,7 @@ export default function RegisterForm() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
+    const [gender, setGender] = useState("");
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,18 +31,24 @@ export default function RegisterForm() {
         const target = e.target as typeof e.target & {
             'first-name': { value: string };
             'last-name': { value: string };
-            phone: { value: string };
-            email: { value: string };
-            password: { value: string };
+            'phone': { value: string };
+            'email': { value: string };
+            'password': { value: string };
             'confirm-password': { value: string };
+            'address': { value: string };
+            'city': { value: string };
+            'country': { value: string };
         };
 
         const firstName = target['first-name'].value;
         const lastName = target['last-name'].value;
         const phone = target.phone.value;
         const email = target.email.value;
-        const password = target['password'].value;
+        const password = target.password.value;
         const confirmPassword = target['confirm-password'].value;
+        const address = target.address.value;
+        const city = target.city.value;
+        const country = target.country.value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
 
@@ -49,6 +57,16 @@ export default function RegisterForm() {
                 variant: "destructive",
                 title: "Error",
                 description: "Passwords do not match.",
+            });
+            setIsLoading(false);
+            return;
+        }
+
+        if (!gender) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Please select your gender.",
             });
             setIsLoading(false);
             return;
@@ -65,12 +83,8 @@ export default function RegisterForm() {
                 console.error("Could not fetch IP address:", ipError);
             }
 
-
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
-
-            // Send verification email
-            await sendEmailVerification(user);
 
             const usersCollection = collection(db, "users");
             const snapshot = await getCountFromServer(usersCollection);
@@ -81,8 +95,8 @@ export default function RegisterForm() {
                 initialBalance = 100;
             }
 
-            const allAvatars = [...boyAvatars, ...girlAvatars];
-            const randomAvatar = allAvatars[Math.floor(Math.random() * allAvatars.length)];
+            const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
+            const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
             const svgString = renderToString(React.createElement(randomAvatar));
             const defaultAvatarUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
             
@@ -92,6 +106,10 @@ export default function RegisterForm() {
                 lastName,
                 phone,
                 email,
+                address,
+                city,
+                country,
+                gender,
                 binancePayId: '',
                 balance: initialBalance,
                 commissionBalance: 0,
@@ -101,7 +119,7 @@ export default function RegisterForm() {
                 l1Count: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
-                emailVerified: false, // Explicitly set to false
+                emailVerified: true, 
             };
 
             const referrerId = mref || ref;
@@ -128,12 +146,10 @@ export default function RegisterForm() {
             await setDoc(doc(db, "users", user.uid), userData);
             
             toast({
-                title: "Almost there!",
-                description: "A verification link has been sent to your email.",
-                duration: 9000,
+                title: "Account Created!",
+                description: "Welcome to Nexbattle.",
             });
-            await auth.signOut();
-            router.push(`/verify-email?email=${encodeURIComponent(email)}`);
+            router.push('/dashboard');
 
         } catch (error: any) {
             console.error("Error signing up:", error);
@@ -156,7 +172,7 @@ export default function RegisterForm() {
     };
 
   return (
-      <Card className="w-full max-w-sm">
+      <Card className="w-full max-w-md">
         <form onSubmit={handleRegister}>
             <CardHeader className="text-center">
             <CardTitle className="text-2xl">Create an Account</CardTitle>
@@ -182,9 +198,36 @@ export default function RegisterForm() {
                   <Input id="last-name" placeholder="Robinson" required />
               </div>
             </div>
+             <div className="grid gap-2">
+                <Label htmlFor="gender">Gender</Label>
+                 <RadioGroup onValueChange={setGender} value={gender} className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="male" id="male" />
+                        <Label htmlFor="male">Male</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="female" id="female" />
+                        <Label htmlFor="female">Female</Label>
+                    </div>
+                </RadioGroup>
+            </div>
             <div className="grid gap-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input id="phone" type="tel" placeholder="+1 234 567 890" required />
+            </div>
+             <div className="grid gap-2">
+                <Label htmlFor="address">Home Address</Label>
+                <Input id="address" placeholder="123 Main St" required />
+            </div>
+             <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="city">City</Label>
+                    <Input id="city" placeholder="New York" required />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="country">Country</Label>
+                    <Input id="country" placeholder="USA" required />
+                </div>
             </div>
             <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
