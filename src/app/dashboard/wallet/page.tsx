@@ -69,8 +69,8 @@ const BonusClaimCard = () => {
             return;
         }
 
-        const bonusExpiry = bonus.startTime.toMillis() + (bonus.durationHours * 60 * 60 * 1000);
-        const isExpired = Date.now() > bonusExpiry;
+        const bonusExpiryTime = bonus.startTime.toDate().getTime() + (bonus.durationHours * 60 * 60 * 1000);
+        const isExpired = Date.now() > bonusExpiryTime;
 
         if (isExpired || (bonus.claimedBy && bonus.claimedBy.includes(user.uid))) {
             setEligibleDeposit(null);
@@ -91,7 +91,13 @@ const BonusClaimCard = () => {
         
         const unsubscribeDeposits = onSnapshot(q, (snapshot) => {
             if (!snapshot.empty) {
-                setEligibleDeposit(snapshot.docs[0].data() as Transaction);
+                const depositData = snapshot.docs[0].data() as Transaction;
+                 // Additional check to ensure deposit was made before bonus expiry
+                if (depositData.createdAt.toDate().getTime() < bonusExpiryTime) {
+                    setEligibleDeposit(depositData);
+                } else {
+                    setEligibleDeposit(null);
+                }
             } else {
                 setEligibleDeposit(null);
             }
