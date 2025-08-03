@@ -426,7 +426,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const switchTurn = useCallback(async (boardState: any, move?: string, capturedPiece?: Piece) => {
         if (gameState.gameOver || gameState.isEnding) return;
-
+    
         const updateLogic = (prevState: GameState) => {
             const p1IsCurrent = prevState.playerColor === prevState.currentPlayer;
             let newMoveHistory = [...prevState.moveHistory];
@@ -444,14 +444,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     }
                 }
             }
-
+    
             const newCapturedByPlayer = capturedPiece && !p1IsCurrent ? [...prevState.capturedByPlayer, capturedPiece] : prevState.capturedByPlayer;
             const newCapturedByBot = capturedPiece && p1IsCurrent ? [...prevState.capturedByBot, capturedPiece] : prevState.capturedByBot;
-
+    
             const nextPlayer = prevState.currentPlayer === 'w' ? 'b' : 'w';
             
             const finalBoardState = gameType === 'checkers' && boardState.board ? { board: boardState.board } : boardState;
-
+    
             return {
                 ...prevState,
                 boardState: finalBoardState,
@@ -468,9 +468,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         // --- Check for Game Over Conditions ---
         if (gameType === 'chess') {
             const game = new Chess(boardState);
-            const opponentId = room?.players.find(p => p !== user?.uid);
             if (game.isCheckmate()) {
-                setWinner(user!.uid, boardState, 'checkmate');
+                const winnerColor = gameState.currentPlayer;
+                const winnerUid = room?.createdBy.color === winnerColor ? room?.createdBy.uid : room?.player2?.uid;
+                setWinner(winnerUid!, boardState, 'checkmate');
                 return;
             } else if (game.isDraw()) {
                 setWinner('draw', boardState, 'draw');
@@ -488,26 +489,26 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }));
             
             if (whitePieces === 0) {
-                 const winnerId = room?.players.find(p => room.createdBy.uid === p ? room.createdBy.color === 'b' : room.player2?.color === 'b');
-                setWinner(winnerId!, boardState, 'piece-capture');
+                 const winnerUid = room?.createdBy.color === 'b' ? room?.createdBy.uid : room?.player2?.uid;
+                setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             } else if (blackPieces === 0) {
-                 const winnerId = room?.players.find(p => room.createdBy.uid === p ? room.createdBy.color === 'w' : room.player2?.color === 'w');
-                 setWinner(winnerId!, boardState, 'piece-capture');
+                 const winnerUid = room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.player2?.uid;
+                 setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             }
         }
-
+    
         // If game is not over, proceed with turn switch
         if (isMultiplayer && room) {
             const roomRef = doc(db, 'game_rooms', room.id);
             const now = Timestamp.now();
             const elapsedSeconds = room.turnStartTime ? Math.max(0, (now.toMillis() - room.turnStartTime.toMillis()) / 1000) : 0;
             const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
-
+    
             const newP1Time = Math.max(0, creatorIsCurrent ? room.p1Time - elapsedSeconds : room.p1Time);
             const newP2Time = Math.max(0, !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time);
-
+    
             let finalBoardStateForFirestore = boardState;
             if (gameType === 'checkers' && boardState.board) {
                 finalBoardStateForFirestore = JSON.stringify(boardState.board);
@@ -521,7 +522,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 p1Time: newP1Time,
                 p2Time: newP2Time,
             };
-
+    
             if (capturedPiece) {
                 const pieceToStore = { type: capturedPiece.type, color: capturedPiece.color };
                 if (room.currentPlayer === room.createdBy.color) { // Creator captured a piece
@@ -530,7 +531,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     updatePayload.capturedByP2 = [...(room.capturedByP2 || []), pieceToStore];
                 }
             }
-
+    
             await updateDoc(roomRef, updatePayload);
         } else {
             setGameState(prevState => {
@@ -586,3 +587,5 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
+
+    
