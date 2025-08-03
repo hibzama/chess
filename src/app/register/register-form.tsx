@@ -128,12 +128,12 @@ export default function RegisterForm() {
             await setDoc(doc(db, "users", user.uid), userData);
             
             toast({
-                title: "Registration Successful!",
-                description: "A verification link has been sent to your email. Please verify your account before logging in.",
+                title: "Almost there!",
+                description: "A verification link has been sent to your email.",
                 duration: 9000,
             });
             await auth.signOut();
-            router.push('/login');
+            router.push(`/verify-email?email=${encodeURIComponent(email)}`);
 
         } catch (error: any) {
             console.error("Error signing up:", error);
