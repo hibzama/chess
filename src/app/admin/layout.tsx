@@ -103,6 +103,9 @@ export default function AdminLayout({
                         <SidebarMenuItem>
                             <Link href="/admin/deposits/pending"><SidebarMenuButton tooltip="Pending Deposits" isActive={isActive('/admin/deposits/pending')}><Clock /><span>Pending Deposits</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
+                         <SidebarMenuItem>
+                             <Link href="/admin/bonus/pending"><SidebarMenuButton tooltip="Pending Bonuses" isActive={isActive('/admin/bonus/pending')}><Gift /><span>Pending Bonuses</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
                         <SidebarMenuItem>
                             <Link href="/admin/withdrawals/pending"><SidebarMenuButton tooltip="Pending Withdrawals" isActive={isActive('/admin/withdrawals/pending')}><Clock /><span>Pending Withdrawals</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
@@ -134,7 +137,7 @@ export default function AdminLayout({
                              <Link href="/admin/marketing/withdrawals/history"><SidebarMenuButton tooltip="Marketing Withdrawals History" isActive={isActive('/admin/marketing/withdrawals/history')}><History /><span>M. Withdraw History</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
-                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Deposit Bonus" isActive={isActive('/admin/bonus')}><Gift /><span>Deposit Bonus</span></SidebarMenuButton></Link>
+                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Deposit Bonus Config" isActive={isActive('/admin/bonus') && !pathname.includes('pending')}><Gift /><span>Bonus Config</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>

@@ -1,4 +1,5 @@
 
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -43,130 +44,6 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
         <path d="M22 2L15 22L11 13L2 9L22 2Z" />
     </svg>
 )
-
-const BonusClaimCard = () => {
-    const { user } = useAuth();
-    const { toast } = useToast();
-    const [bonus, setBonus] = useState<DepositBonus | null>(null);
-    const [eligibleDeposit, setEligibleDeposit] = useState<Transaction | null>(null);
-    const [isClaiming, setIsClaiming] = useState(false);
-    
-    useEffect(() => {
-        const bonusRef = doc(db, 'settings', 'depositBonus');
-        const unsubscribeBonus = onSnapshot(bonusRef, (doc) => {
-            if (doc.exists() && doc.data().isActive) {
-                setBonus(doc.data() as DepositBonus);
-            } else {
-                setBonus(null);
-            }
-        });
-        return () => unsubscribeBonus();
-    }, []);
-
-    useEffect(() => {
-        if (!bonus || !user || !bonus.startTime) {
-            setEligibleDeposit(null);
-            return;
-        }
-
-        const bonusExpiryTime = bonus.startTime.toDate().getTime() + (bonus.durationHours * 60 * 60 * 1000);
-        const isExpired = Date.now() > bonusExpiryTime;
-        const alreadyClaimed = bonus.claimedBy?.includes(user.uid) ?? false;
-        
-        if (isExpired || alreadyClaimed) {
-             setEligibleDeposit(null);
-            return;
-        }
-        
-        const q = query(
-            collection(db, 'transactions'),
-            where('userId', '==', user.uid),
-            where('type', '==', 'deposit'),
-            where('status', '==', 'approved'),
-            orderBy('createdAt', 'desc'),
-            limit(1)
-        );
-        
-        const unsubscribeDeposits = onSnapshot(q, (snapshot) => {
-            if (!snapshot.empty) {
-                const latestDeposit = snapshot.docs[0].data() as Transaction;
-                const depositTime = latestDeposit.createdAt.toDate().getTime();
-
-                // Check if the latest deposit is within the bonus time window and amount range
-                const isWithinTime = depositTime >= bonus.startTime!.toDate().getTime() && depositTime < bonusExpiryTime;
-                const isWithinAmount = latestDeposit.amount >= bonus.minDeposit && latestDeposit.amount <= bonus.maxDeposit;
-
-                if (isWithinTime && isWithinAmount) {
-                    setEligibleDeposit(latestDeposit);
-                } else {
-                    setEligibleDeposit(null);
-                }
-            } else {
-                setEligibleDeposit(null);
-            }
-        });
-
-        return () => unsubscribeDeposits();
-    }, [bonus, user]);
-
-    const handleClaimBonus = async () => {
-        if (!user || !bonus || !eligibleDeposit) return;
-        setIsClaiming(true);
-
-        const bonusAmount = eligibleDeposit.amount * (bonus.percentage / 100);
-        const batch = writeBatch(db);
-        const userRef = doc(db, 'users', user.uid);
-        const bonusSettingsRef = doc(db, 'settings', 'depositBonus');
-        const bonusTransactionRef = doc(collection(db, 'transactions'));
-        
-        try {
-            batch.update(userRef, { balance: increment(bonusAmount) });
-            batch.update(bonusSettingsRef, { claimedBy: arrayUnion(user.uid) });
-            batch.set(bonusTransactionRef, {
-                userId: user.uid,
-                type: 'bonus',
-                amount: bonusAmount,
-                status: 'completed',
-                description: `${bonus.percentage}% Deposit Bonus`,
-                createdAt: serverTimestamp()
-            });
-
-            await batch.commit();
-            toast({ title: 'Success!', description: `LKR ${bonusAmount.toFixed(2)} bonus has been added to your wallet.`});
-        } catch (error) {
-            console.error("Error claiming bonus:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not claim bonus.'});
-        } finally {
-            setIsClaiming(false);
-        }
-    }
-
-    if (!bonus || !eligibleDeposit) {
-        return null;
-    }
-
-    const bonusAmount = eligibleDeposit.amount * (bonus.percentage / 100);
-
-    return (
-        <Card className="bg-gradient-to-r from-primary/10 via-card to-accent/10 border-primary/20 animate-in fade-in-50">
-            <CardHeader>
-                 <CardTitle className="text-lg flex items-center gap-2">
-                    <Gift className="w-6 h-6 text-yellow-300" />
-                    <span className="text-yellow-300">You have a bonus available!</span>
-                </CardTitle>
-                <CardDescription className="text-foreground/80">
-                   You've earned a {bonus.percentage}% bonus of LKR {bonusAmount.toFixed(2)} on your recent deposit.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button className="w-full" onClick={handleClaimBonus} disabled={isClaiming}>
-                    {isClaiming ? 'Claiming...' : 'Claim Your Bonus Now'}
-                </Button>
-            </CardContent>
-        </Card>
-    );
-};
-
 
 export default function WalletPage() {
   const { user, userData, loading: authLoading } = useAuth();
@@ -241,8 +118,11 @@ export default function WalletPage() {
 
     try {
       const amountInLKR = parseFloat(depositAmount);
+      const batch = writeBatch(db);
 
-      await addDoc(collection(db, 'transactions'), {
+      // Create the main deposit transaction
+      const depositRef = doc(collection(db, 'transactions'));
+      batch.set(depositRef, {
         userId: user.uid,
         type: 'deposit',
         amount: amountInLKR,
@@ -251,6 +131,32 @@ export default function WalletPage() {
         depositMethod,
         createdAt: serverTimestamp()
       });
+      
+      // Check for an active bonus and create a pending bonus transaction if eligible
+      const bonusRef = doc(db, 'settings', 'depositBonus');
+      const bonusSnap = await getDoc(bonusRef);
+      if (bonusSnap.exists()) {
+          const bonusData = bonusSnap.data() as DepositBonus;
+          const bonusIsActive = bonusData.isActive && bonusData.startTime && (bonusData.startTime.toMillis() + (bonusData.durationHours * 3600 * 1000)) > Date.now();
+          const alreadyClaimed = bonusData.claimedBy?.includes(user.uid);
+          const amountEligible = amountInLKR >= bonusData.minDeposit && amountInLKR <= bonusData.maxDeposit;
+
+          if (bonusIsActive && !alreadyClaimed && amountEligible) {
+            const bonusAmount = amountInLKR * (bonusData.percentage / 100);
+            const pendingBonusRef = doc(collection(db, 'transactions'));
+            batch.set(pendingBonusRef, {
+                userId: user.uid,
+                type: 'bonus',
+                amount: bonusAmount,
+                status: 'pending',
+                description: `${bonusData.percentage}% Deposit Bonus`,
+                createdAt: serverTimestamp(),
+            });
+            batch.update(bonusRef, { claimedBy: arrayUnion(user.uid) });
+          }
+      }
+
+      await batch.commit();
 
       toast({ title: 'Success', description: 'Deposit request submitted for review.' });
       setDepositAmount('');
@@ -399,8 +305,6 @@ export default function WalletPage() {
         </CardContent>
       </Card>
       
-      <BonusClaimCard />
-
       <Tabs defaultValue="deposit" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="deposit"><ArrowUpCircle /> Deposit</TabsTrigger>
@@ -596,7 +500,7 @@ export default function WalletPage() {
                                             </Badge>
                                         </div>
                                     </div>
-                                    {tx.type === 'deposit' && tx.status === 'pending' && (
+                                    {(tx.type === 'deposit' || tx.type === 'bonus') && tx.status === 'pending' && (
                                         <div className="mt-4 p-3 rounded-md bg-secondary space-y-3">
                                             <div className="flex items-center gap-2">
                                                 <Info className="w-4 h-4 text-primary" />
