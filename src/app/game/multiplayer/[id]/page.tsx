@@ -247,11 +247,11 @@ function MultiplayerGame() {
                 if ((playerFullData[0].data?.balance || 0) < roomData.wager) {
                     throw new Error("Creator has insufficient funds.");
                 }
-                 // Pre-fetch referrer data for all players if they have one
+                // Pre-fetch referrer data for all players if they have one
                 const referrerReadsMap = new Map<string, Promise<DocumentData>>();
                 playerFullData.forEach(p => {
                     // Check for regular referrer
-                    if (p.data.referredBy && !referrerReadsMap.has(p.data.referredBy)) {
+                    if (p.data.referredBy) {
                         referrerReadsMap.set(p.data.referredBy, transaction.get(doc(db, 'users', p.data.referredBy)));
                     }
                     // Check for marketer chain
@@ -313,13 +313,10 @@ function MultiplayerGame() {
                                     });
                                 }
                             }
-                        }
-                        
-                        if (player.data.referredBy) { // Standard L1 referral
+                        } else if (player.data.referredBy) { // Standard L1 referral
                             const l1ReferrerId = player.data.referredBy;
                             const l1ReferrerData = referrersDataMap.get(l1ReferrerId);
     
-                            // Make sure referrer is a standard user, not a marketer (who gets paid via the chain)
                             if (l1ReferrerData && l1ReferrerData.role === 'user') {
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },

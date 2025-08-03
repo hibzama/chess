@@ -130,14 +130,10 @@ export default function RegisterForm() {
                     const referrerData = referrerDoc.data();
                     
                     if (mref && referrerData.role === 'marketer') {
-                         userData.referralChain = [mref];
-                    } else if (ref) {
+                         userData.referralChain = [...(referrerData.referralChain || []), mref];
+                    } else if (ref && referrerData.role === 'user') {
                         userData.referredBy = ref;
                         await updateDoc(doc(db, 'users', ref), { l1Count: increment(1) });
-                        
-                        if (referrerData.referralChain) {
-                             userData.referralChain = [...referrerData.referralChain, ref];
-                        }
                     }
                 }
             }
