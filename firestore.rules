@@ -2,8 +2,7 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
+  
     function isSignedIn() {
       return request.auth != null;
     }
@@ -16,56 +15,52 @@ service cloud.firestore {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Users can read/write their own data. Admins can read/write any user data.
     match /users/{userId} {
-      allow read, update, delete: if isUser(userId) || isAdmin();
+      allow read;
       allow create: if isSignedIn();
+      allow update, delete: if isUser(userId) || isAdmin();
+    }
+
+    match /game_rooms/{roomId} {
+      allow read;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.players[0] == request.auth.uid || resource.data.players[1] == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.createdBy.uid == request.auth.uid;
     }
     
-    // Game rooms can be read by any signed-in user if public.
-    // Users can only create/join/update rooms they are a part of.
-    match /game_rooms/{roomId} {
-      allow read: if isSignedIn() && (resource.data.isPrivate == false || request.auth.uid in resource.data.players);
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && request.auth.uid in resource.data.players;
-    }
-
-    // Chat messages can only be read/written by participants in the chat.
-    match /chats/{chatId} {
-        allow read, update: if isSignedIn() && request.auth.uid in resource.data.users;
-        match /messages/{messageId} {
-            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-        }
-    }
-
-    // Transactions can only be read by the user who owns them or an admin.
-    // Users can create their own transactions.
     match /transactions/{transactionId} {
-      allow read: if isUser(resource.data.userId) || isAdmin();
-      allow create: if isUser(request.resource.data.userId);
-      allow update: if isAdmin(); // Only admins can approve/reject
+        allow read, create: if isSignedIn();
+        allow update, delete: if isAdmin();
     }
-
-    // Marketing applications can be created by anyone, but only read/updated by admins.
+    
     match /marketing_applications/{appId} {
-        allow create: if true;
+        allow create;
         allow read, update, delete: if isAdmin();
     }
-    
-    // Notifications can only be accessed by the user they are for.
-    match /notifications/{notifId} {
-        allow read, create, update: if isUser(resource.data.userId) || isUser(request.resource.data.userId);
-    }
-    
-    // Settings can be read by anyone, but only updated by admins (for bonus config)
+
     match /settings/{settingId} {
-        allow read: if true;
+        allow read;
         allow write: if isAdmin();
     }
 
-    // Default deny all other access
-    match /{document=**} {
-      allow read, write: if false;
+    match /notifications/{notificationId} {
+        allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+        allow create: if isSignedIn();
+    }
+
+    // Rules for Chat
+    match /chats/{chatId} {
+      // Allow read/write access only to users who are part of the chat.
+      allow read, update, delete: if isSignedIn() && request.auth.uid in resource.data.users;
+      allow create: if isSignedIn() && request.auth.uid in request.resource.data.users;
+
+      // Rules for messages subcollection
+      match /messages/{messageId} {
+        // Allow users in the chat to read messages
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid] != null;
+        // Allow a user to create a message if they are the sender and are part of the chat
+        allow create: if isSignedIn() && request.resource.data.senderId == request.auth.uid && get(/databases/$(database)/documents/chats/$(chatId)).data.users[request.auth.uid] != null;
+      }
     }
   }
 }
