@@ -297,3 +297,5 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     </>
   );
 }
+
+    
