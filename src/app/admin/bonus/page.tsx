@@ -37,6 +37,7 @@ export default function BonusPage() {
         isActive: false,
         durationHours: 24,
     });
+    const [initialIsActive, setInitialIsActive] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const { toast } = useToast();
@@ -48,6 +49,7 @@ export default function BonusPage() {
             if (bonusSnap.exists()) {
                 const data = bonusSnap.data() as DepositBonus;
                 setBonus(data);
+                setInitialIsActive(data.isActive);
             }
             setLoading(false);
         };
@@ -64,15 +66,18 @@ export default function BonusPage() {
                  updatedAt: serverTimestamp(),
                  createdAt: bonus.createdAt || serverTimestamp(),
             };
-
-            // If the bonus is active, always set/reset its start time upon saving.
-            if(bonus.isActive) {
+            
+            // Only set a new start time if the bonus is being activated (toggled from off to on)
+            if(bonus.isActive && !initialIsActive) {
                 bonusPayload.startTime = serverTimestamp();
-            } else {
+            } else if (!bonus.isActive) {
                 bonusPayload.startTime = null; // Clear start time if not active
             }
 
             await setDoc(bonusRef, bonusPayload, { merge: true });
+            
+            // Update the initial state after a successful save
+            setInitialIsActive(bonus.isActive || false);
 
             toast({
                 title: 'Success!',

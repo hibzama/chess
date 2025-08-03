@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db, storage } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp, orderBy, limit, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -64,15 +64,15 @@ const BonusClaimCard = () => {
     }, []);
 
     useEffect(() => {
-        if (!bonus || !user) {
+        if (!bonus || !user || !bonus.startTime) {
             setEligibleDeposit(null);
             return;
         }
 
-        const bonusExpiry = bonus.startTime ? bonus.startTime.toMillis() + (bonus.durationHours * 60 * 60 * 1000) : 0;
-        const isExpired = bonus.startTime ? Date.now() > bonusExpiry : false;
+        const bonusExpiry = bonus.startTime.toMillis() + (bonus.durationHours * 60 * 60 * 1000);
+        const isExpired = Date.now() > bonusExpiry;
 
-        if (isExpired || bonus.claimedBy?.includes(user.uid)) {
+        if (isExpired || (bonus.claimedBy && bonus.claimedBy.includes(user.uid))) {
             setEligibleDeposit(null);
             return;
         }
@@ -82,7 +82,7 @@ const BonusClaimCard = () => {
             where('userId', '==', user.uid),
             where('type', '==', 'deposit'),
             where('status', '==', 'approved'),
-            where('createdAt', '>=', bonus.startTime || new Timestamp(0,0)),
+            where('createdAt', '>=', bonus.startTime),
             where('amount', '>=', bonus.minDeposit),
             where('amount', '<=', bonus.maxDeposit),
             orderBy('createdAt', 'desc'),
