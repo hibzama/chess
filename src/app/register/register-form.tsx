@@ -123,15 +123,17 @@ export default function RegisterForm() {
             };
 
             const referrerId = mref || ref;
-
             if (referrerId) {
                 const referrerDoc = await getDoc(doc(db, 'users', referrerId));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    
+                    // If referred by a marketer, set the chain and the direct referrer
                     if (mref && referrerData.role === 'marketer') {
-                         userData.referralChain = [...(referrerData.referralChain || []), mref];
-                    } else if (ref && referrerData.role === 'user') {
+                        userData.referralChain = [...(referrerData.referralChain || []), mref];
+                        userData.referredBy = mref; // Also track direct marketer
+                    } 
+                    // If referred by a regular user, only set the direct referrer
+                    else if (ref && referrerData.role === 'user') {
                         userData.referredBy = ref;
                         await updateDoc(doc(db, 'users', ref), { l1Count: increment(1) });
                     }

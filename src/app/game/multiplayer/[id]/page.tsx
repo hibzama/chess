@@ -247,20 +247,19 @@ function MultiplayerGame() {
                 if ((playerFullData[0].data?.balance || 0) < roomData.wager) {
                     throw new Error("Creator has insufficient funds.");
                 }
-                // Pre-fetch referrer data for all players if they have one
+
+                 // Pre-fetch referrer data for all players if they have one
                 const referrerReadsMap = new Map<string, Promise<DocumentData>>();
                 playerFullData.forEach(p => {
-                    // Check for regular referrer
-                    if (p.data.referredBy) {
+                    if (p.data.referredBy && !referrerReadsMap.has(p.data.referredBy)) {
                         referrerReadsMap.set(p.data.referredBy, transaction.get(doc(db, 'users', p.data.referredBy)));
                     }
-                    // Check for marketer chain
                     if (p.data.referralChain && p.data.referralChain.length > 0) {
                         p.data.referralChain.forEach((marketerId: string) => {
                             if (!referrerReadsMap.has(marketerId)) {
                                 referrerReadsMap.set(marketerId, transaction.get(doc(db, 'users', marketerId)));
                             }
-                        })
+                        });
                     }
                 });
 
@@ -297,7 +296,7 @@ function MultiplayerGame() {
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
-                        // --- Commission Logic ---
+                         // --- Marketing Chain Commission ---
                         if (player.data.referralChain && player.data.referralChain.length > 0) {
                             const marketingCommissionRate = 0.03;
                             for (let i = 0; i < player.data.referralChain.length; i++) {
@@ -313,7 +312,9 @@ function MultiplayerGame() {
                                     });
                                 }
                             }
-                        } else if (player.data.referredBy) { // Standard L1 referral
+                        } 
+                        // --- Regular User Commission ---
+                        else if (player.data.referredBy) {
                             const l1ReferrerId = player.data.referredBy;
                             const l1ReferrerData = referrersDataMap.get(l1ReferrerId);
     
@@ -528,5 +529,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
