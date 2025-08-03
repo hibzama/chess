@@ -24,6 +24,7 @@ interface GameRoom {
     p1Time: number; // Stored as seconds remaining at last turn
     p2Time: number; // Stored as seconds remaining at last turn
     turnStartTime: Timestamp;
+    timeControl: number;
     createdBy: { uid: string; color: PlayerColor; name: string; photoURL?: string; };
     player2?: { uid: string; color: PlayerColor, name: string; photoURL?: string; };
     players: string[];
@@ -346,10 +347,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
 
                 let boardData = roomData.boardState;
-                 if(gameType === 'checkers' && boardData && typeof boardData === 'string') {
-                    try { boardData = { board: JSON.parse(boardData) }; } catch { boardData = createInitialCheckersBoard();}
-                } else if (gameType === 'checkers' && !boardData) {
-                    boardData = createInitialCheckersBoard();
+                if (gameType === 'checkers') {
+                    if (typeof roomData.boardState === 'string') {
+                        try {
+                             boardData = { board: JSON.parse(roomData.boardState) };
+                        } catch (e) {
+                             boardData = createInitialCheckersBoard();
+                        }
+                    } else if (!roomData.boardState) {
+                        boardData = createInitialCheckersBoard();
+                    }
                 }
                 
                 setGameState(prev => ({
@@ -388,8 +395,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
             const currentIsCreator = room.currentPlayer === room.createdBy.color;
 
-            const p1ServerTime = currentIsCreator ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
-            const p2ServerTime = !currentIsCreator ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
+            let p1ServerTime = currentIsCreator ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
+            let p2ServerTime = !currentIsCreator ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
+
+            // Clamp time to not exceed the initial time control
+            p1ServerTime = Math.min(p1ServerTime, room.timeControl);
+            p2ServerTime = Math.min(p2ServerTime, room.timeControl);
             
             const isCreator = room.createdBy.uid === user?.uid;
             updateAndSaveState({
@@ -453,11 +464,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         if (isMultiplayer && room) {
             const roomRef = doc(db, 'game_rooms', room.id);
             const now = Timestamp.now();
-            const elapsedSeconds = room.turnStartTime ? (now.toMillis() - room.turnStartTime.toMillis()) / 1000 : 0;
+            const elapsedSeconds = room.turnStartTime ? Math.max(0, (now.toMillis() - room.turnStartTime.toMillis()) / 1000) : 0;
             const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
 
-            const newP1Time = creatorIsCurrent ? room.p1Time - elapsedSeconds : room.p1Time;
-            const newP2Time = !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time;
+            const newP1Time = Math.max(0, creatorIsCurrent ? room.p1Time - elapsedSeconds : room.p1Time);
+            const newP2Time = Math.max(0, !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time);
 
             let finalBoardStateForFirestore = boardState;
             if (gameType === 'checkers' && boardState.board) {
