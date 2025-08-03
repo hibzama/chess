@@ -238,11 +238,27 @@ function MultiplayerGame() {
                     throw new Error("Creator has insufficient funds.");
                 }
 
+                // --- PRE-READ ALL NECESSARY DATA ---
                 const playersWithData = [
                     { id: creatorDoc.id, data: creatorDoc.data(), name: roomData.createdBy.name },
                     { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
                 ];
                 
+                // Pre-fetch referrer data for both players if they have one
+                const referrerReads = playersWithData
+                    .filter(p => p.data.referredBy && p.data.role !== 'marketer')
+                    .map(p => transaction.get(doc(db, 'users', p.data.referredBy)));
+                
+                const referrerDocs = await Promise.all(referrerReads);
+                const referrersDataMap = new Map();
+                referrerDocs.forEach(refDoc => {
+                    if (refDoc.exists()) {
+                        referrersDataMap.set(refDoc.id, refDoc.data());
+                    }
+                });
+
+                // --- ALL READS ARE DONE. START WRITES. ---
+
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
@@ -279,9 +295,9 @@ function MultiplayerGame() {
                             }
                         } else if (player.data.referredBy) {
                             const l1ReferrerId = player.data.referredBy;
-                            const referrerDoc = await transaction.get(doc(db, 'users', l1ReferrerId));
-                            if (referrerDoc.exists()) {
-                                const l1ReferrerData = referrerDoc.data();
+                            const l1ReferrerData = referrersDataMap.get(l1ReferrerId);
+                            
+                            if (l1ReferrerData) {
                                 const referralRanks = [
                                     { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
                                     { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
