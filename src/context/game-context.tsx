@@ -126,6 +126,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const [isMounted, setIsMounted] = useState(false);
     
     const gameOverHandledRef = useRef(false);
+    const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         setIsMounted(true);
@@ -293,8 +294,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
 
-            // This logic runs for ANY user observing the room.
-             if (roomData.status === 'completed' && !gameOverHandledRef.current) {
+            if (roomData.status === 'completed' && !gameOverHandledRef.current) {
                 gameOverHandledRef.current = true;
                 const winnerIsMe = roomData.winner?.uid === user.uid;
                 const iAmResigner = roomData.winner?.resignerId === user.uid;
@@ -328,7 +328,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 return;
             }
 
-
             if (roomData.status === 'waiting' || roomData.status === 'in-progress') {
                 const isCreator = roomData.createdBy.uid === user.uid;
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
@@ -359,6 +358,44 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
         return () => unsubscribe();
     }, [isMultiplayer, roomId, user, router, gameType, isGameLoading]);
+
+     // Real-time Timer Logic
+    useEffect(() => {
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        if (gameState.gameOver || !isMounted || !room || room.status !== 'in-progress') return;
+
+        timerIntervalRef.current = setInterval(() => {
+            if (gameOverHandledRef.current) {
+                if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                return;
+            }
+
+            const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
+            const currentIsCreator = room.currentPlayer === room.createdBy.color;
+
+            const p1ServerTime = currentIsCreator ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
+            const p2ServerTime = !currentIsCreator ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
+            
+            const isCreator = room.createdBy.uid === user?.uid;
+            updateAndSaveState({
+                p1Time: isCreator ? p1ServerTime : p2ServerTime,
+                p2Time: !isCreator ? p1ServerTime : p2ServerTime,
+            });
+            
+            if (p1ServerTime <= 0) {
+                setWinner(room.player2?.uid || '', room.boardState, 'timeout');
+                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            } else if (p2ServerTime <= 0) {
+                setWinner(room.createdBy.uid, room.boardState, 'timeout');
+                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            }
+        }, 1000);
+
+        return () => {
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+        };
+    }, [isMounted, gameState.gameOver, room, user, updateAndSaveState, setWinner]);
+
 
     const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
     
@@ -478,7 +515,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const contextValue = { ...gameState, isMounted, setupGame, switchTurn, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isGameLoading };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
-}
+};
 
 export const useGame = () => {
     const context = useContext(GameContext);
@@ -487,5 +524,3 @@ export const useGame = () => {
     }
     return context;
 };
-
-    
