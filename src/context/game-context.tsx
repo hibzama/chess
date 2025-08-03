@@ -78,6 +78,20 @@ type Move = { turn: number; white?: string; black?: string };
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
+const createInitialCheckersBoard = () => {
+    const board = Array(8).fill(null).map(() => Array(8).fill(null));
+    for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+            if ((r + c) % 2 !== 0) { // Dark squares
+                if (r < 3) board[r][c] = { player: 'b', type: 'pawn' };
+                else if (r > 4) board[r][c] = { player: 'w', type: 'pawn' };
+            }
+        }
+    }
+    return { board };
+};
+
+
 export const GameProvider = ({ children, gameType }: { children: React.ReactNode, gameType: 'chess' | 'checkers' }) => {
     const { id: roomId } = useParams();
     const router = useRouter();
@@ -99,7 +113,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             gameOverReason: null,
             moveHistory: [],
             moveCount: 0,
-            boardState: null,
+            boardState: gameType === 'checkers' ? createInitialCheckersBoard() : null,
             capturedByPlayer: [],
             capturedByBot: [],
             payoutAmount: null,
@@ -112,6 +126,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const savedState = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null;
             if (savedState) {
                 const parsed = JSON.parse(savedState);
+                // Ensure boardState is correctly structured for checkers
+                if(gameType === 'checkers' && parsed.boardState && !parsed.boardState.board) {
+                    parsed.boardState = { board: parsed.boardState };
+                }
                 return { ...defaultState, ...parsed, gameOver: false, winner: null, isEnding: false };
             }
         } catch (error) {
@@ -328,8 +346,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const myColor = isCreator ? roomData.createdBy.color : (roomData.player2 ? roomData.player2.color : 'w');
 
                 let boardData = roomData.boardState;
-                if(gameType === 'checkers' && typeof boardData === 'string') {
-                    try { boardData = { board: JSON.parse(boardData) }; } catch { boardData = null;}
+                 if(gameType === 'checkers' && boardData && typeof boardData === 'string') {
+                    try { boardData = { board: JSON.parse(boardData) }; } catch { boardData = createInitialCheckersBoard();}
+                } else if (gameType === 'checkers' && !boardData) {
+                    boardData = createInitialCheckersBoard();
                 }
                 
                 setGameState(prev => ({
@@ -416,10 +436,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const newCapturedByBot = capturedPiece && p1IsCurrent ? [...prevState.capturedByBot, capturedPiece] : prevState.capturedByBot;
 
             const nextPlayer = prevState.currentPlayer === 'w' ? 'b' : 'w';
+            
+            const finalBoardState = gameType === 'checkers' && boardState.board ? { board: boardState.board } : boardState;
 
             return {
                 ...prevState,
-                boardState,
+                boardState: finalBoardState,
                 currentPlayer: nextPlayer,
                 moveHistory: newMoveHistory,
                 moveCount: newMoveCount,
@@ -437,15 +459,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const newP1Time = creatorIsCurrent ? room.p1Time - elapsedSeconds : room.p1Time;
             const newP2Time = !creatorIsCurrent ? room.p2Time - elapsedSeconds : room.p2Time;
 
-            let finalBoardState = boardState;
+            let finalBoardStateForFirestore = boardState;
             if (gameType === 'checkers' && boardState.board) {
-                finalBoardState = JSON.stringify(boardState.board);
+                finalBoardStateForFirestore = JSON.stringify(boardState.board);
             }
 
             const updatedGameState = updateLogic(gameState);
             
             const updatePayload: any = {
-                boardState: finalBoardState,
+                boardState: finalBoardStateForFirestore,
                 currentPlayer: updatedGameState.currentPlayer,
                 moveHistory: updatedGameState.moveHistory,
                 turnStartTime: now,
