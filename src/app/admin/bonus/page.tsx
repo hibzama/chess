@@ -40,7 +40,6 @@ export default function BonusPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const { toast } = useToast();
-    const [wasActive, setWasActive] = useState(false);
 
     useEffect(() => {
         const fetchBonus = async () => {
@@ -49,7 +48,6 @@ export default function BonusPage() {
             if (bonusSnap.exists()) {
                 const data = bonusSnap.data() as DepositBonus;
                 setBonus(data);
-                setWasActive(data.isActive);
             }
             setLoading(false);
         };
@@ -61,20 +59,20 @@ export default function BonusPage() {
         try {
             const bonusRef = doc(db, 'settings', 'depositBonus');
             
-            let bonusPayload: Partial<DepositBonus> = {
+            const bonusPayload: Partial<DepositBonus> = {
                  ...bonus,
                  updatedAt: serverTimestamp(),
-                 createdAt: bonus.createdAt || serverTimestamp() 
-            }
+                 createdAt: bonus.createdAt || serverTimestamp(),
+            };
 
-            // If the bonus is being activated now, set its start time.
-            if(bonus.isActive && !wasActive) {
+            // If the bonus is active, always set/reset its start time upon saving.
+            if(bonus.isActive) {
                 bonusPayload.startTime = serverTimestamp();
+            } else {
+                bonusPayload.startTime = null; // Clear start time if not active
             }
 
             await setDoc(bonusRef, bonusPayload, { merge: true });
-
-            setWasActive(bonus.isActive);
 
             toast({
                 title: 'Success!',
@@ -111,7 +109,7 @@ export default function BonusPage() {
                     </div>
                     <Switch
                         id="isActive"
-                        checked={bonus.isActive}
+                        checked={bonus.isActive || false}
                         onCheckedChange={(value) => handleChange('isActive', value)}
                         aria-label="Toggle bonus status"
                     />

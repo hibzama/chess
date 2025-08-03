@@ -1,6 +1,6 @@
 
 'use client'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,17 +22,14 @@ export default function BonusDisplay() {
   const [bonus, setBonus] = useState<DepositBonus | null>(null);
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState('');
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
 
   useEffect(() => {
     const bonusRef = doc(db, 'settings', 'depositBonus');
     const unsubscribe = onSnapshot(bonusRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data() as DepositBonus;
-        if (data.isActive) {
-          setBonus(data);
-        } else {
-          setBonus(null);
-        }
+      if (docSnap.exists() && docSnap.data().isActive) {
+        setBonus(docSnap.data() as DepositBonus);
       } else {
         setBonus(null);
       }
@@ -43,20 +40,24 @@ export default function BonusDisplay() {
   }, []);
 
    useEffect(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+        }
+
         if (!bonus?.isActive || !bonus.startTime) {
             setCountdown('');
             return;
         }
 
-        const interval = setInterval(() => {
+        const calculateCountdown = () => {
             const now = new Date().getTime();
-            const expiryTime = bonus.startTime!.toMillis() + (bonus.durationHours * 60 * 60 * 1000);
+            const expiryTime = bonus.startTime!.toDate().getTime() + (bonus.durationHours * 60 * 60 * 1000);
             const distance = expiryTime - now;
 
             if (distance < 0) {
-                clearInterval(interval);
+                if (intervalRef.current) clearInterval(intervalRef.current);
                 setCountdown("EXPIRED");
-                setBonus(null); // Hide the bonus card once it's expired
+                setBonus(null); 
                 return;
             }
 
@@ -66,9 +67,14 @@ export default function BonusDisplay() {
             const seconds = Math.floor((distance % (1000 * 60)) / 1000);
             
             setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`);
-        }, 1000);
+        }
+        
+        calculateCountdown(); // Run immediately
+        intervalRef.current = setInterval(calculateCountdown, 1000);
 
-        return () => clearInterval(interval);
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
     }, [bonus]);
 
   if (loading) {
