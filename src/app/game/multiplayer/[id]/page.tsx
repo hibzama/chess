@@ -265,7 +265,7 @@ function MultiplayerGame() {
                         });
                         
                         // --- Commission Logic ---
-                        if (player.data.referralChain && player.data.referralChain.length > 0) {
+                        if (player.data.role === 'marketer' && player.data.referralChain && player.data.referralChain.length > 0) {
                             const marketingCommissionRate = 0.03;
                             for (let i = 0; i < player.data.referralChain.length; i++) {
                                 const marketerId = player.data.referralChain[i];
