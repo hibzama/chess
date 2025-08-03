@@ -71,9 +71,10 @@ const BonusClaimCard = () => {
 
         const bonusExpiryTime = bonus.startTime.toDate().getTime() + (bonus.durationHours * 60 * 60 * 1000);
         const isExpired = Date.now() > bonusExpiryTime;
-
-        if (isExpired || (bonus.claimedBy && bonus.claimedBy.includes(user.uid))) {
-            setEligibleDeposit(null);
+        const alreadyClaimed = bonus.claimedBy?.includes(user.uid) ?? false;
+        
+        if (isExpired || alreadyClaimed) {
+             setEligibleDeposit(null);
             return;
         }
         
@@ -82,19 +83,21 @@ const BonusClaimCard = () => {
             where('userId', '==', user.uid),
             where('type', '==', 'deposit'),
             where('status', '==', 'approved'),
-            where('createdAt', '>=', bonus.startTime),
-            where('amount', '>=', bonus.minDeposit),
-            where('amount', '<=', bonus.maxDeposit),
             orderBy('createdAt', 'desc'),
             limit(1)
         );
         
         const unsubscribeDeposits = onSnapshot(q, (snapshot) => {
             if (!snapshot.empty) {
-                const depositData = snapshot.docs[0].data() as Transaction;
-                 // Additional check to ensure deposit was made before bonus expiry
-                if (depositData.createdAt.toDate().getTime() < bonusExpiryTime) {
-                    setEligibleDeposit(depositData);
+                const latestDeposit = snapshot.docs[0].data() as Transaction;
+                const depositTime = latestDeposit.createdAt.toDate().getTime();
+
+                // Check if the latest deposit is within the bonus time window and amount range
+                const isWithinTime = depositTime >= bonus.startTime!.toDate().getTime() && depositTime < bonusExpiryTime;
+                const isWithinAmount = latestDeposit.amount >= bonus.minDeposit && latestDeposit.amount <= bonus.maxDeposit;
+
+                if (isWithinTime && isWithinAmount) {
+                    setEligibleDeposit(latestDeposit);
                 } else {
                     setEligibleDeposit(null);
                 }
