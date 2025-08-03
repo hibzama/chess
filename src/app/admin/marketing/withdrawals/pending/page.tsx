@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { useRouter } from 'next/navigation';
 
 interface Transaction {
     id: string;
@@ -29,6 +30,7 @@ export default function PendingMarketingWithdrawalsPage() {
     const [withdrawals, setWithdrawals] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
+    const router = useRouter();
 
     useEffect(() => {
         const q = query(collection(db, 'transactions'), where('type', '==', 'marketing_withdrawal'), where('status', '==', 'pending'));
@@ -53,7 +55,8 @@ export default function PendingMarketingWithdrawalsPage() {
         return () => unsubscribe();
     }, []);
 
-    const handleTransaction = async (transactionId: string, userId: string, amount: number, newStatus: 'approved' | 'rejected') => {
+    const handleTransaction = async (e: React.MouseEvent, transactionId: string, userId: string, amount: number, newStatus: 'approved' | 'rejected') => {
+        e.stopPropagation();
         const transactionRef = doc(db, 'transactions', transactionId);
 
         try {
@@ -110,7 +113,7 @@ export default function PendingMarketingWithdrawalsPage() {
                     </TableHeader>
                     <TableBody>
                         {withdrawals.map((w) => (
-                            <TableRow key={w.id}>
+                            <TableRow key={w.id} onClick={() => router.push(`/admin/users/${w.userId}`)} className="cursor-pointer">
                                 <TableCell>
                                     <div className="font-medium">{w.user?.firstName} {w.user?.lastName}</div>
                                     <div className="text-sm text-muted-foreground">{w.user?.email}</div>
@@ -118,7 +121,7 @@ export default function PendingMarketingWithdrawalsPage() {
                                 <TableCell>{w.amount.toFixed(2)}</TableCell>
                                 <TableCell>{w.createdAt ? format(new Date(w.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                                 <TableCell>
-                                    <Accordion type="single" collapsible className="w-full">
+                                    <Accordion type="single" collapsible className="w-full" onClick={(e) => e.stopPropagation()}>
                                         <AccordionItem value="item-1">
                                             <AccordionTrigger className="py-1">View Details</AccordionTrigger>
                                             <AccordionContent className="text-xs space-y-1 pt-2">
@@ -131,8 +134,8 @@ export default function PendingMarketingWithdrawalsPage() {
                                     </Accordion>
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
-                                    <Button size="sm" variant="outline" onClick={() => handleTransaction(w.id, w.userId, w.amount, 'approved')}>Approve</Button>
-                                    <Button size="sm" variant="destructive" onClick={() => handleTransaction(w.id, w.userId, w.amount, 'rejected')}>Reject</Button>
+                                    <Button size="sm" variant="outline" onClick={(e) => handleTransaction(e, w.id, w.userId, w.amount, 'approved')}>Approve</Button>
+                                    <Button size="sm" variant="destructive" onClick={(e) => handleTransaction(e, w.id, w.userId, w.amount, 'rejected')}>Reject</Button>
                                 </TableCell>
                             </TableRow>
                         ))}
