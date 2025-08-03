@@ -33,7 +33,7 @@ service cloud.firestore {
 
     // Admins can do anything
     match /{document=**} {
-      allow write, read: if isAdmin();
+      allow write: if isAdmin();
     }
     
     match /users/{userId} {
@@ -107,11 +107,13 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      allow read, list, create, update: if isSignedIn() && request.auth.uid in resource.data.users;
-      
-      match /messages/{messageId} {
-        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
+        // A user can read/write to a chat if their UID is a key in the 'users' map.
+        allow read, write, list: if isSignedIn() && request.auth.uid in resource.data.users;
+        
+        match /messages/{messageId} {
+            // A user can read/create messages if they are a participant of the parent chat.
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
     }
   }
 }
