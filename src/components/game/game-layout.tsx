@@ -117,16 +117,22 @@ const GameOverDisplay = () => {
     )
 }
 
-const ResignationDialogContent = ({ roomWager }: { roomWager: number }) => {
-    const refundAmount = roomWager * 0.75;
-    const opponentPayout = roomWager * 1.05;
+const ResignationDialogContent = ({ roomWager, pieceCount }: { roomWager: number, pieceCount: number }) => {
+    
+    let refundRate = 0;
+    if (pieceCount >= 6) refundRate = 0.50;
+    else if (pieceCount >= 3) refundRate = 0.35;
+    else refundRate = 0.25;
+
+    const refundAmount = roomWager * refundRate;
+    const opponentPayout = roomWager * 1.30;
 
     return (
         <div className="space-y-2 text-left pt-4">
             <div>Resigning will forfeit the match.</div>
             <ul className="list-disc pl-5 text-sm">
-                <li><span className="font-bold text-destructive">You will receive a 75% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
-                <li><span className="font-bold text-green-500">Your opponent will receive a 105% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
+                <li><span className="font-bold text-destructive">You will receive a {refundRate * 100}% refund</span> of your wager (LKR {refundAmount.toFixed(2)}).</li>
+                <li><span className="font-bold text-green-500">Your opponent will receive a 130% payout</span> of their wager (LKR {opponentPayout.toFixed(2)}).</li>
             </ul>
         </div>
     )
@@ -255,7 +261,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
                 <AlertDialogDescription asChild>
                     <div>
                         {isMultiplayer && roomWager > 0 ? (
-                           <ResignationDialogContent roomWager={roomWager} />
+                           <ResignationDialogContent roomWager={roomWager} pieceCount={playerPieceCount} />
                         ) : (
                             <div>This is a practice match, so no funds will be lost.</div>
                         )}

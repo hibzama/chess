@@ -234,6 +234,10 @@ function MultiplayerGame() {
                     throw new Error("One of the players does not exist");
                 }
 
+                if ((creatorDoc.data()?.balance || 0) < roomData.wager) {
+                    throw new Error("Creator has insufficient funds.");
+                }
+
                 const playersWithData = [
                     { id: creatorDoc.id, data: creatorDoc.data(), name: roomData.createdBy.name },
                     { id: joinerDoc.id, data: joinerDoc.data(), name: `${joinerDoc.data().firstName} ${joinerDoc.data().lastName}` }
@@ -489,4 +493,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
