@@ -3,75 +3,114 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+
+    // =================================
     // Helper Functions
-    function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-    function isUser(userId) {
-      return request.auth.uid == userId;
-    }
-    
+    // =================================
+
     function isSignedIn() {
       return request.auth != null;
     }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
     
-    // Default Deny
-    match /{document=**} {
-      allow read, write: if false;
+    // Checks if the user is an admin by looking at their user document.
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Admins can do anything
+    // =================================
+    // Collections
+    // =================================
+
+    // Admins can do anything, anywhere. This is a broad catch-all.
     match /{document=**} {
       allow read, write: if isAdmin();
     }
-    
-    // Specific Collection Rules
+
     match /users/{userId} {
+      // Any signed-in user can read another user's profile.
       allow read: if isSignedIn();
-      allow update: if isUser(userId);
-    }
 
-    match /settings/{docId} {
-        allow read: if isSignedIn();
+      // A user can only create their own document and can only update their own non-critical fields.
+      // Balance updates and other critical changes are handled by other rules or admins.
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
     }
-
+    
+    match /friend_requests/{requestId} {
+      allow read, write, delete: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
+      allow create: if isSignedIn() && isOwner(request.resource.data.fromId);
+    }
+    
     match /game_rooms/{roomId} {
-        allow read: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update: if isSignedIn() && (request.auth.uid in resource.data.players);
-        allow delete: if isSignedIn() && resource.data.createdBy.uid == request.auth.uid;
-    }
-    
-    match /game_rooms/{roomId}/messages/{messageId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /chats/{chatId} {
-      allow read, write: if isSignedIn() && (request.auth.uid in resource.data.users);
-    }
+      // Any signed-in user can list public games. Players in the game can read its full state.
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
+      allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid) && resource.data.status == 'waiting';
 
-    match /chats/{chatId}/messages/{messageId} {
-        allow read, write: if isSignedIn() && exists(/databases/$(database)/documents/chats/$(chatId)) && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users);
+      // This complex rule allows various game state updates: joining, playing moves, and completing the game.
+      allow update: if 
+        isSignedIn() && 
+        (
+          // Rule for JOINING a game
+          (
+            !isOwner(resource.data.createdBy.uid) &&
+            resource.data.status == 'waiting' &&
+            request.resource.data.status == 'in-progress' &&
+            request.resource.data.player2.uid == request.auth.uid &&
+            !(request.auth.uid in resource.data.players) &&
+            (request.auth.uid in request.resource.data.players)
+          ) ||
+          // Rule for UPDATING a game in progress (making a move)
+          (
+            (isOwner(resource.data.createdBy.uid) || (resource.data.player2 != null && isOwner(resource.data.player2.uid))) &&
+            resource.data.status == 'in-progress' &&
+            request.resource.data.status == 'in-progress'
+          ) ||
+          // Rule for COMPLETING a game
+          (
+            (isOwner(resource.data.createdBy.uid) || (resource.data.player2 != null && isOwner(resource.data.player2.uid))) &&
+            resource.data.status == 'in-progress' &&
+            request.resource.data.status == 'completed'
+          )
+        );
     }
     
     match /transactions/{transactionId} {
+      // Users can only read their own transactions.
+      allow read: if isSignedIn() && isOwner(resource.data.userId);
       allow create: if isSignedIn();
-      allow read: if isUser(resource.data.userId);
+      // Only admins can approve/reject transactions.
+      allow update: if isAdmin();
     }
     
     match /notifications/{notificationId} {
-      allow read, write: if isUser(resource.data.userId);
-    }
-    
-    match /friend_requests/{reqId} {
-      allow create: if isSignedIn();
-      allow read, write, delete: if isSignedIn() && (resource.data.toId == request.auth.uid || resource.data.fromId == request.auth.uid);
+        allow read, write: if isSignedIn() && isOwner(resource.data.userId);
     }
     
     match /marketing_applications/{appId} {
-      allow create: if true;
+        allow create; 
+        allow read, update, delete: if isAdmin();
+    }
+    
+    match /game_rooms/{roomId}/messages/{messageId} {
+      allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+    }
+
+    match /chats/{chatId} {
+        allow read, write: if isSignedIn() && request.auth.uid in resource.data.users;
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
+    }
+    
+    // Rule for the deposit bonus system
+    match /settings/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
     }
   }
 }
