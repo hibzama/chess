@@ -1,3 +1,4 @@
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -323,7 +324,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
             return { myPayout: 0 };
         }
-    }, [user, roomId, gameType]);
+    }, [user, roomId]);
 
     const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerDetails: {id: string, pieceCount: number} | null = null) => {
         if (gameOverHandledRef.current) return;
