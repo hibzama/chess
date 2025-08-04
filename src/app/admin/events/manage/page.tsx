@@ -129,38 +129,40 @@ export default function ManageEventsPage() {
                 return;
             };
 
-            const enrollmentsQuery = query(
-                collectionGroup(db, 'event_enrollments'),
-                where('eventId', '==', localEvent.id)
-            );
-
-            const unsubscribe = onSnapshot(enrollmentsQuery, async (snapshot) => {
+            const fetchEnrollments = async () => {
                 setLoadingEnrollments(true);
-                const enrollmentsPromises = snapshot.docs.map(async (enrollmentDoc) => {
-                    const enrollmentData = enrollmentDoc.data() as Enrollment;
-                    const userDoc = await getDoc(doc(db, 'users', enrollmentData.userId));
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data();
-                        return {
-                            ...enrollmentData,
-                            user: {
-                                firstName: userData.firstName,
-                                lastName: userData.lastName,
-                            },
-                        };
+                try {
+                    const usersSnapshot = await getDocs(collection(db, 'users'));
+                    const userIds = usersSnapshot.docs.map(d => d.id);
+                    const enrollmentsData: Enrollment[] = [];
+                    
+                    for (const userId of userIds) {
+                        const enrollmentRef = doc(db, 'users', userId, 'event_enrollments', localEvent.id!);
+                        const enrollmentDoc = await getDoc(enrollmentRef);
+                        
+                        if (enrollmentDoc.exists()) {
+                            const enrollmentData = enrollmentDoc.data() as Enrollment;
+                            const userDoc = await getDoc(doc(db, 'users', userId));
+                            if (userDoc.exists()) {
+                                 enrollmentsData.push({
+                                    ...enrollmentData,
+                                    user: {
+                                        firstName: userDoc.data().firstName,
+                                        lastName: userDoc.data().lastName,
+                                    },
+                                });
+                            }
+                        }
                     }
-                    return null;
-                });
+                    setEnrollments(enrollmentsData);
+                } catch(e) {
+                    console.error("Error fetching enrollments: ", e);
+                } finally {
+                    setLoadingEnrollments(false);
+                }
+            }
 
-                const enrollmentsData = (await Promise.all(enrollmentsPromises)).filter(Boolean) as Enrollment[];
-                setEnrollments(enrollmentsData);
-                setLoadingEnrollments(false);
-            }, (error) => {
-                console.error("Error fetching enrollments:", error);
-                setLoadingEnrollments(false);
-            });
-
-            return () => unsubscribe();
+            fetchEnrollments();
             
         }, [localEvent.id, isNew]);
 
