@@ -16,6 +16,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { format } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 export interface Event {
     id: string;
@@ -330,3 +331,5 @@ export default function ManageEventsPage() {
         </div>
     )
 }
+
+    
