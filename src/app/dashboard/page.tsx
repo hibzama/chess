@@ -50,7 +50,6 @@ const EventListCard = ({ events }: { events: Event[] }) => {
                             <TableRow key={event.id}>
                                 <TableCell>
                                     <p className="font-semibold">{event.title}</p>
-                                    <p className="text-xs text-muted-foreground">{event.description}</p>
                                 </TableCell>
                                 <TableCell>{getTargetDescription(event)}</TableCell>
                                 <TableCell className="text-green-400 font-bold">LKR {event.rewardAmount.toFixed(2)}</TableCell>
