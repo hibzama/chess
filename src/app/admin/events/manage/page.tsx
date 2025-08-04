@@ -128,21 +128,36 @@ export default function ManageEventsPage() {
                 return;
             };
 
-            const enrollmentsQuery = query(collectionGroup(db, 'event_enrollments'), where('id', '==', localEvent.id));
-            const unsubscribe = onSnapshot(enrollmentsQuery, async (snapshot) => {
-                const enrollmentsDataPromises = snapshot.docs.map(async (enrollmentDoc) => {
-                    const data = enrollmentDoc.data() as Enrollment;
-                    const userDoc = await getDoc(doc(db, 'users', data.userId));
-                    if (userDoc.exists()) {
-                        data.user = { firstName: userDoc.data().firstName, lastName: userDoc.data().lastName };
+            const fetchEnrollments = async () => {
+                setLoadingEnrollments(true);
+                // Fetch all users first
+                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const enrollmentsData: Enrollment[] = [];
+                
+                // Iterate through each user to check for an enrollment
+                for (const userDoc of usersSnapshot.docs) {
+                    const userId = userDoc.id;
+                    const enrollmentRef = doc(db, 'users', userId, 'event_enrollments', localEvent.id!);
+                    const enrollmentSnap = await getDoc(enrollmentRef);
+
+                    if (enrollmentSnap.exists()) {
+                        const enrollment = enrollmentSnap.data() as Enrollment;
+                        enrollmentsData.push({
+                            ...enrollment,
+                            user: {
+                                firstName: userDoc.data().firstName,
+                                lastName: userDoc.data().lastName,
+                            },
+                        });
                     }
-                    return data;
-                });
-                const enrollmentsData = await Promise.all(enrollmentsDataPromises);
+                }
+                
                 setEnrollments(enrollmentsData);
                 setLoadingEnrollments(false);
-            });
-            return () => unsubscribe();
+            };
+
+            fetchEnrollments();
+            
         }, [localEvent.id, isNew]);
 
         const handleChange = (field: keyof Event, value: any) => {
