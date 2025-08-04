@@ -1,13 +1,13 @@
 
 'use client'
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
 import { collection, onSnapshot, doc, setDoc, getDoc, writeBatch, serverTimestamp, Timestamp, query, where, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, CheckCircle, Loader2, Trophy } from 'lucide-react';
+import { Calendar, CheckCircle, Loader2, Trophy, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -44,6 +44,8 @@ const EventCard = ({ event }: { event: Event }) => {
     const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
     const [loadingEnrollment, setLoadingEnrollment] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [countdown, setCountdown] = useState('');
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         if (!user) {
@@ -127,6 +129,43 @@ const EventCard = ({ event }: { event: Event }) => {
 
     }, [enrollment, user, event]);
 
+     // Countdown Timer Effect
+    useEffect(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+        }
+
+        if (!enrollment || enrollment.status !== 'enrolled') {
+            setCountdown('');
+            return;
+        }
+
+        const calculateCountdown = () => {
+            const now = new Date().getTime();
+            const expiryTime = enrollment.expiresAt.toDate().getTime();
+            const distance = expiryTime - now;
+
+            if (distance < 0) {
+                if (intervalRef.current) clearInterval(intervalRef.current);
+                setCountdown("EXPIRED");
+                return;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+        }
+        
+        calculateCountdown(); // Run immediately
+        intervalRef.current = setInterval(calculateCountdown, 1000);
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, [enrollment]);
 
     const handleEnroll = async () => {
         if (!user || !userData) return;
@@ -199,8 +238,8 @@ const EventCard = ({ event }: { event: Event }) => {
     }
     
     const now = new Date().getTime();
-    const progressPercentage = enrollment ? Math.min(100, (enrollment.progress / event.targetAmount) * 100) : 0;
     const isExpired = enrollment && now > enrollment.expiresAt.toDate().getTime();
+    const progressPercentage = enrollment ? Math.min(100, (enrollment.progress / event.targetAmount) * 100) : 0;
 
     // Automatically mark as completed
     useEffect(() => {
@@ -245,18 +284,26 @@ const EventCard = ({ event }: { event: Event }) => {
                 </div>
 
                 {loadingEnrollment ? (
-                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-24 w-full" />
                 ) : enrollment ? (
-                     <div className="space-y-2">
+                     <div className="space-y-4">
                         {isExpired && enrollment.status === 'enrolled' && (
                             <Alert variant="destructive">
                                 <AlertTitle>Event Expired</AlertTitle>
                                 <AlertDescription>You did not complete this event in time.</AlertDescription>
                             </Alert>
                         )}
-                        <Label>Your Progress</Label>
-                        <Progress value={progressPercentage} />
-                        <p className="text-xs text-muted-foreground text-right">{getProgressText()}</p>
+                        {enrollment.status === 'enrolled' && !isExpired && (
+                             <div className="text-center p-3 rounded-lg bg-primary/10">
+                                <p className="text-sm text-primary font-semibold flex items-center justify-center gap-2"><Clock/> Time Remaining</p>
+                                <p className="text-2xl font-bold text-primary">{countdown}</p>
+                            </div>
+                        )}
+                        <div className="space-y-2">
+                            <Label>Your Progress</Label>
+                            <Progress value={progressPercentage} />
+                            <p className="text-xs text-muted-foreground text-right">{getProgressText()}</p>
+                        </div>
                     </div>
                 ) : null}
             </CardContent>
