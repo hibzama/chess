@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone, Calendar } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone, Calendar, ArrowRight } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +13,60 @@ import { collection, query, where, getDocs, onSnapshot, limit, doc } from 'fireb
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import BonusDisplay from './bonus-display';
-import EventDisplay, { type Event } from './event-display';
+import type { Event } from './events/page';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+
+
+const EventListCard = ({ events }: { events: Event[] }) => {
+
+    const getTargetDescription = (event: Event) => {
+        if (event.targetType === 'winningMatches') {
+            return `Win ${event.targetAmount} games`;
+        }
+        return `Earn LKR ${event.targetAmount.toFixed(2)}`;
+    }
+
+    return (
+        <Card className="h-full border-primary/50 bg-primary/10 flex flex-col">
+             <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar className="w-6 h-6 text-primary" />
+                    <span className="text-primary">Active Events</span>
+                </CardTitle>
+                <CardDescription>Join a special event to earn exclusive rewards.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Event</TableHead>
+                            <TableHead>Target</TableHead>
+                            <TableHead>Reward</TableHead>
+                            <TableHead></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {events.map(event => (
+                            <TableRow key={event.id}>
+                                <TableCell>
+                                    <p className="font-semibold">{event.title}</p>
+                                    <p className="text-xs text-muted-foreground">{event.description}</p>
+                                </TableCell>
+                                <TableCell>{getTargetDescription(event)}</TableCell>
+                                <TableCell className="text-green-400 font-bold">LKR {event.rewardAmount.toFixed(2)}</TableCell>
+                                <TableCell>
+                                    <Button asChild size="sm" variant="ghost">
+                                        <Link href="/dashboard/events">View <ArrowRight className="ml-2 w-4 h-4"/></Link>
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    )
+}
 
 
 export default function DashboardPage() {
@@ -54,6 +107,7 @@ export default function DashboardPage() {
             const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true));
             const eventsUnsub = onSnapshot(eventsQuery, (snapshot) => {
                  setActiveEvents(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Event)));
+                 setPromotionsLoading(false); 
             });
 
             const bonusRef = doc(db, 'settings', 'depositBonus');
@@ -106,10 +160,7 @@ export default function DashboardPage() {
     { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "/dashboard/wallet" },
   ];
 
-  const promotions = [
-        ...(isBonusActive ? [{type: 'bonus' as const}] : []),
-        ...activeEvents.map(event => ({type: 'event' as const, data: event}))
-    ];
+  const hasPromotions = isBonusActive || activeEvents.length > 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -121,13 +172,10 @@ export default function DashboardPage() {
       </div>
       
        {promotionsLoading ? <Skeleton className="h-48 w-full rounded-lg" /> : (
-            promotions.length > 0 && (
-                <div className={cn("grid gap-6", promotions.length > 1 ? "md:grid-cols-2" : "grid-cols-1")}>
-                   {promotions.map(promo => {
-                        if (promo.type === 'bonus') return <BonusDisplay key="bonus" />;
-                        if (promo.type === 'event') return <EventDisplay key={promo.data.id} event={promo.data} />;
-                        return null;
-                   })}
+            hasPromotions && (
+                <div className={cn("grid gap-6", isBonusActive && activeEvents.length > 0 ? "md:grid-cols-2" : "grid-cols-1")}>
+                    {isBonusActive && <BonusDisplay />}
+                    {activeEvents.length > 0 && <EventListCard events={activeEvents}/>}
                 </div>
             )
        )}
