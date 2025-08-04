@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, onSnapshot, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, limit, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import BonusDisplay from './bonus-display';
@@ -25,58 +25,47 @@ export default function DashboardPage() {
     });
     const [statsLoading, setStatsLoading] = useState(true);
     const [activeEvent, setActiveEvent] = useState<Event | null>(null);
+    const [isBonusActive, setIsBonusActive] = useState(false);
     const [promotionsLoading, setPromotionsLoading] = useState(true);
 
     const USDT_RATE = 310;
 
     useEffect(() => {
         if (user) {
+            setStatsLoading(true);
+            setPromotionsLoading(true);
+
             const fetchStats = async () => {
-                setStatsLoading(true);
                 const q = query(collection(db, "transactions"), where("userId", "==", user.uid));
                 const querySnapshot = await getDocs(q);
-                let deposit = 0;
-                let withdrawal = 0;
-                let earning = 0;
-
+                let deposit = 0, withdrawal = 0, earning = 0;
                 querySnapshot.forEach((doc) => {
-                    const transaction = doc.data();
-                    if (transaction.type === 'deposit' && transaction.status === 'approved') {
-                        deposit += transaction.amount;
-                    }
-                    if (transaction.type === 'withdrawal' && transaction.status === 'approved') {
-                        withdrawal += transaction.amount;
-                    }
-                    if (transaction.type === 'payout') {
-                        earning += transaction.amount;
-                    }
-                    if (transaction.type === 'wager') {
-                        earning -= transaction.amount;
-                    }
+                    const t = doc.data();
+                    if (t.type === 'deposit' && t.status === 'approved') deposit += t.amount;
+                    if (t.type === 'withdrawal' && t.status === 'approved') withdrawal += t.amount;
+                    if (t.type === 'payout') earning += t.amount;
+                    if (t.type === 'wager') earning -= t.amount;
                 });
-
-                setStats({
-                    totalDeposit: deposit,
-                    totalWithdrawal: withdrawal,
-                    totalEarning: earning
-                });
+                setStats({ totalDeposit: deposit, totalWithdrawal: withdrawal, totalEarning: earning });
                 setStatsLoading(false);
             };
             fetchStats();
             
-            // Fetch active event
             const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true), limit(1));
-            const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
-                if (!snapshot.empty) {
-                    const eventData = snapshot.docs[0].data() as Event;
-                    setActiveEvent({ ...eventData, id: snapshot.docs[0].id });
-                } else {
-                    setActiveEvent(null);
-                }
-                setPromotionsLoading(false);
+            const eventsUnsub = onSnapshot(eventsQuery, (snapshot) => {
+                setActiveEvent(snapshot.empty ? null : { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as Event);
+            });
+
+            const bonusRef = doc(db, 'settings', 'depositBonus');
+            const bonusUnsub = onSnapshot(bonusRef, (docSnap) => {
+                setIsBonusActive(docSnap.exists() && docSnap.data().isActive);
+                setPromotionsLoading(false); 
             });
             
-            return () => unsubscribe();
+            return () => {
+                eventsUnsub();
+                bonusUnsub();
+            };
         }
     }, [user]);
 
@@ -87,28 +76,12 @@ export default function DashboardPage() {
                 <Skeleton className="h-12 w-3/4 mb-2" />
                 <Skeleton className="h-6 w-1/2" />
               </div>
-        
               <div className="grid gap-6">
+                <Skeleton className="h-48 w-full" />
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {[...Array(8)].map((_, i) => (
-                        <Card key={i}>
-                        <CardHeader>
-                            <Skeleton className="w-8 h-8 rounded-full mb-2" />
-                            <Skeleton className="h-6 w-3/4 mb-1" />
-                            <Skeleton className="h-4 w-1/2" />
-                        </CardHeader>
-                        </Card>
+                        <Card key={i}><CardHeader><Skeleton className="w-8 h-8 rounded-full mb-2" /><Skeleton className="h-6 w-3/4 mb-1" /><Skeleton className="h-4 w-1/2" /></CardHeader></Card>
                     ))}
-                </div>
-                <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                     <Card key={i}>
-                      <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-                        <Skeleton className="w-7 h-7 rounded-full" />
-                        <Skeleton className="h-5 w-16" />
-                      </CardContent>
-                    </Card>
-                  ))}
                 </div>
               </div>
             </div>
@@ -133,14 +106,10 @@ export default function DashboardPage() {
     { title: "Top up Wallet", description: "Add funds to play and earn", icon: Wallet, href: "/dashboard/wallet" },
   ];
 
-  const navActions = [
-    { title: "Friends", icon: Users, href: "/dashboard/friends" },
-    { title: "Ranking", icon: BarChart3, href: "/dashboard/rankings" },
-    { title: "Start Earning", icon: DollarSign, href: "/lobby" },
-    { title: "Chat", icon: MessageSquare, href: "/dashboard/chat" },
-    { title: "Refer & Earn", icon: Megaphone, href: "/dashboard/refer-earn" },
-    { title: "Equipment", icon: Gamepad2, href: "/dashboard/equipment" },
-  ];
+  const promotions = [
+        ...(isBonusActive ? [{type: 'bonus'}] : []),
+        ...(activeEvent ? [{type: 'event', data: activeEvent}] : [])
+    ];
 
   return (
     <div className="flex flex-col gap-8">
@@ -151,11 +120,17 @@ export default function DashboardPage() {
         </p>
       </div>
       
-       <div className="grid md:grid-cols-2 gap-6">
-            <BonusDisplay />
-            {promotionsLoading ? <Skeleton className="h-48 w-full rounded-lg" /> : activeEvent && <EventDisplay event={activeEvent} />}
-        </div>
-
+       {promotionsLoading ? <Skeleton className="h-48 w-full rounded-lg" /> : (
+            promotions.length > 0 && (
+                <div className={cn("grid gap-6", promotions.length === 2 ? "md:grid-cols-2" : "grid-cols-1")}>
+                   {promotions.map(promo => {
+                        if (promo.type === 'bonus') return <BonusDisplay key="bonus" />;
+                        if (promo.type === 'event') return <EventDisplay key={promo.data.id} event={promo.data} />;
+                        return null;
+                   })}
+                </div>
+            )
+       )}
 
       <div className="grid gap-6">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -194,20 +169,6 @@ export default function DashboardPage() {
             </Link>
           ))}
         </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {navActions.map((action) => (
-                <Link href={action.href} key={action.title}>
-                    <Card className="bg-card/50 hover:bg-primary/5 transition-colors cursor-pointer h-full">
-                        <CardContent className="p-4 flex flex-col items-center justify-center gap-2">
-                           <action.icon className="w-7 h-7 text-primary"/>
-                           <span className="text-sm font-medium">{action.title}</span>
-                        </CardContent>
-                    </Card>
-                </Link>
-            ))}
-        </div>
-
       </div>
     </div>
   );

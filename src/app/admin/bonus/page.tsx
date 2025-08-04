@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, deleteField } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,23 +61,22 @@ export default function BonusPage() {
         try {
             const bonusRef = doc(db, 'settings', 'depositBonus');
             
-            const bonusPayload: Partial<DepositBonus> = {
+            const bonusPayload: any = {
                  ...bonus,
                  updatedAt: serverTimestamp(),
                  createdAt: bonus.createdAt || serverTimestamp(),
             };
             
-            // Only set a new start time if the bonus is being activated (toggled from off to on)
             if(bonus.isActive && !initialIsActive) {
                 bonusPayload.startTime = serverTimestamp();
             } else if (!bonus.isActive) {
-                bonusPayload.startTime = undefined; // Use undefined to remove field on update
+                // Use deleteField() to remove the startTime field from the document
+                bonusPayload.startTime = deleteField();
             }
 
 
             await setDoc(bonusRef, bonusPayload, { merge: true });
             
-            // Update the initial state after a successful save
             if (bonus.isActive !== undefined) {
                 setInitialIsActive(bonus.isActive);
             }
