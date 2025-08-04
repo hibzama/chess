@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, query, where } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -12,6 +12,14 @@ type Player = 'p1' | 'p2';
 type Winner = 'p1' | 'p2' | 'draw' | null;
 type Piece = { type: string; color: 'w' | 'b' | Player };
 export type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | 'piece-capture' | null;
+
+interface Event {
+    id: string;
+    targetType: 'totalEarnings' | 'winningMatches';
+    targetAmount: number;
+    minWager?: number;
+    isActive: boolean;
+}
 
 interface GameRoom {
     id: string;
@@ -220,6 +228,47 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
                     transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
                     winnerObject.uid = winnerId;
+                    
+                    // --- EVENT PROGRESS UPDATE ---
+                    const activeEventsQuery = query(collection(db, 'events'), where('isActive', '==', true));
+                    const eventsSnapshot = await getDocs(activeEventsQuery);
+                    
+                    if (!eventsSnapshot.empty) {
+                        const winnerEnrollmentRef = collection(db, 'users', winnerId, 'event_enrollments');
+                        const enrollmentsSnapshot = await getDocs(query(winnerEnrollmentRef, where('status', '==', 'enrolled')));
+                        const now = Timestamp.now();
+                        
+                        for (const enrollmentDoc of enrollmentsSnapshot.docs) {
+                            const enrollmentData = enrollmentDoc.data();
+                            const event = eventsSnapshot.docs.find(d => d.id === enrollmentData.eventId)?.data() as Event | undefined;
+
+                            if (event && enrollmentData.expiresAt > now) {
+                                let progressIncrement = 0;
+                                let shouldUpdate = false;
+
+                                if (event.targetType === 'winningMatches') {
+                                    if (!event.minWager || wager >= event.minWager) {
+                                        progressIncrement = 1;
+                                        shouldUpdate = true;
+                                    }
+                                } else if (event.targetType === 'totalEarnings') {
+                                    const netEarning = (isCreatorWinner ? creatorPayout : joinerPayout) - wager;
+                                    progressIncrement = netEarning;
+                                    shouldUpdate = true;
+                                }
+
+                                if (shouldUpdate) {
+                                    const newProgress = (enrollmentData.progress || 0) + progressIncrement;
+                                    const updatePayload: any = { progress: increment(progressIncrement) };
+                                    if (newProgress >= event.targetAmount) {
+                                        updatePayload.status = 'completed';
+                                    }
+                                    transaction.update(enrollmentDoc.ref, updatePayload);
+                                }
+                            }
+                        }
+                    }
+                    // --- END EVENT PROGRESS ---
                 }
     
                 const now = serverTimestamp();
