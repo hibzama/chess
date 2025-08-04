@@ -193,48 +193,50 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let creatorPayout = 0, joinerPayout = 0;
                 let creatorDesc = '', joinerDesc = '';
                 
-                const { winnerId, method, resignerDetails } = winnerDetails;
-                const winnerObject: GameRoom['winner'] = { uid: null, method };
-    
-                if (resignerDetails) { // Resignation logic
-                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
+                const { method, resignerDetails } = winnerDetails;
+                let { winnerId } = winnerDetails;
+                
+                // --- Determine Winner and Payouts ---
+                const isResignation = !!resignerDetails;
+                if (isResignation) {
+                    winnerId = roomData.players.find(p => p !== resignerDetails!.id) || null;
+                }
+
+                const winnerObject: GameRoom['winner'] = { uid: winnerId, method };
+
+                if (isResignation) {
                     const opponentPayoutRate = 1.30;
-    
                     let resignerRefundRate = 0;
-                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
-                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                    if (resignerDetails!.pieceCount >= 6) resignerRefundRate = 0.50;
+                    else if (resignerDetails!.pieceCount >= 3) resignerRefundRate = 0.35;
                     else resignerRefundRate = 0.25;
 
-                    if (isCreatorResigner) {
-                        creatorPayout = wager * resignerRefundRate;
-                        joinerPayout = wager * opponentPayoutRate;
-                    } else {
-                        creatorPayout = wager * opponentPayoutRate;
-                        joinerPayout = wager * resignerRefundRate;
-                    }
+                    const isCreatorResigner = resignerDetails!.id === roomData.createdBy.uid;
+                    creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * opponentPayoutRate;
+                    joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * opponentPayoutRate;
                     
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
                     
-                    winnerObject.uid = roomData.players.find(p => p !== resignerDetails.id) || null;
-                    winnerObject.resignerId = resignerDetails.id;
-                    winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+                    winnerObject.resignerId = resignerDetails!.id;
+                    winnerObject.resignerPieceCount = resignerDetails!.pieceCount;
 
-                } else if (winnerId === 'draw') { // Draw logic
+                } else if (winnerId === 'draw') {
                     creatorPayout = joinerPayout = wager * 0.9;
                     creatorDesc = `Draw refund vs ${roomData.player2.name}`;
                     joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
-                } else if (winnerId) { // Win/loss logic
+                } else if (winnerId) {
                     const isCreatorWinner = winnerId === roomData.createdBy.uid;
                     creatorPayout = isCreatorWinner ? wager * 1.8 : 0;
                     joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
                     const reason = method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture');
                     creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
+                }
+
+                 // --- EVENT PROGRESS UPDATE ---
+                if (winnerId && winnerId !== 'draw') {
                     transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
-                    winnerObject.uid = winnerId;
-                    
-                    // --- EVENT PROGRESS UPDATE ---
                     if (activeEvents.length > 0) {
                         const now = Timestamp.now();
                         for (const event of activeEvents) {
@@ -253,7 +255,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                                             shouldUpdate = true;
                                         }
                                     } else if (event.targetType === 'totalEarnings') {
-                                        const netEarning = (isCreatorWinner ? creatorPayout : joinerPayout) - wager;
+                                        const netEarning = (winnerId === roomData.createdBy.uid ? creatorPayout : joinerPayout) - wager;
                                         if (netEarning > 0) {
                                             progressIncrement = netEarning;
                                             shouldUpdate = true;
@@ -272,8 +274,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                              }
                         }
                     }
-                    // --- END EVENT PROGRESS ---
                 }
+                 // --- END EVENT PROGRESS ---
     
                 const now = serverTimestamp();
                 const payoutTxId = doc(collection(db, 'transactions')).id;
