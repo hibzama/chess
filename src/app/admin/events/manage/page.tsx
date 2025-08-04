@@ -46,6 +46,29 @@ interface Enrollment {
 
 const USDT_RATE = 310;
 
+const eventDrafts = [
+    { title: "Weekend Warrior", description: "Climb the ranks this weekend! Earn the most to claim the top prize." },
+    { title: "Rookies Rumble", description: "New to the game? Prove your skills in this beginner-friendly tournament." },
+    { title: "Checkmate Challenge", description: "Secure 10 victories in Chess with a wager of LKR 50 or more to win a bonus." },
+    { title: "King's Ransom", description: "Accumulate LKR 2000 in total earnings to claim a royal reward." },
+    { title: "The Grandmaster's Gauntlet", description: "A high-stakes event for elite players. Only the best will triumph." },
+    { title: "Daily Dasher", description: "Win 5 games in the next 24 hours to get a quick bonus." },
+    { title: "High Roller's Heist", description: "Play big, win bigger. This event is for players who aren't afraid of high wagers." },
+    { title: "Strategic Streak", description: "Achieve a 5-game winning streak to prove your strategic dominance." },
+    { title: "Checkers Champion Quest", description: "Win 15 games of Checkers to be crowned the champion." },
+    { title: "The Profit Prophecy", description: "Double your investment! Earn LKR 5000 from a starting point." },
+    { title: "Midnight Madness", description: "Compete in the late hours for exclusive rewards. Only games after midnight count." },
+    { title: "The Tactician's Trial", description: "This event rewards calculated plays and consistent earnings over a week." },
+    { title: "Blitz Boss", description: "Dominate in fast-paced games. All 5-minute timer games count towards your goal." },
+    { title: "Endgame Expert", description: "Show your prowess in the final stages. Wins with fewer than 10 pieces left get a bonus." },
+    { title: "The Ascendant", description: "A week-long challenge to see who can earn the most from a LKR 1000 starting balance." },
+    { title: "Pawn Promotion Prize", description: "Successfully promote 10 pawns to queens in winning games to earn a special prize." },
+    { title: "The Jumper's Jackpot (Checkers)", description: "Execute 50 successful jumps in Checkers to win." },
+    { title: "The Royal Treasury", description: "A massive event with a huge prize pool for the top 3 earners over a month." },
+    { title: "The Equalizer", description: "Win 5 games against higher-ranked opponents to get a special underdog bonus." },
+    { title: "The First Move Advantage", description: "Win 10 games playing as White to master the opening advantage." }
+];
+
 export default function ManageEventsPage() {
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
@@ -62,6 +85,10 @@ export default function ManageEventsPage() {
 
     const handleSave = async (event: Partial<Event>) => {
         const eventId = event.id || doc(collection(db, 'events')).id;
+        if (!event.title || !event.description) {
+            toast({ variant: "destructive", title: 'Error', description: 'Title and description cannot be empty.' });
+            return;
+        }
         try {
             await setDoc(doc(db, 'events', eventId), {
                 ...event,
@@ -86,7 +113,7 @@ export default function ManageEventsPage() {
         }
     };
 
-    const EventForm = ({ event, onSave, onDelete }: { event: Partial<Event>, onSave: (e: Partial<Event>) => void, onDelete?: (id: string) => void }) => {
+    const EventForm = ({ event, onSave, onDelete, isNew = false }: { event: Partial<Event>, onSave: (e: Partial<Event>) => void, onDelete?: (id: string) => void, isNew?: boolean }) => {
         const [localEvent, setLocalEvent] = useState(event);
         const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
         const [loadingEnrollments, setLoadingEnrollments] = useState(true);
@@ -96,7 +123,7 @@ export default function ManageEventsPage() {
         }, [event]);
 
         useEffect(() => {
-            if (!localEvent.id) {
+            if (!localEvent.id || isNew) {
                 setLoadingEnrollments(false);
                 return;
             };
@@ -116,24 +143,51 @@ export default function ManageEventsPage() {
                 setLoadingEnrollments(false);
             });
             return () => unsubscribe();
-        }, [localEvent.id]);
+        }, [localEvent.id, isNew]);
 
         const handleChange = (field: keyof Event, value: any) => {
             const isNumeric = ['enrollmentFee', 'targetAmount', 'rewardAmount', 'durationHours', 'minWager'].includes(field);
             setLocalEvent(prev => ({ ...prev, [field]: isNumeric ? Number(value) : value }));
         };
         
+        const handleDraftSelect = (draftTitle: string) => {
+            if (draftTitle === 'custom') {
+                handleChange('title', '');
+                handleChange('description', '');
+                return;
+            }
+            const selectedDraft = eventDrafts.find(d => d.title === draftTitle);
+            if (selectedDraft) {
+                handleChange('title', selectedDraft.title);
+                handleChange('description', selectedDraft.description);
+            }
+        };
+
         const isWinningType = localEvent.targetType === 'winningMatches';
 
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>{localEvent.id ? 'Edit Event' : 'Create New Event'}</CardTitle>
+                    <CardTitle>{isNew ? 'Create New Event' : 'Edit Event'}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                     {isNew && (
+                        <div className="space-y-2">
+                            <Label>Load a Draft</Label>
+                            <Select onValueChange={handleDraftSelect}>
+                                <SelectTrigger><SelectValue placeholder="Select a pre-written event draft..."/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="custom">Custom Title</SelectItem>
+                                    {eventDrafts.map(draft => (
+                                        <SelectItem key={draft.title} value={draft.title}>{draft.title}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                     <div className="flex items-center justify-between rounded-lg border p-4">
-                        <Label htmlFor={`isActive-${localEvent.id}`}>Event Status</Label>
-                        <Switch id={`isActive-${localEvent.id}`} checked={localEvent.isActive || false} onCheckedChange={(val) => handleChange('isActive', val)} />
+                        <Label htmlFor={`isActive-${localEvent.id || 'new'}`}>Event Status</Label>
+                        <Switch id={`isActive-${localEvent.id || 'new'}`} checked={localEvent.isActive || false} onCheckedChange={(val) => handleChange('isActive', val)} />
                     </div>
                     <div className="space-y-2">
                         <Label>Title</Label>
@@ -182,7 +236,7 @@ export default function ManageEventsPage() {
                         </div>
                     </div>
                 </CardContent>
-                {localEvent.id && (
+                {!isNew && localEvent.id && (
                     <CardContent>
                         <h3 className="text-lg font-semibold flex items-center gap-2 mb-2"><Users/> Enrolled Players ({enrollments.length})</h3>
                         {loadingEnrollments ? <Skeleton className="h-24 w-full" /> : (
@@ -228,7 +282,7 @@ export default function ManageEventsPage() {
                     </CardContent>
                 )}
                 <CardFooter className="flex justify-between">
-                    <Button onClick={() => onSave(localEvent)}>Save</Button>
+                    <Button onClick={() => onSave(localEvent)}>{isNew ? 'Create Event' : 'Save Changes'}</Button>
                     {onDelete && localEvent.id && <Button variant="destructive" onClick={() => onDelete(localEvent.id!)}><Trash2/></Button>}
                 </CardFooter>
             </Card>
@@ -244,7 +298,7 @@ export default function ManageEventsPage() {
                 </CardHeader>
             </Card>
             
-            <EventForm event={{ isActive: false, targetType: 'totalEarnings' }} onSave={handleSave} />
+            <EventForm event={{ isActive: false, targetType: 'totalEarnings' }} onSave={handleSave} isNew />
             
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold">Existing Events</h2>
