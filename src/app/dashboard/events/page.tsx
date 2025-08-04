@@ -11,6 +11,7 @@ import { Calendar, CheckCircle, Loader2, Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Label } from '@/components/ui/label';
 
 interface Event {
     id: string;
