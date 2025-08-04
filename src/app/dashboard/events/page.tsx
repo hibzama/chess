@@ -135,11 +135,11 @@ const EventCard = ({ event, enrollment, onAction, isProcessing }: { event: Event
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
                  <div className="flex justify-between text-sm p-4 bg-muted rounded-md">
-                    <div>
+                    <div className="space-y-1">
                         <p className="font-semibold text-base">Target: {getTargetDescription()}</p>
                         <p className="text-muted-foreground text-xs">in {event.durationHours} hours</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right space-y-1">
                         <p className="font-semibold text-base">Reward: LKR {event.rewardAmount.toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">~{(event.rewardAmount / USDT_RATE).toFixed(2)} USDT</p>
                         <p className="text-muted-foreground text-xs">Fee: LKR {event.enrollmentFee.toFixed(2)}</p>
@@ -153,7 +153,7 @@ const EventCard = ({ event, enrollment, onAction, isProcessing }: { event: Event
                     </div>
                 )}
                 
-                {enrollment && (
+                {enrollment && enrollment.status !== 'claimed' && (
                     <div className="space-y-2 pt-4">
                         <Label>Your Progress</Label>
                         <Progress value={progressPercentage} />
