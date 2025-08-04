@@ -9,10 +9,12 @@ import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
-import PromotionsCarousel from './promotions-carousel';
+import BonusDisplay from './bonus-display';
+import EventDisplay, { type Event } from './event-display';
+
 
 export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
@@ -22,6 +24,8 @@ export default function DashboardPage() {
         totalEarning: 0,
     });
     const [statsLoading, setStatsLoading] = useState(true);
+    const [activeEvent, setActiveEvent] = useState<Event | null>(null);
+    const [promotionsLoading, setPromotionsLoading] = useState(true);
 
     const USDT_RATE = 310;
 
@@ -59,6 +63,20 @@ export default function DashboardPage() {
                 setStatsLoading(false);
             };
             fetchStats();
+            
+            // Fetch active event
+            const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true), limit(1));
+            const unsubscribe = onSnapshot(eventsQuery, (snapshot) => {
+                if (!snapshot.empty) {
+                    const eventData = snapshot.docs[0].data() as Event;
+                    setActiveEvent({ ...eventData, id: snapshot.docs[0].id });
+                } else {
+                    setActiveEvent(null);
+                }
+                setPromotionsLoading(false);
+            });
+            
+            return () => unsubscribe();
         }
     }, [user]);
 
@@ -132,8 +150,12 @@ export default function DashboardPage() {
           Your journey to becoming a grandmaster starts now. Choose your game and make your move.
         </p>
       </div>
+      
+       <div className="grid md:grid-cols-2 gap-6">
+            <BonusDisplay />
+            {promotionsLoading ? <Skeleton className="h-48 w-full rounded-lg" /> : activeEvent && <EventDisplay event={activeEvent} />}
+        </div>
 
-       <PromotionsCarousel />
 
       <div className="grid gap-6">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
