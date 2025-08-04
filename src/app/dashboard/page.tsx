@@ -24,7 +24,7 @@ export default function DashboardPage() {
         totalEarning: 0,
     });
     const [statsLoading, setStatsLoading] = useState(true);
-    const [activeEvent, setActiveEvent] = useState<Event | null>(null);
+    const [activeEvents, setActiveEvents] = useState<Event[]>([]);
     const [isBonusActive, setIsBonusActive] = useState(false);
     const [promotionsLoading, setPromotionsLoading] = useState(true);
 
@@ -51,9 +51,9 @@ export default function DashboardPage() {
             };
             fetchStats();
             
-            const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true), limit(1));
+            const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true));
             const eventsUnsub = onSnapshot(eventsQuery, (snapshot) => {
-                setActiveEvent(snapshot.empty ? null : { ...snapshot.docs[0].data(), id: snapshot.docs[0].id } as Event);
+                 setActiveEvents(snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Event)));
             });
 
             const bonusRef = doc(db, 'settings', 'depositBonus');
@@ -107,8 +107,8 @@ export default function DashboardPage() {
   ];
 
   const promotions = [
-        ...(isBonusActive ? [{type: 'bonus'}] : []),
-        ...(activeEvent ? [{type: 'event', data: activeEvent}] : [])
+        ...(isBonusActive ? [{type: 'bonus' as const}] : []),
+        ...activeEvents.map(event => ({type: 'event' as const, data: event}))
     ];
 
   return (
@@ -122,7 +122,7 @@ export default function DashboardPage() {
       
        {promotionsLoading ? <Skeleton className="h-48 w-full rounded-lg" /> : (
             promotions.length > 0 && (
-                <div className={cn("grid gap-6", promotions.length === 2 ? "md:grid-cols-2" : "grid-cols-1")}>
+                <div className={cn("grid gap-6", promotions.length > 1 ? "md:grid-cols-2" : "grid-cols-1")}>
                    {promotions.map(promo => {
                         if (promo.type === 'bonus') return <BonusDisplay key="bonus" />;
                         if (promo.type === 'event') return <EventDisplay key={promo.data.id} event={promo.data} />;
