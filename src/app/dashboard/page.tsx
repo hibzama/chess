@@ -4,17 +4,68 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone, Calendar, ArrowRight } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone, Calendar, ArrowRight, Clock } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEffect, useState } from 'react';
-import { collection, query, where, getDocs, onSnapshot, limit, doc } from 'firebase/firestore';
+import { useEffect, useState, useRef } from 'react';
+import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import BonusDisplay from './bonus-display';
 import type { Event } from './events/page';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+
+const EventCountdown = ({ event }: { event: Event }) => {
+    const [countdown, setCountdown] = useState('');
+    const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+        }
+
+        if (!event.createdAt) {
+            setCountdown('Loading...');
+            return;
+        }
+
+        const calculateCountdown = () => {
+            const now = new Date().getTime();
+            // The event's global expiry is based on when the admin created it + its duration
+            const expiryTime = event.createdAt.toDate().getTime() + (event.durationHours * 60 * 60 * 1000);
+            const distance = expiryTime - now;
+
+            if (distance < 0) {
+                if (intervalRef.current) clearInterval(intervalRef.current);
+                setCountdown("EXPIRED");
+                return;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            let countdownString = '';
+            if (days > 0) countdownString += `${days}d `;
+            if (hours > 0) countdownString += `${hours}h `;
+            if (minutes > 0) countdownString += `${minutes}m `;
+            countdownString += `${seconds}s`;
+
+            setCountdown(countdownString.trim());
+        }
+        
+        calculateCountdown();
+        intervalRef.current = setInterval(calculateCountdown, 1000);
+
+        return () => {
+            if (intervalRef.current) clearInterval(intervalRef.current);
+        };
+    }, [event]);
+
+    return <div className="font-semibold">{countdown}</div>;
+};
 
 
 const EventListCard = ({ events }: { events: Event[] }) => {
@@ -42,6 +93,7 @@ const EventListCard = ({ events }: { events: Event[] }) => {
                             <TableHead>Event</TableHead>
                             <TableHead>Target</TableHead>
                             <TableHead>Reward</TableHead>
+                            <TableHead>Time Left</TableHead>
                             <TableHead></TableHead>
                         </TableRow>
                     </TableHeader>
@@ -53,6 +105,7 @@ const EventListCard = ({ events }: { events: Event[] }) => {
                                 </TableCell>
                                 <TableCell>{getTargetDescription(event)}</TableCell>
                                 <TableCell className="text-green-400 font-bold">LKR {event.rewardAmount.toFixed(2)}</TableCell>
+                                <TableCell><EventCountdown event={event} /></TableCell>
                                 <TableCell>
                                     <Button asChild size="sm" variant="ghost">
                                         <Link href="/dashboard/events">View <ArrowRight className="ml-2 w-4 h-4"/></Link>
@@ -172,7 +225,7 @@ export default function DashboardPage() {
       
        {promotionsLoading ? <Skeleton className="h-48 w-full rounded-lg" /> : (
             hasPromotions && (
-                <div className={cn("grid gap-6", isBonusActive && activeEvents.length > 0 ? "md:grid-cols-2" : "grid-cols-1")}>
+                <div className={cn("grid gap-6", isBonusActive && activeEvents.length > 0 ? "lg:grid-cols-2" : "grid-cols-1")}>
                     {isBonusActive && <BonusDisplay />}
                     {activeEvents.length > 0 && <EventListCard events={activeEvents}/>}
                 </div>
