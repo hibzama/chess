@@ -35,7 +35,7 @@ const EventListCard = ({ events }: { events: Event[] }) => {
                 </CardTitle>
                 <CardDescription>Join a special event to earn exclusive rewards.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
                 <Table>
                     <TableHeader>
                         <TableRow>

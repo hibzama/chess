@@ -89,7 +89,7 @@ export default function BonusDisplay() {
   }
 
   return (
-    <Card className="h-full border-accent/50 bg-accent/10">
+    <Card className="h-full border-accent bg-accent/10 flex flex-col">
         <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
                 <Gift className="w-6 h-6 text-accent" />
@@ -99,7 +99,7 @@ export default function BonusDisplay() {
                 A special promotion is active. Deposit now to earn extra rewards.
             </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 flex-1 flex flex-col justify-center">
              <div className="bg-background/50 p-4 rounded-lg text-center">
                 <p className="text-3xl font-bold">{bonus.percentage}%</p>
                 <p className="text-xs text-muted-foreground">Bonus Rate</p>
@@ -108,7 +108,9 @@ export default function BonusDisplay() {
                  <p className="text-sm font-semibold">Time Remaining:</p>
                 <p className="text-xl font-bold text-accent">{countdown}</p>
             </div>
-             <Button asChild className="w-full">
+        </CardContent>
+         <CardContent>
+             <Button asChild className="w-full bg-primary hover:bg-primary/90">
                 <Link href="/dashboard/wallet">Make Deposit <ArrowRight className="ml-2"/></Link>
             </Button>
         </CardContent>
