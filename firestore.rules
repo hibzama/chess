@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -24,10 +23,12 @@ service cloud.firestore {
       return request.resource.data;
     }
     
+    // Checks if the user is an admin by looking at their user document.
     function isAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Checks if the user is a participant in a chat.
     function isChatParticipant(chatId) {
         return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
     }
@@ -37,8 +38,14 @@ service cloud.firestore {
     // =================================
 
     match /users/{userId} {
+      // Any signed-in user can read another user's profile (for leaderboards, friend searches, etc.).
       allow read: if isSignedIn();
+
+      // A user can only create their own user document.
       allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
+
+      // This complex rule allows a user to update their own profile (but not critical fields),
+      // and allows other system processes like friend requests and game transactions to update user documents.
       allow update: if 
         (isOwner(userId) && !(
             'balance' in incomingDoc() && incomingDoc().balance != resource.data.balance
@@ -50,12 +57,17 @@ service cloud.firestore {
         ) ||
         (isSignedIn() && exists(/databases/$(database)/documents/friend_requests/$(request.resource.data.requestId))) ||
         (isSignedIn() && !(userId in incomingDoc().friends) && (userId in resource.data.friends)) ||
+        // Allow admins to update any user document (for balance changes, role changes, etc.)
         isAdmin() ||
-        (isSignedIn() && ('balance' in incomingDoc()));
-        
-        match /event_enrollments/{eventId} {
-          allow read, create, update: if isOwner(userId) || isAdmin();
-        }
+        (isSignedIn() && ('balance' in incomingDoc())) ||
+        // Allow the system to increment wins after a game
+        (isSignedIn() && ('wins' in incomingDoc() && incomingDoc().wins == resource.data.wins + 1));
+
+
+      // Rule for event enrollments subcollection
+      match /event_enrollments/{enrollmentId} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
     match /friend_requests/{requestId} {
@@ -65,9 +77,12 @@ service cloud.firestore {
     }
     
     match /game_rooms/{roomId} {
+      // Any signed-in user can list public games, and admins can read any game room's details.
       allow list, read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
       allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
+
+      // This complex rule allows various game state updates: joining, playing moves, and completing the game.
       allow update: if isSignedIn() && 
         (
           !isOwner(resource.data.createdBy.uid) &&
@@ -90,8 +105,10 @@ service cloud.firestore {
     }
     
     match /transactions/{transactionId} {
+      // Admins can read/list any transaction. Users can only see their own.
       allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
       allow create: if isSignedIn();
+      // Only admins can approve/reject transactions (update status).
       allow update: if isAdmin();
     }
     
@@ -110,8 +127,11 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
+        // A user can only access chats they are a part of. The chat ID is a composite of two user IDs.
         allow read, write, list: if isSignedIn() && request.auth.uid in chatId.split('_');
+
         match /messages/{messageId} {
+            // A user can only read/write messages in a chat they are a part of.
             allow read, create: if isSignedIn() && request.auth.uid in chatId.split('_');
         }
     }
@@ -121,11 +141,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Rules for Events
     match /events/{eventId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
+    // Rules for Collection Group Query in Admin Panel
     match /{path=**}/event_enrollments/{enrollmentId} {
       allow read: if isAdmin();
     }
