@@ -131,7 +131,7 @@ export default function ManageEventsPage() {
 
             const enrollmentsQuery = query(
                 collectionGroup(db, 'event_enrollments'),
-                where('id', '==', localEvent.id)
+                where('eventId', '==', localEvent.id)
             );
 
             const unsubscribe = onSnapshot(enrollmentsQuery, async (snapshot) => {
@@ -154,6 +154,9 @@ export default function ManageEventsPage() {
 
                 const enrollmentsData = (await Promise.all(enrollmentsPromises)).filter(Boolean) as Enrollment[];
                 setEnrollments(enrollmentsData);
+                setLoadingEnrollments(false);
+            }, (error) => {
+                console.error("Error fetching enrollments:", error);
                 setLoadingEnrollments(false);
             });
 

@@ -108,14 +108,14 @@ const EventCard = ({ event }: { event: Event }) => {
                 const relevantGames = snapshot.docs.filter(doc => {
                     const gameData = doc.data();
                     return (
+                        gameData.createdAt &&
                         gameData.createdAt.seconds >= enrollment.enrolledAt.seconds &&
                         gameData.wager >= (event.minWager || 0)
                     );
                 });
                 const winsCount = relevantGames.length;
                 const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-                const enrollmentDoc = await getDoc(enrollmentRef);
-                 if (enrollmentDoc.exists()) {
+                 if (await getDoc(enrollmentRef)) {
                     await setDoc(enrollmentRef, { progress: winsCount }, { merge: true });
                 }
             });
@@ -146,6 +146,7 @@ const EventCard = ({ event }: { event: Event }) => {
             // 2. Create enrollment record
             batch.set(enrollmentRef, {
                 id: event.id,
+                eventId: event.id,
                 userId: user.uid,
                 status: 'enrolled',
                 progress: 0,
