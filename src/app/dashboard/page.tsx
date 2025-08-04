@@ -12,8 +12,7 @@ import { useEffect, useState } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
-import BonusDisplay from './bonus-display';
-import EventDisplay from './event-display';
+import PromotionsCarousel from './promotions-carousel';
 
 export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
@@ -134,8 +133,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-       <BonusDisplay />
-       <EventDisplay />
+       <PromotionsCarousel />
 
       <div className="grid gap-6">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -192,5 +190,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
