@@ -60,6 +60,11 @@ service cloud.firestore {
         // Allow admins to update any user document (for balance changes, role changes, etc.)
         isAdmin() ||
         (isSignedIn() && ('balance' in incomingDoc()));
+
+      // Rule for event enrollments sub-collection
+      match /event_enrollments/{enrollmentId} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
     match /friend_requests/{requestId} {
@@ -128,16 +133,12 @@ service cloud.firestore {
         }
     }
     
-    match /events/{eventId} {
+    match /settings/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-    
-    match /users/{userId}/event_enrollments/{enrollmentId} {
-        allow read, create, update: if isOwner(userId);
-    }
 
-    match /settings/{docId} {
+    match /events/{eventId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
