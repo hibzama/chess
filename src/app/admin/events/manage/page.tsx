@@ -122,44 +122,45 @@ export default function ManageEventsPage() {
         useEffect(() => {
             setLocalEvent(event);
         }, [event]);
-
+        
         useEffect(() => {
             if (!localEvent.id || isNew) {
                 setLoadingEnrollments(false);
                 return;
             };
 
-            const fetchEnrollments = async () => {
-                setLoadingEnrollments(true);
-                // Fetch all users first
-                const usersSnapshot = await getDocs(collection(db, 'users'));
-                const enrollmentsData: Enrollment[] = [];
-                
-                // Iterate through each user to check for an enrollment
-                for (const userDoc of usersSnapshot.docs) {
-                    const userId = userDoc.id;
-                    const enrollmentRef = doc(db, 'users', userId, 'event_enrollments', localEvent.id!);
-                    const enrollmentSnap = await getDoc(enrollmentRef);
+            const enrollmentsQuery = query(
+                collectionGroup(db, 'event_enrollments'),
+                where('id', '==', localEvent.id)
+            );
 
-                    if (enrollmentSnap.exists()) {
-                        const enrollment = enrollmentSnap.data() as Enrollment;
-                        enrollmentsData.push({
-                            ...enrollment,
+            const unsubscribe = onSnapshot(enrollmentsQuery, async (snapshot) => {
+                setLoadingEnrollments(true);
+                const enrollmentsPromises = snapshot.docs.map(async (enrollmentDoc) => {
+                    const enrollmentData = enrollmentDoc.data() as Enrollment;
+                    const userDoc = await getDoc(doc(db, 'users', enrollmentData.userId));
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data();
+                        return {
+                            ...enrollmentData,
                             user: {
-                                firstName: userDoc.data().firstName,
-                                lastName: userDoc.data().lastName,
+                                firstName: userData.firstName,
+                                lastName: userData.lastName,
                             },
-                        });
+                        };
                     }
-                }
-                
+                    return null;
+                });
+
+                const enrollmentsData = (await Promise.all(enrollmentsPromises)).filter(Boolean) as Enrollment[];
                 setEnrollments(enrollmentsData);
                 setLoadingEnrollments(false);
-            };
+            });
 
-            fetchEnrollments();
+            return () => unsubscribe();
             
         }, [localEvent.id, isNew]);
+
 
         const handleChange = (field: keyof Event, value: any) => {
             const isNumeric = ['enrollmentFee', 'targetAmount', 'rewardAmount', 'durationHours', 'minWager'].includes(field);
@@ -331,5 +332,3 @@ export default function ManageEventsPage() {
         </div>
     )
 }
-
-    
