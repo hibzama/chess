@@ -191,9 +191,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const roomData = roomDoc.data() as GameRoom;
                 const { method, resignerDetails } = winnerDetails;
                 let { winnerId } = winnerDetails;
-                const isResignation = !!resignerDetails;
-                if (isResignation) {
-                    winnerId = roomData.players.find(p => p !== resignerDetails!.id) || null;
+                
+                if (resignerDetails) {
+                    winnerId = roomData.players.find(p => p !== resignerDetails.id) || null;
                 }
 
                 // Gather event enrollment reads if there's a winner
@@ -216,22 +216,22 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let creatorDesc = '', joinerDesc = '';
                 const winnerObject: GameRoom['winner'] = { uid: winnerId, method };
 
-                if (isResignation) {
+                if (resignerDetails) {
                     const opponentPayoutRate = 1.30;
                     let resignerRefundRate = 0;
-                    if (resignerDetails!.pieceCount >= 6) resignerRefundRate = 0.50;
-                    else if (resignerDetails!.pieceCount >= 3) resignerRefundRate = 0.35;
+                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
+                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
                     else resignerRefundRate = 0.25;
 
-                    const isCreatorResigner = resignerDetails!.id === roomData.createdBy.uid;
+                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
                     creatorPayout = isCreatorResigner ? wager * resignerRefundRate : wager * opponentPayoutRate;
                     joinerPayout = !isCreatorResigner ? wager * resignerRefundRate : wager * opponentPayoutRate;
                     
                     creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
                     
-                    winnerObject.resignerId = resignerDetails!.id;
-                    winnerObject.resignerPieceCount = resignerDetails!.pieceCount;
+                    winnerObject.resignerId = resignerDetails.id;
+                    winnerObject.resignerPieceCount = resignerDetails.pieceCount;
                 } else if (winnerId === 'draw') {
                     creatorPayout = joinerPayout = wager * 0.9;
                     creatorDesc = `Draw refund vs ${roomData.player2.name}`;
