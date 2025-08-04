@@ -18,13 +18,16 @@ export interface Event {
     title: string;
     description: string;
     enrollmentFee: number;
-    targetType: 'totalEarnings';
+    targetType: 'totalEarnings' | 'winningMatches';
     targetAmount: number;
+    minWager?: number;
     rewardAmount: number;
-    durationDays: number;
+    durationHours: number;
     isActive: boolean;
     createdAt?: any;
 }
+
+const USDT_RATE = 310;
 
 export default function ManageEventsPage() {
     const [events, setEvents] = useState<Event[]>([]);
@@ -74,9 +77,11 @@ export default function ManageEventsPage() {
         }, [event]);
 
         const handleChange = (field: keyof Event, value: any) => {
-            const isNumeric = ['enrollmentFee', 'targetAmount', 'rewardAmount', 'durationDays'].includes(field);
+            const isNumeric = ['enrollmentFee', 'targetAmount', 'rewardAmount', 'durationHours', 'minWager'].includes(field);
             setLocalEvent(prev => ({ ...prev, [field]: isNumeric ? Number(value) : value }));
         };
+        
+        const isWinningType = localEvent.targetType === 'winningMatches';
 
         return (
             <Card>
@@ -100,25 +105,38 @@ export default function ManageEventsPage() {
                          <div className="space-y-2">
                             <Label>Enrollment Fee (LKR)</Label>
                             <Input type="number" value={localEvent.enrollmentFee || 0} onChange={(e) => handleChange('enrollmentFee', e.target.value)} />
+                             <p className="text-xs text-muted-foreground">~{((localEvent.enrollmentFee || 0) / USDT_RATE).toFixed(2)} USDT</p>
                         </div>
                         <div className="space-y-2">
                             <Label>Target Type</Label>
                              <Select value={localEvent.targetType || 'totalEarnings'} onValueChange={(val) => handleChange('targetType', val)}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent><SelectItem value="totalEarnings">Total Earnings</SelectItem></SelectContent>
+                                <SelectContent>
+                                    <SelectItem value="totalEarnings">Total Earnings</SelectItem>
+                                    <SelectItem value="winningMatches">Winning Matches</SelectItem>
+                                </SelectContent>
                             </Select>
                         </div>
+                        {isWinningType && (
+                             <div className="space-y-2">
+                                <Label>Minimum Wager (LKR)</Label>
+                                <Input type="number" value={localEvent.minWager || 0} onChange={(e) => handleChange('minWager', e.target.value)} />
+                                <p className="text-xs text-muted-foreground">Only wins from games with this wager or higher will count.</p>
+                            </div>
+                        )}
                          <div className="space-y-2">
-                            <Label>Target Amount (LKR)</Label>
+                            <Label>{isWinningType ? "Target Wins" : "Target Earnings (LKR)"}</Label>
                             <Input type="number" value={localEvent.targetAmount || 0} onChange={(e) => handleChange('targetAmount', e.target.value)} />
+                            {!isWinningType && <p className="text-xs text-muted-foreground">~{((localEvent.targetAmount || 0) / USDT_RATE).toFixed(2)} USDT</p>}
                         </div>
                         <div className="space-y-2">
                             <Label>Reward Amount (LKR)</Label>
                             <Input type="number" value={localEvent.rewardAmount || 0} onChange={(e) => handleChange('rewardAmount', e.target.value)} />
+                             <p className="text-xs text-muted-foreground">~{((localEvent.rewardAmount || 0) / USDT_RATE).toFixed(2)} USDT</p>
                         </div>
                         <div className="space-y-2">
-                            <Label>Duration (Days)</Label>
-                            <Input type="number" value={localEvent.durationDays || 0} onChange={(e) => handleChange('durationDays', e.target.value)} />
+                            <Label>Duration (Hours)</Label>
+                            <Input type="number" value={localEvent.durationHours || 0} onChange={(e) => handleChange('durationHours', e.target.value)} />
                         </div>
                     </div>
                 </CardContent>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/auth-context';
-import { collection, onSnapshot, doc, setDoc, getDoc, writeBatch, serverTimestamp, Timestamp, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, getDoc, writeBatch, serverTimestamp, Timestamp, query, where, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -17,10 +17,11 @@ interface Event {
     title: string;
     description: string;
     enrollmentFee: number;
-    targetType: 'totalEarnings';
+    targetType: 'totalEarnings' | 'winningMatches';
     targetAmount: number;
+    minWager?: number;
     rewardAmount: number;
-    durationDays: number;
+    durationHours: number;
     isActive: boolean;
 }
 
@@ -32,6 +33,8 @@ interface Enrollment {
     enrolledAt: Timestamp;
     expiresAt: Timestamp;
 }
+
+const USDT_RATE = 310;
 
 const EventCard = ({ event }: { event: Event }) => {
     const { user, userData } = useAuth();
@@ -57,38 +60,55 @@ const EventCard = ({ event }: { event: Event }) => {
         return () => unsubscribe();
     }, [user, event.id]);
     
-    // This effect will be used later to track progress
+    // Progress Tracking Effect
     useEffect(() => {
         if (!enrollment || enrollment.status !== 'enrolled' || !user) return;
 
         const now = Timestamp.now();
         if(now > enrollment.expiresAt) return; // Event expired
 
-        const q = query(
-            collection(db, 'transactions'),
-            where('userId', '==', user.uid),
-            where('createdAt', '>=', enrollment.enrolledAt)
-        );
-
-        const unsubscribe = onSnapshot(q, async (snapshot) => {
-            let totalEarnings = 0;
-            snapshot.forEach(doc => {
-                const tx = doc.data();
-                if(tx.type === 'payout') totalEarnings += tx.amount;
-                if(tx.type === 'wager') totalEarnings -= tx.amount;
+        let unsubscribe;
+        if (event.targetType === 'totalEarnings') {
+            const q = query(
+                collection(db, 'transactions'),
+                where('userId', '==', user.uid),
+                where('createdAt', '>=', enrollment.enrolledAt)
+            );
+            unsubscribe = onSnapshot(q, async (snapshot) => {
+                let totalEarnings = 0;
+                snapshot.forEach(doc => {
+                    const tx = doc.data();
+                    if(tx.type === 'payout') totalEarnings += tx.amount;
+                    if(tx.type === 'wager') totalEarnings -= tx.amount;
+                });
+                
+                const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
+                const currentProgress = (await getDoc(enrollmentRef)).data()?.progress || 0;
+                if (totalEarnings > currentProgress) {
+                     await setDoc(enrollmentRef, { progress: totalEarnings }, { merge: true });
+                }
             });
-            
-            const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-            const currentProgress = (await getDoc(enrollmentRef)).data()?.progress || 0;
-
-            if (totalEarnings > currentProgress) {
-                 await setDoc(enrollmentRef, { progress: totalEarnings }, { merge: true });
-            }
-        });
+        } else if (event.targetType === 'winningMatches') {
+             const q = query(
+                collection(db, 'game_rooms'),
+                where('status', '==', 'completed'),
+                where('players', 'array-contains', user.uid),
+                where('createdAt', '>=', enrollment.enrolledAt),
+                where('winner.uid', '==', user.uid),
+                where('wager', '>=', event.minWager || 0)
+            );
+             unsubscribe = onSnapshot(q, async (snapshot) => {
+                const winsCount = snapshot.size;
+                const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
+                await setDoc(enrollmentRef, { progress: winsCount }, { merge: true });
+            });
+        }
         
-        return () => unsubscribe();
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
 
-    }, [enrollment, user, event.id]);
+    }, [enrollment, user, event]);
 
 
     const handleEnroll = async () => {
@@ -105,7 +125,7 @@ const EventCard = ({ event }: { event: Event }) => {
         
         try {
             // 1. Deduct fee
-            batch.update(userRef, { balance: userData.balance - event.enrollmentFee });
+            batch.update(userRef, { balance: increment(-event.enrollmentFee) });
             // 2. Create enrollment record
             batch.set(enrollmentRef, {
                 id: event.id,
@@ -113,7 +133,7 @@ const EventCard = ({ event }: { event: Event }) => {
                 status: 'enrolled',
                 progress: 0,
                 enrolledAt: now,
-                expiresAt: Timestamp.fromMillis(now.toMillis() + event.durationDays * 24 * 60 * 60 * 1000)
+                expiresAt: Timestamp.fromMillis(now.toMillis() + event.durationHours * 3600 * 1000)
             });
             // 3. Log transaction
             const txRef = doc(collection(db, 'transactions'));
@@ -133,7 +153,7 @@ const EventCard = ({ event }: { event: Event }) => {
     };
     
     const handleClaim = async () => {
-        if (!user || !enrollment || enrollment.status !== 'completed') return;
+        if (!user || !enrollment || enrollment.status !== 'completed' || !userData) return;
         
         setIsProcessing(true);
         const batch = writeBatch(db);
@@ -172,6 +192,20 @@ const EventCard = ({ event }: { event: Event }) => {
         }
     }, [progressPercentage, enrollment, user, event.id]);
 
+    const getTargetDescription = () => {
+        if (event.targetType === 'winningMatches') {
+            return `Win ${event.targetAmount} games (min. wager LKR ${event.minWager || 0})`;
+        }
+        return `Earn LKR ${event.targetAmount.toFixed(2)}`;
+    }
+
+    const getProgressText = () => {
+        if (!enrollment) return '';
+        if (event.targetType === 'winningMatches') {
+            return `${enrollment.progress} / ${event.targetAmount} wins`;
+        }
+        return `LKR ${enrollment.progress.toFixed(2)} / ${event.targetAmount.toFixed(2)}`;
+    }
 
     return (
         <Card>
@@ -182,12 +216,13 @@ const EventCard = ({ event }: { event: Event }) => {
             <CardContent className="space-y-4">
                 <div className="flex justify-between text-sm p-3 bg-muted rounded-md">
                     <div>
-                        <p className="font-semibold">Target: Earn LKR {event.targetAmount}</p>
-                        <p className="text-muted-foreground">in {event.durationDays} days</p>
+                        <p className="font-semibold">Target: {getTargetDescription()}</p>
+                        <p className="text-muted-foreground">in {event.durationHours} hours</p>
                     </div>
                     <div>
-                        <p className="font-semibold text-right">Reward: LKR {event.rewardAmount}</p>
-                        <p className="text-muted-foreground text-right">Enrollment Fee: LKR {event.enrollmentFee}</p>
+                        <p className="font-semibold text-right">Reward: LKR {event.rewardAmount.toFixed(2)}</p>
+                        <p className="text-muted-foreground text-right">~{(event.rewardAmount / USDT_RATE).toFixed(2)} USDT</p>
+                        <p className="text-muted-foreground text-right">Enrollment Fee: LKR {event.enrollmentFee.toFixed(2)}</p>
                     </div>
                 </div>
 
@@ -203,7 +238,7 @@ const EventCard = ({ event }: { event: Event }) => {
                         )}
                         <Label>Your Progress</Label>
                         <Progress value={progressPercentage} />
-                        <p className="text-xs text-muted-foreground text-right">{`LKR ${enrollment.progress.toFixed(2)} / ${event.targetAmount.toFixed(2)}`}</p>
+                        <p className="text-xs text-muted-foreground text-right">{getProgressText()}</p>
                     </div>
                 ) : null}
             </CardContent>
@@ -222,7 +257,7 @@ const EventCard = ({ event }: { event: Event }) => {
                     )
                 ) : (
                     <Button className="w-full" onClick={handleEnroll} disabled={isProcessing}>
-                        {isProcessing ? <Loader2 className="animate-spin"/> : `Enroll for LKR ${event.enrollmentFee}`}
+                        {isProcessing ? <Loader2 className="animate-spin"/> : `Enroll for LKR ${event.enrollmentFee.toFixed(2)}`}
                     </Button>
                 )}
             </CardFooter>
