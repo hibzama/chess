@@ -1,10 +1,9 @@
 
-
 'use client'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone, Calendar, ArrowRight, Clock } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone, Calendar, ArrowRight, Clock, Handshake } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,6 +14,8 @@ import { cn } from '@/lib/utils';
 import BonusDisplay from './bonus-display';
 import type { Event } from './events/page';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
+
 
 const EventCountdown = ({ event }: { event: Event }) => {
     const [countdown, setCountdown] = useState('');
@@ -120,6 +121,49 @@ const EventListCard = ({ events }: { events: Event[] }) => {
     )
 }
 
+const EventDisplayCard = ({ event }: { event: Event }) => {
+    
+    const getTargetDescription = (event: Event) => {
+        if (event.targetType === 'winningMatches') {
+            return `Win ${event.targetAmount} games`;
+        }
+        return `Earn LKR ${event.targetAmount.toFixed(2)}`;
+    }
+
+    return (
+        <Card className="h-full border-primary/50 bg-primary/10 flex flex-col">
+             <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                    <Calendar className="w-6 h-6 text-primary" />
+                    <span className="text-primary">{event.title}</span>
+                </CardTitle>
+                <CardDescription>{event.description}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 flex-1">
+                 <div className="space-y-3 rounded-lg bg-card/50 p-4">
+                    <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground flex items-center gap-2"><Trophy/> Target</span>
+                        <span className="font-bold">{getTargetDescription(event)}</span>
+                    </div>
+                     <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground flex items-center gap-2"><DollarSign/> Reward</span>
+                        <span className="font-bold text-green-400">LKR {event.rewardAmount.toFixed(2)}</span>
+                    </div>
+                     <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground flex items-center gap-2"><Handshake/> Fee</span>
+                        <span className="font-bold text-red-400">LKR {event.enrollmentFee.toFixed(2)}</span>
+                    </div>
+                </div>
+            </CardContent>
+            <CardFooter>
+                 <Button asChild className="w-full bg-primary hover:bg-primary/90">
+                    <Link href="/dashboard/events">View Event Details <ArrowRight className="ml-2"/></Link>
+                </Button>
+            </CardFooter>
+        </Card>
+    );
+};
+
 
 export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
@@ -164,8 +208,10 @@ export default function DashboardPage() {
 
             const bonusRef = doc(db, 'settings', 'depositBonus');
             const bonusUnsub = onSnapshot(bonusRef, (docSnap) => {
-                setIsBonusActive(docSnap.exists() && docSnap.data().isActive);
-                setPromotionsLoading(false); 
+                const bonusData = docSnap.data();
+                const isActive = bonusData?.isActive && bonusData?.startTime && (bonusData.startTime.toDate().getTime() + (bonusData.durationHours * 3600 * 1000)) > new Date().getTime();
+                setIsBonusActive(isActive);
+                setPromotionsLoading(false);
             });
             
             return () => {
@@ -213,6 +259,7 @@ export default function DashboardPage() {
   ];
 
   const hasPromotions = isBonusActive || activeEvents.length > 0;
+  const showSingleEventCard = activeEvents.length === 1;
 
   return (
     <div className="flex flex-col gap-8">
@@ -227,7 +274,8 @@ export default function DashboardPage() {
             hasPromotions && (
                 <div className={cn("grid gap-6", isBonusActive && activeEvents.length > 0 ? "lg:grid-cols-2" : "grid-cols-1")}>
                     {isBonusActive && <BonusDisplay />}
-                    {activeEvents.length > 0 && <EventListCard events={activeEvents}/>}
+                    {showSingleEventCard && <EventDisplayCard event={activeEvents[0]}/>}
+                    {!showSingleEventCard && activeEvents.length > 0 && <EventListCard events={activeEvents}/>}
                 </div>
             )
        )}
@@ -273,3 +321,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
