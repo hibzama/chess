@@ -24,6 +24,7 @@ interface Event {
     rewardAmount: number;
     durationHours: number;
     isActive: boolean;
+    createdAt?: any;
 }
 
 interface Enrollment {
@@ -86,24 +87,37 @@ const EventCard = ({ event }: { event: Event }) => {
                 });
                 
                 const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-                const currentProgress = (await getDoc(enrollmentRef)).data()?.progress || 0;
-                if (totalEarnings > currentProgress) {
-                     await setDoc(enrollmentRef, { progress: totalEarnings }, { merge: true });
+                const enrollmentDoc = await getDoc(enrollmentRef);
+
+                if (enrollmentDoc.exists()) {
+                    const currentProgress = enrollmentDoc.data().progress || 0;
+                    if (totalEarnings > currentProgress) {
+                         await setDoc(enrollmentRef, { progress: totalEarnings }, { merge: true });
+                    }
                 }
             });
         } else if (event.targetType === 'winningMatches') {
-             const q = query(
+            const q = query(
                 collection(db, 'game_rooms'),
-                where('status', '==', 'completed'),
                 where('players', 'array-contains', user.uid),
-                where('createdAt', '>=', enrollment.enrolledAt),
-                where('winner.uid', '==', user.uid),
-                where('wager', '>=', event.minWager || 0)
+                where('status', '==', 'completed'),
+                where('winner.uid', '==', user.uid)
             );
-             unsubscribe = onSnapshot(q, async (snapshot) => {
-                const winsCount = snapshot.size;
+            unsubscribe = onSnapshot(q, async (snapshot) => {
+                // Client-side filtering
+                const relevantGames = snapshot.docs.filter(doc => {
+                    const gameData = doc.data();
+                    return (
+                        gameData.createdAt.seconds >= enrollment.enrolledAt.seconds &&
+                        gameData.wager >= (event.minWager || 0)
+                    );
+                });
+                const winsCount = relevantGames.length;
                 const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-                await setDoc(enrollmentRef, { progress: winsCount }, { merge: true });
+                const enrollmentDoc = await getDoc(enrollmentRef);
+                 if (enrollmentDoc.exists()) {
+                    await setDoc(enrollmentRef, { progress: winsCount }, { merge: true });
+                }
             });
         }
         
@@ -276,7 +290,7 @@ export default function EventsPage() {
     useEffect(() => {
         const q = query(collection(db, 'events'), where('isActive', '==', true));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const eventsData = snapshot.docs.map(doc => doc.data() as Event);
+            const eventsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Event));
             setEvents(eventsData.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
             setLoading(false);
         });
