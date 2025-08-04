@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, setDoc, serverTimestamp, deleteDoc, query, where, getDocs, collectionGroup } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, serverTimestamp, deleteDoc, query, where, getDocs, collectionGroup, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
