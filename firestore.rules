@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -60,14 +61,13 @@ service cloud.firestore {
         // Allow admins to update any user document (for balance changes, role changes, etc.)
         isAdmin() ||
         (isSignedIn() && ('balance' in incomingDoc())) ||
-        // Allow the system to increment wins after a game
-        (isSignedIn() && ('wins' in incomingDoc() && incomingDoc().wins == resource.data.wins + 1));
-
-
-      // Rule for event enrollments subcollection
-      match /event_enrollments/{enrollmentId} {
-        allow read, write: if isOwner(userId);
-      }
+        // Allow win count to be incremented by the system
+        (isSignedIn() && incomingDoc().wins == resource.data.wins + 1);
+        
+        match /event_enrollments/{enrollmentId} {
+            // A user can only manage their own event enrollments
+            allow read, create, update: if isOwner(userId);
+        }
     }
     
     match /friend_requests/{requestId} {
@@ -140,16 +140,10 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-
-    // Rules for Events
+    
     match /events/{eventId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Rules for Collection Group Query in Admin Panel
-    match /{path=**}/event_enrollments/{enrollmentId} {
-      allow read: if isAdmin();
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
     }
   }
 }
