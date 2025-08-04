@@ -78,8 +78,8 @@ const EventCard = ({ event }: { event: Event }) => {
                 let totalEarnings = 0;
                 snapshot.forEach(doc => {
                     const tx = doc.data();
-                    // Filter by date on the client
-                    if (tx.createdAt.seconds >= enrollment.enrolledAt.seconds) {
+                    // Filter by date on the client, and ensure createdAt is not null
+                    if (tx.createdAt && tx.createdAt.seconds >= enrollment.enrolledAt.seconds) {
                         if(tx.type === 'payout') totalEarnings += tx.amount;
                         if(tx.type === 'wager') totalEarnings -= tx.amount;
                     }
