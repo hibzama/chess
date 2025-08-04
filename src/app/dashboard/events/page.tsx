@@ -135,15 +135,17 @@ const EventCard = ({ event, enrollment, onAction, isProcessing }: { event: Event
                 <CardDescription>{event.description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
-                 <div className="flex justify-between text-sm p-4 bg-muted rounded-md space-y-2 flex-col md:flex-row md:space-y-0">
-                    <div className="space-y-1">
-                        <p className="font-semibold text-base">Target: {getTargetDescription()}</p>
-                        <p className="text-muted-foreground text-xs">in {event.durationHours} hours</p>
-                    </div>
-                    <div className="text-left md:text-right space-y-1">
-                        <p className="font-semibold text-base">Reward: LKR {event.rewardAmount.toFixed(2)}</p>
-                         <p className="text-xs text-muted-foreground">~{(event.rewardAmount / USDT_RATE).toFixed(2)} USDT</p>
-                        <p className="text-muted-foreground text-xs">Fee: LKR {event.enrollmentFee.toFixed(2)}</p>
+                 <div className="p-4 bg-muted rounded-md space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className="space-y-1">
+                            <p className="font-semibold text-base">Target: {getTargetDescription()}</p>
+                            <p className="text-muted-foreground text-xs">in {event.durationHours} hours</p>
+                        </div>
+                        <div className="space-y-1 md:text-right">
+                            <p className="font-semibold text-base">Reward: LKR {event.rewardAmount.toFixed(2)}</p>
+                            <p className="text-xs text-muted-foreground">~{(event.rewardAmount / USDT_RATE).toFixed(2)} USDT</p>
+                            <p className="text-muted-foreground text-xs">Fee: LKR {event.enrollmentFee.toFixed(2)}</p>
+                        </div>
                     </div>
                 </div>
 
