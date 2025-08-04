@@ -128,6 +128,15 @@ service cloud.firestore {
         }
     }
     
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+    
+    match /users/{userId}/event_enrollments/{enrollmentId} {
+        allow read, create, update: if isOwner(userId);
+    }
+
     match /settings/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
