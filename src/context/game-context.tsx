@@ -175,7 +175,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const handlePayout = useCallback(async (winnerDetails: { winnerId: string | 'draw' | null, method: GameOverReason, resignerDetails?: {id: string, pieceCount: number} | null }) => {
         if (!roomId || !user) return { myPayout: 0 };
     
-        // Fetch active events outside the transaction
         const activeEventsQuery = query(collection(db, 'events'), where('isActive', '==', true));
         const eventsSnapshot = await getDocs(activeEventsQuery);
         const activeEvents = eventsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Event));
@@ -183,25 +182,35 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         try {
             const payoutResult = await runTransaction(db, async (transaction) => {
                 const roomRef = doc(db, 'game_rooms', roomId as string);
-                const roomDoc = await transaction.get(roomRef);
+                const roomDoc = await transaction.get(roomRef); // READ 1
     
                 if (!roomDoc.exists() || !roomDoc.data()?.player2) throw "Room not found or not ready";
                 if (roomDoc.data().payoutTransactionId) throw "Payout already processed";
     
                 const roomData = roomDoc.data() as GameRoom;
-                const wager = roomData.wager;
-                let creatorPayout = 0, joinerPayout = 0;
-                let creatorDesc = '', joinerDesc = '';
                 
                 const { method, resignerDetails } = winnerDetails;
                 let { winnerId } = winnerDetails;
                 
-                // --- Determine Winner and Payouts ---
                 const isResignation = !!resignerDetails;
                 if (isResignation) {
                     winnerId = roomData.players.find(p => p !== resignerDetails!.id) || null;
                 }
 
+                // --- GATHER ALL READS ---
+                const enrollmentReads = [];
+                if (winnerId && winnerId !== 'draw' && activeEvents.length > 0) {
+                    for (const event of activeEvents) {
+                        const enrollmentRef = doc(db, 'users', winnerId, 'event_enrollments', event.id);
+                        enrollmentReads.push(transaction.get(enrollmentRef));
+                    }
+                }
+                const enrollmentDocs = await Promise.all(enrollmentReads);
+                // --- ALL READS ARE NOW COMPLETE ---
+
+                const wager = roomData.wager;
+                let creatorPayout = 0, joinerPayout = 0;
+                let creatorDesc = '', joinerDesc = '';
                 const winnerObject: GameRoom['winner'] = { uid: winnerId, method };
 
                 if (isResignation) {
@@ -233,60 +242,56 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
                 }
-
-                 // --- EVENT PROGRESS UPDATE ---
-                if (winnerId && winnerId !== 'draw') {
+                
+                // --- START ALL WRITES ---
+                 if (winnerId && winnerId !== 'draw') {
                     transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
-                    if (activeEvents.length > 0) {
-                        const now = Timestamp.now();
-                        for (const event of activeEvents) {
-                             const enrollmentRef = doc(db, 'users', winnerId, 'event_enrollments', event.id);
-                             const enrollmentDoc = await transaction.get(enrollmentRef);
-
-                             if (enrollmentDoc.exists()) {
-                                const enrollmentData = enrollmentDoc.data();
-                                if (enrollmentData.status === 'enrolled' && enrollmentData.expiresAt > now) {
-                                    let progressIncrement = 0;
-                                    let shouldUpdate = false;
-                                    
-                                    if (event.targetType === 'winningMatches') {
-                                        if (!event.minWager || wager >= event.minWager) {
-                                            progressIncrement = 1;
-                                            shouldUpdate = true;
-                                        }
-                                    } else if (event.targetType === 'totalEarnings') {
-                                        const netEarning = (winnerId === roomData.createdBy.uid ? creatorPayout : joinerPayout) - wager;
-                                        if (netEarning > 0) {
-                                            progressIncrement = netEarning;
-                                            shouldUpdate = true;
-                                        }
+                    const now = Timestamp.now();
+                    
+                    enrollmentDocs.forEach((enrollmentDoc, index) => {
+                        const event = activeEvents[index];
+                        if (enrollmentDoc.exists()) {
+                            const enrollmentData = enrollmentDoc.data();
+                            if (enrollmentData.status === 'enrolled' && enrollmentData.expiresAt > now) {
+                                let progressIncrement = 0;
+                                let shouldUpdate = false;
+                                
+                                if (event.targetType === 'winningMatches') {
+                                    if (!event.minWager || wager >= event.minWager) {
+                                        progressIncrement = 1;
+                                        shouldUpdate = true;
                                     }
-
-                                    if (shouldUpdate) {
-                                        const newProgress = (enrollmentData.progress || 0) + progressIncrement;
-                                        const updatePayload: any = { progress: increment(progressIncrement) };
-                                        if (newProgress >= event.targetAmount) {
-                                            updatePayload.status = 'completed';
-                                        }
-                                        transaction.update(enrollmentRef, updatePayload);
+                                } else if (event.targetType === 'totalEarnings') {
+                                    const netEarning = (winnerId === roomData.createdBy.uid ? creatorPayout : joinerPayout) - wager;
+                                    if (netEarning > 0) {
+                                        progressIncrement = netEarning;
+                                        shouldUpdate = true;
                                     }
                                 }
-                             }
+
+                                if (shouldUpdate) {
+                                    const newProgress = (enrollmentData.progress || 0) + progressIncrement;
+                                    const updatePayload: any = { progress: increment(progressIncrement) };
+                                    if (newProgress >= event.targetAmount) {
+                                        updatePayload.status = 'completed';
+                                    }
+                                    transaction.update(enrollmentDoc.ref, updatePayload);
+                                }
+                            }
                         }
-                    }
+                    });
                 }
-                 // --- END EVENT PROGRESS ---
     
-                const now = serverTimestamp();
+                const payoutTimestamp = serverTimestamp();
                 const payoutTxId = doc(collection(db, 'transactions')).id;
     
                 if (creatorPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
-                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: payoutTimestamp, payoutTxId });
                 }
                 if (joinerPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
-                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: payoutTimestamp, payoutTxId });
                 }
     
                 transaction.update(roomRef, { 
@@ -643,5 +648,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
-
-    
