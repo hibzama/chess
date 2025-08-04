@@ -72,15 +72,17 @@ const EventCard = ({ event }: { event: Event }) => {
         if (event.targetType === 'totalEarnings') {
             const q = query(
                 collection(db, 'transactions'),
-                where('userId', '==', user.uid),
-                where('createdAt', '>=', enrollment.enrolledAt)
+                where('userId', '==', user.uid)
             );
             unsubscribe = onSnapshot(q, async (snapshot) => {
                 let totalEarnings = 0;
                 snapshot.forEach(doc => {
                     const tx = doc.data();
-                    if(tx.type === 'payout') totalEarnings += tx.amount;
-                    if(tx.type === 'wager') totalEarnings -= tx.amount;
+                    // Filter by date on the client
+                    if (tx.createdAt.seconds >= enrollment.enrolledAt.seconds) {
+                        if(tx.type === 'payout') totalEarnings += tx.amount;
+                        if(tx.type === 'wager') totalEarnings -= tx.amount;
+                    }
                 });
                 
                 const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
