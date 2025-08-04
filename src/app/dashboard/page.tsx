@@ -153,6 +153,10 @@ const EventDisplayCard = ({ event }: { event: Event }) => {
                         <span className="text-muted-foreground flex items-center gap-2"><Handshake/> Fee</span>
                         <span className="font-bold text-red-400">LKR {event.enrollmentFee.toFixed(2)}</span>
                     </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground flex items-center gap-2"><Clock/> Time Left</span>
+                        <div className="font-bold"><EventCountdown event={event} /></div>
+                    </div>
                 </div>
             </CardContent>
             <CardFooter>
@@ -321,4 +325,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
