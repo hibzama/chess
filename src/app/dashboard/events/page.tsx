@@ -141,7 +141,7 @@ const EventCard = ({ event, enrollment, onAction, isProcessing }: { event: Event
                     </div>
                     <div className="text-right">
                         <p className="font-semibold">Reward: LKR {event.rewardAmount.toFixed(2)}</p>
-                        <p className="text-muted-foreground">~{(event.rewardAmount / USDT_RATE).toFixed(2)} USDT</p>
+                        <p className="text-xs text-muted-foreground">~{(event.rewardAmount / USDT_RATE).toFixed(2)} USDT</p>
                         <p className="text-muted-foreground">Fee: LKR {event.enrollmentFee.toFixed(2)}</p>
                     </div>
                 </div>
