@@ -7,7 +7,7 @@ import { collection, onSnapshot, doc, setDoc, getDoc, writeBatch, serverTimestam
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, CheckCircle, Loader2, Trophy, Clock, History, AlertCircle } from 'lucide-react';
+import { Calendar, CheckCircle, Loader2, Trophy, Clock, History, AlertCircle, DollarSign } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -70,7 +70,7 @@ const EventCard = ({ event, enrollment, onAction, isProcessing }: { event: Event
             }
 
             const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((distance % (1000 * 60)) / 1000);
             
@@ -134,27 +134,27 @@ const EventCard = ({ event, enrollment, onAction, isProcessing }: { event: Event
                 <CardDescription>{event.description}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 flex-1">
-                <div className="flex justify-between text-sm p-3 bg-muted rounded-md">
+                 <div className="flex justify-between text-sm p-4 bg-muted rounded-md">
                     <div>
-                        <p className="font-semibold">Target: {getTargetDescription()}</p>
-                        <p className="text-muted-foreground">in {event.durationHours} hours</p>
+                        <p className="font-semibold text-base">Target: {getTargetDescription()}</p>
+                        <p className="text-muted-foreground text-xs">in {event.durationHours} hours</p>
                     </div>
                     <div className="text-right">
-                        <p className="font-semibold">Reward: LKR {event.rewardAmount.toFixed(2)}</p>
+                        <p className="font-semibold text-base">Reward: LKR {event.rewardAmount.toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">~{(event.rewardAmount / USDT_RATE).toFixed(2)} USDT</p>
-                        <p className="text-muted-foreground">Fee: LKR {event.enrollmentFee.toFixed(2)}</p>
+                        <p className="text-muted-foreground text-xs">Fee: LKR {event.enrollmentFee.toFixed(2)}</p>
                     </div>
                 </div>
 
                 {enrollment && enrollment.status === 'enrolled' && !isExpired && (
                      <div className="text-center p-3 rounded-lg bg-primary/10">
                         <p className="text-sm text-primary font-semibold flex items-center justify-center gap-2"><Clock/> Time Remaining</p>
-                        <p className="text-2xl font-bold text-primary">{countdown}</p>
+                        <p className="text-3xl font-bold text-primary">{countdown}</p>
                     </div>
                 )}
                 
                 {enrollment && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 pt-4">
                         <Label>Your Progress</Label>
                         <Progress value={progressPercentage} />
                         <p className="text-xs text-muted-foreground text-right">{getProgressText()}</p>
@@ -178,9 +178,9 @@ export default function EventsPage() {
 
     useEffect(() => {
         // Fetch all events (active or not, we will filter later)
-        const eventsUnsub = onSnapshot(collection(db, 'events'), (snapshot) => {
+        const eventsUnsub = onSnapshot(query(collection(db, 'events'), orderBy('createdAt', 'desc')), (snapshot) => {
             const eventsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Event));
-            setAllEvents(eventsData.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+            setAllEvents(eventsData);
             setLoading(false);
         });
 
