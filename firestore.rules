@@ -61,7 +61,6 @@ service cloud.firestore {
         isAdmin() ||
         (isSignedIn() && ('balance' in incomingDoc()));
 
-      // Rule for event enrollments sub-collection
       match /event_enrollments/{enrollmentId} {
         allow read, write: if isOwner(userId);
       }
@@ -141,6 +140,10 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+
+    match /{path=**}/event_enrollments/{enrollmentId} {
+      allow read, list: if isAdmin();
     }
   }
 }
