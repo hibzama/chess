@@ -2,16 +2,20 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, doc, setDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, serverTimestamp, deleteDoc, query, where, getDocs, collectionGroup } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, PlusCircle, Trash2 } from 'lucide-react';
+import { Calendar, PlusCircle, Trash2, Users, Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { format } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
+import Link from 'next/link';
 
 export interface Event {
     id: string;
@@ -26,6 +30,19 @@ export interface Event {
     isActive: boolean;
     createdAt?: any;
 }
+
+interface Enrollment {
+    id: string; // eventId
+    userId: string;
+    status: 'enrolled' | 'completed' | 'claimed';
+    progress: number;
+    enrolledAt: any;
+    user?: {
+        firstName: string;
+        lastName: string;
+    };
+}
+
 
 const USDT_RATE = 310;
 
@@ -71,10 +88,35 @@ export default function ManageEventsPage() {
 
     const EventForm = ({ event, onSave, onDelete }: { event: Partial<Event>, onSave: (e: Partial<Event>) => void, onDelete?: (id: string) => void }) => {
         const [localEvent, setLocalEvent] = useState(event);
+        const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+        const [loadingEnrollments, setLoadingEnrollments] = useState(true);
 
         useEffect(() => {
             setLocalEvent(event);
         }, [event]);
+
+        useEffect(() => {
+            if (!localEvent.id) {
+                setLoadingEnrollments(false);
+                return;
+            };
+
+            const enrollmentsQuery = query(collectionGroup(db, 'event_enrollments'), where('id', '==', localEvent.id));
+            const unsubscribe = onSnapshot(enrollmentsQuery, async (snapshot) => {
+                const enrollmentsDataPromises = snapshot.docs.map(async (enrollmentDoc) => {
+                    const data = enrollmentDoc.data() as Enrollment;
+                    const userDoc = await getDoc(doc(db, 'users', data.userId));
+                    if (userDoc.exists()) {
+                        data.user = { firstName: userDoc.data().firstName, lastName: userDoc.data().lastName };
+                    }
+                    return data;
+                });
+                const enrollmentsData = await Promise.all(enrollmentsDataPromises);
+                setEnrollments(enrollmentsData);
+                setLoadingEnrollments(false);
+            });
+            return () => unsubscribe();
+        }, [localEvent.id]);
 
         const handleChange = (field: keyof Event, value: any) => {
             const isNumeric = ['enrollmentFee', 'targetAmount', 'rewardAmount', 'durationHours', 'minWager'].includes(field);
@@ -140,6 +182,51 @@ export default function ManageEventsPage() {
                         </div>
                     </div>
                 </CardContent>
+                {localEvent.id && (
+                    <CardContent>
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-2"><Users/> Enrolled Players ({enrollments.length})</h3>
+                        {loadingEnrollments ? <Skeleton className="h-24 w-full" /> : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Player</TableHead>
+                                        <TableHead>Enrolled At</TableHead>
+                                        <TableHead>Progress</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {enrollments.length > 0 ? enrollments.map(enr => {
+                                        const progressPercentage = localEvent.targetAmount ? Math.min(100, (enr.progress / (localEvent.targetAmount || 1)) * 100) : 0;
+                                        return (
+                                            <TableRow key={enr.userId}>
+                                                <TableCell>
+                                                    <Link href={`/admin/users/${enr.userId}`} className="text-primary hover:underline">
+                                                        {enr.user?.firstName} {enr.user?.lastName}
+                                                    </Link>
+                                                </TableCell>
+                                                <TableCell>{format(enr.enrolledAt.toDate(), 'PPp')}</TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Progress value={progressPercentage} className="w-24"/>
+                                                        <span className="text-xs text-muted-foreground">{progressPercentage.toFixed(0)}%</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                     <Badge variant={enr.status === 'completed' || enr.status === 'claimed' ? 'default' : 'secondary'}>{enr.status}</Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    }) : (
+                                         <TableRow>
+                                            <TableCell colSpan={4} className="text-center">No players have enrolled in this event yet.</TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </CardContent>
+                )}
                 <CardFooter className="flex justify-between">
                     <Button onClick={() => onSave(localEvent)}>Save</Button>
                     {onDelete && localEvent.id && <Button variant="destructive" onClick={() => onDelete(localEvent.id!)}><Trash2/></Button>}
