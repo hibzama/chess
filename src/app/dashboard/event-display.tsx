@@ -1,7 +1,7 @@
 
 
 'use client'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -24,7 +24,7 @@ export default function EventDisplay({ event }: EventDisplayProps) {
   }
 
   return (
-    <Card className="h-full border-primary/50 bg-primary/10">
+    <Card className="h-full border-primary/50 bg-primary/10 flex flex-col">
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Calendar className="w-6 h-6 text-primary" />
@@ -32,11 +32,11 @@ export default function EventDisplay({ event }: EventDisplayProps) {
         </CardTitle>
         <CardDescription>{event.description}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardFooter className="mt-auto">
         <Button asChild className="w-full">
           <Link href="/dashboard/events">View Event Details <ArrowRight className="ml-2" /></Link>
         </Button>
-      </CardContent>
+      </CardFooter>
     </Card>
   );
 }
