@@ -3,78 +3,75 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is an admin
     function isAdmin() {
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     match /users/{userId} {
-      // Allow users to read their own document
       allow read: if request.auth.uid == userId || isAdmin();
-      // Allow users to update their own document, but not change their role or balance
-      allow update: if request.auth.uid == userId && !('role' in request.resource.data) && !('balance' in request.resource.data);
-      // Allow anyone to create a user (for registration)
+      allow write: if request.auth.uid == userId;
       allow create: if request.auth != null;
-      // Allow admins to perform any action
+
+      // Allow admins to read all event enrollments
+      match /event_enrollments/{enrollmentId} {
+        allow read, write: if request.auth.uid == userId || isAdmin();
+      }
+    }
+    
+    // Allow admins to read all event enrollments for the admin panel
+    match /{path=**}/event_enrollments/{enrollmentId} {
+      allow read: if isAdmin();
+    }
+
+    match /events/{eventId} {
+      allow read: if request.auth != null;
       allow write: if isAdmin();
-    }
-    
-    match /users/{userId}/event_enrollments/{eventId} {
-        allow read, write: if request.auth.uid == userId;
-    }
-
-    match /transactions/{transactionId} {
-      allow read, create: if request.auth.uid == get(request.resource.data.userId).id || isAdmin();
-      allow update: if isAdmin();
-    }
-    
-    match /marketing_applications/{applicationId} {
-      allow create: if request.auth == null || request.auth != null; // Allow anyone to apply
-      allow read, update: if isAdmin();
-    }
-    
-    match /game_rooms/{roomId} {
-        allow read: if true;
-        allow create: if request.auth.uid == request.resource.data.createdBy.uid;
-        
-        // Allow player who created the room to delete it if it's still waiting
-        allow delete: if resource.data.status == 'waiting' && request.auth.uid == resource.data.createdBy.uid;
-
-        // Allow updates by either player in the game
-        allow update: if request.auth.uid in resource.data.players;
-    }
-    
-     match /game_rooms/{roomId}/messages/{messageId} {
-      allow read, write: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-    }
-    
-    match /chats/{chatId} {
-        allow read, update: if request.auth.uid in resource.data.users;
-    }
-    
-    match /chats/{chatId}/messages/{messageId} {
-       allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-    }
-    
-    match /notifications/{notificationId} {
-        allow read, write, create: if request.auth.uid == resource.data.userId || request.auth.uid == request.resource.data.userId;
     }
 
     match /settings/{settingId} {
-        allow read: if true;
+        allow read: if request.auth != null;
         allow write: if isAdmin();
     }
     
-    match /events/{eventId} {
-        allow read: if true;
-        allow write: if isAdmin();
+    match /transactions/{transactionId} {
+        allow read: if request.auth.uid == resource.data.userId || isAdmin();
+        allow create: if request.auth != null;
+        allow update: if isAdmin();
+    }
+    
+    match /marketing_applications/{applicationId} {
+        allow read: if isAdmin();
+        allow create: if request.auth == null;
+        allow update: if isAdmin();
     }
 
-    // This is the new rule that fixes the error.
-    // It allows admins to read from the event_enrollments subcollection across all users.
-    match /{path=**}/event_enrollments/{enrollmentId} {
-      allow read: if isAdmin();
+    match /chats/{chatId} {
+        allow read, write: if request.auth.uid in resource.data.users;
+        
+        match /messages/{messageId} {
+            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
+    }
+    
+    match /notifications/{notificationId} {
+        allow read, update: if request.auth.uid == resource.data.userId;
+        allow create: if request.auth != null;
+    }
+
+    match /game_rooms/{roomId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        
+        allow update: if request.auth.uid in resource.data.players && 
+                        (request.resource.data.status == 'in-progress' || 
+                         (resource.data.status == 'in-progress' && request.resource.data.status == 'completed'));
+
+        allow delete: if request.auth.uid == resource.data.createdBy.uid;
+
+        match /messages/{messageId} {
+            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+        }
     }
   }
 }
