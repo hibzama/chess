@@ -13,7 +13,7 @@ import { Calendar as CalendarIcon, Gift, Users, DollarSign, Clock, Wallet, Perce
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 
 export interface DailyBonus {
@@ -49,8 +49,7 @@ export default function DailyBonusPage() {
             const bonusRef = doc(db, 'settings', 'dailyBonus');
             const bonusSnap = await getDoc(bonusRef);
             if (bonusSnap.exists()) {
-                const data = bonusSnap.data() as DailyBonus;
-                setBonus(data);
+                setBonus(bonusSnap.data() as DailyBonus);
             }
             setLoading(false);
         };
@@ -87,9 +86,26 @@ export default function DailyBonusPage() {
         setBonus(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
     };
 
+    const handleTimeChange = (type: 'hour' | 'minute', value: string) => {
+        const numValue = parseInt(value, 10);
+        if (isNaN(numValue)) return;
+        
+        const currentDate = bonus.startTime ? bonus.startTime.toDate() : new Date();
+        let newDate;
+        if (type === 'hour') {
+            newDate = setHours(currentDate, numValue);
+        } else {
+            newDate = setMinutes(currentDate, numValue);
+        }
+        setBonus(prev => ({ ...prev, startTime: Timestamp.fromDate(newDate) }));
+    };
+
     if (loading) {
         return <Skeleton className="w-full h-96" />
     }
+
+    const startHour = bonus.startTime ? bonus.startTime.toDate().getHours() : 0;
+    const startMinute = bonus.startTime ? bonus.startTime.toDate().getMinutes() : 0;
 
     return (
         <Card>
@@ -120,8 +136,8 @@ export default function DailyBonusPage() {
                         <Label htmlFor="maxUsers" className="flex items-center gap-2"><Users/> Max Users</Label>
                         <Input id="maxUsers" type="number" value={bonus.maxUsers || 0} onChange={(e) => handleChange('maxUsers', e.target.value)} />
                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="startTime" className="flex items-center gap-2"><CalendarIcon /> Start Time</Label>
+                    <div className="space-y-2">
+                        <Label htmlFor="startTime" className="flex items-center gap-2"><CalendarIcon /> Start Date</Label>
                          <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className="w-full justify-start text-left font-normal">
@@ -132,6 +148,14 @@ export default function DailyBonusPage() {
                                 <Calendar mode="single" selected={bonus.startTime?.toDate()} onSelect={(date) => date && handleChange('startTime', Timestamp.fromDate(date))} initialFocus />
                             </PopoverContent>
                          </Popover>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Start Time (24h format)</Label>
+                        <div className="flex items-center gap-2">
+                            <Input type="number" placeholder="Hour" min="0" max="23" value={startHour} onChange={(e) => handleTimeChange('hour', e.target.value)}/>
+                            <span>:</span>
+                            <Input type="number" placeholder="Minute" min="0" max="59" value={startMinute} onChange={(e) => handleTimeChange('minute', e.target.value)}/>
+                        </div>
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="durationHours" className="flex items-center gap-2"><Clock/> Bonus Duration (in hours)</Label>
