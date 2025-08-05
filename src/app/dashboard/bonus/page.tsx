@@ -241,9 +241,9 @@ export default function DailyBonusClaimPage() {
                             <TableBody>
                                 {claimedHistory.length > 0 ? claimedHistory.map(h => (
                                     <TableRow key={h.id}>
-                                        <TableCell>{format(h.claimedAt.toDate(), 'PPp')}</TableCell>
+                                        <TableCell>{h.claimedAt ? format(h.claimedAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                                         <TableCell>{h.title}</TableCell>
-                                        <TableCell className="text-green-400 font-semibold">LKR {h.amount.toFixed(2)}</TableCell>
+                                        <TableCell className="text-green-400 font-semibold">LKR {(h.amount || 0).toFixed(2)}</TableCell>
                                     </TableRow>
                                 )) : <TableRow><TableCell colSpan={3} className="text-center h-24">You haven't claimed any bonuses yet.</TableCell></TableRow>}
                             </TableBody>
