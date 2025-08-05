@@ -1,3 +1,4 @@
+
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -132,7 +133,10 @@ export default function AdminLayout({
                              <Link href="/admin/marketing/withdrawals/history"><SidebarMenuButton tooltip="Marketing Withdrawals History" isActive={isActive('/admin/marketing/withdrawals/history')}><History /><span>M. Withdraw History</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
-                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Deposit Bonus Config" isActive={isActive('/admin/bonus') && !pathname.includes('pending')}><Gift /><span>Bonus Config</span></SidebarMenuButton></Link>
+                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Deposit Bonus Config" isActive={isActive('/admin/bonus')}><Gift /><span>Deposit Bonus</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                         <SidebarMenuItem>
+                             <Link href="/admin/daily-bonus"><SidebarMenuButton tooltip="Daily Bonus Config" isActive={isActive('/admin/daily-bonus')}><Gift /><span>Daily Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>
@@ -161,5 +165,3 @@ export default function AdminLayout({
         </SidebarProvider>
     )
   }
-
-    
