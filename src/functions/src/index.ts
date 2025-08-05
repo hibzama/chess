@@ -86,13 +86,21 @@ export const updateEventProgress = functions.firestore
   .onCreate(async (snap, context) => {
     const transaction = snap.data();
 
-    // Exit if not a payout transaction or no winner
-    if (transaction.type !== 'payout' || !transaction.userId) {
+    // Exit if not a payout transaction
+    if (transaction.type !== 'payout') {
       return null;
     }
 
-    const winnerId = transaction.userId;
-    const wagerAmount = transaction.gameWager || 0; // Assuming wager is stored in the transaction
+    const winnerId = transaction.winnerId;
+    const resignerId = transaction.resignerId;
+
+    // Exit if there is no winner or if the winner is the one who resigned
+    if (!winnerId || winnerId === resignerId) {
+      functions.logger.log(`Exiting event progress update for tx ${context.params.transactionId}: No valid winner or winner was resigner.`);
+      return null;
+    }
+    
+    const wagerAmount = transaction.gameWager || 0; 
     const netEarning = transaction.amount - wagerAmount;
 
     // Get all active events

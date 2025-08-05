@@ -1,3 +1,4 @@
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -167,34 +168,21 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         if (!roomId || !user) return { myPayout: 0 };
     
         try {
-            // First, fetch active events outside the transaction
-            const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true));
-            const activeEventsSnapshot = await getDocs(eventsQuery);
-            const activeEvents = activeEventsSnapshot.docs.map(doc => ({...doc.data(), id: doc.id} as any));
-
             const payoutResult = await runTransaction(db, async (transaction) => {
                  // --- PHASE 1: READS ---
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomDoc = await transaction.get(roomRef);
     
-                if (!roomDoc.exists() || !roomDoc.data()?.player2) throw "Room not found or not ready";
-                if (roomDoc.data().payoutTransactionId) throw "Payout already processed";
+                if (!roomDoc.exists() || !roomDoc.data()?.player2) throw new Error("Room not found or not ready");
+                if (roomDoc.data().payoutTransactionId) throw new Error("Payout already processed");
 
                 const roomData = roomDoc.data() as GameRoom;
                 const { method, resignerDetails } = winnerDetails;
                 let { winnerId } = winnerDetails;
                 
-                // If this was a resignation, the winner is the other player
                 if (resignerDetails) {
                     winnerId = roomData.players.find(p => p !== resignerDetails.id) || null;
                 }
-
-                // Get winner's event enrollments
-                const enrollmentRefs = winnerId && winnerId !== 'draw'
-                    ? activeEvents.map(event => doc(db, `users/${winnerId}/event_enrollments/${event.id}`))
-                    : [];
-                const enrollmentDocs = enrollmentRefs.length > 0 ? await Promise.all(enrollmentRefs.map(ref => transaction.get(ref))) : [];
-                const enrollments = enrollmentDocs.map(doc => doc.exists() ? doc.data() : null);
 
                 // --- PHASE 2: CALCULATIONS & WRITES ---
                 const wager = roomData.wager;
@@ -237,36 +225,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const reason = method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture');
                     creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
+                    winnerObject.uid = winnerId;
                 }
                 
-                if (winnerId && winnerId !== 'draw') {
-                    transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
-                    winnerObject.uid = winnerId;
-
-                    // Update event progress for the winner
-                    const netEarning = (winnerId === roomData.createdBy.uid ? creatorPayout : joinerPayout) - wager;
-                    enrollments.forEach((enrollment, index) => {
-                        const event = activeEvents[index];
-                        if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
-                            let progressIncrement = 0;
-                            if (event.targetType === 'winningMatches' && (!event.minWager || wager >= event.minWager)) {
-                                progressIncrement = 1;
-                            } else if (event.targetType === 'totalEarnings' && netEarning > 0) {
-                                progressIncrement = netEarning;
-                            }
-
-                            if (progressIncrement > 0) {
-                                const newProgress = (enrollment.progress || 0) + progressIncrement;
-                                const updatePayload: { [key: string]: any } = { progress: increment(progressIncrement) };
-                                if (newProgress >= event.targetAmount) {
-                                    updatePayload.status = 'completed';
-                                }
-                                transaction.update(doc(db, 'users', winnerId, 'event_enrollments', event.id), updatePayload);
-                            }
-                        }
-                    });
-                }
-    
                 const now = serverTimestamp();
                 const payoutTxId = doc(collection(db, 'transactions')).id;
     
@@ -277,6 +238,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (joinerPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
                     transaction.set(doc(collection(db, 'transactions')), { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, winnerId: winnerId, resignerId: resignerDetails?.id || null });
+                }
+                
+                if (winnerId && winnerId !== 'draw') {
+                    transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
                 }
     
                 transaction.update(roomRef, { 
@@ -325,12 +290,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         if (isMultiplayer && roomId && user) {
             gameOverHandledRef.current = true;
             handlePayout({ winnerId, method, resignerDetails }).then(({ myPayout }) => {
-                let winnerIsMe = winnerId === user.uid;
-                if(resignerDetails) {
-                    winnerIsMe = winnerId !== resignerDetails.id && user.uid !== resignerDetails.id;
+                let finalWinnerId = winnerId;
+                if (resignerDetails) {
+                    finalWinnerId = room?.players.find(p => p !== resignerDetails.id) || null;
                 }
+
+                const winnerIsMe = finalWinnerId === user.uid;
+
                 updateAndSaveState({ gameOver: true,
-                    winner: winnerId === 'draw' ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
+                    winner: finalWinnerId === 'draw' ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
                     gameOverReason: method, payoutAmount: myPayout,
                 });
             });
@@ -339,7 +307,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const winner = winnerId === 'bot' ? 'p2' : (winnerId ? 'p1' : 'draw');
             updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method, boardState });
         }
-    }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout]);
+    }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout, room]);
 
     // Multiplayer state sync
     useEffect(() => {
