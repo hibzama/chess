@@ -45,9 +45,11 @@ export default function DailyBonusClaimPage() {
         }
 
         // Fetch active bonuses
-        const bonusesQuery = query(collection(db, 'bonuses'), where('isActive', '==', true), orderBy('startTime', 'desc'));
+        const bonusesQuery = query(collection(db, 'bonuses'), where('isActive', '==', true));
         const unsubBonuses = onSnapshot(bonusesQuery, (snapshot) => {
             const bonusesData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bonus));
+            // Sort on the client to avoid needing a composite index
+            bonusesData.sort((a, b) => b.startTime.seconds - a.startTime.seconds);
             setBonuses(bonusesData);
             setLoading(false);
         });
