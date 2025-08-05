@@ -189,3 +189,91 @@ export const processCommissions = functions.firestore
         return null;
     });
 
+// This function triggers whenever a payout transaction is created for a game winner.
+export const updateEventProgress = functions.firestore
+  .document('transactions/{transactionId}')
+  .onCreate(async (snap, context) => {
+    const transaction = snap.data();
+
+    // 1. Ensure this is a valid winning payout transaction.
+    if (transaction.type !== 'payout' || !transaction.winnerId) {
+      return null;
+    }
+
+    // 2. Ensure the winner did not resign.
+    if (transaction.resignerId && transaction.winnerId === transaction.resignerId) {
+        functions.logger.log(`Exiting event progress: Winner ${transaction.winnerId} was the resigner.`);
+        return null;
+    }
+
+    const winnerId = transaction.winnerId;
+    const wagerAmount = transaction.gameWager || 0;
+    // 3. Correctly calculate net earning.
+    const netEarning = transaction.amount - wagerAmount;
+
+    // Get all active events.
+    const eventsRef = admin.firestore().collection('events');
+    const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
+
+    if (activeEventsSnapshot.empty) {
+      return null;
+    }
+
+    const batch = admin.firestore().batch();
+    let hasUpdates = false;
+
+    // Iterate through each active event.
+    for (const eventDoc of activeEventsSnapshot.docs) {
+      const event = eventDoc.data();
+      const enrollmentRef = admin.firestore().collection('users').doc(winnerId).collection('event_enrollments').doc(event.id);
+      
+      const enrollmentSnap = await enrollmentRef.get();
+      
+      // Check if user is enrolled in this event and the event is not expired/completed.
+      if (enrollmentSnap.exists) {
+          const enrollment = enrollmentSnap.data();
+          if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
+              let progressIncrement = 0;
+              
+              // 4. Update progress based on event type.
+              if (event.targetType === 'winningMatches') {
+                  // A win is a win, as long as they are the winnerId and not the resigner
+                  if (!event.minWager || wagerAmount >= event.minWager) {
+                      progressIncrement = 1;
+                  }
+              } else if (event.targetType === 'totalEarnings') {
+                  // Only count positive net earnings towards progress.
+                  if (netEarning > 0) { 
+                      progressIncrement = netEarning;
+                  }
+              }
+
+              if (progressIncrement > 0) {
+                  hasUpdates = true;
+                  const newProgress = (enrollment.progress || 0) + progressIncrement;
+                  const updatePayload: { [key: string]: any } = { 
+                      progress: admin.firestore.FieldValue.increment(progressIncrement) 
+                  };
+
+                  // If the new progress meets or exceeds the target, mark as completed.
+                  if (newProgress >= event.targetAmount) {
+                      updatePayload.status = 'completed';
+                  }
+                  batch.update(enrollmentRef, updatePayload);
+              }
+          }
+      }
+    }
+
+    // 5. Commit the batch if there are any updates.
+    if (hasUpdates) {
+      try {
+        await batch.commit();
+        functions.logger.log(`Successfully updated event progress for user ${winnerId}.`);
+      } catch (error) {
+        functions.logger.error(`Error committing event progress for user ${winnerId}:`, error);
+      }
+    }
+
+    return null;
+  });
