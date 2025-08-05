@@ -12,6 +12,7 @@ import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp } 
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import BonusDisplay from './bonus-display';
+import DailyBonusDisplay from './daily-bonus-display';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 
@@ -23,15 +24,12 @@ export default function DashboardPage() {
         totalEarning: 0,
     });
     const [statsLoading, setStatsLoading] = useState(true);
-    const [isBonusActive, setIsBonusActive] = useState(false);
-    const [promotionsLoading, setPromotionsLoading] = useState(true);
 
     const USDT_RATE = 310;
 
     useEffect(() => {
         if (user) {
             setStatsLoading(true);
-            setPromotionsLoading(true);
 
             const fetchStats = async () => {
                 const q = query(collection(db, "transactions"), where("userId", "==", user.uid));
@@ -49,17 +47,6 @@ export default function DashboardPage() {
             };
             fetchStats();
             
-            const bonusRef = doc(db, 'settings', 'depositBonus');
-            const bonusUnsub = onSnapshot(bonusRef, (docSnap) => {
-                const bonusData = docSnap.data();
-                const isActive = bonusData?.isActive && bonusData?.startTime && (bonusData.startTime.toDate().getTime() + (bonusData.durationHours * 3600 * 1000)) > new Date().getTime();
-                setIsBonusActive(isActive);
-                setPromotionsLoading(false);
-            });
-            
-            return () => {
-                bonusUnsub();
-            };
         }
     }, [user]);
 
@@ -109,13 +96,10 @@ export default function DashboardPage() {
         </p>
       </div>
       
-       {promotionsLoading ? <Skeleton className="h-48 w-full rounded-lg" /> : (
-            isBonusActive && (
-                <div className="grid grid-cols-1">
-                    <BonusDisplay />
-                </div>
-            )
-       )}
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <BonusDisplay />
+            <DailyBonusDisplay />
+       </div>
 
       <div className="grid gap-6">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -59,7 +59,6 @@ export default function DailyBonusClaimPage() {
         const unsubClaimed = onSnapshot(claimedQuery, (snapshot) => {
             const claimedIds = snapshot.docs.map(doc => doc.id);
             const history = snapshot.docs.map(doc => ({...doc.data(), id: doc.id}));
-            setClaimedBonuses(claimedIds);
             setClaimedHistory(history.sort((a,b) => b.claimedAt.seconds - a.claimedAt.seconds));
         });
         
@@ -218,10 +217,15 @@ export default function DailyBonusClaimPage() {
                 <TabsTrigger value="history">Claim History</TabsTrigger>
             </TabsList>
             <TabsContent value="available">
-                 <div className="space-y-6 mt-4">
-                    {loading ? <Skeleton className="h-96 w-full" /> : 
+                 <div className="grid md:grid-cols-2 gap-6 mt-4">
+                    {loading ? (
+                        <>
+                            <Skeleton className="h-96 w-full" />
+                            <Skeleton className="h-96 w-full" />
+                        </>
+                    ) : 
                      bonuses.length > 0 ? bonuses.map(b => <BonusCard key={b.id} bonus={b} />) : (
-                         <div className="flex flex-col items-center justify-center text-center gap-4 py-12">
+                         <div className="md:col-span-2 flex flex-col items-center justify-center text-center gap-4 py-12">
                             <Gift className="w-16 h-16 text-muted-foreground" />
                             <h2 className="text-2xl font-bold">No Active Daily Bonuses</h2>
                             <p className="text-muted-foreground">Check back later for new promotions!</p>
