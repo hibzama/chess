@@ -1,5 +1,4 @@
 
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -89,7 +88,6 @@ export const processCommissions = functions.firestore
         const txnId = context.params.transactionId;
 
         // 1. Commission logic should only run for winning payouts, not draws.
-        // It SHOULD run on resignations, as that still results in a win/loss payout.
         if (transaction.type !== 'payout' || !transaction.winnerId) {
             functions.logger.log(`Txn ${txnId}: Not a commissionable payout. Type: ${transaction.type}, Winner: ${!!transaction.winnerId}`);
             return null;
@@ -302,4 +300,3 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
-

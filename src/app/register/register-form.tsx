@@ -1,5 +1,4 @@
 
-
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -86,9 +85,6 @@ export default function RegisterForm() {
 
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
-            
-            // Send verification email
-            await sendEmailVerification(user);
 
             const usersCollection = collection(db, "users");
             const snapshot = await getCountFromServer(usersCollection);
@@ -102,7 +98,7 @@ export default function RegisterForm() {
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
             const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
             const svgString = renderToString(React.createElement(randomAvatar));
-            const defaultAvatarUri = `data:image/svg+xml;base64,${'btoa' in window ? window.btoa(svgString) : svgString}`;
+            const defaultAvatarUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
             
             const userData: any = {
                 uid: user.uid,
@@ -123,43 +119,40 @@ export default function RegisterForm() {
                 l1Count: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
-                emailVerified: false, 
-                friends: [],
-                wins: 0,
-                referralChain: [], // Initialize empty chain
+                emailVerified: true, 
             };
-            
-            const referrerId = mref || ref;
-            if (referrerId) {
-                const referrerDoc = await getDoc(doc(db, 'users', referrerId));
+
+            const directReferrerId = mref || ref;
+            if (directReferrerId) {
+                const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    userData.referredBy = referrerId; // Always set the direct referrer
+                    userData.referredBy = directReferrerId; // Always set the direct referrer
 
-                    if(referrerData.role === 'marketer'){
-                        // If direct referrer is a marketer, start the chain with them.
-                        userData.referralChain = [referrerId];
-                    } else if (referrerData.referralChain && referrerData.referralChain.length > 0) {
-                        // If direct referrer is a regular user but part of a chain, inherit and append.
-                        userData.referralChain = [...referrerData.referralChain, referrerId];
+                    // If the referrer has a chain, it means they are part of a marketer's downline.
+                    // The new user should inherit this chain and add the direct referrer to it.
+                    if (referrerData.referralChain) {
+                        userData.referralChain = [...referrerData.referralChain, directReferrerId];
+                    } 
+                    // If the referrer is a marketer themselves (and thus the start of a chain)
+                    else if (referrerData.role === 'marketer') {
+                        userData.referralChain = [directReferrerId];
                     }
 
                     // Increment the direct referrer's L1 count if they are a regular user
                     if (referrerData.role === 'user') {
-                        await updateDoc(doc(db, 'users', referrerId), { l1Count: increment(1) });
+                        await updateDoc(doc(db, 'users', directReferrerId), { l1Count: increment(1) });
                     }
                 }
             }
-
 
             await setDoc(doc(db, "users", user.uid), userData);
             
             toast({
                 title: "Account Created!",
-                description: "A verification email has been sent. Please verify your email before logging in.",
+                description: "Welcome to Nexbattle.",
             });
-            await auth.signOut();
-            router.push(`/verify-email?email=${email}`);
+            router.push('/dashboard');
 
         } catch (error: any) {
             console.error("Error signing up:", error);
