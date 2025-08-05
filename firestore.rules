@@ -24,12 +24,10 @@ service cloud.firestore {
       return request.resource.data;
     }
     
-    // Checks if the user is an admin by looking at their user document.
     function isAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Checks if the user is a participant in a chat.
     function isChatParticipant(chatId) {
         return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
     }
@@ -39,15 +37,8 @@ service cloud.firestore {
     // =================================
 
     match /users/{userId} {
-      // Any signed-in user can read another user's profile (for leaderboards, friend searches, etc.).
-      // NOTE: This allows GET, not LIST.
       allow read: if isSignedIn();
-
-      // A user can only create their own user document.
       allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
-
-      // This complex rule allows a user to update their own profile (but not critical fields),
-      // and allows other system processes like friend requests and game transactions to update user documents.
       allow update: if 
         (isOwner(userId) && !(
             'balance' in incomingDoc() && incomingDoc().balance != resource.data.balance
@@ -59,13 +50,13 @@ service cloud.firestore {
         ) ||
         (isSignedIn() && exists(/databases/$(database)/documents/friend_requests/$(request.resource.data.requestId))) ||
         (isSignedIn() && !(userId in incomingDoc().friends) && (userId in resource.data.friends)) ||
-        // Allow admins to update any user document (for balance changes, role changes, etc.)
         isAdmin() ||
         (isSignedIn() && ('balance' in incomingDoc()));
-        
-      match /daily_bonus_claims/{bonusId} {
-        allow read, create: if isOwner(userId);
-      }
+
+        // Allow users to create their own bonus claim documents
+        match /daily_bonus_claims/{claimId} {
+            allow read, create: if isOwner(userId);
+        }
     }
     
     match /friend_requests/{requestId} {
@@ -75,12 +66,9 @@ service cloud.firestore {
     }
     
     match /game_rooms/{roomId} {
-      // Any signed-in user can list public games, and admins can read any game room's details.
       allow list, read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
       allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
-
-      // This complex rule allows various game state updates: joining, playing moves, and completing the game.
       allow update: if isSignedIn() && 
         (
           !isOwner(resource.data.createdBy.uid) &&
@@ -103,10 +91,8 @@ service cloud.firestore {
     }
     
     match /transactions/{transactionId} {
-      // Admins can read/list any transaction. Users can only see their own.
       allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
       allow create: if isSignedIn();
-      // Only admins can approve/reject transactions (update status).
       allow update: if isAdmin();
     }
     
@@ -125,11 +111,9 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-        // A user can only access chats they are a part of. The chat ID is a composite of two user IDs.
         allow read, write, list: if isSignedIn() && request.auth.uid in chatId.split('_');
 
         match /messages/{messageId} {
-            // A user can only read/write messages in a chat they are a part of.
             allow read, create: if isSignedIn() && request.auth.uid in chatId.split('_');
         }
     }
@@ -138,13 +122,20 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-
-    match /dailyBonusClaims/{bonusId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin();
-      // Allow user to write only within a transaction
-      allow update: if request.auth != null;
+    
+    // New rules for bonus system
+    match /bonuses/{bonusId} {
+        allow read, list: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+    }
+    
+    match /dailyBonusClaims/{claimId} {
+        // Users can read to see claim counts
+        allow read: if isSignedIn();
+        // Claiming is done via a transaction which is secure, so direct writes aren't needed here.
+        // Update is allowed for the transaction to increment the count.
+        allow update: if isSignedIn();
+        allow create: if isAdmin();
     }
   }
 }
-    
