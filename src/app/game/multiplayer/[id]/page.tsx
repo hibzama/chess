@@ -159,14 +159,22 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
+        const userRef = doc(db, 'users', user.uid);
     
         try {
-            await deleteDoc(roomRef);
+            const batch = writeBatch(db);
+            // Refund the wager to the creator
+            if (room.wager > 0) {
+                batch.update(userRef, { balance: increment(room.wager) });
+            }
+            // Delete the room
+            batch.delete(roomRef);
+            await batch.commit();
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -213,6 +221,7 @@ function MultiplayerGame() {
     
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
+        const gameName = room.gameType.charAt(0).toUpperCase() + room.gameType.slice(1);
 
         try {
             await runTransaction(db, async (transaction) => {
@@ -225,33 +234,31 @@ function MultiplayerGame() {
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
         
-                 // --- PRE-READ ALL NECESSARY DATA ---
-                const playerRefs = [creatorRef, joinerRef];
-                const playerDocReads = playerRefs.map(ref => transaction.get(ref));
-                const playerDocs = await Promise.all(playerDocReads);
+                const [creatorDoc, joinerDoc] = await Promise.all([transaction.get(creatorRef), transaction.get(joinerRef)]);
 
-                if (playerDocs.some(doc => !doc.exists())) {
-                    throw new Error("One of the players does not exist");
-                }
+                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("A player does not exist.");
                 
-                const [creatorDoc, joinerDoc] = playerDocs;
-                const playersData = [
-                    { id: creatorRef.id, name: roomData.createdBy.name, data: creatorDoc.data() },
-                    { id: joinerRef.id, name: `${userData.firstName} ${userData.lastName}`, data: joinerDoc.data() }
-                ];
+                const creatorData = creatorDoc.data();
+                const joinerData = joinerDoc.data();
 
-                if ((playersData[0].data?.balance || 0) < roomData.wager) {
-                    throw new Error("Creator has insufficient funds.");
+                if ((joinerData.balance || 0) < roomData.wager) {
+                    throw new Error("You have insufficient funds.");
                 }
 
-                // --- ALL READS ARE DONE. START WRITES. ---
-
+                // Deduct wager from the joiner
+                transaction.update(joinerRef, { balance: increment(-roomData.wager) });
+                const joinerTxRef = doc(collection(db, 'transactions'));
+                transaction.set(joinerTxRef, {
+                    userId: user.uid, type: 'wager', amount: roomData.wager, status: 'completed',
+                    description: `Wager for ${gameName} game`, gameRoomId: room.id, createdAt: serverTimestamp()
+                });
+                
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
                 transaction.update(roomRef, {
                     status: 'in-progress',
-                    player2: { uid: user.uid, name: playersData[1].name, color: joinerColor, photoURL: userData.photoURL || '' },
+                    player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
                     players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),

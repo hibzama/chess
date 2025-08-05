@@ -58,21 +58,16 @@ export default function CreateGamePage() {
         const batch = writeBatch(db);
 
         try {
-            // 1. Deduct wager from user's balance
             const userRef = doc(db, 'users', user.uid);
             if(wagerAmount > 0) {
-                batch.update(userRef, {
-                    balance: increment(-wagerAmount)
-                });
+                batch.update(userRef, { balance: increment(-wagerAmount) });
             }
 
-            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            // 2. Create the game room document
             const roomData = {
                 gameType,
                 wager: wagerAmount,
@@ -89,11 +84,10 @@ export default function CreateGamePage() {
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
-
+            
             const roomRef = doc(collection(db, 'game_rooms'));
             batch.set(roomRef, roomData);
             
-            // 3. Create a transaction log for the wager
             if(wagerAmount > 0) {
                 const transactionRef = doc(collection(db, 'transactions'));
                 batch.set(transactionRef, {
@@ -110,15 +104,12 @@ export default function CreateGamePage() {
             await batch.commit();
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
-
-            // 4. Navigate to the game room page
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your wager has been refunded.' });
             
-            // Revert balance deduction if room creation fails
              if (wagerAmount > 0) {
                  const userRef = doc(db, 'users', user.uid);
                  await updateDoc(userRef, { balance: increment(wagerAmount) });
@@ -218,4 +209,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-
