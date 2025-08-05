@@ -121,30 +121,36 @@ export default function RegisterForm() {
                 ipAddress: ipAddress,
                 emailVerified: true, 
             };
-
+            
             const directReferrerId = mref || ref;
+
             if (directReferrerId) {
                 const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    userData.referredBy = directReferrerId; // Always set the direct referrer
+                    userData.referredBy = directReferrerId;
 
-                    // If the referrer has a chain, it means they are part of a marketer's downline.
-                    // The new user should inherit this chain and add the direct referrer to it.
+                    const newReferralChain = [...(referrerData.referralChain || [])];
+                    if (referrerData.role === 'marketer' && !newReferralChain.includes(directReferrerId)) {
+                        newReferralChain.push(directReferrerId);
+                    } else if (referrerData.role === 'user') {
+                         if (referrerData.referredBy && !newReferralChain.includes(referrerData.referredBy)) {
+                           // This logic might need adjustment based on how deep user-chains should go
+                         }
+                    }
+
                     if (referrerData.referralChain) {
                         userData.referralChain = [...referrerData.referralChain, directReferrerId];
-                    } 
-                    // If the referrer is a marketer themselves (and thus the start of a chain)
-                    else if (referrerData.role === 'marketer') {
+                    } else if (referrerData.role === 'marketer') {
                         userData.referralChain = [directReferrerId];
                     }
 
-                    // Increment the direct referrer's L1 count if they are a regular user
                     if (referrerData.role === 'user') {
                         await updateDoc(doc(db, 'users', directReferrerId), { l1Count: increment(1) });
                     }
                 }
             }
+
 
             await setDoc(doc(db, "users", user.uid), userData);
             
