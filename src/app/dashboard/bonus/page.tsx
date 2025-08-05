@@ -2,10 +2,10 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp, updateDoc, arrayUnion, increment } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, updateDoc, arrayUnion, increment, runTransaction } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gift, Clock, Users, DollarSign, Ban, CheckCircle } from 'lucide-react';
+import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Percent } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
@@ -13,7 +13,9 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export interface DailyBonus {
     id: string;
+    bonusType: 'percentage' | 'fixed';
     amount: number;
+    percentage: number;
     maxUsers: number;
     targetAudience: 'all' | 'zero_balance';
     claimedBy: string[];
@@ -87,7 +89,7 @@ export default function DailyBonusClaimPage() {
                 return;
             }
             
-            if (!isAllPlayersEligible && !isZeroBalanceEligible) {
+            if (bonus.targetAudience === 'zero_balance' && !isZeroBalanceEligible) {
                 setBonusStatus('not_eligible');
                 setCountdown('Not eligible');
                 if (intervalRef.current) clearInterval(intervalRef.current);
@@ -112,7 +114,7 @@ export default function DailyBonusClaimPage() {
     }, [bonus, user, userData]);
 
     const handleClaimBonus = async () => {
-        if (!user || bonusStatus !== 'available' || !bonus) {
+        if (!user || !userData || bonusStatus !== 'available' || !bonus) {
             toast({ variant: 'destructive', title: 'Cannot Claim', description: 'This bonus is not available for you to claim.' });
             return;
         }
@@ -122,12 +124,29 @@ export default function DailyBonusClaimPage() {
         const userRef = doc(db, 'users', user.uid);
         
         try {
-            await updateDoc(bonusRef, { claimedBy: arrayUnion(user.uid) });
-            await updateDoc(userRef, { balance: increment(bonus.amount) });
-            toast({ title: 'Success!', description: `LKR ${bonus.amount.toFixed(2)} has been added to your wallet.` });
-        } catch (error) {
+            await runTransaction(db, async (transaction) => {
+                const bonusDoc = await transaction.get(bonusRef);
+                if (!bonusDoc.exists()) throw new Error("Bonus not found.");
+
+                const currentBonusData = bonusDoc.data() as DailyBonus;
+                if (currentBonusData.claimedBy.includes(user.uid)) throw new Error("Already claimed.");
+                if (currentBonusData.claimedBy.length >= currentBonusData.maxUsers) throw new Error("Bonus limit reached.");
+                
+                let bonusAmountToGive = 0;
+                if(currentBonusData.bonusType === 'fixed') {
+                    bonusAmountToGive = currentBonusData.amount;
+                } else { // percentage
+                    bonusAmountToGive = userData.balance * (currentBonusData.percentage / 100);
+                }
+
+                transaction.update(userRef, { balance: increment(bonusAmountToGive) });
+                transaction.update(bonusRef, { claimedBy: arrayUnion(user.uid) });
+
+                toast({ title: 'Success!', description: `LKR ${bonusAmountToGive.toFixed(2)} has been added to your wallet.` });
+            });
+        } catch (error: any) {
             console.error("Error claiming bonus: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not claim bonus. Please try again.' });
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not claim bonus. Please try again.' });
         } finally {
             setIsClaiming(false);
         }
@@ -148,6 +167,10 @@ export default function DailyBonusClaimPage() {
         )
     }
 
+    const bonusDisplayValue = bonus.bonusType === 'fixed' 
+        ? `LKR ${bonus.amount.toFixed(2)}`
+        : `${bonus.percentage}%`;
+
     return (
         <Card className="max-w-md mx-auto">
             <CardHeader className="text-center">
@@ -162,7 +185,8 @@ export default function DailyBonusClaimPage() {
             <CardContent className="space-y-6">
                 <div className="p-6 bg-secondary/50 rounded-lg text-center space-y-2">
                     <p className="text-sm text-muted-foreground">Bonus Amount</p>
-                    <p className="text-5xl font-bold text-primary">LKR {bonus.amount.toFixed(2)}</p>
+                    <p className="text-5xl font-bold text-primary">{bonusDisplayValue}</p>
+                    {bonus.bonusType === 'percentage' && <p className="text-xs text-muted-foreground">of your current wallet balance</p>}
                 </div>
                 
                  <div className="grid grid-cols-2 gap-4 text-center">
@@ -223,4 +247,3 @@ export default function DailyBonusClaimPage() {
         </Card>
     );
 }
-
