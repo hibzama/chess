@@ -54,19 +54,15 @@ service cloud.firestore {
             'marketingBalance' in incomingDoc() && incomingDoc().marketingBalance != resource.data.marketingBalance
           ) && !(
             'role' in incomingDoc() && incomingDoc().role != resource.data.role
-          ) && !(
-            'wins' in incomingDoc() && incomingDoc().wins != resource.data.wins
           )
         ) ||
         (isSignedIn() && exists(/databases/$(database)/documents/friend_requests/$(request.resource.data.requestId))) ||
         (isSignedIn() && !(userId in incomingDoc().friends) && (userId in resource.data.friends)) ||
         // Allow admins to update any user document (for balance changes, role changes, etc.)
         isAdmin() ||
-        (isSignedIn() && ('balance' in incomingDoc())) ||
-        (isSignedIn() && ('wins' in incomingDoc()));
-
-        // Event Enrollments sub-collection
-        match /event_enrollments/{enrollmentId} {
+        (isSignedIn() && ('balance' in incomingDoc()));
+        
+        match /daily_bonus_claims/{claimId} {
             allow read, write: if isOwner(userId);
         }
     }
@@ -141,16 +137,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-
-    match /events/{eventId} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin();
-    }
-
-    // Collection Group Rules
-    match /{path=**}/event_enrollments/{enrollmentId} {
-        // Admins can query across all event_enrollments subcollections
-        allow list, get: if isAdmin();
+    
+    // New rule for the bonus counter
+    match /dailyBonusClaims/{bonusId} {
+      // Any signed in user can read the count
+      allow read: if isSignedIn();
+      // Only an admin can initialize the counter, and any signed in user can increment it (via the transaction).
+      allow write: if isSignedIn();
     }
   }
 }

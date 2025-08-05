@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp, collection, getDocs, where, query } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, collection, getDocs, where, query, writeBatch } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,9 +57,20 @@ export default function DailyBonusPage() {
 
     const fetchClaimedUsers = async (bonusId: string) => {
         if (!bonusId) return;
-        const claimsQuery = query(collection(db, 'users'), where(`daily_bonus_claims.${bonusId}`, '==', true));
-        const claimsSnapshot = await getDocs(claimsQuery);
-        const users = claimsSnapshot.docs.map(doc => doc.data() as ClaimedUser);
+        
+        // This query might become slow with many users, but is fine for admin use.
+        // It queries the subcollection within each user doc.
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const userPromises = usersSnapshot.docs.map(async (userDoc) => {
+            const claimRef = doc(db, 'users', userDoc.id, 'daily_bonus_claims', bonusId);
+            const claimSnap = await getDoc(claimRef);
+            if (claimSnap.exists()) {
+                return { ...userDoc.data(), uid: userDoc.id } as ClaimedUser;
+            }
+            return null;
+        });
+
+        const users = (await Promise.all(userPromises)).filter(u => u !== null) as ClaimedUser[];
         setClaimedUsers(users);
     };
 
@@ -81,6 +92,7 @@ export default function DailyBonusPage() {
     const handleSave = async () => {
         setSaving(true);
         try {
+            const batch = writeBatch(db);
             const bonusRef = doc(db, 'settings', 'dailyBonus');
             
             const bonusPayload: any = {
@@ -88,8 +100,16 @@ export default function DailyBonusPage() {
                  updatedAt: serverTimestamp(),
                  createdAt: bonus.createdAt || serverTimestamp(),
             };
+            batch.set(bonusRef, bonusPayload, { merge: true });
 
-            await setDoc(bonusRef, bonusPayload, { merge: true });
+            // Initialize or update the counter document
+            const counterRef = doc(db, 'dailyBonusClaims', bonus.id!);
+            const counterSnap = await getDoc(counterRef);
+            if (!counterSnap.exists()) {
+                batch.set(counterRef, { count: 0 });
+            }
+
+            await batch.commit();
             
             toast({
                 title: 'Success!',

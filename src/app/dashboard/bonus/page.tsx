@@ -34,21 +34,37 @@ export default function DailyBonusClaimPage() {
     const [bonusStatus, setBonusStatus] = useState<'available' | 'claimed' | 'expired' | 'not_eligible' | 'not_started' | 'limit_reached'>('not_eligible');
     const [totalClaims, setTotalClaims] = useState(0);
 
+    // Listener for the global bonus settings
     useEffect(() => {
         const bonusRef = doc(db, 'settings', 'dailyBonus');
         const unsubscribe = onSnapshot(bonusRef, (docSnap) => {
             if (docSnap.exists() && docSnap.data().isActive) {
                 const bonusData = docSnap.data() as DailyBonus;
                 setBonus(bonusData);
-                // We'll check for user claim status dynamically
             } else {
                 setBonus(null);
+                setBonusStatus('not_eligible'); // No active bonus
             }
             setLoading(false);
         });
         return () => unsubscribe();
     }, []);
 
+    // Listener for the total claims count
+    useEffect(() => {
+        if (!bonus) return;
+        const counterRef = doc(db, 'dailyBonusClaims', bonus.id);
+        const unsubscribeCounter = onSnapshot(counterRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setTotalClaims(docSnap.data().count);
+            } else {
+                setTotalClaims(0);
+            }
+        });
+        return () => unsubscribeCounter();
+    }, [bonus]);
+
+    // Main effect to calculate countdown and eligibility
     useEffect(() => {
         if (intervalRef.current) clearInterval(intervalRef.current);
         if (!bonus || !user || !userData) {
@@ -62,7 +78,7 @@ export default function DailyBonusClaimPage() {
             return claimSnap.exists();
         };
 
-        const calculateCountdown = async () => {
+        const calculateStatus = async () => {
             const hasClaimed = await checkClaimStatus();
             if(hasClaimed) {
                 setBonusStatus('claimed');
@@ -71,12 +87,7 @@ export default function DailyBonusClaimPage() {
                 return;
             }
 
-            const claimsQuery = query(collection(db, `users`), where(`daily_bonus_claims.${bonus.id}`, '==', true));
-            const claimsSnapshot = await getDocs(claimsQuery);
-            const currentClaimCount = claimsSnapshot.size;
-            setTotalClaims(currentClaimCount);
-
-            if (currentClaimCount >= bonus.maxUsers) {
+            if (totalClaims >= bonus.maxUsers) {
                  setBonusStatus('limit_reached');
                  setCountdown('Bonus limit reached');
                  if (intervalRef.current) clearInterval(intervalRef.current);
@@ -124,13 +135,13 @@ export default function DailyBonusClaimPage() {
             setCountdown(`${days}d ${hours}h ${minutes}m ${seconds}s`);
         }
 
-        calculateCountdown();
-        intervalRef.current = setInterval(calculateCountdown, 1000);
+        calculateStatus();
+        intervalRef.current = setInterval(calculateStatus, 1000);
 
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
-    }, [bonus, user, userData]);
+    }, [bonus, user, userData, totalClaims]);
 
     const handleClaimBonus = async () => {
         if (!user || !userData || bonusStatus !== 'available' || !bonus) {
@@ -139,17 +150,23 @@ export default function DailyBonusClaimPage() {
         }
 
         setIsClaiming(true);
-        const claimRef = doc(db, 'users', user.uid);
-        
+        const userClaimRef = doc(db, 'users', user.uid, 'daily_bonus_claims', bonus.id);
+        const userRef = doc(db, 'users', user.uid);
+        const counterRef = doc(db, 'dailyBonusClaims', bonus.id);
+
         try {
             await runTransaction(db, async (transaction) => {
-                const userDoc = await transaction.get(claimRef);
+                const userDoc = await transaction.get(userRef);
+                const counterDoc = await transaction.get(counterRef);
+                
                 if (!userDoc.exists()) throw new Error("User not found.");
-
-                // Check claim status again inside transaction for safety
-                const claimDocRef = doc(db, 'users', user.uid, 'daily_bonus_claims', bonus.id);
-                const claimDoc = await transaction.get(claimDocRef);
+                
+                const claimDoc = await transaction.get(userClaimRef);
                 if (claimDoc.exists()) throw new Error("Already claimed.");
+
+                if (!counterDoc.exists() || counterDoc.data().count >= bonus.maxUsers) {
+                    throw new Error("Bonus claim limit reached.");
+                }
 
                 let bonusAmountToGive = 0;
                 if(bonus.bonusType === 'fixed') {
@@ -158,9 +175,10 @@ export default function DailyBonusClaimPage() {
                     bonusAmountToGive = userDoc.data().balance * (bonus.percentage / 100);
                 }
 
-                transaction.update(claimRef, { balance: increment(bonusAmountToGive) });
-                transaction.set(claimDocRef, { claimedAt: serverTimestamp() });
-
+                transaction.update(userRef, { balance: increment(bonusAmountToGive) });
+                transaction.set(userClaimRef, { claimedAt: serverTimestamp() });
+                transaction.update(counterRef, { count: increment(1) });
+                
                 toast({ title: 'Success!', description: `LKR ${bonusAmountToGive.toFixed(2)} has been added to your wallet.` });
             });
         } catch (error: any) {
