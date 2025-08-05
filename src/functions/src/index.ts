@@ -87,14 +87,21 @@ export const updateEventProgress = functions.firestore
   .onCreate(async (snap, context) => {
     const transaction = snap.data();
 
-    // Exit if not a payout transaction or if there's no winner
-    if (transaction.type !== 'payout' || !transaction.winnerId) {
+    // Exit if not a payout transaction
+    if (transaction.type !== 'payout') {
       return null;
     }
 
     const winnerId = transaction.winnerId;
     
+    // Exit if there's no valid winner recorded in the transaction
+    if (!winnerId) {
+        functions.logger.log(`Exiting event progress for tx ${context.params.transactionId}: No winnerId found.`);
+        return null;
+    }
+    
     const wagerAmount = transaction.gameWager || 0; 
+    // Correctly calculate net earning based on the actual payout vs the wager.
     const netEarning = transaction.amount - wagerAmount;
 
     // Get all active events
@@ -122,12 +129,13 @@ export const updateEventProgress = functions.firestore
               let progressIncrement = 0;
               
               if (event.targetType === 'winningMatches') {
-                  // A "winning match" is any scenario where the user is the winnerId
+                  // A win is a win, regardless of method (checkmate, timeout, opponent resign), as long as they are the winnerId
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
               } else if (event.targetType === 'totalEarnings') {
-                  if (netEarning > 0) {
+                  // Only count positive net earnings towards progress.
+                  if (netEarning > 0) { 
                       progressIncrement = netEarning;
                   }
               }
@@ -139,6 +147,7 @@ export const updateEventProgress = functions.firestore
                       progress: admin.firestore.FieldValue.increment(progressIncrement) 
                   };
 
+                  // If the new progress meets or exceeds the target, mark as completed.
                   if (newProgress >= event.targetAmount) {
                       updatePayload.status = 'completed';
                   }
