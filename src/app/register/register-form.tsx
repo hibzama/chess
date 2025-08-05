@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -86,6 +86,9 @@ export default function RegisterForm() {
 
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
+            
+            // Send verification email
+            await sendEmailVerification(user);
 
             const usersCollection = collection(db, "users");
             const snapshot = await getCountFromServer(usersCollection);
@@ -99,7 +102,7 @@ export default function RegisterForm() {
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
             const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
             const svgString = renderToString(React.createElement(randomAvatar));
-            const defaultAvatarUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
+            const defaultAvatarUri = `data:image/svg+xml;base64,${'btoa' in window ? window.btoa(svgString) : svgString}`;
             
             const userData: any = {
                 uid: user.uid,
@@ -120,7 +123,9 @@ export default function RegisterForm() {
                 l1Count: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
-                emailVerified: true, 
+                emailVerified: false, 
+                friends: [],
+                wins: 0,
             };
             
             const directReferrerId = mref || ref;
@@ -152,9 +157,10 @@ export default function RegisterForm() {
             
             toast({
                 title: "Account Created!",
-                description: "Welcome to Nexbattle.",
+                description: "A verification email has been sent. Please verify your email before logging in.",
             });
-            router.push('/dashboard');
+            await auth.signOut();
+            router.push(`/verify-email?email=${email}`);
 
         } catch (error: any) {
             console.error("Error signing up:", error);

@@ -159,17 +159,9 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
-    
+        
         try {
-            const batch = writeBatch(db);
-            // Refund the wager to the creator
-            if (room.wager > 0) {
-                batch.update(userRef, { balance: increment(room.wager) });
-            }
-            // Delete the room
-            batch.delete(roomRef);
-            await batch.commit();
+            await deleteDoc(roomRef);
     
             if (isAutoCancel) {
                 toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
@@ -244,25 +236,6 @@ function MultiplayerGame() {
                 if ((joinerData.balance || 0) < roomData.wager) {
                     throw new Error("You have insufficient funds.");
                 }
-                
-                if ((creatorData.balance || 0) < roomData.wager) {
-                    throw new Error("The room creator has insufficient funds.");
-                }
-
-                // Deduct wager from both players and create transaction logs
-                transaction.update(joinerRef, { balance: increment(-roomData.wager) });
-                const joinerTxRef = doc(collection(db, 'transactions'));
-                transaction.set(joinerTxRef, {
-                    userId: user.uid, type: 'wager', amount: roomData.wager, status: 'completed',
-                    description: `Wager for ${gameName} game vs ${creatorData.firstName}`, gameRoomId: room.id, createdAt: serverTimestamp()
-                });
-                
-                transaction.update(creatorRef, { balance: increment(-roomData.wager) });
-                const creatorTxRef = doc(collection(db, 'transactions'));
-                transaction.set(creatorTxRef, {
-                    userId: creatorData.uid, type: 'wager', amount: roomData.wager, status: 'completed',
-                    description: `Wager for ${gameName} game vs ${joinerData.firstName}`, gameRoomId: room.id, createdAt: serverTimestamp()
-                });
                 
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
