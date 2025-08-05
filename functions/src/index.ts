@@ -1,4 +1,5 @@
 
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -101,7 +102,7 @@ export const updateEventProgress = functions.firestore
     }
     
     const wagerAmount = transaction.gameWager || 0; 
-    const netEarning = transaction.amount - wagerAmount;
+    const netEarning = wagerAmount * 0.8; // Net earning is always 80% of the wager for a standard win
 
     // Get all active events
     const eventsRef = admin.firestore().collection('events');
@@ -132,7 +133,7 @@ export const updateEventProgress = functions.firestore
                       progressIncrement = 1;
                   }
               } else if (event.targetType === 'totalEarnings') {
-                  if (netEarning > 0) {
+                  if (netEarning > 0 && !resignerId) { // Only count earnings on full wins
                       progressIncrement = netEarning;
                   }
               }
