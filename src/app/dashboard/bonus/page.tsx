@@ -32,7 +32,6 @@ export default function DailyBonusClaimPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
     const [bonuses, setBonuses] = useState<Bonus[]>([]);
-    const [claimedBonuses, setClaimedBonuses] = useState<string[]>([]);
     const [claimedHistory, setClaimedHistory] = useState<any[]>([]);
     const [bonusClaimsCount, setBonusClaimsCount] = useState<{[key: string]: number}>({});
     const [loading, setLoading] = useState(true);
@@ -57,7 +56,6 @@ export default function DailyBonusClaimPage() {
         // Fetch user's claimed bonuses
         const claimedQuery = collection(db, 'users', user.uid, 'daily_bonus_claims');
         const unsubClaimed = onSnapshot(claimedQuery, (snapshot) => {
-            const claimedIds = snapshot.docs.map(doc => doc.id);
             const history = snapshot.docs.map(doc => ({...doc.data(), id: doc.id}));
             setClaimedHistory(history.sort((a,b) => b.claimedAt.seconds - a.claimedAt.seconds));
         });
@@ -132,13 +130,19 @@ export default function DailyBonusClaimPage() {
     const BonusCard = ({ bonus }: { bonus: Bonus }) => {
         const [countdown, setCountdown] = useState('');
         const [status, setStatus] = useState<'available' | 'claimed' | 'expired' | 'not_eligible' | 'not_started' | 'limit_reached'>('not_eligible');
+        const [hasUserClaimed, setHasUserClaimed] = useState(false);
+
+        useEffect(() => {
+            const checkClaimed = claimedHistory.some(h => h.bonusId === bonus.id);
+            setHasUserClaimed(checkClaimed);
+        }, [claimedHistory, bonus.id]);
+
 
         useEffect(() => {
             const interval = setInterval(() => {
                  if (!user || !userData) return;
                 
-                const hasClaimed = claimedBonuses.includes(bonus.id);
-                if(hasClaimed) { setStatus('claimed'); setCountdown('Claimed'); return; }
+                if(hasUserClaimed) { setStatus('claimed'); setCountdown('Claimed'); return; }
 
                 const claimsCount = bonusClaimsCount[bonus.id] || 0;
                 if(claimsCount >= bonus.maxUsers) { setStatus('limit_reached'); setCountdown('Limit Reached'); return; }
@@ -172,7 +176,7 @@ export default function DailyBonusClaimPage() {
                 }
             }, 1000);
             return () => clearInterval(interval);
-        }, [bonus, claimedBonuses, bonusClaimsCount, user, userData]);
+        }, [bonus, hasUserClaimed, bonusClaimsCount, user, userData]);
 
         const bonusDisplayValue = bonus.bonusType === 'fixed' ? `LKR ${bonus.amount.toFixed(2)}` : `${bonus.percentage}%`;
         const claimsLeft = Math.max(0, bonus.maxUsers - (bonusClaimsCount[bonus.id] || 0));
@@ -217,7 +221,7 @@ export default function DailyBonusClaimPage() {
                 <TabsTrigger value="history">Claim History</TabsTrigger>
             </TabsList>
             <TabsContent value="available">
-                 <div className="grid md:grid-cols-2 gap-6 mt-4">
+                 <div className="grid grid-cols-2 gap-6 mt-4">
                     {loading ? (
                         <>
                             <Skeleton className="h-96 w-full" />
@@ -225,7 +229,7 @@ export default function DailyBonusClaimPage() {
                         </>
                     ) : 
                      bonuses.length > 0 ? bonuses.map(b => <BonusCard key={b.id} bonus={b} />) : (
-                         <div className="md:col-span-2 flex flex-col items-center justify-center text-center gap-4 py-12">
+                         <div className="col-span-2 flex flex-col items-center justify-center text-center gap-4 py-12">
                             <Gift className="w-16 h-16 text-muted-foreground" />
                             <h2 className="text-2xl font-bold">No Active Daily Bonuses</h2>
                             <p className="text-muted-foreground">Check back later for new promotions!</p>
