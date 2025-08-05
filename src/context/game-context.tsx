@@ -173,8 +173,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomDoc = await transaction.get(roomRef);
     
-                if (!roomDoc.exists() || !roomDoc.data()?.player2) throw new Error("Room not found or not ready");
-                if (roomDoc.data().payoutTransactionId) throw new Error("Payout already processed");
+                if (!roomDoc.exists() || !roomDoc.data()?.player2) throw "Room not found or not ready";
+                if (roomDoc.data().payoutTransactionId) throw "Payout already processed";
 
                 const roomData = roomDoc.data() as GameRoom;
                 const { method, resignerDetails } = winnerDetails;
@@ -193,11 +193,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 if (resignerDetails) { 
                     const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
-                    const opponentPayoutRate = 1.30;
-                    let resignerRefundRate = 0;
-                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
-                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
-                    else resignerRefundRate = 0.25;
+                    const opponentPayoutRate = 1.05;
+                    const resignerRefundRate = 0.75;
 
                     if (isCreatorResigner) {
                         creatorPayout = wager * resignerRefundRate;
@@ -233,11 +230,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 if (creatorPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
-                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, winnerId: winnerId, resignerId: resignerDetails?.id || null });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, winnerId: roomData.createdBy.uid === winnerId ? winnerId : null, resignerId: resignerDetails?.id || null });
                 }
                 if (joinerPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
-                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, winnerId: winnerId, resignerId: resignerDetails?.id || null });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, winnerId: roomData.player2.uid === winnerId ? winnerId : null, resignerId: resignerDetails?.id || null });
                 }
                 
                 if (winnerId && winnerId !== 'draw') {
@@ -264,12 +261,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const resignerDetails = winnerData?.resignerId ? {id: winnerData.resignerId, pieceCount: winnerData.resignerPieceCount || 0} : null;
 
                     if (resignerDetails) { // Resignation
-                        let refundRate = 0;
-                        if (resignerDetails.pieceCount >= 6) refundRate = 0.50;
-                        else if (resignerDetails.pieceCount >= 3) refundRate = 0.35;
-                        else refundRate = 0.25;
-
-                        return { myPayout: resignerDetails.id === user.uid ? wager * refundRate : wager * 1.30 };
+                        return { myPayout: resignerDetails.id === user.uid ? wager * 0.75 : wager * 1.05 };
                     } else if (roomData.draw) { // Draw
                         return { myPayout: wager * 0.9 };
                     } else if (winnerData?.uid === user.uid) { // I won
@@ -334,14 +326,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let myPayout = 0;
 
                  if (iAmResigner) {
-                    const pieceCount = roomData.winner?.resignerPieceCount || 0;
-                    let refundRate = 0;
-                    if (pieceCount >= 6) refundRate = 0.50;
-                    else if (pieceCount >= 3) refundRate = 0.35;
-                    else refundRate = 0.25;
-                    myPayout = wager * refundRate;
+                    myPayout = wager * 0.75;
                 } else if (roomData.winner?.resignerId) {
-                    myPayout = wager * 1.30;
+                    myPayout = wager * 1.05;
                 } else if (roomData.draw) {
                     myPayout = wager * 0.9;
                 } else if (winnerIsMe) {

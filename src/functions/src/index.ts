@@ -1,4 +1,5 @@
 
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -86,19 +87,12 @@ export const updateEventProgress = functions.firestore
   .onCreate(async (snap, context) => {
     const transaction = snap.data();
 
-    // Exit if not a payout transaction
-    if (transaction.type !== 'payout') {
+    // Exit if not a payout transaction or if there's no winner
+    if (transaction.type !== 'payout' || !transaction.winnerId) {
       return null;
     }
 
     const winnerId = transaction.winnerId;
-    const resignerId = transaction.resignerId;
-
-    // Exit if there is no winner or if the winner is the one who resigned
-    if (!winnerId || winnerId === resignerId) {
-      functions.logger.log(`Exiting event progress update for tx ${context.params.transactionId}: No valid winner or winner was resigner.`);
-      return null;
-    }
     
     const wagerAmount = transaction.gameWager || 0; 
     const netEarning = transaction.amount - wagerAmount;
@@ -128,6 +122,7 @@ export const updateEventProgress = functions.firestore
               let progressIncrement = 0;
               
               if (event.targetType === 'winningMatches') {
+                  // A "winning match" is any scenario where the user is the winnerId
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
