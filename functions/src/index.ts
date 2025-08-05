@@ -1,5 +1,4 @@
 
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -81,37 +80,29 @@ export const announceNewGame = functions.firestore
     return null;
   });
 
-// This function triggers whenever a payout transaction is created.
+// This function triggers whenever a payout transaction is created for a game winner.
 export const updateEventProgress = functions.firestore
   .document('transactions/{transactionId}')
   .onCreate(async (snap, context) => {
     const transaction = snap.data();
 
-    // Exit if not a payout transaction
-    if (transaction.type !== 'payout') {
+    // 1. Ensure this is a valid winning payout transaction.
+    if (transaction.type !== 'payout' || !transaction.winnerId) {
       return null;
     }
 
-    // A payout is for a winner. The winnerId is the key.
-    const winnerId = transaction.winnerId;
-    
-    // If there's no winnerId, it's not a win, so no event progress.
-    if (!winnerId) {
-        functions.logger.log(`Exiting event progress for tx ${context.params.transactionId}: No winnerId found.`);
+    // 2. Ensure the winner did not resign.
+    if (transaction.resignerId && transaction.winnerId === transaction.resignerId) {
+        functions.logger.log(`Exiting event progress: Winner ${transaction.winnerId} was the resigner.`);
         return null;
     }
 
-    // Exit if the winner is the one who resigned.
-    if (transaction.resignerId && winnerId === transaction.resignerId) {
-        functions.logger.log(`Exiting event progress for tx ${context.params.transactionId}: Winner was the resigner.`);
-        return null;
-    }
-    
-    const wagerAmount = transaction.gameWager || 0; 
-    // Calculate net earning based on the actual payout vs the wager.
+    const winnerId = transaction.winnerId;
+    const wagerAmount = transaction.gameWager || 0;
+    // 3. Correctly calculate net earning.
     const netEarning = transaction.amount - wagerAmount;
 
-    // Get all active events
+    // Get all active events.
     const eventsRef = admin.firestore().collection('events');
     const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
 
@@ -122,21 +113,22 @@ export const updateEventProgress = functions.firestore
     const batch = admin.firestore().batch();
     let hasUpdates = false;
 
-    // Iterate through each active event
+    // Iterate through each active event.
     for (const eventDoc of activeEventsSnapshot.docs) {
       const event = eventDoc.data();
       const enrollmentRef = admin.firestore().collection('users').doc(winnerId).collection('event_enrollments').doc(event.id);
       
       const enrollmentSnap = await enrollmentRef.get();
       
-      // Check if user is enrolled and event is not expired/completed
+      // Check if user is enrolled in this event and the event is not expired/completed.
       if (enrollmentSnap.exists) {
           const enrollment = enrollmentSnap.data();
           if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
               let progressIncrement = 0;
               
+              // 4. Update progress based on event type.
               if (event.targetType === 'winningMatches') {
-                  // A win is a win, as long as they are the winnerId
+                  // A win is a win, as long as they are the winnerId and not the resigner
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
@@ -164,7 +156,7 @@ export const updateEventProgress = functions.firestore
       }
     }
 
-    // Commit the batch if there are any updates
+    // 5. Commit the batch if there are any updates.
     if (hasUpdates) {
       try {
         await batch.commit();
