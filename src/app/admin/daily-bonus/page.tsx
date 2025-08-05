@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, collection, getDocs, where, query } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,16 +16,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { format, setHours, setMinutes } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
 
 export interface DailyBonus {
-    id: string;
+    id: string; // e.g., 'daily_bonus_2024-07-28'
     bonusType: 'percentage' | 'fixed';
     amount: number; // For fixed amount
     percentage: number; // For percentage bonus
     maxUsers: number;
     targetAudience: 'all' | 'zero_balance';
-    claimedBy: string[];
     isActive: boolean;
     startTime: Timestamp;
     durationHours: number;
@@ -42,13 +40,12 @@ interface ClaimedUser {
 
 export default function DailyBonusPage() {
     const [bonus, setBonus] = useState<Partial<DailyBonus>>({
-        id: 'daily_bonus',
+        id: `daily_bonus_${format(new Date(), 'yyyy-MM-dd')}`,
         bonusType: 'fixed',
         amount: 50,
         percentage: 10,
         maxUsers: 100,
         targetAudience: 'all',
-        claimedBy: [],
         isActive: false,
         durationHours: 24,
         startTime: Timestamp.now(),
@@ -58,6 +55,14 @@ export default function DailyBonusPage() {
     const [claimedUsers, setClaimedUsers] = useState<ClaimedUser[]>([]);
     const { toast } = useToast();
 
+    const fetchClaimedUsers = async (bonusId: string) => {
+        if (!bonusId) return;
+        const claimsQuery = query(collection(db, 'users'), where(`daily_bonus_claims.${bonusId}`, '==', true));
+        const claimsSnapshot = await getDocs(claimsQuery);
+        const users = claimsSnapshot.docs.map(doc => doc.data() as ClaimedUser);
+        setClaimedUsers(users);
+    };
+
     useEffect(() => {
         const fetchBonus = async () => {
             const bonusRef = doc(db, 'settings', 'dailyBonus');
@@ -65,19 +70,9 @@ export default function DailyBonusPage() {
             if (bonusSnap.exists()) {
                 const bonusData = bonusSnap.data() as DailyBonus;
                 setBonus(bonusData);
-                if (bonusData.claimedBy && bonusData.claimedBy.length > 0) {
-                    fetchClaimedUsers(bonusData.claimedBy);
-                }
+                fetchClaimedUsers(bonusData.id);
             }
             setLoading(false);
-        };
-
-        const fetchClaimedUsers = async (uids: string[]) => {
-            const usersRef = collection(db, 'users');
-            const usersQuery = query(usersRef, where('uid', 'in', uids));
-            const usersSnapshot = await getDocs(usersQuery);
-            const users = usersSnapshot.docs.map(doc => doc.data() as ClaimedUser);
-            setClaimedUsers(users);
         };
         
         fetchBonus();
@@ -264,4 +259,3 @@ export default function DailyBonusPage() {
         </div>
     )
 }
-

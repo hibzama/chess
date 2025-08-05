@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp, updateDoc, arrayUnion, increment, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, updateDoc, arrayUnion, increment, runTransaction, getDoc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Percent } from 'lucide-react';
@@ -18,7 +18,6 @@ export interface DailyBonus {
     percentage: number;
     maxUsers: number;
     targetAudience: 'all' | 'zero_balance';
-    claimedBy: string[];
     isActive: boolean;
     startTime: Timestamp;
     durationHours: number;
@@ -32,13 +31,16 @@ export default function DailyBonusClaimPage() {
     const [countdown, setCountdown] = useState('');
     const [isClaiming, setIsClaiming] = useState(false);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
-    const [bonusStatus, setBonusStatus] = useState<'available' | 'claimed' | 'expired' | 'not_eligible' | 'not_started'>('not_eligible');
+    const [bonusStatus, setBonusStatus] = useState<'available' | 'claimed' | 'expired' | 'not_eligible' | 'not_started' | 'limit_reached'>('not_eligible');
+    const [totalClaims, setTotalClaims] = useState(0);
 
     useEffect(() => {
         const bonusRef = doc(db, 'settings', 'dailyBonus');
         const unsubscribe = onSnapshot(bonusRef, (docSnap) => {
             if (docSnap.exists() && docSnap.data().isActive) {
-                setBonus(docSnap.data() as DailyBonus);
+                const bonusData = docSnap.data() as DailyBonus;
+                setBonus(bonusData);
+                // We'll check for user claim status dynamically
             } else {
                 setBonus(null);
             }
@@ -54,14 +56,14 @@ export default function DailyBonusClaimPage() {
             return;
         }
 
-        const calculateCountdown = () => {
-            const now = new Date();
-            const startTime = bonus.startTime.toDate();
-            const expiryTime = new Date(startTime.getTime() + (bonus.durationHours * 60 * 60 * 1000));
-            
-            const hasClaimed = bonus.claimedBy.includes(user.uid);
-            const hasReachedLimit = bonus.claimedBy.length >= bonus.maxUsers;
+        const checkClaimStatus = async () => {
+            const claimRef = doc(db, 'users', user.uid, 'daily_bonus_claims', bonus.id);
+            const claimSnap = await getDoc(claimRef);
+            return claimSnap.exists();
+        };
 
+        const calculateCountdown = async () => {
+            const hasClaimed = await checkClaimStatus();
             if(hasClaimed) {
                 setBonusStatus('claimed');
                 setCountdown('Already claimed today');
@@ -69,6 +71,22 @@ export default function DailyBonusClaimPage() {
                 return;
             }
 
+            const claimsQuery = query(collection(db, `users`), where(`daily_bonus_claims.${bonus.id}`, '==', true));
+            const claimsSnapshot = await getDocs(claimsQuery);
+            const currentClaimCount = claimsSnapshot.size;
+            setTotalClaims(currentClaimCount);
+
+            if (currentClaimCount >= bonus.maxUsers) {
+                 setBonusStatus('limit_reached');
+                 setCountdown('Bonus limit reached');
+                 if (intervalRef.current) clearInterval(intervalRef.current);
+                 return;
+            }
+
+            const now = new Date();
+            const startTime = bonus.startTime.toDate();
+            const expiryTime = new Date(startTime.getTime() + (bonus.durationHours * 60 * 60 * 1000));
+            
             if(now < startTime) {
                 setBonusStatus('not_started');
                 const distance = startTime.getTime() - now.getTime();
@@ -80,7 +98,7 @@ export default function DailyBonusClaimPage() {
                 return;
             }
 
-            if (now > expiryTime || hasReachedLimit) {
+            if (now > expiryTime) {
                 setBonusStatus('expired');
                 setCountdown("EXPIRED");
                 if (intervalRef.current) clearInterval(intervalRef.current);
@@ -121,27 +139,27 @@ export default function DailyBonusClaimPage() {
         }
 
         setIsClaiming(true);
-        const bonusRef = doc(db, 'settings', 'dailyBonus');
-        const userRef = doc(db, 'users', user.uid);
+        const claimRef = doc(db, 'users', user.uid);
         
         try {
             await runTransaction(db, async (transaction) => {
-                const bonusDoc = await transaction.get(bonusRef);
-                if (!bonusDoc.exists()) throw new Error("Bonus not found.");
+                const userDoc = await transaction.get(claimRef);
+                if (!userDoc.exists()) throw new Error("User not found.");
 
-                const currentBonusData = bonusDoc.data() as DailyBonus;
-                if (currentBonusData.claimedBy.includes(user.uid)) throw new Error("Already claimed.");
-                if (currentBonusData.claimedBy.length >= currentBonusData.maxUsers) throw new Error("Bonus limit reached.");
-                
+                // Check claim status again inside transaction for safety
+                const claimDocRef = doc(db, 'users', user.uid, 'daily_bonus_claims', bonus.id);
+                const claimDoc = await transaction.get(claimDocRef);
+                if (claimDoc.exists()) throw new Error("Already claimed.");
+
                 let bonusAmountToGive = 0;
-                if(currentBonusData.bonusType === 'fixed') {
-                    bonusAmountToGive = currentBonusData.amount;
+                if(bonus.bonusType === 'fixed') {
+                    bonusAmountToGive = bonus.amount;
                 } else { // percentage
-                    bonusAmountToGive = userData.balance * (currentBonusData.percentage / 100);
+                    bonusAmountToGive = userDoc.data().balance * (bonus.percentage / 100);
                 }
 
-                transaction.update(userRef, { balance: increment(bonusAmountToGive) });
-                transaction.update(bonusRef, { claimedBy: arrayUnion(user.uid) });
+                transaction.update(claimRef, { balance: increment(bonusAmountToGive) });
+                transaction.set(claimDocRef, { claimedAt: serverTimestamp() });
 
                 toast({ title: 'Success!', description: `LKR ${bonusAmountToGive.toFixed(2)} has been added to your wallet.` });
             });
@@ -197,7 +215,7 @@ export default function DailyBonusClaimPage() {
                     </div>
                     <div className="p-3 bg-secondary/50 rounded-lg">
                         <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Users/> Claims Left</p>
-                        <p className="text-lg font-semibold">{Math.max(0, bonus.maxUsers - bonus.claimedBy.length)}</p>
+                        <p className="text-lg font-semibold">{Math.max(0, bonus.maxUsers - totalClaims)}</p>
                     </div>
                 </div>
 
@@ -216,12 +234,12 @@ export default function DailyBonusClaimPage() {
                         </AlertDescription>
                     </Alert>
                 )}
-                {bonusStatus === 'expired' && (
+                {(bonusStatus === 'expired' || bonusStatus === 'limit_reached') && (
                      <Alert variant="destructive">
                         <Ban className="h-4 w-4"/>
-                        <AlertTitle>Bonus Expired</AlertTitle>
+                        <AlertTitle>Bonus Unavailable</AlertTitle>
                         <AlertDescription>
-                           This daily bonus is no longer available.
+                           {bonusStatus === 'expired' ? 'This daily bonus has expired.' : 'The claim limit for this bonus has been reached.'}
                         </AlertDescription>
                     </Alert>
                 )}
