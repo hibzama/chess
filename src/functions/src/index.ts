@@ -88,9 +88,10 @@ export const processCommissions = functions.firestore
         const transaction = snap.data();
         const txnId = context.params.transactionId;
 
-        // 1. Commission logic should only run for winning payouts, not draws or resignations
-        if (transaction.type !== 'payout' || !transaction.winnerId || transaction.resignerId) {
-            functions.logger.log(`Txn ${txnId}: Not a commissionable payout. Type: ${transaction.type}, Winner: ${!!transaction.winnerId}, Resigner: ${!!transaction.resignerId}`);
+        // 1. Commission logic should only run for winning payouts, not draws.
+        // It SHOULD run on resignations, as that still results in a win/loss payout.
+        if (transaction.type !== 'payout' || !transaction.winnerId) {
+            functions.logger.log(`Txn ${txnId}: Not a commissionable payout. Type: ${transaction.type}, Winner: ${!!transaction.winnerId}`);
             return null;
         }
 
@@ -301,3 +302,4 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
+
