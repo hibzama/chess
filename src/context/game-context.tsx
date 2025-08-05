@@ -188,21 +188,23 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let creatorDesc = '', joinerDesc = '';
                 const winnerObject: GameRoom['winner'] = { uid: null, method };
     
-                if (winnerId === 'draw') {
+                 if (winnerId === 'draw') {
                     creatorPayout = joinerPayout = wager * 0.9;
                     creatorDesc = `Draw refund vs ${roomData.player2.name}`;
                     joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
                 } else if (winnerId) {
                     const isCreatorWinner = winnerId === roomData.createdBy.uid;
+                    const winnerPlayer = isCreatorWinner ? roomData.createdBy : roomData.player2!;
+                    const loserPlayer = isCreatorWinner ? roomData.player2! : roomData.createdBy;
+
                     creatorPayout = isCreatorWinner ? wager * 1.8 : 0;
                     joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
                     
-                    const reason = resignerDetails ? 'Win by opponent resignation' : (method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture'));
-                    creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
-                    joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
+                    creatorDesc = isCreatorWinner ? `Win vs ${loserPlayer.name}` : `Loss vs ${winnerPlayer.name}`;
+                    joinerDesc = !isCreatorWinner ? `Win vs ${loserPlayer.name}` : `Loss vs ${winnerPlayer.name}`;
                     
                     winnerObject.uid = winnerId;
-                    if(resignerDetails){
+                    if (resignerDetails) {
                         winnerObject.resignerId = resignerDetails.id;
                     }
                 }
@@ -212,14 +214,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 if (creatorPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
-                    const creatorTxData: any = { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null };
-                    if(roomData.createdBy.uid === winnerId) creatorTxData.winnerId = winnerId;
+                    const creatorTxData: any = { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null, winnerId: winnerId === roomData.createdBy.uid ? winnerId : null };
                     transaction.set(doc(collection(db, 'transactions')), creatorTxData);
                 }
+
                 if (joinerPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
-                    const joinerTxData: any = { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null };
-                    if(roomData.player2.uid === winnerId) joinerTxData.winnerId = winnerId;
+                    const joinerTxData: any = { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null, winnerId: winnerId === roomData.player2.uid ? winnerId : null };
                     transaction.set(doc(collection(db, 'transactions')), joinerTxData);
                 }
                 
@@ -299,7 +300,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (roomData.status === 'completed' && !gameOverHandledRef.current) {
                 gameOverHandledRef.current = true;
                 const winnerIsMe = roomData.winner?.uid === user.uid;
-                const iAmResigner = roomData.winner?.resignerId === user.uid;
                 const wager = roomData.wager || 0;
                 let myPayout = 0;
 
