@@ -169,7 +169,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         try {
             const payoutResult = await runTransaction(db, async (transaction) => {
-                 // --- PHASE 1: READS ---
                 const roomRef = doc(db, 'game_rooms', roomId as string);
                 const roomDoc = await transaction.get(roomRef);
     
@@ -184,7 +183,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     winnerId = roomData.players.find(p => p !== resignerDetails.id) || null;
                 }
 
-                // --- PHASE 2: CALCULATIONS & WRITES ---
                 const wager = roomData.wager;
                 let creatorPayout = 0, joinerPayout = 0;
                 let creatorDesc = '', joinerDesc = '';

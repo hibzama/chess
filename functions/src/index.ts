@@ -1,5 +1,4 @@
 
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -92,17 +91,24 @@ export const updateEventProgress = functions.firestore
       return null;
     }
 
-    const winnerId = transaction.winnerId;
-    const resignerId = transaction.resignerId;
+    // Use winnerId if it exists, otherwise fall back to userId (for non-resignation wins)
+    const winnerId = transaction.winnerId || transaction.userId;
+    
+    // Exit if there's no valid winner recorded in the transaction
+    if (!winnerId) {
+        functions.logger.log(`Exiting event progress for tx ${context.params.transactionId}: No winnerId found.`);
+        return null;
+    }
 
-    // Exit if there is no winner or if the winner is the one who resigned
-    if (!winnerId || winnerId === resignerId) {
-      functions.logger.log(`Exiting event progress update for tx ${context.params.transactionId}: No valid winner or winner was resigner.`);
-      return null;
+    // If there was a resigner, ensure the winner is not the resigner.
+    if(transaction.resignerId && winnerId === transaction.resignerId) {
+        functions.logger.log(`Exiting event progress for tx ${context.params.transactionId}: Winner was the resigner.`);
+        return null;
     }
     
     const wagerAmount = transaction.gameWager || 0; 
-    const netEarning = wagerAmount * 0.8; // Net earning is always 80% of the wager for a standard win
+    // Correctly calculate net earning based on the actual payout vs the wager.
+    const netEarning = transaction.amount - wagerAmount;
 
     // Get all active events
     const eventsRef = admin.firestore().collection('events');
@@ -129,11 +135,13 @@ export const updateEventProgress = functions.firestore
               let progressIncrement = 0;
               
               if (event.targetType === 'winningMatches') {
+                  // A win is a win, regardless of method (checkmate, timeout, opponent resign), as long as they are the winnerId
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
               } else if (event.targetType === 'totalEarnings') {
-                  if (netEarning > 0 && !resignerId) { // Only count earnings on full wins
+                  // Only count positive net earnings towards progress.
+                  if (netEarning > 0) { 
                       progressIncrement = netEarning;
                   }
               }
@@ -145,6 +153,7 @@ export const updateEventProgress = functions.firestore
                       progress: admin.firestore.FieldValue.increment(progressIncrement) 
                   };
 
+                  // If the new progress meets or exceeds the target, mark as completed.
                   if (newProgress >= event.targetAmount) {
                       updatePayload.status = 'completed';
                   }
