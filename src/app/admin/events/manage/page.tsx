@@ -128,32 +128,33 @@ export default function ManageEventsPage() {
                 setLoadingEnrollments(false);
                 return;
             };
-
+        
             const fetchEnrollments = async () => {
                 setLoadingEnrollments(true);
                 try {
-                    const usersSnapshot = await getDocs(collection(db, 'users'));
-                    const userIds = usersSnapshot.docs.map(d => d.id);
-                    const enrollmentsData: Enrollment[] = [];
+                    // Use a collection group query to fetch all enrollments for a specific event
+                    const enrollmentsQuery = query(
+                        collectionGroup(db, 'event_enrollments'), 
+                        where('eventId', '==', localEvent.id)
+                    );
                     
-                    for (const userId of userIds) {
-                        const enrollmentRef = doc(db, 'users', userId, 'event_enrollments', localEvent.id!);
-                        const enrollmentDoc = await getDoc(enrollmentRef);
-                        
-                        if (enrollmentDoc.exists()) {
-                            const enrollmentData = enrollmentDoc.data() as Enrollment;
-                            const userDoc = await getDoc(doc(db, 'users', userId));
-                            if (userDoc.exists()) {
-                                 enrollmentsData.push({
-                                    ...enrollmentData,
-                                    user: {
-                                        firstName: userDoc.data().firstName,
-                                        lastName: userDoc.data().lastName,
-                                    },
-                                });
-                            }
+                    const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+                    const enrollmentsDataPromises = enrollmentsSnapshot.docs.map(async (enrollmentDoc) => {
+                        const enrollmentData = enrollmentDoc.data() as Enrollment;
+                        const userDoc = await getDoc(doc(db, 'users', enrollmentData.userId));
+                        if (userDoc.exists()) {
+                            return {
+                                ...enrollmentData,
+                                user: {
+                                    firstName: userDoc.data().firstName,
+                                    lastName: userDoc.data().lastName,
+                                },
+                            };
                         }
-                    }
+                        return null;
+                    });
+        
+                    const enrollmentsData = (await Promise.all(enrollmentsDataPromises)).filter(Boolean) as Enrollment[];
                     setEnrollments(enrollmentsData);
                 } catch(e) {
                     console.error("Error fetching enrollments: ", e);
@@ -161,7 +162,7 @@ export default function ManageEventsPage() {
                     setLoadingEnrollments(false);
                 }
             }
-
+        
             fetchEnrollments();
             
         }, [localEvent.id, isNew]);
