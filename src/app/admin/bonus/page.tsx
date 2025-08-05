@@ -11,10 +11,13 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Gift, Percent, Users, DollarSign, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 export interface DepositBonus {
     id: string;
+    bonusType: 'percentage' | 'fixed';
     percentage: number;
+    fixedAmount: number;
     minDeposit: number;
     maxDeposit: number;
     maxUsers: number;
@@ -29,7 +32,9 @@ export interface DepositBonus {
 export default function BonusPage() {
     const [bonus, setBonus] = useState<Partial<DepositBonus>>({
         id: 'main_bonus',
+        bonusType: 'percentage',
         percentage: 10,
+        fixedAmount: 500,
         minDeposit: 1000,
         maxDeposit: 5000,
         maxUsers: 100,
@@ -48,7 +53,7 @@ export default function BonusPage() {
             const bonusSnap = await getDoc(bonusRef);
             if (bonusSnap.exists()) {
                 const data = bonusSnap.data() as DepositBonus;
-                setBonus(data);
+                setBonus(prev => ({...prev, ...data}));
                 setInitialIsActive(data.isActive);
             }
             setLoading(false);
@@ -70,7 +75,6 @@ export default function BonusPage() {
             if(bonus.isActive && !initialIsActive) {
                 bonusPayload.startTime = serverTimestamp();
             } else if (!bonus.isActive) {
-                // Use deleteField() to remove the startTime field from the document
                 bonusPayload.startTime = deleteField();
             }
 
@@ -94,7 +98,7 @@ export default function BonusPage() {
     };
     
     const handleChange = (field: keyof DepositBonus, value: any) => {
-        const isNumericField = ['percentage', 'minDeposit', 'maxDeposit', 'maxUsers', 'durationHours'].includes(field);
+        const isNumericField = ['percentage', 'minDeposit', 'maxDeposit', 'maxUsers', 'durationHours', 'fixedAmount'].includes(field);
         setBonus(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
     };
 
@@ -121,12 +125,34 @@ export default function BonusPage() {
                         aria-label="Toggle bonus status"
                     />
                 </div>
+
+                <div className="space-y-3">
+                    <Label className="flex items-center gap-2 font-medium">Bonus Type</Label>
+                     <RadioGroup value={bonus.bonusType} onValueChange={(value) => handleChange('bonusType', value)} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="percentage" id="percentage-type" />
+                            <Label htmlFor="percentage-type">Percentage Bonus</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="fixed" id="fixed-type" />
+                            <Label htmlFor="fixed-type">Fixed Amount Bonus</Label>
+                        </div>
+                    </RadioGroup>
+                </div>
                 
                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <Label htmlFor="percentage" className="flex items-center gap-2"><Percent/> Bonus Percentage</Label>
-                        <Input id="percentage" type="number" value={bonus.percentage || 0} onChange={(e) => handleChange('percentage', e.target.value)} />
-                    </div>
+                    {bonus.bonusType === 'percentage' && (
+                        <div className="space-y-2">
+                            <Label htmlFor="percentage" className="flex items-center gap-2"><Percent/> Bonus Percentage</Label>
+                            <Input id="percentage" type="number" value={bonus.percentage || 0} onChange={(e) => handleChange('percentage', e.target.value)} />
+                        </div>
+                    )}
+                    {bonus.bonusType === 'fixed' && (
+                        <div className="space-y-2">
+                            <Label htmlFor="fixedAmount" className="flex items-center gap-2"><DollarSign/> Fixed Bonus Amount (LKR)</Label>
+                            <Input id="fixedAmount" type="number" value={bonus.fixedAmount || 0} onChange={(e) => handleChange('fixedAmount', e.target.value)} />
+                        </div>
+                    )}
                     <div className="space-y-2">
                         <Label htmlFor="durationHours" className="flex items-center gap-2"><Clock/> Bonus Duration (in hours)</Label>
                         <Input id="durationHours" type="number" value={bonus.durationHours || 0} onChange={(e) => handleChange('durationHours', e.target.value)} />

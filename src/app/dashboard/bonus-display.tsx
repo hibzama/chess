@@ -11,7 +11,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 
 export interface DepositBonus {
+    bonusType: 'percentage' | 'fixed';
     percentage: number;
+    fixedAmount: number;
     minDeposit: number;
     maxDeposit: number;
     maxUsers: number;
@@ -25,8 +27,6 @@ export default function BonusDisplay() {
   const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState('');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const USDT_RATE = 310;
 
   useEffect(() => {
     const bonusRef = doc(db, 'settings', 'depositBonus');
@@ -88,6 +88,14 @@ export default function BonusDisplay() {
     return null;
   }
 
+  const bonusText = bonus.bonusType === 'fixed' 
+    ? `LKR ${bonus.fixedAmount.toFixed(2)}`
+    : `${bonus.percentage}%`;
+  
+  const bonusDescription = bonus.bonusType === 'fixed'
+    ? 'Fixed Bonus Amount'
+    : 'Bonus Rate';
+
   return (
     <Card className="h-full border-accent bg-accent/10 flex flex-col">
         <CardHeader>
@@ -101,8 +109,8 @@ export default function BonusDisplay() {
         </CardHeader>
         <CardContent className="space-y-4 flex-1 flex flex-col justify-center">
              <div className="bg-background/50 p-4 rounded-lg text-center">
-                <p className="text-3xl font-bold">{bonus.percentage}%</p>
-                <p className="text-xs text-muted-foreground">Bonus Rate</p>
+                <p className="text-3xl font-bold">{bonusText}</p>
+                <p className="text-xs text-muted-foreground">{bonusDescription}</p>
             </div>
             <div className="text-center">
                  <p className="text-sm font-semibold">Time Remaining:</p>

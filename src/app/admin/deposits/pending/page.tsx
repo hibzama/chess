@@ -41,6 +41,8 @@ export default function PendingDepositsPage() {
         const unsubscribeBonus = onSnapshot(bonusRef, (docSnap) => {
             if (docSnap.exists()) {
                 setBonusSettings(docSnap.data() as DepositBonus);
+            } else {
+                setBonusSettings(null);
             }
         });
 
@@ -75,9 +77,10 @@ export default function PendingDepositsPage() {
         const updatedBonusAmounts: {[key: string]: number} = {};
 
         deposits.forEach(deposit => {
+            if (!bonusSettings.startTime) return;
+
             const now = new Date();
             const bonusIsActive = bonusSettings.isActive && 
-                                  bonusSettings.startTime && 
                                   (bonusSettings.startTime.toDate().getTime() + (bonusSettings.durationHours * 3600 * 1000)) > now.getTime();
 
             const isEligible = bonusIsActive &&
@@ -86,7 +89,12 @@ export default function PendingDepositsPage() {
                 deposit.createdAt.toDate() > bonusSettings.startTime.toDate();
             
             if (isEligible) {
-                const calculatedBonus = deposit.amount * (bonusSettings.percentage / 100);
+                let calculatedBonus = 0;
+                if (bonusSettings.bonusType === 'percentage') {
+                    calculatedBonus = deposit.amount * (bonusSettings.percentage / 100);
+                } else if (bonusSettings.bonusType === 'fixed') {
+                    calculatedBonus = bonusSettings.fixedAmount;
+                }
                 updatedBonusAmounts[deposit.id] = calculatedBonus;
             }
         });
