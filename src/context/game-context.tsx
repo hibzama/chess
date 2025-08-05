@@ -180,40 +180,31 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const { method, resignerDetails } = winnerDetails;
                 let { winnerId } = winnerDetails;
     
+                // Determine the winner if there was a resignation
                 if (resignerDetails) {
                     winnerId = roomData.players.find(p => p !== resignerDetails.id) || null;
                 }
     
                 const wager = roomData.wager;
                 let creatorPayout = 0, joinerPayout = 0;
-                let creatorDesc = '', joinerDesc = '';
+                let creatorDesc = `vs ${roomData.player2.name}`;
+                let joinerDesc = `vs ${roomData.createdBy.name}`;
                 const winnerObject: GameRoom['winner'] = { uid: null, method };
 
                 if (winnerId === 'draw') {
                     creatorPayout = joinerPayout = wager * 0.9;
-                    creatorDesc = `Draw refund vs ${roomData.player2.name}`;
-                    joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
+                    creatorDesc = `Draw ${creatorDesc}`;
+                    joinerDesc = `Draw ${joinerDesc}`;
                 } else if (resignerDetails && winnerId) {
-                    const pieceCount = resignerDetails.pieceCount;
-                    let refundRate = 0.25;
-                    if (pieceCount >= 6) refundRate = 0.50;
-                    else if (pieceCount >= 3) refundRate = 0.35;
-                    
-                    const resignerRefund = wager * refundRate;
-                    const winnerReturn = wager * 1.30;
-
-                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
-
+                     const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
                     if(isCreatorResigner) {
-                        creatorPayout = resignerRefund;
-                        joinerPayout = winnerReturn;
+                        creatorPayout = wager * 0.75;
+                        joinerPayout = wager * 1.05;
                     } else {
-                        creatorPayout = winnerReturn;
-                        joinerPayout = resignerRefund;
+                        creatorPayout = wager * 1.05;
+                        joinerPayout = wager * 0.75;
                     }
-                    
                     winnerObject.resignerId = resignerDetails.id;
-
                 } else if (winnerId) {
                     const isCreatorWinner = winnerId === roomData.createdBy.uid;
                     creatorPayout = isCreatorWinner ? wager * 1.8 : 0;
@@ -225,22 +216,26 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const now = serverTimestamp();
                 const payoutTxId = doc(collection(db, 'transactions')).id;
     
+                // Set winner info and payout for creator
                 if (creatorPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
                     const creatorTxData: any = { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null, winnerId: winnerId === roomData.createdBy.uid ? winnerId : null };
                     transaction.set(doc(collection(db, 'transactions')), creatorTxData);
                 }
 
+                // Set winner info and payout for joiner
                 if (joinerPayout > 0) {
                     transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
                     const joinerTxData: any = { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null, winnerId: winnerId === roomData.player2.uid ? winnerId : null };
                     transaction.set(doc(collection(db, 'transactions')), joinerTxData);
                 }
                 
+                // Increment wins for the winner
                 if (winnerId && winnerId !== 'draw') {
                     transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
                 }
     
+                // Mark room as completed
                 transaction.update(roomRef, { 
                     status: 'completed',
                     winner: winnerObject,
@@ -260,13 +255,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                    if (roomData.draw) return { myPayout: wager * 0.9 };
                    if (roomData.winner?.resignerId) {
                        const isMeResigner = roomData.winner.resignerId === user.uid;
-                       if(isMeResigner) {
-                           // This part needs the piece count which we don't have on a reload.
-                           // For now, let's just assume a base refund. This is an edge case.
-                           return { myPayout: wager * 0.25 };
-                       } else {
-                           return { myPayout: wager * 1.3 };
-                       }
+                       return { myPayout: isMeResigner ? wager * 0.75 : wager * 1.05 };
                    }
                    if (roomData.winner?.uid === user.uid) return { myPayout: wager * 1.8 };
                 }
@@ -330,15 +319,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (roomData.draw) {
                     myPayout = wager * 0.9;
                 } else if (roomData.winner?.resignerId) {
-                    if (isMeResigner) {
-                        const pieceCount = roomData.winner.resignerPieceCount || 0;
-                        let refundRate = 0.25;
-                        if (pieceCount >= 6) refundRate = 0.50;
-                        else if (pieceCount >= 3) refundRate = 0.35;
-                        myPayout = wager * refundRate;
-                    } else {
-                        myPayout = wager * 1.30;
-                    }
+                   myPayout = isMeResigner ? wager * 0.75 : wager * 1.05;
                 } else if (winnerIsMe) {
                     myPayout = wager * 1.8;
                 }
