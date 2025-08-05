@@ -1,8 +1,9 @@
 
+
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, getDoc, doc, documentId, where, getDocs, writeBatch, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, getDoc, doc, documentId, where, getDocs, writeBatch, Timestamp, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 export interface Bonus {
     id: string;
@@ -61,6 +63,9 @@ export default function DailyBonusPage() {
     const [saving, setSaving] = useState(false);
     const { toast } = useToast();
 
+    // State for editing existing bonuses
+    const [editingBonus, setEditingBonus] = useState<Partial<Bonus> | null>(null);
+
     useEffect(() => {
         const bonusesQuery = query(collection(db, 'bonuses'), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(bonusesQuery, (snapshot) => {
@@ -86,9 +91,26 @@ export default function DailyBonusPage() {
                     userDocs.forEach(doc => users.push({ ...doc.data(), uid: doc.id } as ClaimedUser));
                 }
                 setClaimedUsers(prev => ({ ...prev, [bonusId]: users }));
+            } else {
+                 setClaimedUsers(prev => ({ ...prev, [bonusId]: [] }));
             }
         }
     };
+    
+    const handleUpdateBonus = async (bonusId: string, updatedData: Partial<Bonus>) => {
+        setSaving(true);
+        const bonusRef = doc(db, 'bonuses', bonusId);
+        try {
+            await updateDoc(bonusRef, {...updatedData, updatedAt: Timestamp.now()});
+            toast({ title: "Success!", description: "Bonus has been updated." });
+        } catch(e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: "Error", description: "Failed to update bonus."});
+        } finally {
+            setSaving(false);
+        }
+    }
+
 
     const handleCreateBonus = async () => {
         setSaving(true);
@@ -126,6 +148,11 @@ export default function DailyBonusPage() {
         const isNumericField = ['amount', 'maxUsers', 'durationHours', 'percentage'].includes(field);
         setNewBonus(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
     };
+    
+     const handleEditingChange = (field: keyof Bonus, value: any) => {
+        const isNumericField = ['maxUsers'].includes(field);
+        setEditingBonus(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
+    };
 
     const handleTimeChange = (type: 'hour' | 'minute', value: string) => {
         const numValue = parseInt(value, 10);
@@ -140,6 +167,7 @@ export default function DailyBonusPage() {
     };
     
     const getBonusStatus = (bonus: Bonus) => {
+        if (!bonus.isActive) return { text: "Inactive", color: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
         const now = new Date();
         const start = bonus.startTime.toDate();
         const end = new Date(start.getTime() + bonus.durationHours * 60 * 60 * 1000);
@@ -224,15 +252,15 @@ export default function DailyBonusPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Bonus History</CardTitle>
-                    <CardDescription>List of all created daily bonuses.</CardDescription>
+                    <CardTitle>Bonus History & Management</CardTitle>
+                    <CardDescription>View and manage all created daily bonuses.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {loading ? <Skeleton className="h-48 w-full"/> : (
-                         <Accordion type="single" collapsible className="w-full">
+                         <Accordion type="single" collapsible className="w-full" onValueChange={(id) => id && fetchClaimedUsers(id)}>
                             {bonuses.map(b => (
                                 <AccordionItem key={b.id} value={b.id}>
-                                    <AccordionTrigger onClick={() => fetchClaimedUsers(b.id)}>
+                                    <AccordionTrigger>
                                         <div className="flex items-center justify-between w-full pr-4">
                                             <div className="text-left">
                                                 <p className="font-semibold">{b.title}</p>
@@ -242,18 +270,47 @@ export default function DailyBonusPage() {
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent>
-                                        <div className="p-4 bg-muted/50 rounded-md">
+                                        <div className="p-4 bg-muted/50 rounded-md space-y-4">
+                                            <div className="space-y-4">
+                                                <h4 className="font-semibold">Manage Bonus</h4>
+                                                <div className="flex items-center justify-between rounded-lg border p-3">
+                                                    <div>
+                                                        <Label htmlFor={`isActive-${b.id}`} className="font-medium">Bonus Active</Label>
+                                                        <p className="text-xs text-muted-foreground">Turn this bonus on or off.</p>
+                                                    </div>
+                                                    <Switch
+                                                        id={`isActive-${b.id}`}
+                                                        checked={editingBonus?.id === b.id ? editingBonus.isActive : b.isActive}
+                                                        onCheckedChange={(value) => handleUpdateBonus(b.id, { isActive: value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor={`maxUsers-${b.id}`}>Max Users</Label>
+                                                    <Input 
+                                                        id={`maxUsers-${b.id}`}
+                                                        type="number" 
+                                                        defaultValue={b.maxUsers}
+                                                        onChange={(e) => handleEditingChange('maxUsers', e.target.value)}
+                                                    />
+                                                </div>
+                                                <Button size="sm" onClick={() => editingBonus && handleUpdateBonus(b.id, {maxUsers: editingBonus.maxUsers})} disabled={saving}>
+                                                    {saving ? 'Saving...' : 'Save Max Users'}
+                                                </Button>
+                                            </div>
+                                            <Separator/>
                                              <h4 className="font-semibold mb-2">Claimed Players ({claimedUsers[b.id]?.length || 0} / {b.maxUsers})</h4>
-                                             {claimedUsers[b.id] && claimedUsers[b.id].length > 0 ? (
-                                                <Table>
-                                                    <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead></TableRow></TableHeader>
-                                                    <TableBody>
-                                                        {claimedUsers[b.id].map(u => (
-                                                            <TableRow key={u.uid}><TableCell>{u.firstName} {u.lastName}</TableCell><TableCell>{u.email}</TableCell></TableRow>
-                                                        ))}
-                                                    </TableBody>
-                                                </Table>
-                                             ) : <p className="text-sm text-center text-muted-foreground p-4">No claims yet for this bonus.</p>}
+                                             {claimedUsers[b.id] ? (
+                                                claimedUsers[b.id].length > 0 ? (
+                                                    <Table>
+                                                        <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead></TableRow></TableHeader>
+                                                        <TableBody>
+                                                            {claimedUsers[b.id].map(u => (
+                                                                <TableRow key={u.uid}><TableCell>{u.firstName} {u.lastName}</TableCell><TableCell>{u.email}</TableCell></TableRow>
+                                                            ))}
+                                                        </TableBody>
+                                                    </Table>
+                                                ) : <p className="text-sm text-center text-muted-foreground p-4">No claims yet for this bonus.</p>
+                                             ) : <Skeleton className="h-24 w-full" />}
                                         </div>
                                     </AccordionContent>
                                 </AccordionItem>
