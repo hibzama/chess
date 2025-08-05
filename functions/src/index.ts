@@ -1,4 +1,5 @@
 
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -91,23 +92,23 @@ export const updateEventProgress = functions.firestore
       return null;
     }
 
-    // Use winnerId if it exists, otherwise fall back to userId (for non-resignation wins)
-    const winnerId = transaction.winnerId || transaction.userId;
+    // A payout is for a winner. The winnerId is the key.
+    const winnerId = transaction.winnerId;
     
-    // Exit if there's no valid winner recorded in the transaction
+    // If there's no winnerId, it's not a win, so no event progress.
     if (!winnerId) {
         functions.logger.log(`Exiting event progress for tx ${context.params.transactionId}: No winnerId found.`);
         return null;
     }
 
-    // If there was a resigner, ensure the winner is not the resigner.
-    if(transaction.resignerId && winnerId === transaction.resignerId) {
+    // Exit if the winner is the one who resigned.
+    if (transaction.resignerId && winnerId === transaction.resignerId) {
         functions.logger.log(`Exiting event progress for tx ${context.params.transactionId}: Winner was the resigner.`);
         return null;
     }
     
     const wagerAmount = transaction.gameWager || 0; 
-    // Correctly calculate net earning based on the actual payout vs the wager.
+    // Calculate net earning based on the actual payout vs the wager.
     const netEarning = transaction.amount - wagerAmount;
 
     // Get all active events
@@ -135,7 +136,7 @@ export const updateEventProgress = functions.firestore
               let progressIncrement = 0;
               
               if (event.targetType === 'winningMatches') {
-                  // A win is a win, regardless of method (checkmate, timeout, opponent resign), as long as they are the winnerId
+                  // A win is a win, as long as they are the winnerId
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
