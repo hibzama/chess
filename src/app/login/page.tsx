@@ -41,7 +41,7 @@ export default function LoginPage() {
       
       const userData = userDoc.data();
 
-      // Check for forced verification
+      // Check for forced verification by admin
       if (userData.emailVerified === false) {
           if (user.emailVerified === false) {
             // Send a new verification email just in case
@@ -50,12 +50,13 @@ export default function LoginPage() {
             router.push(`/verify-email?email=${email}`);
             toast({
                 title: "Verification Required",
-                description: "Please check your email to verify your account before logging in.",
+                description: "An admin has required you to verify your account. Please check your email to verify before logging in.",
             });
             return;
           } else {
-            // User has verified through Firebase, but admin hasn't re-enabled. For now, let's let them in.
-            // A more strict system could keep them out.
+            // User has verified through Firebase, but admin hasn't re-enabled them yet.
+            // For now, let's let them in if they've done their part. 
+            // A more strict system could keep them out until admin re-enables.
           }
       }
 

@@ -114,9 +114,9 @@ export default function UsersPage() {
                                 </TableCell>
                                  <TableCell>
                                     {user.emailVerified ? (
-                                        <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-none">Verified</Badge>
+                                        <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-none">Allowed</Badge>
                                     ) : (
-                                        <Badge variant="destructive">Not Verified</Badge>
+                                        <Badge variant="destructive">Verification Required</Badge>
                                     )}
                                 </TableCell>
                                 <TableCell className="text-right space-x-2">
