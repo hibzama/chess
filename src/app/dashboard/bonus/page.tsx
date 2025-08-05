@@ -61,12 +61,10 @@ export default function DailyBonusClaimPage() {
             
             const hasClaimed = bonus.claimedBy.includes(user.uid);
             const hasReachedLimit = bonus.claimedBy.length >= bonus.maxUsers;
-            const isZeroBalanceEligible = bonus.targetAudience === 'zero_balance' && userData.balance === 0;
-            const isAllPlayersEligible = bonus.targetAudience === 'all';
 
             if(hasClaimed) {
                 setBonusStatus('claimed');
-                setCountdown('Already claimed');
+                setCountdown('Already claimed today');
                 if (intervalRef.current) clearInterval(intervalRef.current);
                 return;
             }
@@ -89,7 +87,10 @@ export default function DailyBonusClaimPage() {
                 return;
             }
             
-            if (bonus.targetAudience === 'zero_balance' && !isZeroBalanceEligible) {
+            const isZeroBalanceEligible = bonus.targetAudience === 'zero_balance' && userData.balance === 0;
+            const isAllPlayersEligible = bonus.targetAudience === 'all';
+
+            if (!isAllPlayersEligible && !isZeroBalanceEligible) {
                 setBonusStatus('not_eligible');
                 setCountdown('Not eligible');
                 if (intervalRef.current) clearInterval(intervalRef.current);
@@ -191,7 +192,7 @@ export default function DailyBonusClaimPage() {
                 
                  <div className="grid grid-cols-2 gap-4 text-center">
                     <div className="p-3 bg-secondary/50 rounded-lg">
-                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Clock/> Time Left</p>
+                        <p className="text-sm text-muted-foreground flex items-center justify-center gap-1"><Clock/> {bonusStatus === 'not_started' ? 'Starts In' : 'Time Left'}</p>
                         <p className="text-lg font-semibold">{countdown}</p>
                     </div>
                     <div className="p-3 bg-secondary/50 rounded-lg">
