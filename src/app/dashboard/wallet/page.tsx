@@ -386,9 +386,12 @@ export default function WalletPage() {
                                 <span className="font-medium text-foreground">- LKR {withdrawalFee.toFixed(2)}</span>
                             </div>
                             <Separator/>
-                            <div className="flex justify-between font-bold">
+                             <div className="flex justify-between font-bold">
                                 <span>You will receive:</span>
-                                <span className="text-foreground">LKR {finalWithdrawalAmount.toFixed(2)}</span>
+                                <div className="text-right">
+                                    <p className="text-foreground">LKR {finalWithdrawalAmount.toFixed(2)}</p>
+                                    {withdrawalMethod === 'binance' && <p className="text-xs font-normal text-muted-foreground">~{(finalWithdrawalAmount / USDT_RATE).toFixed(2)} USDT</p>}
+                                </div>
                             </div>
                         </div>
 

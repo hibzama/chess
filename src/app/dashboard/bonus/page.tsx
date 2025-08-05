@@ -1,4 +1,5 @@
 
+
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -27,6 +28,8 @@ export interface Bonus {
     startTime: Timestamp;
     durationHours: number;
 }
+
+const USDT_RATE = 310;
 
 export default function DailyBonusClaimPage() {
     const { user, userData } = useAuth();
@@ -179,6 +182,7 @@ export default function DailyBonusClaimPage() {
         }, [bonus, hasUserClaimed, bonusClaimsCount, user, userData]);
 
         const bonusDisplayValue = bonus.bonusType === 'fixed' ? `LKR ${bonus.amount.toFixed(2)}` : `${bonus.percentage}%`;
+        const usdtValue = bonus.bonusType === 'fixed' ? `~${(bonus.amount / USDT_RATE).toFixed(2)} USDT` : null;
         const claimsLeft = Math.max(0, bonus.maxUsers - (bonusClaimsCount[bonus.id] || 0));
 
         return (
@@ -192,6 +196,7 @@ export default function DailyBonusClaimPage() {
                     <div className="p-6 bg-secondary/50 rounded-lg text-center space-y-2">
                         <p className="text-sm text-muted-foreground">Bonus Amount</p>
                         <p className="text-5xl font-bold text-primary">{bonusDisplayValue}</p>
+                        {usdtValue && <p className="text-sm text-muted-foreground">{usdtValue}</p>}
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-center">
                         <div className="p-3 bg-secondary/50 rounded-lg">
@@ -221,7 +226,7 @@ export default function DailyBonusClaimPage() {
                 <TabsTrigger value="history">Claim History</TabsTrigger>
             </TabsList>
             <TabsContent value="available">
-                 <div className="grid grid-cols-2 gap-6 mt-4">
+                 <div className="grid md:grid-cols-2 gap-6 mt-4">
                     {loading ? (
                         <>
                             <Skeleton className="h-96 w-full" />
@@ -251,7 +256,10 @@ export default function DailyBonusClaimPage() {
                                     <TableRow key={h.id}>
                                         <TableCell>{h.claimedAt ? format(h.claimedAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                                         <TableCell>{h.title}</TableCell>
-                                        <TableCell className="text-green-400 font-semibold">LKR {(h.amount || 0).toFixed(2)}</TableCell>
+                                        <TableCell className="text-green-400 font-semibold">
+                                            <div>LKR {(h.amount || 0).toFixed(2)}</div>
+                                            <div className="text-xs font-normal text-muted-foreground">~{((h.amount || 0) / USDT_RATE).toFixed(2)} USDT</div>
+                                        </TableCell>
                                     </TableRow>
                                 )) : <TableRow><TableCell colSpan={3} className="text-center h-24">You haven't claimed any bonuses yet.</TableCell></TableRow>}
                             </TableBody>
