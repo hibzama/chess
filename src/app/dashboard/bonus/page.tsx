@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp, updateDoc, arrayUnion, increment, runTransaction, getDoc, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, updateDoc, arrayUnion, increment, runTransaction, getDoc, setDoc, serverTimestamp, collection, getDocs, where, query, writeBatch, documentId } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Percent } from 'lucide-react';
@@ -287,5 +287,3 @@ export default function DailyBonusClaimPage() {
         </Card>
     );
 }
-
-    
