@@ -73,12 +73,31 @@ export default function DashboardPage() {
       redirect('/login');
     }
     
-    const summaryCards = [
-        { title: "Wallet Balance", value: userData?.balance, description: "Your current available funds.", colorClass: "text-primary" },
-        { title: "Total Deposit", value: stats.totalDeposit, description: "All funds you've added.", colorClass: "text-green-500" },
-        { title: "Total Withdrawals", value: stats.totalWithdrawal, description: "All funds you've taken out.", colorClass: "text-red-500" },
-        { title: "Total Earnings", value: stats.totalEarning, description: "Your net profit from games.", colorClass: "text-yellow-500" },
-    ];
+    const summaryCards = {
+        balance: { title: "Wallet Balance", value: userData?.balance, description: "Your current available funds.", colorClass: "text-primary" },
+        earnings: { title: "Total Earnings", value: stats.totalEarning, description: "Your net profit from games.", colorClass: "text-yellow-500" },
+        deposit: { title: "Total Deposit", value: stats.totalDeposit, description: "All funds you've added.", colorClass: "text-green-500" },
+        withdrawals: { title: "Total Withdrawals", value: stats.totalWithdrawal, description: "All funds you've taken out.", colorClass: "text-red-500" },
+    };
+
+    const StatCard = ({ card }: { card: typeof summaryCards.balance }) => (
+         <Card className="bg-card/50">
+            <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+            </CardHeader>
+            <CardContent>
+                 {statsLoading ? (
+                    <Skeleton className="h-8 w-3/4" />
+                ) : (
+                    <div>
+                        <div className={cn("text-3xl font-bold", card.colorClass)}>LKR {card.value?.toFixed(2) ?? '0.00'}</div>
+                        <p className="text-xs text-muted-foreground">~{((card.value ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
+                    </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">{card.description}</p>
+            </CardContent>
+        </Card>
+    );
 
   const mainActions = [
     { title: "Practice Games", description: "Play for free against the bot", icon: Sword, href: "/practice" },
@@ -102,25 +121,13 @@ export default function DashboardPage() {
        </div>
 
       <div className="grid gap-6">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {summaryCards.map((card) => (
-                <Card key={card.title} className="bg-card/50">
-                    <CardHeader>
-                        <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                         {statsLoading ? (
-                            <Skeleton className="h-8 w-3/4" />
-                        ) : (
-                            <div>
-                                <div className={cn("text-3xl font-bold", card.colorClass)}>LKR {card.value?.toFixed(2) ?? '0.00'}</div>
-                                <p className="text-xs text-muted-foreground">~{((card.value ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
-                            </div>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-2">{card.description}</p>
-                    </CardContent>
-                </Card>
-            ))}
+        <div className="grid grid-cols-2 gap-6">
+            <StatCard card={summaryCards.balance} />
+            <StatCard card={summaryCards.earnings} />
+        </div>
+        <div className="grid grid-cols-2 gap-6">
+            <StatCard card={summaryCards.deposit} />
+            <StatCard card={summaryCards.withdrawals} />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
