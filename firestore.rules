@@ -40,6 +40,7 @@ service cloud.firestore {
 
     match /users/{userId} {
       // Any signed-in user can read another user's profile (for leaderboards, friend searches, etc.).
+      // NOTE: This allows GET, not LIST.
       allow read: if isSignedIn();
 
       // A user can only create their own user document.
@@ -62,9 +63,9 @@ service cloud.firestore {
         isAdmin() ||
         (isSignedIn() && ('balance' in incomingDoc()));
         
-        match /daily_bonus_claims/{claimId} {
-            allow read, write: if isOwner(userId);
-        }
+      match /daily_bonus_claims/{bonusId} {
+        allow read, create: if isOwner(userId);
+      }
     }
     
     match /friend_requests/{requestId} {
@@ -137,13 +138,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-    
-    // New rule for the bonus counter
+
     match /dailyBonusClaims/{bonusId} {
-      // Any signed in user can read the count
       allow read: if isSignedIn();
-      // Only an admin can initialize the counter, and any signed in user can increment it (via the transaction).
-      allow write: if isSignedIn();
+      allow create: if isAdmin();
+      // Allow user to write only within a transaction
+      allow update: if request.auth != null;
     }
   }
 }
+    

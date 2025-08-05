@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp, collection, getDocs, where, query, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, collection, getDocs, where, query, writeBatch, documentId } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,21 +57,37 @@ export default function DailyBonusPage() {
 
     const fetchClaimedUsers = async (bonusId: string) => {
         if (!bonusId) return;
-        
-        // This query might become slow with many users, but is fine for admin use.
-        // It queries the subcollection within each user doc.
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        const userPromises = usersSnapshot.docs.map(async (userDoc) => {
-            const claimRef = doc(db, 'users', userDoc.id, 'daily_bonus_claims', bonusId);
-            const claimSnap = await getDoc(claimRef);
-            if (claimSnap.exists()) {
-                return { ...userDoc.data(), uid: userDoc.id } as ClaimedUser;
-            }
-            return null;
-        });
 
-        const users = (await Promise.all(userPromises)).filter(u => u !== null) as ClaimedUser[];
-        setClaimedUsers(users);
+        const claimsRef = doc(db, 'dailyBonusClaims', bonusId);
+        const claimsSnap = await getDoc(claimsRef);
+
+        if (claimsSnap.exists()) {
+            const claimsData = claimsSnap.data();
+            const claimedUids = claimsData.claimedByUids || [];
+            
+            if (claimedUids.length > 0) {
+                 // Fetch user documents in batches of 10 to avoid firestore limitations
+                const userDocsPromises = [];
+                for (let i = 0; i < claimedUids.length; i += 10) {
+                    const batchUids = claimedUids.slice(i, i + 10);
+                    const usersQuery = query(collection(db, 'users'), where(documentId(), 'in', batchUids));
+                    userDocsPromises.push(getDocs(usersQuery));
+                }
+                
+                const userDocsSnapshots = await Promise.all(userDocsPromises);
+                const users: ClaimedUser[] = [];
+                userDocsSnapshots.forEach(snapshot => {
+                    snapshot.docs.forEach(doc => {
+                         users.push({ ...doc.data(), uid: doc.id } as ClaimedUser)
+                    });
+                });
+                setClaimedUsers(users);
+            } else {
+                 setClaimedUsers([]);
+            }
+        } else {
+            setClaimedUsers([]);
+        }
     };
 
     useEffect(() => {
@@ -102,11 +118,10 @@ export default function DailyBonusPage() {
             };
             batch.set(bonusRef, bonusPayload, { merge: true });
 
-            // Initialize or update the counter document
             const counterRef = doc(db, 'dailyBonusClaims', bonus.id!);
             const counterSnap = await getDoc(counterRef);
             if (!counterSnap.exists()) {
-                batch.set(counterRef, { count: 0 });
+                batch.set(counterRef, { count: 0, claimedByUids: [] });
             }
 
             await batch.commit();
@@ -279,3 +294,5 @@ export default function DailyBonusPage() {
         </div>
     )
 }
+
+    

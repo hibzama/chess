@@ -177,7 +177,10 @@ export default function DailyBonusClaimPage() {
 
                 transaction.update(userRef, { balance: increment(bonusAmountToGive) });
                 transaction.set(userClaimRef, { claimedAt: serverTimestamp() });
-                transaction.update(counterRef, { count: increment(1) });
+                transaction.update(counterRef, { 
+                    count: increment(1),
+                    claimedByUids: arrayUnion(user.uid) 
+                });
                 
                 toast({ title: 'Success!', description: `LKR ${bonusAmountToGive.toFixed(2)} has been added to your wallet.` });
             });
@@ -284,3 +287,5 @@ export default function DailyBonusClaimPage() {
         </Card>
     );
 }
+
+    
