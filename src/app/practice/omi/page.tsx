@@ -8,41 +8,43 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ArrowLeft, Spade, Heart, Diamond, Club, Repeat, Trophy } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const suitIcons: { [key: string]: React.ReactNode } = {
-    s: <Spade className="w-full h-full fill-current text-foreground" />,
-    h: <Heart className="w-full h-full fill-current text-red-500" />,
-    d: <Diamond className="w-full h-full fill-current text-red-500" />,
-    c: <Club className="w-full h-full fill-current text-foreground" />,
+    s: <Spade className="w-full h-full fill-current" />,
+    h: <Heart className="w-full h-full fill-current" />,
+    d: <Diamond className="w-full h-full fill-current" />,
+    c: <Club className="w-full h-full fill-current" />,
 };
 
 const suitColors = {
-    s: 'text-foreground',
-    h: 'text-red-500',
-    d: 'text-red-500',
-    c: 'text-foreground',
+    s: 'text-black',
+    h: 'text-red-600',
+    d: 'text-red-600',
+    c: 'text-black',
 }
 
 const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
     const numericRank = parseInt(rank, 10);
     const Icon = suitIcons[suit];
 
-    if (isNaN(numericRank) || numericRank < 7 || numericRank > 9) { // A, K, Q, J, T
-        return (
+    if (isNaN(numericRank)) { // A, K, Q, J, T
+         return (
             <div className={cn("absolute inset-0 flex items-center justify-center", suitColors[suit])}>
-                <span className="text-8xl font-bold opacity-10">{rank.toUpperCase()}</span>
+                <span className="text-8xl font-bold opacity-10 select-none">{rank.toUpperCase()}</span>
             </div>
         );
     }
     
-    // Specific layouts for 7, 8, 9
+    // Layouts for 7, 8, 9, 10
     const pipLayouts: { [key: number]: string[] } = {
         7: ['col-start-2 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-2 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5'],
-        8: ['col-start-2 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5'],
-        9: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-2 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5', 'col-start-2 row-start-3'],
+        8: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-2 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5'],
+        9: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5'],
+       10: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5', 'col-start-2 row-start-6'],
     };
 
-    const gridClass = 'grid-cols-3 grid-rows-5';
+    const gridClass = numericRank === 10 ? 'grid-cols-3 grid-rows-6' : 'grid-cols-3 grid-rows-5';
     
     return (
         <div className={cn("absolute inset-y-8 inset-x-2 grid place-items-center", gridClass)}>
@@ -144,7 +146,7 @@ const TrumpSelector = ({ onSelectTrump, onPass }) => (
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4 py-4">
                 {Object.entries(suitIcons).map(([suit, icon]) => (
-                    <Button key={suit} variant="outline" className="h-20" onClick={() => onSelectTrump(suit as 's'|'h'|'d'|'c')}>
+                    <Button key={suit} variant="outline" className={cn("h-20", suitColors[suit])} onClick={() => onSelectTrump(suit as 's'|'h'|'d'|'c')}>
                         <div className="w-8 h-8">{icon}</div>
                     </Button>
                 ))}
@@ -164,7 +166,7 @@ const GameHeader = ({ scores, trumpSuit }) => (
              <div className="font-bold text-sm">Tricks</div>
              <div className="flex gap-4 items-center">
                 <span className="text-2xl font-bold">{scores.tricks1}</span>
-                <div className="w-10 h-10 p-1.5 bg-card rounded-full shadow-inner">{trumpSuit ? suitIcons[trumpSuit] : '?'}</div>
+                <div className={cn("w-10 h-10 p-1.5 bg-card rounded-full shadow-inner", trumpSuit ? suitColors[trumpSuit] : 'text-white')}>{trumpSuit ? suitIcons[trumpSuit] : '?'}</div>
                 <span className="text-2xl font-bold">{scores.tricks2}</span>
              </div>
         </div>
@@ -226,10 +228,10 @@ const OmiGameUI = () => {
 
             <div className="relative flex-1 w-full flex items-center justify-center my-4">
                  <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 2} />
-                 <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
-                 <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
+                 <PlayerDisplay player={players[1]} position="left-12 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
+                 <PlayerDisplay player={players[3]} position="right-12 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
 
-                 <div className="absolute w-[450px] h-[300px] bg-green-800/80 rounded-3xl border-8 border-yellow-900 shadow-2xl overflow-hidden">
+                 <div className="absolute w-[450px] h-[300px] bg-green-800 rounded-3xl border-8 border-black shadow-2xl overflow-hidden">
                     <div className="absolute inset-0 bg-black/10"></div>
                     <TrickArea trick={trick} />
                 </div>
@@ -277,7 +279,7 @@ const OmiGameUI = () => {
 export default function OmiPage() {
     return (
         <OmiGameProvider>
-            <div className="w-full max-w-lg mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-900 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
+            <div className="w-full max-w-lg mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-950 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
                 <div className="p-2">
                     <Link href="/practice" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" />
