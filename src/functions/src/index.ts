@@ -88,8 +88,8 @@ export const processCommissions = functions.firestore
         const beforeData = change.before.data();
         const afterData = change.after.data();
 
-        // 1. Only run when a game is completed
-        if (beforeData.status !== 'completed' && afterData.status === 'completed') {
+        // 1. Only run when a game is completed and not on a draw
+        if (beforeData.status !== 'completed' && afterData.status === 'completed' && !afterData.draw) {
             const gameWager = afterData.wager || 0;
             if (gameWager <= 0) {
                 functions.logger.log(`Game ${gameRoomId}: Skipping commissions for zero wager game.`);
