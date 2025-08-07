@@ -73,21 +73,21 @@ const PlayerDisplay = ({ player, position, isCurrent, isDealer, handSize }) => {
 
 const TrickArea = ({ trick }) => {
     const trickPositions = [
-        { bottom: 'calc(50% - 4.5rem)', left: '50%', transform: 'translateX(-50%) rotate(0deg)' }, // Player 0 (You)
-        { left: 'calc(50% - 9rem)', top: '50%', transform: 'translateY(-50%) rotate(90deg)' }, // Player 1 (Left)
-        { top: 'calc(50% - 4.5rem)', left: '50%', transform: 'translateX(-50%) rotate(180deg)' }, // Player 2 (Partner)
-        { right: 'calc(50% - 9rem)', top: '50%', transform: 'translateY(-50%) rotate(-90deg)' }, // Player 3 (Right)
+        { bottom: 'calc(50% - 9rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 0 (You)
+        { left: 'calc(50% - 12rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 1 (Left)
+        { top: 'calc(50% - 9rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 2 (Partner)
+        { right: 'calc(50% - 12rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 3 (Right)
     ];
 
     return (
         <div className="relative w-full h-full">
             <AnimatePresence>
-                {trick.map((play) => (
+                {trick.map((play, index) => (
                     <motion.div
                         key={play.player}
                         layoutId={`trick-${play.card}`}
                         className="absolute"
-                        style={trickPositions[play.player]}
+                        style={{ ...trickPositions[play.player], zIndex: index }}
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.2 }}
@@ -206,16 +206,17 @@ const OmiGameUI = () => {
                  <div className="relative w-full h-48 flex justify-center items-end">
                     {userPlayer.hand.map((card, i) => {
                         const handSize = userPlayer.hand.length;
-                        const anglePerCard = Math.min(10, 80 / handSize);
+                        const anglePerCard = 10;
                         const totalAngle = (handSize - 1) * anglePerCard;
                         const rotation = (i * anglePerCard) - (totalAngle / 2);
+                        const cardOffset = Math.abs(rotation) / 2; // Make center cards higher
                         
                         return (
                             <div
                                 key={card}
                                 className="absolute bottom-0"
                                 style={{
-                                    transform: `rotate(${rotation}deg)`,
+                                    transform: `rotate(${rotation}deg) translateY(${cardOffset}px)`,
                                     transformOrigin: `50% 25rem`, // Pivot from a point far below the cards
                                     zIndex: i,
                                 }}
