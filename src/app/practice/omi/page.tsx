@@ -1,4 +1,5 @@
 
+
 'use client';
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -248,27 +249,15 @@ const OmiGameUI = () => {
              <div className="relative w-full h-48 flex justify-center items-end">
                 <PlayerDisplay player={players[0]} position="bottom-44 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 0} />
                 {isUserTurn && phase === 'playing' && <div className="absolute -bottom-8 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Your Turn...</div>}
-                <div className="relative w-full h-48 flex justify-center items-end -bottom-8">
-                     <AnimatePresence>
-                        {userPlayer.hand.map((card, i) => {
-                             const handSize = userPlayer.hand.length;
-                             const arc = 120; // Arc of the fan in degrees
-                             const radius = 350; // Radius of the arc
-                             
-                             const angleStep = handSize > 1 ? arc / (handSize - 1) : 0;
-                             const startAngle = -arc / 2;
-                             const angle = startAngle + i * angleStep;
-                             
-                             const x = radius * Math.sin((angle * Math.PI) / 180);
-                             const y = radius * (1 - Math.cos((angle * Math.PI) / 180));
-                             
-                            return (
+                 <div className="relative w-full h-48 flex justify-center items-end -bottom-8">
+                     <div className="flex justify-center items-end">
+                        <AnimatePresence>
+                            {userPlayer.hand.map((card, i) => (
                                 <motion.div
                                     key={card}
-                                    className="absolute origin-bottom-center"
+                                    className="absolute"
                                     style={{
-                                        bottom: `${y}px`,
-                                        transform: `translateX(${x}px) rotate(${angle}deg)`,
+                                        transform: `translateX(${(i - userPlayer.hand.length / 2) * 30}px)`,
                                         zIndex: i,
                                     }}
                                 >
@@ -279,9 +268,9 @@ const OmiGameUI = () => {
                                         isCurrentUser={true}
                                     />
                                 </motion.div>
-                            )
-                        })}
-                    </AnimatePresence>
+                            ))}
+                        </AnimatePresence>
+                    </div>
                 </div>
             </div>
         </div>
