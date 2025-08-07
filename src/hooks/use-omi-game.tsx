@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 
@@ -28,7 +27,6 @@ interface OmiGameState {
 const SUITS: Suit[] = ['s', 'h', 'd', 'c'];
 const RANKS: Rank[] = ['a', 'k', 'q', 'j', 't', '9', '8', '7'];
 const RANK_VALUE: Record<Rank, number> = { 'a': 8, 'k': 7, 'q': 6, 'j': 5, 't': 4, '9': 3, '8': 2, '7': 1 };
-
 
 const createDeck = (): Card[] => {
     const cards: Card[] = [];

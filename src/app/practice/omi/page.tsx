@@ -28,38 +28,36 @@ const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
     const numericRank = parseInt(rank, 10);
     const Icon = suitIcons[suit];
 
-    if (isNaN(numericRank) && rank !== 't') { // A, K, Q, J
-         return (
+    // For face cards and Aces, show a large, faint rank in the center.
+    if (isNaN(numericRank) || rank === 't') { // A, K, Q, J, 10(t)
+        const displayRank = rank === 't' ? '10' : rank.toUpperCase();
+        return (
             <div className={cn("absolute inset-0 flex items-center justify-center", suitColors[suit])}>
-                <span className="text-8xl font-bold opacity-10 select-none">{rank.toUpperCase()}</span>
+                <span className="text-8xl font-bold opacity-10 select-none">{displayRank}</span>
             </div>
         );
     }
     
-    // Layouts for 7, 8, 9, 10
+    // Layouts for number cards 7, 8, 9
     const pipLayouts: { [key: number]: string[] } = {
         7: ['col-start-2 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-2 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5'],
         8: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5', 'col-start-1 row-start-6', 'col-start-3 row-start-6'],
         9: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5'],
-       10: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5', 'col-start-2 row-start-6'],
     };
     
-    const isTen = numericRank === 10 || rank === 't';
-    const gridClass = isTen ? 'grid-cols-3 grid-rows-6' : 'grid-cols-3 grid-rows-5';
-    const pipsToShow = isTen ? pipLayouts[10] : pipLayouts[numericRank];
-
+    const pipsToShow = pipLayouts[numericRank];
     if (!pipsToShow) return null;
 
     return (
-        <div className={cn("absolute inset-y-8 inset-x-2 grid place-items-center", gridClass)}>
-            {(pipsToShow).map((pos, i) => (
+        <div className="absolute inset-y-8 inset-x-2 grid grid-cols-3 grid-rows-6 place-items-center">
+            {pipsToShow.map((pos, i) => (
                 <div key={i} className={cn("w-4 h-4", pos, suitColors[suit])}>{Icon}</div>
             ))}
         </div>
     )
 }
 
-const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style }: { card: string, onPlay?: (card: string) => void, isPlayable?: boolean, isCurrentUser?: boolean, style?: React.CSSProperties }) => {
+const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser }: { card: string, onPlay?: (card: string) => void, isPlayable?: boolean, isCurrentUser?: boolean }) => {
     const [suit, rank] = card.split('');
     const Icon = suitIcons[suit];
     const colorClass = suitColors[suit];
@@ -75,7 +73,6 @@ const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style }: { card:
                 isPlayable ? "border-primary hover:-translate-y-4 hover:shadow-primary/30" : "border-black/20",
                 !isPlayable && isCurrentUser && "cursor-not-allowed opacity-60"
             )}
-            style={style}
             initial={{ opacity: 0, y: 50, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 50, scale: 0.5, transition: { duration: 0.2 } }}
@@ -114,14 +111,13 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 };
 
 const TrickArea = ({ trick }) => {
-    // Player 0: Bottom, Player 1: Left, Player 2: Top, Player 3: Right
+    // Correct positions for each player's card on the board.
     const basePositions: React.CSSProperties[] = [
-        { top: '50%', left: '50%', transform: 'translate(-50%, 15%)' },     // Player 0 (Bottom)
-        { top: '50%', left: '50%', transform: 'translate(-120%, -50%) rotate(90deg)' },  // Player 1 (Left)
-        { top: '50%', left: '50%', transform: 'translate(-50%, -115%) rotate(180deg)' }, // Player 2 (Top)
-        { top: '50%', left: '50%', transform: 'translate(20%, -50%) rotate(-90deg)' }, // Player 3 (Right)
+        { top: '50%', left: '50%', transform: 'translate(-50%, 25%)' },     // Player 0 (Bottom)
+        { top: '50%', left: '50%', transform: 'translate(-150%, -50%) rotate(90deg)' },  // Player 1 (Left)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -125%) rotate(180deg)' }, // Player 2 (Top)
+        { top: '50%', left: '50%', transform: 'translate(50%, -50%) rotate(-90deg)' }, // Player 3 (Right)
     ];
-
 
     return (
         <div className="relative w-full h-full">
@@ -186,7 +182,6 @@ const GameHeader = ({ scores, trumpSuit }) => (
     </div>
 );
 
-
 const OmiGameUI = () => {
     const { gameState, actions } = useOmiGame();
 
@@ -236,22 +231,21 @@ const OmiGameUI = () => {
             <GameHeader scores={scores} trumpSuit={trumpSuit} />
 
             <div className="relative flex-1 w-full flex items-center justify-center my-4">
-                <PlayerDisplay player={players[2]} position="top-[-4rem] left-1/2 -translate-x-1/2" isDealer={dealerIndex === 2} />
-                <PlayerDisplay player={players[1]} position="left-[-4rem] top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
-                <PlayerDisplay player={players[3]} position="right-[-4rem] top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
+                <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 2} />
+                <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
+                <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
 
-                 <div className="absolute w-[450px] h-[300px] bg-[#65a30d]/50 rounded-3xl border-8 border-black shadow-2xl overflow-hidden">
+                 <div className="absolute w-[500px] h-[350px] bg-green-800/80 rounded-3xl border-8 border-black shadow-2xl overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/felt.png')]">
                     <div className="absolute inset-0 bg-black/10"></div>
                      <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-48 h-48 rounded-full border-2 border-yellow-300/20"></div>
                     </div>
                     <TrickArea trick={trick} />
                 </div>
-                 {isUserTurn && <div className="absolute -bottom-8 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Your Turn...</div>}
             </div>
-
-            <div className="relative w-full h-48 flex justify-center items-end">
+             <div className="relative w-full h-48 flex justify-center items-end">
                 <PlayerDisplay player={players[0]} position="bottom-44 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 0} />
+                {isUserTurn && <div className="absolute -bottom-8 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Your Turn...</div>}
                 <div className="relative w-full h-48 flex justify-center items-center -bottom-8">
                      <AnimatePresence>
                         {userPlayer.hand.map((card, i) => {
@@ -259,11 +253,11 @@ const OmiGameUI = () => {
                              const isEven = handSize % 2 === 0;
                              const midIndex = Math.floor(handSize / 2);
                              const position = i - midIndex;
-                             const xOffset = isEven ? (position + 0.5) * 35 : position * 35;
+                             const xOffset = isEven ? (position + 0.5) * 45 : position * 45;
                              const rotation = isEven ? (position + 0.5) * 5 : position * 5;
                             
                             return (
-                                <div
+                                <motion.div
                                     key={card}
                                     className="absolute origin-bottom"
                                     style={{
@@ -278,7 +272,7 @@ const OmiGameUI = () => {
                                         isPlayable={playableCards.has(card)}
                                         isCurrentUser={true}
                                     />
-                                </div>
+                                </motion.div>
                             )
                         })}
                     </AnimatePresence>
@@ -291,7 +285,7 @@ const OmiGameUI = () => {
 export default function OmiPage() {
     return (
         <OmiGameProvider>
-            <div className="w-full max-w-5xl mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-950 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
+            <div className="w-full max-w-7xl mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-950 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
                 <div className="p-2">
                     <Link href="/practice" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" />
