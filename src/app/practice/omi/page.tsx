@@ -55,7 +55,7 @@ const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
     )
 }
 
-const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser }) => {
+const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style }: { card: string, onPlay?: (card: string) => void, isPlayable?: boolean, isCurrentUser?: boolean, style?: React.CSSProperties }) => {
     const [suit, rank] = card.split('');
     const Icon = suitIcons[suit];
     const colorClass = suitColors[suit];
@@ -63,13 +63,14 @@ const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser }) => {
     return (
         <motion.div
             layoutId={`card-${card}`}
-            onClick={() => isPlayable && onPlay(card)}
+            onClick={() => isPlayable && onPlay && onPlay(card)}
             className={cn(
-                "w-24 h-36 bg-white rounded-lg shadow-md flex flex-col p-1 border-2 relative transition-all duration-300",
+                "w-24 h-36 bg-white rounded-lg shadow-md flex flex-col p-1 border-2 relative transition-all duration-300 origin-bottom",
                 isCurrentUser && "cursor-pointer",
                 isPlayable ? "border-primary hover:-translate-y-4 hover:shadow-primary/30" : "border-black/20",
                 !isPlayable && isCurrentUser && "cursor-not-allowed opacity-60"
             )}
+            style={style}
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
@@ -111,12 +112,13 @@ const PlayerDisplay = ({ player, position, isCurrent, isDealer }) => {
     );
 };
 
-const TrickArea = ({ trick, players }) => {
+const TrickArea = ({ trick }) => {
+    // Positions relative to the center of the table
     const basePositions = [
-        { bottom: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%) rotate(0deg)' }, // Player 0 (You)
-        { left: 'calc(50% - 11rem)', top: '50%', transform: 'translateY(-50%) rotate(90deg)' }, // Player 1 (Left)
-        { top: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%) rotate(180deg)' }, // Player 2 (Partner)
-        { right: 'calc(50% - 11rem)', top: '50%', transform: 'translateY(-50%) rotate(-90deg)' }, // Player 3 (Right)
+        { bottom: '1rem', left: '50%', transform: 'translateX(-50%)' }, // Player 0 (You)
+        { left: '1rem', top: '50%', transform: 'translateY(-50%)' }, // Player 1 (Left)
+        { top: '1rem', left: '50%', transform: 'translateX(-50%)' }, // Player 2 (Partner)
+        { right: '1rem', top: '50%', transform: 'translateY(-50%)' }, // Player 3 (Right)
     ];
 
     return (
@@ -132,7 +134,7 @@ const TrickArea = ({ trick, players }) => {
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.2 }}
                     >
-                         <PlayingCard card={play.card} onPlay={() => {}} isPlayable={false} isCurrentUser={false} />
+                         <PlayingCard card={play.card} />
                     </motion.div>
                 ))}
             </AnimatePresence>
@@ -229,13 +231,14 @@ const OmiGameUI = () => {
 
             {/* Players & Table */}
             <div className="relative flex-1 w-full flex items-center justify-center my-4">
+                 <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 2} isDealer={dealerIndex === 2} />
+                 <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 1} isDealer={dealerIndex === 1} />
+                 <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 3} isDealer={dealerIndex === 3} />
+
                 <div className="absolute w-[450px] h-[300px] bg-green-700 rounded-3xl border-8 border-yellow-900 shadow-2xl overflow-hidden">
                     <div className="absolute inset-0 bg-black/10"></div>
-                    <TrickArea trick={trick} players={players} />
+                    <TrickArea trick={trick} />
                 </div>
-                <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 2} isDealer={dealerIndex === 2} />
-                <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 1} isDealer={dealerIndex === 1} />
-                <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 3} isDealer={dealerIndex === 3} />
             </div>
 
 
@@ -246,11 +249,9 @@ const OmiGameUI = () => {
                      <AnimatePresence>
                         {userPlayer.hand.map((card, i) => {
                             const handSize = userPlayer.hand.length;
-                            const cardWidth = 96; // width of card
-                            const overlap = cardWidth * 0.6; // overlap factor
-                            const totalWidth = (handSize - 1) * overlap + cardWidth;
+                            const totalWidth = handSize * 40; // Approx total width
                             const startX = -totalWidth / 2;
-                            const x = startX + i * overlap;
+                            const x = startX + i * 40;
                             
                             return (
                                 <div
@@ -292,4 +293,3 @@ export default function OmiPage() {
         </OmiGameProvider>
     );
 }
-
