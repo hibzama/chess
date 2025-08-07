@@ -43,7 +43,7 @@ const shuffleDeck = (deck: Card[]): Card[] => {
 const useOmiGameLogic = () => {
     const [gameState, setGameState] = useState<OmiGameState | null>(null);
 
-    const initializeGame = useCallback((dealerIdx = Math.floor(Math.random() * 4)) => {
+    const initializeGame = useCallback((dealerIdx = Math.floor(Math.random() * 4), scores = { team1: 0, team2: 0, tricks1: 0, tricks2: 0 }) => {
         const players: Player[] = [
             { id: 0, name: 'You', hand: [], isBot: false },
             { id: 1, name: 'Bot 1', hand: [], isBot: true },
@@ -61,13 +61,15 @@ const useOmiGameLogic = () => {
             currentPlayerIndex: (dealerIdx + 1) % 4,
             dealerIndex: dealerIdx,
             trumpCaller: null,
-            scores: { team1: 0, team2: 0, tricks1: 0, tricks2: 0 },
+            scores: scores,
         });
     }, []);
 
     useEffect(() => {
-        initializeGame();
-    }, [initializeGame]);
+        if (!gameState) {
+            initializeGame();
+        }
+    }, [initializeGame, gameState]);
 
     const handleNewGame = useCallback(() => {
         initializeGame();
@@ -143,7 +145,9 @@ const useOmiGameLogic = () => {
             // deal remaining cards
             for(let i=0; i < 9; i++) {
                 for(let p=0; p < 4; p++) {
-                    newPlayers[p].hand.push(newDeck.pop()!);
+                    if (newDeck.length > 0) {
+                        newPlayers[p].hand.push(newDeck.pop()!);
+                    }
                 }
             }
             return { ...gs, phase: 'playing', trumpSuit: suit, trumpCaller: gs.currentPlayerIndex, players: newPlayers, deck: newDeck };
@@ -156,7 +160,7 @@ const useOmiGameLogic = () => {
             const nextPlayer = (gs.currentPlayerIndex + 1) % 4;
             // If it comes back to the dealer and they pass, re-deal.
             if (nextPlayer === (gs.dealerIndex + 1) % 4) {
-                initializeGame((gs.dealerIndex + 1) % 4);
+                initializeGame((gs.dealerIndex + 1) % 4, gs.scores);
                 return null;
             }
             return { ...gs, currentPlayerIndex: nextPlayer };
@@ -196,12 +200,12 @@ const useOmiGameLogic = () => {
             newScores.tricks2++;
         }
 
-        let nextPhase = 'playing';
+        let nextPhase: GamePhase = 'playing';
         if (currentState.players[0].hand.length === 0) {
             nextPhase = 'scoring';
         }
 
-        return { ...currentState, scores: newScores, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase as GamePhase };
+        return { ...currentState, scores: newScores, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase };
 
     }, []);
 
@@ -231,7 +235,7 @@ const useOmiGameLogic = () => {
                        // After trick ends, check if round is over
                        if (updatedState.phase === 'scoring') {
                            const { trumpCaller, scores } = updatedState;
-                           const newOverallScores = { ...scores };
+                           const newOverallScores = { ...scores, tricks1: 0, tricks2: 0 };
                            const callingTeamIs1 = trumpCaller === 0 || trumpCaller === 2;
                            
                            if (callingTeamIs1) {
@@ -247,7 +251,7 @@ const useOmiGameLogic = () => {
                            } else {
                                // Start new round
                                const newDealer = (updatedState.dealerIndex + 1) % 4;
-                               initializeGame(newDealer);
+                               initializeGame(newDealer, newOverallScores);
                                return null; // Let initialize handle the new state
                            }
                        }
@@ -274,7 +278,7 @@ const useOmiGameLogic = () => {
 
 const OmiGameContext = createContext<ReturnType<typeof useOmiGameLogic> | undefined>(undefined);
 
-export const OmiGameProvider = ({ children }) => {
+export const OmiGameProvider = ({ children }: { children: React.ReactNode }) => {
     const game = useOmiGameLogic();
     return (
         <OmiGameContext.Provider value={game}>
