@@ -1,3 +1,4 @@
+
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -204,7 +205,8 @@ function MultiplayerGame() {
     const handleJoinGame = async () => {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
-        if(userData.balance < room.wager) {
+        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+        if(totalBalance < room.wager) {
             toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have enough balance to join this game."});
             return;
         }
@@ -214,9 +216,6 @@ function MultiplayerGame() {
 
         try {
             await runTransaction(db, async (transaction) => {
-                // =================================================================
-                //  READ PHASE: Perform all reads upfront.
-                // =================================================================
                 const currentRoomDoc = await transaction.get(roomRef);
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
                     throw new Error("Room not available");
@@ -225,32 +224,29 @@ function MultiplayerGame() {
         
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
-        
-                const playerDocs = await Promise.all([
+                
+                const [creatorDoc, joinerDoc] = await Promise.all([
                     transaction.get(creatorRef),
                     transaction.get(joinerRef)
                 ]);
 
-                if (playerDocs.some(doc => !doc.exists())) {
+                if (!creatorDoc.exists() || !joinerDoc.exists()) {
                     throw new Error("One of the players does not exist");
                 }
                 
-                const [creatorDoc, joinerDoc] = playerDocs;
                 const creatorData = creatorDoc.data();
                 const joinerData = joinerDoc.data();
-
-                if ((creatorData?.balance || 0) < roomData.wager) {
+                
+                const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
+                if (creatorTotalBalance < roomData.wager) {
                     throw new Error("Creator has insufficient funds.");
                 }
 
-                // =================================================================
-                //  WRITE PHASE: Perform all writes now that reads are done.
-                // =================================================================
+                // --- ALL READS ARE DONE. START WRITES. ---
 
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
-                // 1. Update Game Room
                 transaction.update(roomRef, {
                     status: 'in-progress',
                     player2: { uid: user.uid, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
@@ -261,57 +257,27 @@ function MultiplayerGame() {
         
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-                    const players = [
-                        { id: creatorRef.id, name: roomData.createdBy.name, data: creatorData },
-                        { id: joinerRef.id, name: `${joinerData.firstName} ${joinerData.lastName}`, data: joinerData }
-                    ];
 
-                    for (const player of players) {
-                        // 2. Deduct Wager and create Wager Transaction
-                        transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
+                    const processWagerForPlayer = (playerData: any, playerId: string, playerName: string, opponentName: string) => {
+                        let bonusWagered = Math.min(wagerAmount, playerData.bonusBalance || 0);
+                        let mainWagered = wagerAmount - bonusWagered;
+                        
+                        const updatePayload: any = {};
+                        if (bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
+                        if (mainWagered > 0) updatePayload.balance = increment(-mainWagered);
+                        
+                        transaction.update(doc(db, 'users', playerId), updatePayload);
+
                         transaction.set(doc(collection(db, 'transactions')), {
-                            userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${roomData.gameType} game vs ${player.id === players[0].id ? players[1].name : players[0].name}`,
+                            userId: playerId, type: 'wager', amount: wagerAmount, status: 'completed',
+                            description: `Wager for ${roomData.gameType} vs ${opponentName}`,
+                            wagerSource: { main: mainWagered, bonus: bonusWagered },
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
-                        
-                        // 3. Process Marketer Commission
-                        if (player.data.referralChain && player.data.referralChain.length > 0) {
-                            const marketingCommissionRate = 0.03;
-                            for (let i = 0; i < player.data.referralChain.length && i < 20; i++) {
-                                const marketerId = player.data.referralChain[i];
-                                const commissionAmount = wagerAmount * marketingCommissionRate;
-                                transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
-                                transaction.set(doc(collection(db, 'transactions')), {
-                                    userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
-                                    description: `L${i + 1} Commission from ${player.name}`, fromUserId: player.id,
-                                    level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
-                                });
-                            }
-                        } 
-                        
-                        // 4. Process Regular User Commission
-                        if (player.data.referredBy) {
-                            const l1ReferrerId = player.data.referredBy;
-                            const l1ReferrerDoc = await getDoc(doc(db, 'users', l1ReferrerId));
-    
-                            if (l1ReferrerDoc.exists() && l1ReferrerDoc.data()?.role === 'user') {
-                                const l1ReferrerData = l1ReferrerDoc.data();
-                                const l1Count = l1ReferrerData.l1Count || 0; 
-                                const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
-                                const l1Commission = wagerAmount * l1Rate;
-        
-                                if (l1Commission > 0) {
-                                    transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
-                                    transaction.set(doc(collection(db, 'transactions')), {
-                                        userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
-                                        description: `L1 Commission from ${player.name}`, fromUserId: player.id,
-                                        level: 1, gameRoomId: room.id, createdAt: serverTimestamp()
-                                    });
-                                }
-                            }
-                        }
                     }
+
+                    processWagerForPlayer(creatorData, roomData.createdBy.uid, roomData.createdBy.name, joinerData.firstName);
+                    processWagerForPlayer(joinerData, user.uid, joinerData.firstName, roomData.createdBy.name);
                 }
             });
 
@@ -384,7 +350,8 @@ function MultiplayerGame() {
                 </div>
             )
         } else {
-            const hasEnoughBalance = userData.balance >= room.wager;
+            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+            const hasEnoughBalance = totalBalance >= room.wager;
 
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -416,7 +383,7 @@ function MultiplayerGame() {
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
-                                        You need at least LKR {room.wager.toFixed(2)} to join. Your current balance is LKR {userData.balance.toFixed(2)}.
+                                        You need at least LKR {room.wager.toFixed(2)} to join. Your current balance is LKR {totalBalance.toFixed(2)}.
                                     </CardDescription>
                                      <Button asChild variant="destructive">
                                         <Link href="/dashboard/wallet"><Wallet className="mr-2"/> Top Up Wallet</Link>

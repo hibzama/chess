@@ -93,9 +93,9 @@ export default function RegisterForm() {
             const snapshot = await getCountFromServer(usersCollection);
             const userCount = snapshot.data().count;
             
-            let initialBalance = 0;
+            let initialBonusBalance = 0;
             if (userCount < 250) {
-                initialBalance = 100;
+                initialBonusBalance = 100;
             }
 
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
@@ -114,7 +114,8 @@ export default function RegisterForm() {
                 country,
                 gender,
                 binancePayId: '',
-                balance: initialBalance,
+                balance: 0,
+                bonusBalance: initialBonusBalance,
                 commissionBalance: 0,
                 marketingBalance: 0,
                 role: 'user',

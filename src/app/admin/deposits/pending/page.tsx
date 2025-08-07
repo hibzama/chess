@@ -1,4 +1,5 @@
 
+
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -110,9 +111,15 @@ export default function PendingDepositsPage() {
         try {
             if (newStatus === 'approved') {
                 const bonusAmount = bonusAmounts[transaction.id] || 0;
-                const totalAmountToAdd = transaction.amount + bonusAmount;
                 
-                batch.update(userRef, { balance: increment(totalAmountToAdd) });
+                const updatePayload: any = {
+                    balance: increment(transaction.amount)
+                };
+                if (bonusAmount > 0) {
+                    updatePayload.bonusBalance = increment(bonusAmount);
+                }
+                
+                batch.update(userRef, updatePayload);
                 
                 let description = `Approved: ${transaction.amount.toFixed(2)} Deposit`;
                 if (bonusAmount > 0) {

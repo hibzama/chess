@@ -258,24 +258,46 @@ export default function WalletPage() {
         <p className="text-muted-foreground text-center">Manage your funds for the games ahead.</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><DollarSign /> Current Balance</CardTitle>
-        </CardHeader>
-        <CardContent>
-            {authLoading || !userData || typeof userData.balance === 'undefined' ? (
-                <div className="space-y-2">
-                    <Skeleton className="h-10 w-48" />
-                    <Skeleton className="h-4 w-32" />
-                </div>
-            ) : (
-                <div>
-                    <p className="text-4xl font-bold">LKR {userData.balance.toFixed(2)}</p>
-                    <p className="text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
-                </div>
-            )}
-        </CardContent>
-      </Card>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+            <CardHeader>
+            <CardTitle className="flex items-center gap-2"><DollarSign /> Main Balance</CardTitle>
+            <CardDescription>Withdraw anytime.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {authLoading || !userData || typeof userData.balance === 'undefined' ? (
+                    <div className="space-y-2">
+                        <Skeleton className="h-10 w-48" />
+                        <Skeleton className="h-4 w-32" />
+                    </div>
+                ) : (
+                    <div>
+                        <p className="text-4xl font-bold">LKR {userData.balance.toFixed(2)}</p>
+                        <p className="text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+        <Card className="bg-primary/10 border-primary/20">
+            <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-primary"><Gift /> Bonus Balance</CardTitle>
+            <CardDescription>Use for gameplay. Profits are moved to main balance.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {authLoading || !userData || typeof userData.bonusBalance === 'undefined' ? (
+                    <div className="space-y-2">
+                        <Skeleton className="h-10 w-48" />
+                        <Skeleton className="h-4 w-32" />
+                    </div>
+                ) : (
+                    <div>
+                        <p className="text-4xl font-bold text-primary">LKR {(userData.bonusBalance || 0).toFixed(2)}</p>
+                        <p className="text-muted-foreground">~{((userData.bonusBalance || 0) / USDT_RATE).toFixed(2)} USDT</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+      </div>
       
       <Tabs defaultValue="deposit" className="w-full">
         <TabsList className="grid w-full grid-cols-3">

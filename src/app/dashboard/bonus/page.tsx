@@ -113,14 +113,14 @@ export default function DailyBonusClaimPage() {
                 if(bonus.bonusType === 'fixed') {
                     bonusAmountToGive = bonus.amount;
                 } else {
-                    bonusAmountToGive = userData.balance * (bonus.percentage / 100);
+                    bonusAmountToGive = (userData.balance + (userData.bonusBalance || 0)) * (bonus.percentage / 100);
                 }
 
-                transaction.update(userRef, { balance: increment(bonusAmountToGive) });
+                transaction.update(userRef, { bonusBalance: increment(bonusAmountToGive) });
                 transaction.set(userClaimRef, { bonusId: bonus.id, title: bonus.title, amount: bonusAmountToGive, claimedAt: Timestamp.now() });
                 transaction.update(counterRef, { count: increment(1), claimedByUids: arrayUnion(user.uid) });
                 
-                toast({ title: 'Success!', description: `LKR ${bonusAmountToGive.toFixed(2)} has been added to your wallet.` });
+                toast({ title: 'Success!', description: `LKR ${bonusAmountToGive.toFixed(2)} has been added to your bonus wallet.` });
             });
         } catch (error: any) {
             console.error("Error claiming bonus: ", error);
@@ -190,7 +190,7 @@ export default function DailyBonusClaimPage() {
                 <CardHeader className="text-center">
                     <div className="flex justify-center mb-4"><div className="p-4 bg-primary/10 rounded-full"><Gift className="w-12 h-12 text-primary" /></div></div>
                     <CardTitle className="text-3xl">{bonus.title}</CardTitle>
-                    <CardDescription>{bonus.bonusType === 'percentage' ? 'Percentage of your wallet balance' : 'A special gift for our players!'}</CardDescription>
+                    <CardDescription>{bonus.bonusType === 'percentage' ? 'Percentage of your total wallet balance' : 'A special gift for our players!'}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="p-6 bg-secondary/50 rounded-lg text-center space-y-2">
