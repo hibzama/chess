@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -112,15 +113,14 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     const basePositions: React.CSSProperties[] = [
-        { bottom: '0px', left: '50%', transform: 'translateX(-50%)' },  // Player 0 (Bottom)
-        { top: '50%', left: '0px', transform: 'translateY(-50%) rotate(90deg)' },  // Player 1 (Left)
-        { top: '0px', left: '50%', transform: 'translateX(-50%) rotate(180deg)' }, // Player 2 (Top)
-        { top: '50%', right: '0px', transform: 'translateY(-50%) rotate(-90deg)' }  // Player 3 (Right)
+      { top: '50%', left: '50%', transform: 'translate(-50%, 0px) rotate(0deg)' },  // Player 0 (Bottom)
+      { top: '50%', left: '50%', transform: 'translate(-100px, -50%) rotate(90deg)' },  // Player 1 (Left)
+      { top: '50%', left: '50%', transform: 'translate(-50%, -100%) rotate(180deg)' }, // Player 2 (Top)
+      { top: '50%', left: '50%', transform: 'translate(0px, -50%) rotate(-90deg)' }  // Player 3 (Right)
     ];
 
-
     return (
-        <div className="absolute inset-10 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative w-56 h-40">
                 <AnimatePresence>
                     {trick.map((play, index) => (
@@ -128,7 +128,7 @@ const TrickArea = ({ trick }) => {
                             key={play.card}
                             layoutId={`card-${play.card}`}
                             className="absolute"
-                            style={{ ...basePositions[play.player], zIndex: index }}
+                            style={{ ...basePositions[play.player], zIndex: index, transformOrigin: 'center center' }}
                             initial={{ scale: 0, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ duration: 0.2 }}
@@ -234,8 +234,8 @@ const OmiGameUI = () => {
 
             <div className="relative flex-1 w-full flex items-center justify-center my-4">
                 <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 2} />
-                <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
-                <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
+                <PlayerDisplay player={players[1]} position="left-4 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
+                <PlayerDisplay player={players[3]} position="right-4 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
 
                  <div className="absolute w-[500px] h-[350px] bg-green-800/80 rounded-3xl border-8 border-black shadow-2xl overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/felt.png')]">
                     <div className="absolute inset-0 bg-black/10"></div>
@@ -248,23 +248,27 @@ const OmiGameUI = () => {
              <div className="relative w-full h-48 flex justify-center items-end">
                 <PlayerDisplay player={players[0]} position="bottom-44 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 0} />
                 {isUserTurn && <div className="absolute -bottom-8 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Your Turn...</div>}
-                <div className="relative w-full h-48 flex justify-center items-center -bottom-8">
+                <div className="relative w-full h-48 flex justify-center items-end -bottom-8">
                      <AnimatePresence>
                         {userPlayer.hand.map((card, i) => {
                              const handSize = userPlayer.hand.length;
-                             const isEven = handSize % 2 === 0;
-                             const midIndex = Math.floor(handSize / 2);
-                             const position = i - midIndex;
-                             const xOffset = isEven ? (position + 0.5) * 45 : position * 45;
-                             const rotation = isEven ? (position + 0.5) * 5 : position * 5;
-                            
+                             const arc = 120; // Arc of the fan in degrees
+                             const radius = 350; // Radius of the arc
+                             
+                             const angleStep = handSize > 1 ? arc / (handSize - 1) : 0;
+                             const startAngle = -arc / 2;
+                             const angle = startAngle + i * angleStep;
+                             
+                             const x = radius * Math.sin((angle * Math.PI) / 180);
+                             const y = radius * (1 - Math.cos((angle * Math.PI) / 180));
+                             
                             return (
                                 <motion.div
                                     key={card}
-                                    className="absolute origin-bottom"
+                                    className="absolute origin-bottom-center"
                                     style={{
-                                        left: '50%',
-                                        transform: `translateX(${xOffset}px) rotate(${rotation}deg)`,
+                                        bottom: `${y}px`,
+                                        transform: `translateX(${x}px) rotate(${angle}deg)`,
                                         zIndex: i,
                                     }}
                                 >
