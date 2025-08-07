@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 
@@ -26,7 +27,8 @@ interface OmiGameState {
 
 const SUITS: Suit[] = ['s', 'h', 'd', 'c'];
 const RANKS: Rank[] = ['a', 'k', 'q', 'j', 't', '9', '8', '7'];
-const RANK_VALUE = Object.fromEntries(RANKS.map((r, i) => [r, RANKS.length - i]));
+const RANK_VALUE: Record<Rank, number> = { 'a': 8, 'k': 7, 'q': 6, 'j': 5, 't': 4, '9': 3, '8': 2, '7': 1 };
+
 
 const createDeck = (): Card[] => {
     const cards: Card[] = [];
@@ -49,7 +51,7 @@ const shuffleDeck = (deck: Card[]): Card[] => {
 const useOmiGameLogic = () => {
     const [gameState, setGameState] = useState<OmiGameState | null>(null);
 
-    const initializeGame = useCallback((dealerIdx = Math.floor(Math.random() * 4), scores = { team1: 0, team2: 0, tricks1: 0, tricks2: 0 }) => {
+    const initializeGame = useCallback((dealerIdx = Math.floor(Math.random() * 4), scores: {team1: number, team2: number} = { team1: 0, team2: 0 }) => {
         const players: Player[] = [
             { id: 0, name: 'You', hand: [], isBot: false },
             { id: 1, name: 'Bot 1', hand: [], isBot: true },
@@ -166,7 +168,7 @@ const useOmiGameLogic = () => {
             const nextPlayer = (gs.currentPlayerIndex + 1) % 4;
             // If it comes back to the dealer and they pass, re-deal.
             if (nextPlayer === (gs.dealerIndex + 1) % 4) {
-                initializeGame((gs.dealerIndex + 1) % 4, gs.scores);
+                initializeGame((gs.dealerIndex + 1) % 4, {team1: gs.scores.team1, team2: gs.scores.team2});
                 return null;
             }
             return { ...gs, currentPlayerIndex: nextPlayer };
@@ -180,8 +182,8 @@ const useOmiGameLogic = () => {
         let winningPlay = trick[0];
         for (let i = 1; i < trick.length; i++) {
             const currentPlay = trick[i];
-            const winningSuit = winningPlay.card[0];
-            const currentSuit = currentPlay.card[0];
+            const winningSuit = winningPlay.card[0] as Suit;
+            const currentSuit = currentPlay.card[0] as Suit;
             const winningRank = RANK_VALUE[winningPlay.card[1] as Rank];
             const currentRank = RANK_VALUE[currentPlay.card[1] as Rank];
 
@@ -223,7 +225,7 @@ const useOmiGameLogic = () => {
                 if (finalState.phase === 'scoring') {
                     // All tricks are played, now score the round
                     const { trumpCaller, scores } = finalState;
-                    const newOverallScores = { ...scores, tricks1: 0, tricks2: 0 };
+                    const newOverallScores = { team1: scores.team1, team2: scores.team2 };
                     
                     if(trumpCaller === null) {
                         initializeGame((finalState.dealerIndex + 1) % 4, newOverallScores);
@@ -251,7 +253,7 @@ const useOmiGameLogic = () => {
                 
                 return finalState;
             });
-        }, 1000); // Wait 1 second before clearing the trick
+        }, 1500); // Wait 1.5 seconds before clearing the trick
 
         return tempState; // Return the temporary state immediately
 

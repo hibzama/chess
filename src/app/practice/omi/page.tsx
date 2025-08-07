@@ -29,7 +29,7 @@ const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
     const numericRank = parseInt(rank, 10);
     const Icon = suitIcons[suit];
 
-    if (isNaN(numericRank)) { // A, K, Q, J, T
+    if (isNaN(numericRank) && rank !== 't') { // A, K, Q, J
          return (
             <div className={cn("absolute inset-0 flex items-center justify-center", suitColors[suit])}>
                 <span className="text-8xl font-bold opacity-10 select-none">{rank.toUpperCase()}</span>
@@ -45,11 +45,12 @@ const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
        10: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5', 'col-start-2 row-start-6'],
     };
 
-    const gridClass = numericRank === 10 ? 'grid-cols-3 grid-rows-6' : 'grid-cols-3 grid-rows-5';
-    
+    const gridClass = numericRank === 10 || rank === 't' ? 'grid-cols-3 grid-rows-6' : 'grid-cols-3 grid-rows-5';
+    const pipsToShow = pipLayouts[numericRank] || pipLayouts[10];
+
     return (
         <div className={cn("absolute inset-y-8 inset-x-2 grid place-items-center", gridClass)}>
-            {(pipLayouts[numericRank] || []).map((pos, i) => (
+            {(pipsToShow).map((pos, i) => (
                 <div key={i} className={cn("w-4 h-4", pos, suitColors[suit])}>{Icon}</div>
             ))}
         </div>
@@ -60,6 +61,7 @@ const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style }: { card:
     const [suit, rank] = card.split('');
     const Icon = suitIcons[suit];
     const colorClass = suitColors[suit];
+    const rankDisplay = rank === 't' ? '10' : rank.toUpperCase();
 
     return (
         <motion.div
@@ -78,12 +80,12 @@ const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style }: { card:
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
              <div className={cn("absolute top-1 left-1 text-center font-bold", colorClass)}>
-                <span>{rank.toUpperCase()}</span>
+                <span>{rankDisplay}</span>
                 <div className="w-4 h-4 mx-auto">{Icon}</div>
             </div>
             <CardPips rank={rank} suit={suit}/>
              <div className={cn("absolute bottom-1 right-1 text-center font-bold rotate-180", colorClass)}>
-                <span>{rank.toUpperCase()}</span>
+                <span>{rankDisplay}</span>
                 <div className="w-4 h-4 mx-auto">{Icon}</div>
             </div>
         </motion.div>
@@ -111,10 +113,10 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     const basePositions = [
-        { top: 'calc(50% + 20px)', left: '50%', transform: 'translate(-50%, -50%) rotate(0deg)' },     // Player 0 (Bottom)
-        { top: '50%', left: 'calc(50% - 65px)', transform: 'translate(-50%, -50%) rotate(90deg)' },   // Player 1 (Left)
-        { top: 'calc(50% - 20px)', left: '50%', transform: 'translate(-50%, -50%) rotate(180deg)' },  // Player 2 (Top)
-        { top: '50%', left: 'calc(50% + 65px)', transform: 'translate(-50%, -50%) rotate(-90deg)' }, // Player 3 (Right)
+        { top: '50%', left: '50%', transform: 'translate(-50%, 20px) rotate(0deg)' },     // Player 0 (Bottom)
+        { top: '50%', left: '50%', transform: 'translate(-120%, -50%) rotate(90deg)' },   // Player 1 (Left)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -120%) rotate(180deg)' },  // Player 2 (Top)
+        { top: '50%', left: '50%', transform: 'translate(20%, -50%) rotate(-90deg)' }, // Player 3 (Right)
     ];
 
 
@@ -233,7 +235,7 @@ const OmiGameUI = () => {
                 <PlayerDisplay player={players[1]} position="left-[-4rem] top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
                 <PlayerDisplay player={players[3]} position="right-[-4rem] top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
 
-                 <div className="absolute w-[450px] h-[300px] bg-[#65a30d]/50 rounded-3xl border-8 border-[#1a1a1a] shadow-2xl overflow-hidden">
+                 <div className="absolute w-[450px] h-[300px] bg-[#65a30d]/50 rounded-3xl border-8 border-black shadow-2xl overflow-hidden">
                     <div className="absolute inset-0 bg-black/10"></div>
                      <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-48 h-48 rounded-full border-2 border-yellow-300/20"></div>
