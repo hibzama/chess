@@ -397,27 +397,28 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
             
             const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
-            const currentIsCreator = room.currentPlayer === room.createdBy.color;
+            const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
 
-            let p1ServerTime = currentIsCreator ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
-            let p2ServerTime = !currentIsCreator ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
+            let p1ServerTime = creatorIsCurrent ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
+            let p2ServerTime = !isCreatorIsCurrent ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
 
             // Clamp time to not exceed the initial time control
             p1ServerTime = Math.min(p1ServerTime, room.timeControl);
             p2ServerTime = Math.min(p2ServerTime, room.timeControl);
             
             const isCreator = room.createdBy.uid === user?.uid;
+            
+            const myTime = isCreator ? p1ServerTime : p2ServerTime;
+            const opponentTime = isCreator ? p2ServerTime : p1ServerTime;
+
             updateAndSaveState({
-                p1Time: isCreator ? p1ServerTime : p2ServerTime,
-                p2Time: !isCreator ? p1ServerTime : p2ServerTime,
+                p1Time: myTime,
+                p2Time: opponentTime,
             });
             
-            if (p1ServerTime <= 0) {
-                setWinner(room.player2?.uid || '', room.boardState, 'timeout');
-                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-            } else if (p2ServerTime <= 0) {
-                setWinner(room.createdBy.uid, room.boardState, 'timeout');
-                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            if (myTime > 0 && opponentTime <= 0) {
+                setWinner(user?.uid || '', room.boardState, 'timeout');
+                if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             }
         }, 1000);
 
@@ -591,3 +592,5 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
+
+    
