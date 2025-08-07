@@ -215,6 +215,7 @@ function MultiplayerGame() {
 
         try {
             await runTransaction(db, async (transaction) => {
+                // --- READ PHASE ---
                 const currentRoomDoc = await transaction.get(roomRef);
                 if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
                     throw new Error("Room not available");
@@ -233,18 +234,13 @@ function MultiplayerGame() {
                 
                 const creatorData = creatorDoc.data();
                 const joinerData = joinerDoc.data();
-
-                const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
-                if (creatorTotalBalance < roomData.wager) throw new Error("Creator has insufficient funds.");
-
-                // --- READS COMPLETE ---
-                const batch = writeBatch(db);
-
-                // --- START GAME STATE UPDATE ---
+                
+                // --- WRITE PHASE ---
+                
+                // 1. Update Game State
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-                
-                batch.update(roomRef, {
+                transaction.update(roomRef, {
                     status: 'in-progress',
                     player2: { uid: user.uid, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
                     players: [...roomData.players, user.uid],
@@ -252,7 +248,7 @@ function MultiplayerGame() {
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
                 });
         
-                // --- PROCESS WAGERS AND COMMISSIONS ---
+                // 2. Process Wagers and Commissions
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
 
@@ -262,7 +258,7 @@ function MultiplayerGame() {
                     ];
 
                     for (const { playerData, playerId, opponentName } of allPlayerInfo) {
-                        // 1. Process Wager
+                        // A. Process Wager
                         const bonusWagered = Math.min(wagerAmount, playerData.bonusBalance || 0);
                         const mainWagered = wagerAmount - bonusWagered;
                         
@@ -270,17 +266,17 @@ function MultiplayerGame() {
                         if (bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
                         if (mainWagered > 0) updatePayload.balance = increment(-mainWagered);
                         
-                        batch.update(doc(db, 'users', playerId), updatePayload);
+                        transaction.update(doc(db, 'users', playerId), updatePayload);
 
                         const wagerTxRef = doc(collection(db, 'transactions'));
-                        batch.set(wagerTxRef, {
+                        transaction.set(wagerTxRef, {
                             userId: playerId, type: 'wager', amount: wagerAmount, status: 'completed',
                             description: `Wager for ${roomData.gameType} vs ${opponentName}`,
                             wagerSource: { main: mainWagered, bonus: bonusWagered },
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
-                        // 2. Process Commissions
+                        // B. Process Commissions
                         const { referredBy, referralChain } = playerData;
 
                         // Regular User Commission
@@ -291,9 +287,9 @@ function MultiplayerGame() {
                                 const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
                                 const commissionAmount = wagerAmount * l1Rate;
                                 if(commissionAmount > 0) {
-                                    batch.update(doc(db, 'users', referredBy), { balance: increment(commissionAmount) });
+                                    transaction.update(doc(db, 'users', referredBy), { balance: increment(commissionAmount) });
                                     const commTxRef = doc(collection(db, 'transactions'));
-                                    batch.set(commTxRef, { userId: referredBy, fromUserId: playerId, type: 'commission', amount: commissionAmount, level: 1, gameRoomId: room.id, status: 'completed', description: `L1 commission from ${playerData.firstName}`, createdAt: serverTimestamp() });
+                                    transaction.set(commTxRef, { userId: referredBy, fromUserId: playerId, type: 'commission', amount: commissionAmount, level: 1, gameRoomId: room.id, status: 'completed', description: `L1 commission from ${playerData.firstName}`, createdAt: serverTimestamp() });
                                 }
                             }
                         }
@@ -306,16 +302,14 @@ function MultiplayerGame() {
                                 for (let i = 0; i < referralChain.length; i++) {
                                     const marketerId = referralChain[i];
                                     const level = i + 1;
-                                    batch.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
+                                    transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
                                     const commTxRef = doc(collection(db, 'transactions'));
-                                    batch.set(commTxRef, { userId: marketerId, fromUserId: playerId, type: 'commission', amount: commissionAmount, level, gameRoomId: room.id, status: 'completed', description: `Level ${level} marketing commission from ${playerData.firstName}`, createdAt: serverTimestamp() });
+                                    transaction.set(commTxRef, { userId: marketerId, fromUserId: playerId, type: 'commission', amount: commissionAmount, level, gameRoomId: room.id, status: 'completed', description: `Level ${level} marketing commission from ${playerData.firstName}`, createdAt: serverTimestamp() });
                                 }
                             }
                         }
                     }
                 }
-                
-                await batch.commit();
             });
 
             toast({ title: "Game Joined!", description: "The match is starting now."});
@@ -326,7 +320,7 @@ function MultiplayerGame() {
                  toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
                  router.push(`/lobby/${room.gameType}`);
             } else {
-                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. ${error.message}`});
+                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again.`});
             }
         } finally {
             setIsJoining(false);
@@ -508,5 +502,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
