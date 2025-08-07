@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -40,13 +39,16 @@ const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
     // Layouts for 7, 8, 9, 10
     const pipLayouts: { [key: number]: string[] } = {
         7: ['col-start-2 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-2 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5'],
-        8: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-2 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5'],
+        8: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5', 'col-start-1 row-start-6', 'col-start-3 row-start-6'],
         9: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5'],
        10: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5', 'col-start-2 row-start-6'],
     };
+    
+    const isTen = numericRank === 10 || rank === 't';
+    const gridClass = isTen ? 'grid-cols-3 grid-rows-6' : 'grid-cols-3 grid-rows-5';
+    const pipsToShow = isTen ? pipLayouts[10] : pipLayouts[numericRank];
 
-    const gridClass = numericRank === 10 || rank === 't' ? 'grid-cols-3 grid-rows-6' : 'grid-cols-3 grid-rows-5';
-    const pipsToShow = pipLayouts[numericRank] || pipLayouts[10];
+    if (!pipsToShow) return null;
 
     return (
         <div className={cn("absolute inset-y-8 inset-x-2 grid place-items-center", gridClass)}>
@@ -113,10 +115,10 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     // Player 0: Bottom, Player 1: Left, Player 2: Top, Player 3: Right
-    const basePositions = [
-        { top: '50%', left: '50%', transform: 'translate(-50%, 10%) rotate(0deg)' },     // Player 0 (Bottom)
+    const basePositions: React.CSSProperties[] = [
+        { top: '50%', left: '50%', transform: 'translate(-50%, 15%)' },     // Player 0 (Bottom)
         { top: '50%', left: '50%', transform: 'translate(-120%, -50%) rotate(90deg)' },  // Player 1 (Left)
-        { top: '50%', left: '50%', transform: 'translate(-50%, -110%) rotate(180deg)' }, // Player 2 (Top)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -115%) rotate(180deg)' }, // Player 2 (Top)
         { top: '50%', left: '50%', transform: 'translate(20%, -50%) rotate(-90deg)' }, // Player 3 (Right)
     ];
 
@@ -289,7 +291,7 @@ const OmiGameUI = () => {
 export default function OmiPage() {
     return (
         <OmiGameProvider>
-            <div className="w-full max-w-4xl mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-950 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
+            <div className="w-full max-w-5xl mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-950 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
                 <div className="p-2">
                     <Link href="/practice" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" />
@@ -301,4 +303,3 @@ export default function OmiPage() {
         </OmiGameProvider>
     );
 }
-
