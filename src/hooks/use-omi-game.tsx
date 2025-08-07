@@ -90,16 +90,9 @@ const useOmiGameLogic = () => {
         return hand; // Can play any card
     };
     
-    // Bot Logic
     const getBotMove = useCallback((player: Player, currentTrick: Trick, leadSuit: Suit | null, trumpSuit: Suit | null): Card => {
         const playableCards = getPlayableCardsForPlayer(player.hand, leadSuit);
         // This is a very basic bot logic. A more advanced bot would be needed for a real challenge.
-        // 1. If can win, play winning card.
-        // 2. If must follow suit, play lowest card of that suit.
-        // 3. If can't follow suit, play a trump if available.
-        // 4. Otherwise, play a low card of another suit.
-        
-        // Simple: just play the first playable card.
         return playableCards[0];
     }, []);
 
@@ -144,7 +137,6 @@ const useOmiGameLogic = () => {
                 nextPhase = 'scoring';
             }
             
-            // Set state to show the winning card, then clear
             setTimeout(() => {
                 setGameState(gs => {
                     if (!gs) return null;
@@ -182,20 +174,17 @@ const useOmiGameLogic = () => {
                 });
             }, 1500);
 
-            // This state is temporary, just to keep cards on screen
+            // This state update is to show who won before clearing
             return { ...currentState, scores: newScores, currentPlayerIndex: winnerId, leadSuit: null };
         });
-
     }, [initializeGame]);
 
-
-    // Game Flow Effects
     useEffect(() => {
         if (!gameState) return;
+        const { phase, players, currentPlayerIndex, trick } = gameState;
 
-        // Dealing phase
-        if (gameState.phase === 'dealing') {
-            const { deck, players } = gameState;
+        if (phase === 'dealing') {
+            const { deck } = gameState;
             const newPlayers = JSON.parse(JSON.stringify(players));
             const newDeck = [...deck];
             for (let i = 0; i < 4; i++) {
@@ -204,43 +193,33 @@ const useOmiGameLogic = () => {
                 }
             }
             setGameState(gs => ({ ...gs!, phase: 'trumping', players: newPlayers, deck: newDeck }));
+            return;
         }
 
-        // Trumping phase (bot)
-        if (gameState.phase === 'trumping' && gameState.players[gameState.currentPlayerIndex].isBot) {
+        if (phase === 'playing' && trick.length === 4) {
+            endTrick();
+            return;
+        }
+
+        if (players[currentPlayerIndex]?.isBot) {
             const timeout = setTimeout(() => {
-                // Bot logic to decide trump. For now, it will always pass.
-                // A real implementation would analyze the hand.
-                handlePass();
+                if (phase === 'trumping') {
+                    handlePass();
+                } else if (phase === 'playing') {
+                    const botPlayer = players[currentPlayerIndex];
+                    const cardToPlay = getBotMove(botPlayer, trick, gameState.leadSuit, gameState.trumpSuit);
+                    handlePlayCard(cardToPlay);
+                }
             }, 1000);
             return () => clearTimeout(timeout);
         }
-
-        // Playing phase (bot)
-        if (gameState.phase === 'playing' && gameState.players[gameState.currentPlayerIndex].isBot) {
-            if (gameState.trick.length === 4) return;
-            const timeout = setTimeout(() => {
-                const botPlayer = gameState.players[gameState.currentPlayerIndex];
-                const cardToPlay = getBotMove(botPlayer, gameState.trick, gameState.leadSuit, gameState.trumpSuit);
-                handlePlayCard(cardToPlay);
-            }, 1000);
-            return () => clearTimeout(timeout);
-        }
-        
-        // End trick when 4 cards are played
-        if (gameState.phase === 'playing' && gameState.trick.length === 4) {
-             endTrick();
-        }
-
     }, [gameState, getBotMove, endTrick]);
 
-    // Action handlers
     const handleSelectTrump = (suit: Suit) => {
         setGameState(gs => {
             if (!gs || gs.phase !== 'trumping') return gs;
             const newDeck = [...gs.deck];
             const newPlayers = JSON.parse(JSON.stringify(gs.players));
-            // deal remaining 4 cards
             for(let i=0; i < 4; i++) {
                 for(let p=0; p < 4; p++) {
                     if (newDeck.length > 0) {
@@ -256,7 +235,6 @@ const useOmiGameLogic = () => {
         setGameState(gs => {
             if (!gs || gs.phase !== 'trumping') return gs;
             const nextPlayer = (gs.currentPlayerIndex + 1) % 4;
-            // If it comes back to the dealer and they pass, re-deal.
             if (nextPlayer === (gs.dealerIndex + 1) % 4) {
                 initializeGame((gs.dealerIndex + 1) % 4, {team1: gs.scores.team1, team2: gs.scores.team2});
                 return null;
