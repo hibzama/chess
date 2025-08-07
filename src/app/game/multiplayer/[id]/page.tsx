@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentData } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -220,20 +220,24 @@ function MultiplayerGame() {
                 }
                 const roomData = currentRoomDoc.data();
         
-                // --- SETUP PLAYER DATA ---
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
-                const [creatorDoc, joinerDoc] = await Promise.all([transaction.get(creatorRef), transaction.get(joinerRef)]);
+        
+                 // --- PRE-READ ALL NECESSARY DATA ---
+                const playerRefs = [creatorRef, joinerRef];
+                const playerDocReads = playerRefs.map(ref => transaction.get(ref));
+                const playerDocs = await Promise.all(playerDocReads);
 
-                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("One of the players does not exist.");
+                if (playerDocs.some(doc => !doc.exists())) {
+                    throw new Error("One of the players does not exist");
+                }
                 
+                const [creatorDoc, joinerDoc] = playerDocs;
                 const playersData = [
                     { id: creatorRef.id, name: roomData.createdBy.name, data: creatorDoc.data() },
                     { id: joinerRef.id, name: `${userData.firstName} ${userData.lastName}`, data: joinerDoc.data() }
                 ];
-                 if ((playersData[1].data?.balance || 0) < roomData.wager) throw new Error("You have insufficient funds.");
-
-                // --- UPDATE ROOM AND START GAME ---
+                
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
@@ -245,12 +249,9 @@ function MultiplayerGame() {
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
                 });
         
-                // --- PROCESS WAGERS AND COMMISSIONS ---
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-
                     for (const player of playersData) {
-                        // 1. Deduct Wager from Player
                         transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
                         transaction.set(doc(collection(db, 'transactions')), {
                             userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
@@ -258,47 +259,42 @@ function MultiplayerGame() {
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
                         
-                        // 2. Process Commissions for the Player's Wager
-                        const referredBy = player.data.referredBy;
-                        const referralChain = player.data.referralChain || [];
-
-                        // 2a. Regular User Commission (Level 1)
-                        if (referredBy) {
-                            const referrerDoc = await transaction.get(doc(db, 'users', referredBy));
-                            if (referrerDoc.exists() && referrerDoc.data()?.role === 'user') {
-                                const l1Count = referrerDoc.data()?.l1Count || 0;
-                                const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
-                                const commissionAmount = wagerAmount * l1Rate;
-
-                                if (commissionAmount > 0) {
-                                    transaction.update(doc(db, 'users', referredBy), { balance: increment(commissionAmount) });
-                                    transaction.set(doc(collection(db, 'transactions')), {
-                                        userId: referredBy, fromUserId: player.id, type: 'commission',
-                                        amount: commissionAmount, level: 1, gameRoomId: room.id,
-                                        status: 'completed', description: `L1 commission from ${player.name}`,
-                                        createdAt: serverTimestamp(),
-                                    });
-                                }
+                        // --- Marketer Chain Commission ---
+                        if (player.data.referralChain && player.data.referralChain.length > 0) {
+                            const marketingCommissionRate = 0.03;
+                            for (let i = 0; i < player.data.referralChain.length && i < 20; i++) {
+                                const marketerId = player.data.referralChain[i];
+                                const commissionAmount = wagerAmount * marketingCommissionRate;
+                                transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
+                                transaction.set(doc(collection(db, 'transactions')), {
+                                    userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
+                                    description: `L${i + 1} Commission from ${player.name}`, fromUserId: player.id,
+                                    level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
+                                });
                             }
-                        }
-
-                        // 2b. Marketing Partner Commissions (Up to 20 Levels)
-                        if (referralChain.length > 0) {
-                            const marketerCommissionRate = 0.03;
-                            const commissionAmount = wagerAmount * marketerCommissionRate;
-
-                            if (commissionAmount > 0) {
-                                const relevantChain = referralChain.slice(-20);
-                                for (let i = 0; i < relevantChain.length; i++) {
-                                    const marketerId = relevantChain[i];
-                                    const level = player.data.referralChain.indexOf(marketerId) + 1;
-                                    
-                                    transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
+                        } 
+                        
+                        // --- Regular User Commission ---
+                        if (player.data.referredBy) {
+                            const l1ReferrerId = player.data.referredBy;
+                            const l1ReferrerDoc = await transaction.get(doc(db, 'users', l1ReferrerId));
+    
+                            if (l1ReferrerDoc.exists() && l1ReferrerDoc.data()?.role === 'user') {
+                                const l1ReferrerData = l1ReferrerDoc.data();
+                                const referralRanks = [
+                                    { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
+                                    { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
+                                ];
+                                const l1Count = l1ReferrerData.l1Count || 0; 
+                                const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
+                                const l1Commission = wagerAmount * rank.l1Rate;
+        
+                                if (l1Commission > 0) {
+                                    transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
                                     transaction.set(doc(collection(db, 'transactions')), {
-                                        userId: marketerId, fromUserId: player.id, type: 'commission',
-                                        amount: commissionAmount, level: level, gameRoomId: room.id,
-                                        status: 'completed', description: `Level ${level} marketing commission from ${player.name}`,
-                                        createdAt: serverTimestamp(),
+                                        userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
+                                        description: `L1 Commission from ${player.name}`, fromUserId: player.id,
+                                        level: 1, gameRoomId: room.id, createdAt: serverTimestamp()
                                     });
                                 }
                             }
@@ -311,9 +307,11 @@ function MultiplayerGame() {
     
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            toast({ variant: 'destructive', title: "Error Joining Game", description: `${error.message}`});
             if (error.message === 'Room not available') {
+                 toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
                  router.push(`/lobby/${room.gameType}`);
+            } else {
+                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. ${error.message}`});
             }
         } finally {
             setIsJoining(false);
