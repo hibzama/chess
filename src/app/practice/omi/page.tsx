@@ -37,9 +37,9 @@ const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
     
     // Specific layouts for 7, 8, 9
     const pipLayouts: { [key: number]: string[] } = {
-        7: ['col-span-1 row-start-1', 'col-span-1 row-start-1', 'col-start-2 row-start-2', 'col-span-1 row-start-4', 'col-span-1 row-start-4', 'col-start-2 row-start-5', 'col-start-2 row-start-5'],
-        8: ['col-span-1 row-start-1', 'col-span-1 row-start-1', 'col-start-2 row-start-2', 'col-start-2 row-start-2', 'col-span-1 row-start-5', 'col-span-1 row-start-5', 'col-start-2 row-start-4', 'col-start-2 row-start-4'],
-        9: ['col-span-1 row-start-1', 'col-span-1 row-start-1', 'col-span-1 row-start-2', 'col-span-1 row-start-2', 'col-start-2 row-start-3', 'col-span-1 row-start-4', 'col-span-1 row-start-4', 'col-span-1 row-start-5', 'col-span-1 row-start-5'],
+        7: ['col-start-2 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-2 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5'],
+        8: ['col-start-2 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5'],
+        9: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-3', 'col-start-3 row-start-3', 'col-start-2 row-start-4', 'col-start-1 row-start-5', 'col-start-3 row-start-5', 'col-start-2 row-start-3'],
     };
 
     const gridClass = 'grid-cols-3 grid-rows-5';
