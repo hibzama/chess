@@ -75,6 +75,7 @@ export default function DashboardPage() {
     
     const summaryCards = {
         balance: { title: "Wallet Balance", value: userData?.balance, description: "Your current available funds.", colorClass: "text-primary" },
+        bonus: { title: "Bonus Balance", value: userData?.bonusBalance, description: "Funds for gameplay.", colorClass: "text-accent" },
         earnings: { title: "Total Earnings", value: stats.totalEarning, description: "Your net profit from games.", colorClass: "text-yellow-500" },
         deposit: { title: "Total Deposit", value: stats.totalDeposit, description: "All funds you've added.", colorClass: "text-green-500" },
         withdrawals: { title: "Total Withdrawals", value: stats.totalWithdrawal, description: "All funds you've taken out.", colorClass: "text-red-500" },
@@ -123,11 +124,11 @@ export default function DashboardPage() {
       <div className="grid gap-6">
         <div className="grid grid-cols-2 gap-6">
             <StatCard card={summaryCards.balance} />
-            <StatCard card={summaryCards.earnings} />
+            <StatCard card={summaryCards.bonus} />
         </div>
         <div className="grid grid-cols-2 gap-6">
+            <StatCard card={summaryCards.earnings} />
             <StatCard card={summaryCards.deposit} />
-            <StatCard card={summaryCards.withdrawals} />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
