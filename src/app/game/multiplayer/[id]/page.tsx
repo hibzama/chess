@@ -159,21 +159,14 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
-        const batch = writeBatch(db);
-
+        
         try {
-            // Delete room and refund wager
-            batch.delete(roomRef);
-            if(room.wager > 0) {
-                batch.update(userRef, { balance: increment(room.wager) });
-            }
-            await batch.commit();
+            await deleteDoc(roomRef);
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -220,8 +213,6 @@ function MultiplayerGame() {
     
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
-        const gameName = room.gameType.charAt(0).toUpperCase() + room.gameType.slice(1);
-        const batch = writeBatch(db);
 
         try {
             const currentRoomDoc = await getDoc(roomRef);
@@ -229,16 +220,10 @@ function MultiplayerGame() {
                 throw new Error("Room not available");
             }
             
-            // 1. Deduct wager from joiner
-            const joinerRef = doc(db, 'users', user.uid);
-            if (room.wager > 0) {
-                 batch.update(joinerRef, { balance: increment(-room.wager) });
-            }
-
-            // 2. Update the room to start the game
             const creatorColor = room.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-            batch.update(roomRef, {
+            
+            await updateDoc(roomRef, {
                 status: 'in-progress',
                 player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
                 players: [...room.players, user.uid],
@@ -246,21 +231,6 @@ function MultiplayerGame() {
                 currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
             });
 
-            // 3. Create a transaction log for the joiner's wager
-            if (room.wager > 0) {
-                const transactionRef = doc(collection(db, 'transactions'));
-                batch.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'wager',
-                    amount: room.wager,
-                    status: 'completed',
-                    description: `Wager for ${gameName} game`,
-                    gameRoomId: room.id,
-                    createdAt: serverTimestamp()
-                });
-            }
-
-            await batch.commit();
             toast({ title: "Game Joined!", description: "The match is starting now."});
     
         } catch (error: any) {

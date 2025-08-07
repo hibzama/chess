@@ -1,7 +1,8 @@
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -175,65 +176,81 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (roomDoc.data().payoutTransactionId) throw "Payout already processed";
     
                 const roomData = roomDoc.data() as GameRoom;
-                const { method, resignerDetails } = winnerDetails;
-                let { winnerId } = winnerDetails;
-    
-                // Determine the winner if there was a resignation
-                if (resignerDetails) {
-                    winnerId = roomData.players.find(p => p !== resignerDetails.id) || null;
-                }
-    
                 const wager = roomData.wager;
                 let creatorPayout = 0, joinerPayout = 0;
-                let creatorDesc = `vs ${roomData.player2.name}`;
-                let joinerDesc = `vs ${roomData.createdBy.name}`;
-                const winnerObject: GameRoom['winner'] = { uid: null, method };
+                
+                const { method, resignerDetails } = winnerDetails;
+                let { winnerId } = winnerDetails;
 
-                if (winnerId === 'draw') {
-                    creatorPayout = joinerPayout = wager * 0.9;
-                    creatorDesc = `Draw ${creatorDesc}`;
-                    joinerDesc = `Draw ${joinerDesc}`;
-                } else if (resignerDetails && winnerId) {
-                     const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
-                    if(isCreatorResigner) {
-                        creatorPayout = wager * 0.75;
-                        joinerPayout = wager * 1.05;
+                // Deduct wagers first
+                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
+                const joinerRef = doc(db, 'users', roomData.player2.uid);
+                transaction.update(creatorRef, { balance: increment(-wager) });
+                transaction.update(joinerRef, { balance: increment(-wager) });
+                
+                const winnerObject: GameRoom['winner'] = { uid: null, method };
+    
+                if (resignerDetails) { // Resignation logic
+                    winnerId = roomData.players.find(p => p !== resignerDetails.id) || null;
+                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
+                    const opponentPayoutRate = 1.30;
+    
+                    let resignerRefundRate = 0;
+                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
+                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                    else resignerRefundRate = 0.25;
+
+                    if (isCreatorResigner) {
+                        creatorPayout = wager * resignerRefundRate;
+                        joinerPayout = wager * opponentPayoutRate;
                     } else {
-                        creatorPayout = wager * 1.05;
-                        joinerPayout = wager * 0.75;
+                        creatorPayout = wager * opponentPayoutRate;
+                        joinerPayout = wager * resignerRefundRate;
                     }
+                    
+                    winnerObject.uid = winnerId;
                     winnerObject.resignerId = resignerDetails.id;
-                } else if (winnerId) {
+                    winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+
+                } else if (winnerId === 'draw') { // Draw logic
+                    creatorPayout = joinerPayout = wager * 0.9;
+                } else if (winnerId) { // Win/loss logic
                     const isCreatorWinner = winnerId === roomData.createdBy.uid;
                     creatorPayout = isCreatorWinner ? wager * 1.8 : 0;
                     joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
+                    transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
+                    winnerObject.uid = winnerId;
                 }
-
-                if (winnerId) winnerObject.uid = winnerId;
     
                 const now = serverTimestamp();
                 const payoutTxId = doc(collection(db, 'transactions')).id;
     
-                // Set winner info and payout for creator
+                // Add payout amounts back to balance
                 if (creatorPayout > 0) {
-                    transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
-                    const creatorTxData: any = { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null, winnerId: winnerId === roomData.createdBy.uid ? winnerId : null };
-                    transaction.set(doc(collection(db, 'transactions')), creatorTxData);
+                    transaction.update(creatorRef, { balance: increment(creatorPayout) });
+                }
+                if (joinerPayout > 0) {
+                    transaction.update(joinerRef, { balance: increment(joinerPayout) });
                 }
 
-                // Set winner info and payout for joiner
-                if (joinerPayout > 0) {
-                    transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
-                    const joinerTxData: any = { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId, gameWager: wager, resignerId: resignerDetails?.id || null, winnerId: winnerId === roomData.player2.uid ? winnerId : null };
-                    transaction.set(doc(collection(db, 'transactions')), joinerTxData);
-                }
-                
-                // Increment wins for the winner
-                if (winnerId && winnerId !== 'draw') {
-                    transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
+                // Create a single Payout transaction for the winner for commission processing
+                 if (winnerId && winnerId !== 'draw') {
+                    const winnerPayoutAmount = winnerId === roomData.createdBy.uid ? creatorPayout : joinerPayout;
+                    const payoutTxData: any = {
+                        userId: winnerId,
+                        type: 'payout',
+                        amount: winnerPayoutAmount,
+                        status: 'completed',
+                        gameRoomId: roomId,
+                        createdAt: now,
+                        payoutTxId,
+                        gameWager: wager,
+                        resignerId: resignerDetails?.id || null,
+                        winnerId,
+                    };
+                    transaction.set(doc(collection(db, 'transactions')), payoutTxData);
                 }
     
-                // Mark room as completed
                 transaction.update(roomRef, { 
                     status: 'completed',
                     winner: winnerObject,
@@ -250,19 +267,25 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if (roomDoc.exists()) {
                    const roomData = roomDoc.data() as GameRoom;
                    const wager = roomData.wager || 0;
-                   if (roomData.draw) return { myPayout: wager * 0.9 };
-                   if (roomData.winner?.resignerId) {
-                       const isMeResigner = roomData.winner.resignerId === user.uid;
-                       return { myPayout: isMeResigner ? wager * 0.75 : wager * 1.05 };
-                   }
-                   if (roomData.winner?.uid === user.uid) return { myPayout: wager * 1.8 };
+                   const winnerData = roomData.winner;
+                   const resignerDetails = winnerData?.resignerId ? {id: winnerData.resignerId, pieceCount: winnerData.resignerPieceCount || 0} : null;
+
+                    if (resignerDetails) {
+                        let refundRate = 0;
+                        if (resignerDetails.pieceCount >= 6) refundRate = 0.50;
+                        else if (resignerDetails.pieceCount >= 3) refundRate = 0.35;
+                        else refundRate = 0.25;
+                        return { myPayout: resignerDetails.id === user.uid ? wager * refundRate : wager * 1.30 };
+                    }
+                    if (roomData.draw) return { myPayout: wager * 0.9 };
+                    if (winnerData?.uid === user.uid) return { myPayout: wager * 1.8 };
                 }
             } else {
                  console.error("Payout Transaction failed:", error);
             }
             return { myPayout: 0 };
         }
-    }, [user, roomId]);
+    }, [user, roomId, gameType]);
 
     const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerDetails: {id: string, pieceCount: number} | null = null) => {
         if (gameOverHandledRef.current) return;
@@ -310,14 +333,21 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             if (roomData.status === 'completed' && !gameOverHandledRef.current) {
                 gameOverHandledRef.current = true;
                 const winnerIsMe = roomData.winner?.uid === user.uid;
-                const isMeResigner = roomData.winner?.resignerId === user.uid;
+                const iAmResigner = roomData.winner?.resignerId === user.uid;
                 const wager = roomData.wager || 0;
                 let myPayout = 0;
 
-                if (roomData.draw) {
-                    myPayout = wager * 0.9;
+                if (iAmResigner) {
+                    const pieceCount = roomData.winner?.resignerPieceCount || 0;
+                    let refundRate = 0;
+                    if (pieceCount >= 6) refundRate = 0.50;
+                    else if (pieceCount >= 3) refundRate = 0.35;
+                    else refundRate = 0.25;
+                    myPayout = wager * refundRate;
                 } else if (roomData.winner?.resignerId) {
-                   myPayout = isMeResigner ? wager * 0.75 : wager * 1.05;
+                    myPayout = wager * 1.30;
+                } else if (roomData.draw) {
+                    myPayout = wager * 0.9;
                 } else if (winnerIsMe) {
                     myPayout = wager * 1.8;
                 }
@@ -375,7 +405,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
      // Real-time Timer Logic
     useEffect(() => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-        if (gameState.gameOver || !isMounted || !room || room.status !== 'in-progress') return;
+        if (gameState.gameOver || !isMounted || !room || room.status !== 'in-progress' || !room.turnStartTime) return;
 
         timerIntervalRef.current = setInterval(() => {
             if (gameOverHandledRef.current) {
