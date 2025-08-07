@@ -1,4 +1,3 @@
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -383,6 +382,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
                 return;
             }
+
+            if (!room.turnStartTime) return; // FIX: Ensure turnStartTime exists
 
             const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
             const currentIsCreator = room.currentPlayer === room.createdBy.color;
