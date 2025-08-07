@@ -159,9 +159,16 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        
+        const userRef = doc(db, 'users', user.uid);
+        const batch = writeBatch(db);
+
         try {
-            await deleteDoc(roomRef);
+            // Delete room and refund wager
+            batch.delete(roomRef);
+            if(room.wager > 0) {
+                batch.update(userRef, { balance: increment(room.wager) });
+            }
+            await batch.commit();
     
             if (isAutoCancel) {
                 toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
@@ -214,41 +221,46 @@ function MultiplayerGame() {
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
         const gameName = room.gameType.charAt(0).toUpperCase() + room.gameType.slice(1);
+        const batch = writeBatch(db);
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const currentRoomDoc = await transaction.get(roomRef);
-                if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
-                    throw new Error("Room not available");
-                }
-                const roomData = currentRoomDoc.data();
-        
-                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
-                const joinerRef = doc(db, 'users', user.uid);
-        
-                const [creatorDoc, joinerDoc] = await Promise.all([transaction.get(creatorRef), transaction.get(joinerRef)]);
+            const currentRoomDoc = await getDoc(roomRef);
+            if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
+                throw new Error("Room not available");
+            }
+            
+            // 1. Deduct wager from joiner
+            const joinerRef = doc(db, 'users', user.uid);
+            if (room.wager > 0) {
+                 batch.update(joinerRef, { balance: increment(-room.wager) });
+            }
 
-                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("A player does not exist.");
-                
-                const creatorData = creatorDoc.data();
-                const joinerData = joinerDoc.data();
-
-                if ((joinerData.balance || 0) < roomData.wager) {
-                    throw new Error("You have insufficient funds.");
-                }
-                
-                const creatorColor = roomData.createdBy.color;
-                const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-                
-                transaction.update(roomRef, {
-                    status: 'in-progress',
-                    player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
-                    players: [...roomData.players, user.uid],
-                    capturedByP1: [], capturedByP2: [], moveHistory: [],
-                    currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
-                });
+            // 2. Update the room to start the game
+            const creatorColor = room.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            batch.update(roomRef, {
+                status: 'in-progress',
+                player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
+                players: [...room.players, user.uid],
+                capturedByP1: [], capturedByP2: [], moveHistory: [],
+                currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
             });
 
+            // 3. Create a transaction log for the joiner's wager
+            if (room.wager > 0) {
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'wager',
+                    amount: room.wager,
+                    status: 'completed',
+                    description: `Wager for ${gameName} game`,
+                    gameRoomId: room.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            await batch.commit();
             toast({ title: "Game Joined!", description: "The match is starting now."});
     
         } catch (error: any) {
