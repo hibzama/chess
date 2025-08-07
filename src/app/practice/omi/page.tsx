@@ -111,34 +111,35 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     const cardSlots = [
-        { top: '50%', left: '50%', transform: 'translate(-50%, -20%)' },      // Bottom (Player 0)
-        { top: '50%', left: '50%', transform: 'translate(-120%, -50%) rotate(90deg)' }, // Left (Player 1)
-        { top: '50%', left: '50%', transform: 'translate(-50%, -80%) rotate(180deg)' },// Top (Player 2)
-        { top: '50%', left: '50%', transform: 'translate(20%, -50%) rotate(-90deg)' },   // Right (Player 3)
+        { gridArea: '2 / 2 / 3 / 3', transform: '' },             // Bottom (Player 0)
+        { gridArea: '2 / 1 / 3 / 2', transform: 'rotate(90deg)' },  // Left (Player 1)
+        { gridArea: '1 / 2 / 2 / 3', transform: 'rotate(180deg)' }, // Top (Player 2)
+        { gridArea: '2 / 3 / 3 / 4', transform: 'rotate(-90deg)' }  // Right (Player 3)
     ];
 
     return (
-        <div className="absolute inset-0 flex items-center justify-center">
-            <div className="relative w-64 h-48">
-                <AnimatePresence>
-                    {trick.map((play, index) => (
-                        <motion.div
-                            key={play.card}
-                            layoutId={`card-${play.card}`}
-                            className="absolute"
-                            style={{ ...cardSlots[play.player], zIndex: index, transformOrigin: 'center center' }}
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ duration: 0.2 }}
-                        >
+        <div className="absolute inset-0 p-8 grid grid-cols-3 grid-rows-2">
+            <AnimatePresence>
+                {trick.map((play, index) => (
+                    <motion.div
+                        key={play.card}
+                        layoutId={`card-${play.card}`}
+                        className="flex items-center justify-center"
+                        style={{ ...cardSlots[play.player], zIndex: index }}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1, ...cardSlots[play.player] }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        <div style={{transform: cardSlots[play.player].transform}}>
                             <PlayingCard card={play.card} />
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            </div>
+                        </div>
+                    </motion.div>
+                ))}
+            </AnimatePresence>
         </div>
     );
 };
+
 
 const TrumpSelector = ({ onSelectTrump, onPass }) => (
     <Dialog open={true}>
@@ -237,8 +238,11 @@ const OmiGameUI = () => {
 
                  <div className="absolute w-[500px] h-[350px] bg-green-800/80 rounded-3xl border-8 border-black shadow-2xl overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/felt.png')]">
                     <div className="absolute inset-0 bg-black/10"></div>
-                     <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-48 h-48 rounded-full border-2 border-yellow-300/20"></div>
+                     <div className="absolute inset-0 p-8 grid grid-cols-3 grid-rows-2 gap-2">
+                        <div className="bg-blue-500/10" style={{gridArea: '1 / 2 / 2 / 3'}}></div>
+                        <div className="bg-blue-500/10" style={{gridArea: '2 / 1 / 3 / 2'}}></div>
+                        <div className="bg-blue-500/10" style={{gridArea: '2 / 3 / 3 / 4'}}></div>
+                        <div className="bg-blue-500/10" style={{gridArea: '2 / 2 / 3 / 3'}}></div>
                     </div>
                     <TrickArea trick={trick} />
                 </div>
