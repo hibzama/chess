@@ -54,14 +54,14 @@ const useOmiGameLogic = () => {
         setGameState({
             phase: 'dealing',
             players,
-            deck: shuffleDeck(createDeck()),
+            deck: shuffleDeck(createDeck()), // Ensure a fresh deck is created and shuffled
             trick: [],
             trumpSuit: null,
             leadSuit: null,
             currentPlayerIndex: (dealerIdx + 1) % 4,
             dealerIndex: dealerIdx,
             trumpCaller: null,
-            scores: scores,
+            scores: { ...scores, tricks1: 0, tricks2: 0 }, // Reset trick counts for the new round
         });
     }, []);
 
@@ -104,7 +104,7 @@ const useOmiGameLogic = () => {
         // Dealing phase
         if (gameState.phase === 'dealing') {
             const { deck, players } = gameState;
-            const newPlayers = [...players];
+            const newPlayers = JSON.parse(JSON.stringify(players));
             const newDeck = [...deck];
             for (let i = 0; i < 4; i++) {
                 for (let p = 0; p < 4; p++) {
@@ -134,14 +134,14 @@ const useOmiGameLogic = () => {
             return () => clearTimeout(timeout);
         }
 
-    }, [gameState, getBotMove]);
+    }, [gameState?.phase, gameState?.currentPlayerIndex, gameState?.players, gameState?.deck, gameState?.trick, gameState?.leadSuit, gameState?.trumpSuit, getBotMove]);
 
     // Action handlers
     const handleSelectTrump = (suit: Suit) => {
         setGameState(gs => {
             if (!gs || gs.phase !== 'trumping') return gs;
             const newDeck = [...gs.deck];
-            const newPlayers = [...gs.players];
+            const newPlayers = JSON.parse(JSON.stringify(gs.players));
             // deal remaining cards
             for(let i=0; i < 9; i++) {
                 for(let p=0; p < 4; p++) {
@@ -186,7 +186,7 @@ const useOmiGameLogic = () => {
             } else {
                 if (currentSuit === trumpSuit) {
                     winningPlay = currentPlay;
-                } else if (currentSuit === leadSuit && currentRank > winningRank) {
+                } else if (leadSuit && currentSuit === leadSuit && currentRank > winningRank) {
                     winningPlay = currentPlay;
                 }
             }
@@ -236,6 +236,13 @@ const useOmiGameLogic = () => {
                        if (updatedState.phase === 'scoring') {
                            const { trumpCaller, scores } = updatedState;
                            const newOverallScores = { ...scores, tricks1: 0, tricks2: 0 };
+                           
+                           if(trumpCaller === null) {
+                               // This case shouldn't happen if trumping phase is handled correctly, but as a fallback
+                               initializeGame((updatedState.dealerIndex + 1) % 4, newOverallScores);
+                               return null;
+                           }
+                           
                            const callingTeamIs1 = trumpCaller === 0 || trumpCaller === 2;
                            
                            if (callingTeamIs1) {
