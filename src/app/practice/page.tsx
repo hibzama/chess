@@ -5,13 +5,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Bot, BrainCircuit, Layers } from 'lucide-react';
+import { ArrowLeft, Bot, BrainCircuit, Layers, Spade } from 'lucide-react';
 
 export default function PracticeArenaPage() {
     const router = useRouter();
 
-    const handleStartGame = (game: 'chess' | 'checkers') => {
-        router.push(`/practice/${game}/setup`);
+    const handleStartGame = (game: 'chess' | 'checkers' | 'omi') => {
+        if(game === 'chess' || game === 'checkers') {
+            router.push(`/practice/${game}/setup`);
+        } else {
+            router.push(`/practice/${game}`);
+        }
     };
 
     const practiceOptions = [
@@ -26,12 +30,18 @@ export default function PracticeArenaPage() {
             description: 'A fun, strategic game of jumps.',
             icon: <Layers className="w-12 h-12 text-primary" />,
             action: () => handleStartGame('checkers'),
+        },
+        {
+            name: 'Practice Omi',
+            description: 'The classic Sri Lankan card game.',
+            icon: <Spade className="w-12 h-12 text-primary" />,
+            action: () => handleStartGame('omi'),
         }
     ]
 
     return (
         <div className="flex flex-col items-center w-full p-4 min-h-screen">
-            <div className="w-full max-w-4xl mb-8">
+            <div className="w-full max-w-5xl mb-8">
                 <Link href="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                     <span>Back to Dashboard</span>
@@ -48,7 +58,7 @@ export default function PracticeArenaPage() {
                 <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">Hone your skills against our AI opponent for free. No stakes, just pure practice.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
                 {practiceOptions.map((option) => (
                      <Card key={option.name} className="bg-card/50 hover:border-primary/50 transition-all flex flex-col">
                         <CardHeader className="items-center text-center">
