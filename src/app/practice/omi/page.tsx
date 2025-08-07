@@ -68,10 +68,10 @@ const PlayerDisplay = ({ player, position, isCurrent, isDealer, handSize }) => {
 
 const TrickArea = ({ trick }) => {
     const trickPositions = [
-        { bottom: '0.5rem', left: '50%', transform: 'translateX(-50%)' }, // Player 0 (You)
-        { left: '0.5rem', top: '50%', transform: 'translateY(-50%)' }, // Player 1 (Left)
-        { top: '0.5rem', left: '50%', transform: 'translateX(-50%)' }, // Player 2 (Partner)
-        { right: '0.5rem', top: '50%', transform: 'translateY(-50%)' }, // Player 3 (Right)
+        { bottom: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 0 (You)
+        { left: 'calc(50% - 10rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 1 (Left)
+        { top: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 2 (Partner)
+        { right: 'calc(50% - 10rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 3 (Right)
     ];
 
     return (
@@ -156,10 +156,7 @@ const OmiGameUI = () => {
     };
 
     const playableCards = getPlayableCards();
-    const handSize = userPlayer.hand.length;
-    const cardAngle = 8;
-    const handRadius = 400;
-
+    
     return (
         <div className="flex flex-col h-full w-full items-center justify-between p-4 bg-green-800 bg-opacity-50 overflow-hidden">
             {phase === 'trumping' && isUserTurn && (
@@ -203,6 +200,8 @@ const OmiGameUI = () => {
                  <PlayerDisplay player={players[0]} position="bottom-36 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 0} isDealer={dealerIndex === 0} handSize={0} />
                  <AnimatePresence>
                     {userPlayer.hand.map((card, i) => {
+                        const handSize = userPlayer.hand.length;
+                        const cardAngle = 8;
                         const rotation = (i - (handSize - 1) / 2) * cardAngle;
                         return (
                             <div
