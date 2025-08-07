@@ -174,10 +174,12 @@ const useOmiGameLogic = () => {
     };
     
     const endTrick = useCallback((currentState: OmiGameState) => {
-        const { trick, trumpSuit, leadSuit } = currentState;
+        const { trick, trumpSuit } = currentState;
         if (trick.length !== 4) return currentState;
 
         let winningPlay = trick[0];
+        const leadSuit = trick[0].card[0] as Suit;
+
         for (let i = 1; i < trick.length; i++) {
             const currentPlay = trick[i];
             const winningSuit = winningPlay.card[0] as Suit;
@@ -192,7 +194,7 @@ const useOmiGameLogic = () => {
             } else {
                 if (currentSuit === trumpSuit) {
                     winningPlay = currentPlay;
-                } else if (leadSuit && currentSuit === leadSuit && currentRank > winningRank) {
+                } else if (currentSuit === leadSuit && currentRank > winningRank) {
                     winningPlay = currentPlay;
                 }
             }
@@ -211,17 +213,14 @@ const useOmiGameLogic = () => {
             nextPhase = 'scoring';
         }
         
-        // This is a temporary state to show the won trick
         const tempState = { ...currentState, scores: newScores, trick: currentState.trick, currentPlayerIndex: winnerId, leadSuit: null };
 
         setTimeout(() => {
             setGameState(gs => {
                 if (!gs) return null;
-                // Clear the trick and set the new leader for the next turn
                 const finalState = { ...gs, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase, scores: newScores };
                 
                 if (finalState.phase === 'scoring') {
-                    // All tricks are played, now score the round
                     const { trumpCaller, scores } = finalState;
                     const newOverallScores = { team1: scores.team1, team2: scores.team2 };
                     
@@ -251,9 +250,9 @@ const useOmiGameLogic = () => {
                 
                 return finalState;
             });
-        }, 1500); // Wait 1.5 seconds before clearing the trick
+        }, 1500);
 
-        return tempState; // Return the temporary state immediately
+        return tempState;
 
     }, [initializeGame]);
 

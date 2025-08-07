@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -112,23 +111,23 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 };
 
 const TrickArea = ({ trick }) => {
-    const basePositions: React.CSSProperties[] = [
-      { top: '50%', left: '50%', transform: 'translate(-50%, 0px) rotate(0deg)' },  // Player 0 (Bottom)
-      { top: '50%', left: '50%', transform: 'translate(-100px, -50%) rotate(90deg)' },  // Player 1 (Left)
-      { top: '50%', left: '50%', transform: 'translate(-50%, -100%) rotate(180deg)' }, // Player 2 (Top)
-      { top: '50%', left: '50%', transform: 'translate(0px, -50%) rotate(-90deg)' }  // Player 3 (Right)
+    const cardSlots = [
+        { top: '50%', left: '50%', transform: 'translate(-50%, 0) rotate(0deg)' },      // Bottom (Player 0)
+        { top: '50%', left: '50%', transform: 'translate(-100%, -50%) rotate(90deg)' }, // Left (Player 1)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -100%) rotate(180deg)' },// Top (Player 2)
+        { top: '50%', left: '50%', transform: 'translate(0, -50%) rotate(-90deg)' },   // Right (Player 3)
     ];
 
     return (
         <div className="absolute inset-0 flex items-center justify-center">
-            <div className="relative w-56 h-40">
+            <div className="relative w-64 h-48">
                 <AnimatePresence>
                     {trick.map((play, index) => (
                         <motion.div
                             key={play.card}
                             layoutId={`card-${play.card}`}
                             className="absolute"
-                            style={{ ...basePositions[play.player], zIndex: index, transformOrigin: 'center center' }}
+                            style={{ ...cardSlots[play.player], zIndex: index, transformOrigin: 'center center' }}
                             initial={{ scale: 0, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             transition={{ duration: 0.2 }}
@@ -171,7 +170,7 @@ const GameHeader = ({ scores, trumpSuit }) => (
              <div className="font-bold text-sm">Tricks</div>
              <div className="flex gap-4 items-center">
                 <span className="text-2xl font-bold">{scores.tricks1}</span>
-                <div className={cn("w-10 h-10 p-1.5 bg-card rounded-full shadow-inner flex items-center justify-center font-bold", trumpSuit ? suitColors[trumpSuit] : 'text-white')}>
+                 <div className={cn("w-10 h-10 p-1.5 bg-card rounded-full shadow-inner flex items-center justify-center font-bold", trumpSuit ? suitColors[trumpSuit] : 'text-white')}>
                     {trumpSuit ? suitIcons[trumpSuit] : '?'}
                 </div>
                 <span className="text-2xl font-bold">{scores.tricks2}</span>
