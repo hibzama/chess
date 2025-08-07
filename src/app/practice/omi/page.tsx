@@ -113,10 +113,10 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     const basePositions = [
-        { top: '50%', left: '50%', transform: 'translate(-50%, 20px) rotate(0deg)' },     // Player 0 (Bottom)
-        { top: '50%', left: '50%', transform: 'translate(-120%, -50%) rotate(90deg)' },   // Player 1 (Left)
-        { top: '50%', left: '50%', transform: 'translate(-50%, -120%) rotate(180deg)' },  // Player 2 (Top)
-        { top: '50%', left: '50%', transform: 'translate(20%, -50%) rotate(-90deg)' }, // Player 3 (Right)
+        { top: '50%', left: '50%', transform: 'translate(-50%, 20%) rotate(0deg)' },     // Player 0 (Bottom)
+        { top: '50%', left: '50%', transform: 'translate(-120%, -50%) rotate(0deg)' },   // Player 1 (Left)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -120%) rotate(0deg)' },  // Player 2 (Top)
+        { top: '50%', left: '50%', transform: 'translate(20%, -50%) rotate(0deg)' }, // Player 3 (Right)
     ];
 
 
@@ -170,7 +170,9 @@ const GameHeader = ({ scores, trumpSuit }) => (
              <div className="font-bold text-sm">Tricks</div>
              <div className="flex gap-4 items-center">
                 <span className="text-2xl font-bold">{scores.tricks1}</span>
-                <div className={cn("w-10 h-10 p-1.5 bg-card rounded-full shadow-inner", trumpSuit ? suitColors[trumpSuit] : 'text-white')}>{trumpSuit ? suitIcons[trumpSuit] : '?'}</div>
+                <div className={cn("w-10 h-10 p-1.5 bg-card rounded-full shadow-inner flex items-center justify-center font-bold", trumpSuit ? suitColors[trumpSuit] : 'text-white')}>
+                    {trumpSuit ? suitIcons[trumpSuit] : <span className="text-xl">?</span>}
+                </div>
                 <span className="text-2xl font-bold">{scores.tricks2}</span>
              </div>
         </div>
@@ -286,7 +288,7 @@ const OmiGameUI = () => {
 export default function OmiPage() {
     return (
         <OmiGameProvider>
-            <div className="w-full max-w-lg mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-950 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
+            <div className="w-full max-w-2xl mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-950 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
                 <div className="p-2">
                     <Link href="/practice" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" />
