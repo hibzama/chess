@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -191,9 +191,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const opponentPayoutRate = 1.30;
     
                     let resignerRefundRate = 0;
-                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
-                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
-                    else resignerRefundRate = 0.25;
+                    if (resignerDetails.pieceCount >= 6) {
+                        resignerRefundRate = 0.50;
+                    } else if (resignerDetails.pieceCount >= 3) {
+                        resignerRefundRate = 0.35;
+                    } else {
+                        resignerRefundRate = 0.25;
+                    }
 
                     if (isCreatorResigner) {
                         creatorPayout = wager * resignerRefundRate;
@@ -258,10 +262,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
                     if (resignerDetails) { // Resignation
                         let refundRate = 0;
-                        if (resignerDetails.pieceCount >= 6) refundRate = 0.50;
-                        else if (resignerDetails.pieceCount >= 3) refundRate = 0.35;
-                        else refundRate = 0.25;
-
+                         if (resignerDetails.pieceCount >= 6) {
+                            refundRate = 0.50;
+                        } else if (resignerDetails.pieceCount >= 3) {
+                            refundRate = 0.35;
+                        } else {
+                            refundRate = 0.25;
+                        }
                         return { myPayout: resignerDetails.id === user.uid ? wager * refundRate : wager * 1.30 };
                     } else if (roomData.draw) { // Draw
                         return { myPayout: wager * 0.9 };
@@ -323,9 +330,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                  if (iAmResigner) {
                     const pieceCount = roomData.winner?.resignerPieceCount || 0;
                     let refundRate = 0;
-                    if (pieceCount >= 6) refundRate = 0.50;
-                    else if (pieceCount >= 3) refundRate = 0.35;
-                    else refundRate = 0.25;
+                    if (pieceCount >= 6) {
+                        refundRate = 0.50;
+                    } else if (pieceCount >= 3) {
+                        refundRate = 0.35;
+                    } else {
+                        refundRate = 0.25;
+                    }
                     myPayout = wager * refundRate;
                 } else if (roomData.winner?.resignerId) {
                     myPayout = wager * 1.30;
@@ -416,8 +427,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 p2Time: opponentTime,
             });
             
-            if (myTime <= 0) {
-                 const opponentUid = room.players.find(p => p !== user?.uid);
+            if (myTime <= 0 && user) {
+                 const opponentUid = room.players.find(p => p !== user.uid);
                  if(opponentUid) {
                      setWinner(opponentUid, room.boardState, 'timeout');
                  }
@@ -595,5 +606,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
-
-    

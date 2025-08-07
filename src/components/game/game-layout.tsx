@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '../ui/skeleton';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
-import GameChat from './game-chat';
+import GameChat from '@/components/game/game-chat';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import Image from 'next/image';
 
@@ -119,9 +119,14 @@ const GameOverDisplay = () => {
 
 const ResignationDialogContent = ({ roomWager, pieceCount }: { roomWager: number, pieceCount: number }) => {
     
-    let refundRate = 0.25;
-    if (pieceCount >= 6) refundRate = 0.50;
-    else if (pieceCount >= 3) refundRate = 0.35;
+    let refundRate = 0;
+    if (pieceCount >= 6) {
+        refundRate = 0.50;
+    } else if (pieceCount >= 3) {
+        refundRate = 0.35;
+    } else {
+        refundRate = 0.25;
+    }
 
     const refundAmount = roomWager * refundRate;
     const opponentPayout = roomWager * 1.30;
