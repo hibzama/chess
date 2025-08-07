@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -110,10 +111,10 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     const basePositions = [
-        { bottom: '1rem', left: '50%', transform: 'translateX(-50%) rotate(0deg)' }, // Player 0 (You)
-        { left: '1rem', top: '50%', transform: 'translateY(-50%) rotate(90deg)' }, // Player 1 (Left)
-        { top: '1rem', left: '50%', transform: 'translateX(-50%) rotate(0deg)' }, // Player 2 (Partner)
-        { right: '1rem', top: '50%', transform: 'translateY(-50%) rotate(-90deg)' }, // Player 3 (Right)
+        { top: '50%', left: '50%', transform: 'translate(-50%, 0%) rotate(0deg)' }, // Player 0 (You)
+        { top: '50%', left: '50%', transform: 'translate(-100%, -50%) rotate(90deg)' }, // Player 1 (Left)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -100%) rotate(0deg)' }, // Player 2 (Partner)
+        { top: '50%', left: '50%', transform: 'translate(0%, -50%) rotate(-90deg)' }, // Player 3 (Right)
     ];
 
     return (
@@ -231,8 +232,11 @@ const OmiGameUI = () => {
                  <PlayerDisplay player={players[1]} position="left-12 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
                  <PlayerDisplay player={players[3]} position="right-12 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
 
-                 <div className="absolute w-[450px] h-[300px] bg-green-800 rounded-3xl border-8 border-black shadow-2xl overflow-hidden">
+                 <div className="absolute w-[450px] h-[300px] bg-[#65a30d]/50 rounded-3xl border-8 border-[#1a1a1a] shadow-2xl overflow-hidden">
                     <div className="absolute inset-0 bg-black/10"></div>
+                     <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-48 h-48 rounded-full border-2 border-yellow-300/20"></div>
+                    </div>
                     <TrickArea trick={trick} />
                 </div>
                  {isUserTurn && <div className="absolute -bottom-8 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Your Turn...</div>}
@@ -291,3 +295,4 @@ export default function OmiPage() {
         </OmiGameProvider>
     );
 }
+
