@@ -82,46 +82,33 @@ export const announceNewGame = functions.firestore
 
 
 export const processCommissions = functions.firestore
-    .document('transactions/{transactionId}')
-    .onCreate(async (snap, context) => {
-        const transaction = snap.data();
-        const txnId = context.params.transactionId;
+    .document('game_rooms/{gameRoomId}')
+    .onUpdate(async (change, context) => {
+        const gameRoomId = context.params.gameRoomId;
+        const beforeData = change.before.data();
+        const afterData = change.after.data();
 
-        // 1. Commission logic should only run for winning payouts, not draws or other types.
-        if (transaction.type !== 'payout' || !transaction.winnerId) {
-            functions.logger.log(`Txn ${txnId}: Not a commissionable payout. Type: ${transaction.type}, Winner: ${!!transaction.winnerId}`);
+        // 1. Only run when a game is completed and not on a draw
+        if (beforeData.status === 'completed' || afterData.status !== 'completed' || afterData.draw) {
             return null;
         }
 
-        const gameWager = transaction.gameWager || 0;
+        const gameWager = afterData.wager || 0;
         if (gameWager <= 0) {
-            functions.logger.log(`Txn ${txnId}: Skipping commissions for zero wager game.`);
+            functions.logger.log(`Game ${gameRoomId}: Skipping commissions for zero wager game.`);
             return null;
         }
 
-        const gameRoomId = transaction.gameRoomId;
-        if (!gameRoomId) {
-            functions.logger.error(`Txn ${txnId} is missing gameRoomId.`);
-            return null;
-        }
-        
-        const db = admin.firestore();
-        const gameRoomSnap = await db.collection('game_rooms').doc(gameRoomId).get();
-        if (!gameRoomSnap.exists) {
-            functions.logger.error(`Game room ${gameRoomId} not found for transaction ${txnId}.`);
-            return null;
-        }
-        
-        const gameRoomData = gameRoomSnap.data();
-        const playerIds = gameRoomData?.players || [];
+        const playerIds = afterData.players || [];
         if (playerIds.length < 2) {
             functions.logger.log(`Not enough players in game room ${gameRoomId} to process commissions.`);
             return null;
         }
-        
+
+        const db = admin.firestore();
         const batch = db.batch();
 
-        // Iterate through each player in the game to check for their referrers
+        // 2. Iterate through EACH player in the game to check for their referrers
         for (const playerId of playerIds) {
             const userDoc = await db.collection('users').doc(playerId).get();
             if (!userDoc.exists) {
@@ -134,14 +121,13 @@ export const processCommissions = functions.firestore
 
             const referredBy = userData.referredBy;
             const referralChain = userData.referralChain || [];
-            
-            // Process Regular User Commission (Level 1)
+
+            // 3. Process Regular User Commission (Level 1)
             if (referredBy) {
                 const referrerDoc = await db.collection('users').doc(referredBy).get();
-                // Ensure referrer is a 'user' to avoid paying L1 commission to a marketer from this logic
                 if (referrerDoc.exists && referrerDoc.data()?.role === 'user') {
                     const l1Count = referrerDoc.data()?.l1Count || 0;
-                    const l1Rate = l1Count >= 21 ? 0.05 : 0.03; // 5% for Rank 2 (21+), 3% for Rank 1
+                    const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
                     const commissionAmount = gameWager * l1Rate;
 
                     if (commissionAmount > 0) {
@@ -158,27 +144,24 @@ export const processCommissions = functions.firestore
                             description: `L1 commission from ${userData.firstName}`,
                             createdAt: admin.firestore.FieldValue.serverTimestamp(),
                         });
-                        // Regular user commissions go to their main balance
                         batch.update(db.collection('users').doc(referredBy), {
                             balance: admin.firestore.FieldValue.increment(commissionAmount),
                         });
                     }
                 }
             }
-            
-            // Process Marketing Partner Commissions (Up to 20 Levels)
+
+            // 4. Process Marketing Partner Commissions (Up to 20 Levels)
             if (referralChain.length > 0) {
-                const marketerCommissionRate = 0.03; 
+                const marketerCommissionRate = 0.03;
                 const commissionAmount = gameWager * marketerCommissionRate;
 
                 if (commissionAmount > 0) {
-                    // Pay commission to the last 20 members of the chain
                     const relevantChain = referralChain.slice(-20);
-                    
+
                     for (let i = 0; i < relevantChain.length; i++) {
                         const marketerId = relevantChain[i];
-                        // The level is determined by the marketer's position in the user's referral chain.
-                        const level = referralChain.indexOf(marketerId) + 1; 
+                        const level = referralChain.indexOf(marketerId) + 1;
 
                         functions.logger.log(`Paying L${level} marketing commission of ${commissionAmount} to ${marketerId} from player ${playerId}'s game.`);
 
@@ -194,7 +177,6 @@ export const processCommissions = functions.firestore
                             description: `Level ${level} marketing commission from ${userData.firstName}`,
                             createdAt: admin.firestore.FieldValue.serverTimestamp(),
                         });
-                        // Marketing commissions go to their dedicated marketingBalance
                         batch.update(db.collection('users').doc(marketerId), {
                             marketingBalance: admin.firestore.FieldValue.increment(commissionAmount),
                         });
@@ -202,14 +184,14 @@ export const processCommissions = functions.firestore
                 }
             }
         }
-        
+
         try {
             await batch.commit();
             functions.logger.log(`Successfully committed commission batch for game ${gameRoomId}.`);
         } catch (error) {
             functions.logger.error(`Error committing commission batch for game ${gameRoomId}:`, error);
         }
-
+        
         return null;
     });
 
@@ -303,4 +285,3 @@ export const updateEventProgress = functions.firestore
     return null;
   });
 
-    
