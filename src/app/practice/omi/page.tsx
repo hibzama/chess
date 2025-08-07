@@ -111,31 +111,33 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 };
 
 const TrickArea = ({ trick }) => {
-    // Correct positions for each player's card on the board.
     const basePositions: React.CSSProperties[] = [
-        { top: '50%', left: '50%', transform: 'translate(-50%, 25%)' },     // Player 0 (Bottom)
-        { top: '50%', left: '50%', transform: 'translate(-150%, -50%) rotate(90deg)' },  // Player 1 (Left)
-        { top: '50%', left: '50%', transform: 'translate(-50%, -125%) rotate(180deg)' }, // Player 2 (Top)
-        { top: '50%', left: '50%', transform: 'translate(50%, -50%) rotate(-90deg)' }, // Player 3 (Right)
+        { bottom: '0px', left: '50%', transform: 'translateX(-50%)' },  // Player 0 (Bottom)
+        { top: '50%', left: '0px', transform: 'translateY(-50%) rotate(90deg)' },  // Player 1 (Left)
+        { top: '0px', left: '50%', transform: 'translateX(-50%) rotate(180deg)' }, // Player 2 (Top)
+        { top: '50%', right: '0px', transform: 'translateY(-50%) rotate(-90deg)' }  // Player 3 (Right)
     ];
 
+
     return (
-        <div className="relative w-full h-full">
-            <AnimatePresence>
-                {trick.map((play, index) => (
-                    <motion.div
-                        key={play.card}
-                        layoutId={`card-${play.card}`}
-                        className="absolute"
-                        style={{ ...basePositions[play.player], zIndex: index }}
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ duration: 0.2 }}
-                    >
-                         <PlayingCard card={play.card} />
-                    </motion.div>
-                ))}
-            </AnimatePresence>
+        <div className="absolute inset-10 flex items-center justify-center">
+            <div className="relative w-56 h-40">
+                <AnimatePresence>
+                    {trick.map((play, index) => (
+                        <motion.div
+                            key={play.card}
+                            layoutId={`card-${play.card}`}
+                            className="absolute"
+                            style={{ ...basePositions[play.player], zIndex: index }}
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.2 }}
+                        >
+                            <PlayingCard card={play.card} />
+                        </motion.div>
+                    ))}
+                </AnimatePresence>
+            </div>
         </div>
     );
 };

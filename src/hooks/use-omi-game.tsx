@@ -218,7 +218,7 @@ const useOmiGameLogic = () => {
             setGameState(gs => {
                 if (!gs) return null;
                 // Clear the trick and set the new leader for the next turn
-                const finalState = { ...gs, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase };
+                const finalState = { ...gs, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase, scores: newScores };
                 
                 if (finalState.phase === 'scoring') {
                     // All tricks are played, now score the round
