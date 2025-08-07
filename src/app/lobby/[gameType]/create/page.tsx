@@ -1,5 +1,3 @@
-
-
 'use client'
 
 import { useState } from 'react';
@@ -57,7 +55,6 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';

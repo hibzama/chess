@@ -1,4 +1,3 @@
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -136,11 +135,9 @@ export const processCommissions = functions.firestore
             // 3. Process Regular User Commission (Level 1)
             if (referredBy) {
                 const referrerDoc = await db.collection('users').doc(referredBy).get();
-                // Ensure referrer is a 'user' to avoid paying L1 commission to a marketer from this logic
                 if (referrerDoc.exists && referrerDoc.data()?.role === 'user') {
                     const l1Count = referrerDoc.data()?.l1Count || 0;
-                    // Determine commission rate based on the referrer's L1 count
-                    const l1Rate = l1Count >= 20 ? 0.05 : 0.03; // 5% for 20+, 3% otherwise
+                    const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
                     const commissionAmount = gameWager * l1Rate;
 
                     if (commissionAmount > 0) {
@@ -157,7 +154,6 @@ export const processCommissions = functions.firestore
                             description: `L1 commission from ${userData.firstName}`,
                             createdAt: admin.firestore.FieldValue.serverTimestamp(),
                         });
-                        // Regular user commissions go to their main balance
                         batch.update(db.collection('users').doc(referredBy), {
                             balance: admin.firestore.FieldValue.increment(commissionAmount),
                         });
@@ -171,7 +167,6 @@ export const processCommissions = functions.firestore
                 const commissionAmount = gameWager * marketerCommissionRate;
 
                 if (commissionAmount > 0) {
-                    // Pay commission to the last 20 members of the chain
                     const relevantChain = referralChain.slice(-20);
                     
                     for (let i = 0; i < relevantChain.length; i++) {
@@ -192,7 +187,6 @@ export const processCommissions = functions.firestore
                             description: `Level ${level} marketing commission from ${userData.firstName}`,
                             createdAt: admin.firestore.FieldValue.serverTimestamp(),
                         });
-                        // Marketing commissions go to their dedicated marketingBalance
                         batch.update(db.collection('users').doc(marketerId), {
                             marketingBalance: admin.firestore.FieldValue.increment(commissionAmount),
                         });
@@ -300,4 +294,3 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
-

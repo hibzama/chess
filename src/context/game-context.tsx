@@ -1,8 +1,7 @@
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -182,9 +181,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const { method, resignerDetails } = winnerDetails;
                 let { winnerId } = winnerDetails;
 
-                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
-                const joinerRef = doc(db, 'users', roomData.player2.uid);
-                
                 const winnerObject: GameRoom['winner'] = { uid: null, method };
     
                 if (resignerDetails) { // Resignation logic
@@ -222,16 +218,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const now = serverTimestamp();
                 const payoutTxId = doc(collection(db, 'transactions')).id;
     
-                // Add payout amounts back to balance
                 if (creatorPayout > 0) {
-                    transaction.update(creatorRef, { balance: increment(creatorPayout) });
+                    transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
                 }
                 if (joinerPayout > 0) {
-                    transaction.update(joinerRef, { balance: increment(joinerPayout) });
+                    transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
                 }
 
-                // Create a single Payout transaction for the winner for commission processing
-                 if (winnerId && winnerId !== 'draw') {
+                if (winnerId && winnerId !== 'draw') {
                     const winnerPayoutAmount = winnerId === roomData.createdBy.uid ? creatorPayout : joinerPayout;
                     const payoutTxData: any = {
                         userId: winnerId,
