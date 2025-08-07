@@ -242,54 +242,52 @@ export default function MainLayout({
                 <div className="relative z-10 flex flex-col min-h-svh">
                     <header className="px-4 lg:px-6 h-16 flex items-center border-b">
                         <SidebarTrigger className="md:hidden"/>
-                        <div className="ml-auto flex items-center gap-2">
-                           <div className="flex items-center gap-2">
-                            {isMounted && (
-                                <>
-                               <Link href={isMarketer ? "/marketing/dashboard/wallet" : "/dashboard/wallet"}>
-                                  <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
-                                      <CardContent className="p-2 flex items-center gap-2">
-                                          <Wallet className="w-5 h-5 text-primary"/>
-                                          <div>
-                                          {loading || !userData ? (
-                                              <div className="space-y-1">
-                                                <Skeleton className="h-4 w-16"/>
-                                                <Skeleton className="h-3 w-12"/>
+                        <div className="ml-auto flex items-center gap-4">
+                           {isMounted && (
+                               <div className="flex items-center gap-2">
+                                   <Link href={isMarketer ? "/marketing/dashboard/wallet" : "/dashboard/wallet"}>
+                                      <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
+                                          <CardContent className="p-2 flex items-center gap-2">
+                                              <Wallet className="w-5 h-5 text-primary"/>
+                                              <div>
+                                              {loading || !userData ? (
+                                                  <div className="space-y-1">
+                                                    <Skeleton className="h-4 w-16"/>
+                                                    <Skeleton className="h-3 w-12"/>
+                                                  </div>
+                                                  ) : (
+                                                  <>
+                                                      <p className="text-sm font-bold text-primary">LKR {(isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0).toFixed(2)}</p>
+                                                      <p className="text-xs text-muted-foreground">~{((isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
+                                                  </>
+                                              )}
                                               </div>
-                                              ) : (
-                                              <>
-                                                  <p className="text-sm font-bold text-primary">LKR {(isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0).toFixed(2)}</p>
-                                                  <p className="text-xs text-muted-foreground">~{((isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
-                                              </>
-                                          )}
-                                          </div>
-                                      </CardContent>
-                                  </Card>
-                              </Link>
-                              
-                              <Link href={"/dashboard/wallet"}>
-                                  <Card className="bg-card/50 border-accent/20 hover:bg-accent/5 transition-colors">
-                                      <CardContent className="p-2 flex items-center gap-2">
-                                          <Gift className="w-5 h-5 text-accent"/>
-                                          <div>
-                                          {loading || !userData ? (
-                                              <div className="space-y-1">
-                                                <Skeleton className="h-4 w-16"/>
-                                                <Skeleton className="h-3 w-12"/>
+                                          </CardContent>
+                                      </Card>
+                                  </Link>
+                                  
+                                  <Link href={"/dashboard/wallet"}>
+                                      <Card className="bg-card/50 border-accent/20 hover:bg-accent/5 transition-colors">
+                                          <CardContent className="p-2 flex items-center gap-2">
+                                              <Gift className="w-5 h-5 text-accent"/>
+                                              <div>
+                                              {loading || !userData ? (
+                                                  <div className="space-y-1">
+                                                    <Skeleton className="h-4 w-16"/>
+                                                    <Skeleton className="h-3 w-12"/>
+                                                  </div>
+                                                  ) : (
+                                                  <>
+                                                      <p className="text-sm font-bold text-accent">LKR {(userData.bonusBalance ?? 0).toFixed(2)}</p>
+                                                      <p className="text-xs text-muted-foreground">~{((userData.bonusBalance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
+                                                  </>
+                                              )}
                                               </div>
-                                              ) : (
-                                              <>
-                                                  <p className="text-sm font-bold text-accent">LKR {(userData.bonusBalance ?? 0).toFixed(2)}</p>
-                                                  <p className="text-xs text-muted-foreground">~{((userData.bonusBalance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
-                                              </>
-                                          )}
-                                          </div>
-                                      </CardContent>
-                                  </Card>
-                              </Link>
-                              </>
-                            )}
-                           </div>
+                                          </CardContent>
+                                      </Card>
+                                  </Link>
+                               </div>
+                           )}
                             <NotificationBell />
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
