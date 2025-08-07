@@ -33,7 +33,7 @@ const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style = {}, layo
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-            transition={{ duration: 0.3 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
             <div className="flex items-start justify-start">
                 <span className="text-2xl font-bold">{rank.toUpperCase()}</span>
@@ -55,23 +55,28 @@ const PlayerDisplay = ({ player, position, isCurrent, isDealer, handSize }) => {
     return (
         <div className={cn("absolute flex flex-col items-center gap-2", position)}>
             <div className="flex items-center gap-2">
-                {handSize > 0 && <div className="text-sm font-bold bg-black/30 rounded-full px-2">{handSize}</div>}
-                 <div className={cn("p-1 bg-card/80 backdrop-blur-sm rounded-full shadow-lg border-2", isCurrent ? 'border-primary' : 'border-transparent')}>
-                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center font-bold text-xl">{player.name.charAt(0)}</div>
+                 <div className="relative">
+                     <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center font-bold text-xl shadow-inner">{player.name.charAt(0)}</div>
+                     {handSize > 0 && <div className="absolute -top-1 -right-1 text-xs font-bold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5">{handSize}</div>}
+                 </div>
+                 <div className="flex flex-col items-start">
+                    <div className="text-center font-semibold text-sm text-white bg-black/30 rounded-md px-2 py-1">{player.name}</div>
+                    <div className="flex gap-1 mt-1">
+                        {isDealer && <div className="text-xs bg-yellow-400 text-black rounded-full px-2 py-0.5">Dealer</div>}
+                        {isCurrent && <div className="text-xs bg-green-400 text-black rounded-full px-2 py-0.5 animate-pulse">Playing...</div>}
+                    </div>
                 </div>
-                 {isDealer && <div className="text-xs bg-yellow-400 text-black rounded-full px-2 py-0.5">Dealer</div>}
             </div>
-            <div className="text-center font-semibold text-sm text-white bg-black/30 rounded-md px-2 py-1">{player.name}</div>
         </div>
     );
 };
 
 const TrickArea = ({ trick }) => {
     const trickPositions = [
-        { bottom: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 0 (You)
-        { left: 'calc(50% - 10rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 1 (Left)
-        { top: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 2 (Partner)
-        { right: 'calc(50% - 10rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 3 (Right)
+        { bottom: 'calc(50% - 4.5rem)', left: '50%', transform: 'translateX(-50%) rotate(0deg)' }, // Player 0 (You)
+        { left: 'calc(50% - 9rem)', top: '50%', transform: 'translateY(-50%) rotate(90deg)' }, // Player 1 (Left)
+        { top: 'calc(50% - 4.5rem)', left: '50%', transform: 'translateX(-50%) rotate(180deg)' }, // Player 2 (Partner)
+        { right: 'calc(50% - 9rem)', top: '50%', transform: 'translateY(-50%) rotate(-90deg)' }, // Player 3 (Right)
     ];
 
     return (
@@ -197,19 +202,21 @@ const OmiGameUI = () => {
 
             {/* User Player Hand */}
             <div className="relative w-full h-48 flex justify-center items-end">
-                 <PlayerDisplay player={players[0]} position="bottom-36 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 0} isDealer={dealerIndex === 0} handSize={0} />
-                 <AnimatePresence>
+                 <PlayerDisplay player={players[0]} position="bottom-[10rem] left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 0} isDealer={dealerIndex === 0} handSize={0} />
+                 <div className="relative w-full h-48 flex justify-center items-end">
                     {userPlayer.hand.map((card, i) => {
                         const handSize = userPlayer.hand.length;
-                        const cardAngle = 8;
-                        const rotation = (i - (handSize - 1) / 2) * cardAngle;
+                        const anglePerCard = Math.min(10, 80 / handSize);
+                        const totalAngle = (handSize - 1) * anglePerCard;
+                        const rotation = (i * anglePerCard) - (totalAngle / 2);
+                        
                         return (
                             <div
                                 key={card}
                                 className="absolute bottom-0"
                                 style={{
-                                    transform: `rotate(${rotation}deg) translateY(calc(${Math.abs(rotation) * 1.5}px))`,
-                                    transformOrigin: `bottom center`,
+                                    transform: `rotate(${rotation}deg)`,
+                                    transformOrigin: `50% 25rem`, // Pivot from a point far below the cards
                                     zIndex: i,
                                 }}
                             >
@@ -223,7 +230,7 @@ const OmiGameUI = () => {
                              </div>
                         )
                     })}
-                </AnimatePresence>
+                </div>
             </div>
         </div>
     );
