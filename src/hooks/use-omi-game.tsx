@@ -181,7 +181,7 @@ const useOmiGameLogic = () => {
 
     useEffect(() => {
         if (!gameState) return;
-        const { phase, players, currentPlayerIndex, trick } = gameState;
+        const { phase, players, currentPlayerIndex, trick, leadSuit, trumpSuit, dealerIndex } = gameState;
 
         if (phase === 'dealing') {
             const { deck } = gameState;
@@ -204,16 +204,19 @@ const useOmiGameLogic = () => {
         if (players[currentPlayerIndex]?.isBot) {
             const timeout = setTimeout(() => {
                 if (phase === 'trumping') {
+                    // Bot trumping logic
+                    const botPlayer = players[currentPlayerIndex];
+                    // Very basic: just pass for now
                     handlePass();
                 } else if (phase === 'playing') {
                     const botPlayer = players[currentPlayerIndex];
-                    const cardToPlay = getBotMove(botPlayer, trick, gameState.leadSuit, gameState.trumpSuit);
+                    const cardToPlay = getBotMove(botPlayer, trick, leadSuit, trumpSuit);
                     handlePlayCard(cardToPlay);
                 }
             }, 1000);
             return () => clearTimeout(timeout);
         }
-    }, [gameState, getBotMove, endTrick]);
+    }, [gameState?.phase, gameState?.trick.length, gameState?.currentPlayerIndex, endTrick, getBotMove]);
 
     const handleSelectTrump = (suit: Suit) => {
         setGameState(gs => {
@@ -236,6 +239,7 @@ const useOmiGameLogic = () => {
             if (!gs || gs.phase !== 'trumping') return gs;
             const nextPlayer = (gs.currentPlayerIndex + 1) % 4;
             if (nextPlayer === (gs.dealerIndex + 1) % 4) {
+                // All players passed, redeal
                 initializeGame((gs.dealerIndex + 1) % 4, {team1: gs.scores.team1, team2: gs.scores.team2});
                 return null;
             }
