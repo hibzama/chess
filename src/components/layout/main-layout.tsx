@@ -244,12 +244,14 @@ export default function MainLayout({
                         <SidebarTrigger className="md:hidden"/>
                         <div className="ml-auto flex items-center gap-2">
                            <div className="flex items-center gap-2">
+                            {isMounted && (
+                                <>
                                <Link href={isMarketer ? "/marketing/dashboard/wallet" : "/dashboard/wallet"}>
                                   <Card className="bg-card/50 border-primary/20 hover:bg-primary/5 transition-colors">
                                       <CardContent className="p-2 flex items-center gap-2">
                                           <Wallet className="w-5 h-5 text-primary"/>
                                           <div>
-                                          {!isMounted || loading || !userData ? (
+                                          {loading || !userData ? (
                                               <div className="space-y-1">
                                                 <Skeleton className="h-4 w-16"/>
                                                 <Skeleton className="h-3 w-12"/>
@@ -270,7 +272,7 @@ export default function MainLayout({
                                       <CardContent className="p-2 flex items-center gap-2">
                                           <Gift className="w-5 h-5 text-accent"/>
                                           <div>
-                                          {!isMounted || loading || !userData ? (
+                                          {loading || !userData ? (
                                               <div className="space-y-1">
                                                 <Skeleton className="h-4 w-16"/>
                                                 <Skeleton className="h-3 w-12"/>
@@ -285,6 +287,8 @@ export default function MainLayout({
                                       </CardContent>
                                   </Card>
                               </Link>
+                              </>
+                            )}
                            </div>
                             <NotificationBell />
                             <DropdownMenu>
