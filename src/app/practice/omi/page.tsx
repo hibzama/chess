@@ -38,7 +38,6 @@ const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
         );
     }
     
-    // Layouts for number cards 7, 8, 9
     const pipLayouts: { [key: number]: string[] } = {
         7: ['col-start-2 row-start-1', 'col-start-1 row-start-2', 'col-start-3 row-start-2', 'col-start-2 row-start-3', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5'],
         8: ['col-start-1 row-start-1', 'col-start-3 row-start-1', 'col-start-2 row-start-2', 'col-start-1 row-start-4', 'col-start-3 row-start-4', 'col-start-2 row-start-5', 'col-start-1 row-start-6', 'col-start-3 row-start-6'],
@@ -112,10 +111,10 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     const cardSlots = [
-        { top: '50%', left: '50%', transform: 'translate(-50%, 0) rotate(0deg)' },      // Bottom (Player 0)
-        { top: '50%', left: '50%', transform: 'translate(-100%, -50%) rotate(90deg)' }, // Left (Player 1)
-        { top: '50%', left: '50%', transform: 'translate(-50%, -100%) rotate(180deg)' },// Top (Player 2)
-        { top: '50%', left: '50%', transform: 'translate(0, -50%) rotate(-90deg)' },   // Right (Player 3)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -20%)' },      // Bottom (Player 0)
+        { top: '50%', left: '50%', transform: 'translate(-120%, -50%) rotate(90deg)' }, // Left (Player 1)
+        { top: '50%', left: '50%', transform: 'translate(-50%, -80%) rotate(180deg)' },// Top (Player 2)
+        { top: '50%', left: '50%', transform: 'translate(20%, -50%) rotate(-90deg)' },   // Right (Player 3)
     ];
 
     return (
