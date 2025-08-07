@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -191,9 +191,10 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     const opponentPayoutRate = 1.30;
     
                     let resignerRefundRate = 0;
-                    if (resignerDetails.pieceCount >= 6) {
+                    const pieceCount = resignerDetails.pieceCount;
+                    if (pieceCount >= 6) {
                         resignerRefundRate = 0.50;
-                    } else if (resignerDetails.pieceCount >= 3) {
+                    } else if (pieceCount >= 3) {
                         resignerRefundRate = 0.35;
                     } else {
                         resignerRefundRate = 0.25;
