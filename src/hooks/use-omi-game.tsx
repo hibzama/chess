@@ -81,6 +81,15 @@ const useOmiGameLogic = () => {
         initializeGame();
     }, [initializeGame]);
 
+    const getPlayableCardsForPlayer = (hand: Card[], leadSuit: Suit | null): Card[] => {
+        if (!leadSuit) return hand;
+        const hasLeadSuit = hand.some(card => card.startsWith(leadSuit));
+        if (hasLeadSuit) {
+            return hand.filter(card => card.startsWith(leadSuit));
+        }
+        return hand; // Can play any card
+    };
+    
     // Bot Logic
     const getBotMove = useCallback((player: Player, currentTrick: Trick, leadSuit: Suit | null, trumpSuit: Suit | null): Card => {
         const playableCards = getPlayableCardsForPlayer(player.hand, leadSuit);
@@ -94,15 +103,6 @@ const useOmiGameLogic = () => {
         return playableCards[0];
     }, []);
 
-    const getPlayableCardsForPlayer = (hand: Card[], leadSuit: Suit | null): Card[] => {
-        if (!leadSuit) return hand;
-        const hasLeadSuit = hand.some(card => card.startsWith(leadSuit));
-        if (hasLeadSuit) {
-            return hand.filter(card => card.startsWith(leadSuit));
-        }
-        return hand; // Can play any card
-    };
-    
     const endTrick = useCallback(() => {
         setGameState(currentState => {
             if (!currentState || currentState.trick.length !== 4) return currentState;
@@ -226,8 +226,13 @@ const useOmiGameLogic = () => {
             }, 1000);
             return () => clearTimeout(timeout);
         }
+        
+        // End trick when 4 cards are played
+        if (gameState.phase === 'playing' && gameState.trick.length === 4) {
+             endTrick();
+        }
 
-    }, [gameState, getBotMove]);
+    }, [gameState, getBotMove, endTrick]);
 
     // Action handlers
     const handleSelectTrump = (suit: Suit) => {
@@ -274,22 +279,14 @@ const useOmiGameLogic = () => {
             if (newTrick.length === 1) {
                 newLeadSuit = card[0] as Suit;
             }
-
-            const isTrickComplete = newTrick.length === 4;
-
-            const newState: OmiGameState = { 
+            
+            return { 
                 ...gs, 
                 players: newPlayers, 
                 trick: newTrick, 
                 leadSuit: newLeadSuit, 
-                currentPlayerIndex: isTrickComplete ? gs.currentPlayerIndex : (gs.currentPlayerIndex + 1) % 4 
+                currentPlayerIndex: (gs.currentPlayerIndex + 1) % 4 
             };
-
-            if(isTrickComplete) {
-                 endTrick();
-            }
-
-            return newState;
         });
     };
 

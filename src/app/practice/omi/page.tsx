@@ -118,13 +118,6 @@ const TrickArea = ({ trick }) => {
         3: 'row-start-2 col-start-3', // Right (Player 3)
     };
     
-    const cardRotations: { [key: number]: string } = {
-        0: 'rotate-0',
-        1: 'rotate-90',
-        2: 'rotate-180',
-        3: '-rotate-90',
-    };
-
     return (
         <div className="absolute inset-0 p-4 grid grid-cols-3 grid-rows-3 gap-2">
             {[...Array(9)].map((_, i) => {
@@ -143,9 +136,7 @@ const TrickArea = ({ trick }) => {
                         exit={{ scale: 0, opacity: 0, transition: { duration: 0.2 } }}
                         transition={{ duration: 0.2 }}
                     >
-                        <div className={cn(cardRotations[play.player])}>
-                            <PlayingCard card={play.card} />
-                        </div>
+                        <PlayingCard card={play.card} />
                     </motion.div>
                 ))}
             </AnimatePresence>
