@@ -97,7 +97,7 @@ export default function EarningHomePage() {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Button asChild size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white">
-                            <a href="https://chat.whatsapp.com/KGvUICFJNgt8tzFcGtVVmr" target="_blank" rel="noopener noreferrer">
+                            <a href="https://chat.whatsapp.com/EJFHx4y9n9EDstQ971Bvf5?mode=ac_t" target="_blank" rel="noopener noreferrer">
                                 <MessageSquare className="mr-2 h-5 w-5" />
                                 Join WhatsApp Group
                             </a>
