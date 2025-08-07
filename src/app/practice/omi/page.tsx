@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useOmiGame, OmiGameProvider } from '@/hooks/use-omi-game';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { ArrowLeft, Spade, Heart, Diamond, Club, Repeat, Trophy, Crown } from 'lucide-react';
+import { ArrowLeft, Spade, Heart, Diamond, Club, Repeat, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 const suitIcons: { [key: string]: React.ReactNode } = {
@@ -25,17 +25,17 @@ const suitColors = {
 
 const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
     const numericRank = parseInt(rank, 10);
-    if (isNaN(numericRank) || numericRank < 7 || numericRank > 9) { // Only for 7, 8, 9
-        // A, K, Q, J, T have a large central character
+    const Icon = suitIcons[suit];
+
+    if (isNaN(numericRank) || numericRank < 7 || numericRank > 9) { // A, K, Q, J, T
         return (
             <div className={cn("absolute inset-0 flex items-center justify-center", suitColors[suit])}>
-                <span className="text-8xl font-bold opacity-20">{rank.toUpperCase()}</span>
+                <span className="text-8xl font-bold opacity-10">{rank.toUpperCase()}</span>
             </div>
         );
     }
     
-    const Icon = suitIcons[suit];
-    
+    // Specific layouts for 7, 8, 9
     const pipLayouts: { [key: number]: string[] } = {
         7: ['col-span-1 row-start-1', 'col-span-1 row-start-1', 'col-start-2 row-start-2', 'col-span-1 row-start-4', 'col-span-1 row-start-4', 'col-start-2 row-start-5', 'col-start-2 row-start-5'],
         8: ['col-span-1 row-start-1', 'col-span-1 row-start-1', 'col-start-2 row-start-2', 'col-start-2 row-start-2', 'col-span-1 row-start-5', 'col-span-1 row-start-5', 'col-start-2 row-start-4', 'col-start-2 row-start-4'],
@@ -87,8 +87,7 @@ const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style }: { card:
     );
 };
 
-
-const PlayerDisplay = ({ player, position, isCurrent, isDealer }) => {
+const PlayerDisplay = ({ player, position, isDealer }) => {
     return (
         <div className={cn("absolute flex flex-col items-center gap-2", position)}>
             <div className="relative">
@@ -101,11 +100,8 @@ const PlayerDisplay = ({ player, position, isCurrent, isDealer }) => {
             </div>
             <div className="flex flex-col items-center">
                 <div className="font-semibold text-sm text-white bg-black/50 rounded-md px-2 py-1 shadow-lg">{player.name}</div>
-                <div className="flex gap-1 mt-1">
-                    {isDealer && <div className="text-xs bg-yellow-400 text-black rounded-full px-2 py-0.5 font-bold">Dealer</div>}
-                </div>
+                 {isDealer && <div className="text-xs mt-1 bg-yellow-400 text-black rounded-full px-2 py-0.5 font-bold">Dealer</div>}
             </div>
-             {isCurrent && <div className="absolute -bottom-5 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Playing...</div>}
         </div>
     );
 };
@@ -229,27 +225,28 @@ const OmiGameUI = () => {
             <GameHeader scores={scores} trumpSuit={trumpSuit} />
 
             <div className="relative flex-1 w-full flex items-center justify-center my-4">
-                 <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 2} isDealer={dealerIndex === 2} />
-                 <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 1} isDealer={dealerIndex === 1} />
-                 <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 3} isDealer={dealerIndex === 3} />
+                 <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 2} />
+                 <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
+                 <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
 
                  <div className="absolute w-[450px] h-[300px] bg-green-800/80 rounded-3xl border-8 border-yellow-900 shadow-2xl overflow-hidden">
                     <div className="absolute inset-0 bg-black/10"></div>
                     <TrickArea trick={trick} />
                 </div>
+                 {isUserTurn && <div className="absolute -bottom-8 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Your Turn...</div>}
             </div>
 
             <div className="relative w-full h-48 flex justify-center items-end">
-                <PlayerDisplay player={players[0]} position="bottom-44 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 0} isDealer={dealerIndex === 0} />
-                <div className="relative w-[500px] h-48 flex justify-center items-center -bottom-8">
+                <PlayerDisplay player={players[0]} position="bottom-44 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 0} />
+                <div className="relative w-full h-48 flex justify-center items-center -bottom-8">
                      <AnimatePresence>
                         {userPlayer.hand.map((card, i) => {
-                            const handSize = userPlayer.hand.length;
-                            const cardOffset = 35; // How much each card overlaps
-                            const totalWidth = cardOffset * (handSize - 1) + 96; // 96 is card width
-                            const startX = -totalWidth / 2;
-                            
-                            const x = startX + i * cardOffset;
+                             const handSize = userPlayer.hand.length;
+                             const isEven = handSize % 2 === 0;
+                             const midIndex = Math.floor(handSize / 2);
+                             const position = i - midIndex;
+                             const xOffset = isEven ? (position + 0.5) * 35 : position * 35;
+                             const rotation = isEven ? (position + 0.5) * 5 : position * 5;
                             
                             return (
                                 <div
@@ -257,7 +254,7 @@ const OmiGameUI = () => {
                                     className="absolute origin-bottom"
                                     style={{
                                         left: '50%',
-                                        transform: `translateX(${x}px)`,
+                                        transform: `translateX(${xOffset}px) rotate(${rotation}deg)`,
                                         zIndex: i,
                                     }}
                                 >

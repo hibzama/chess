@@ -29,7 +29,13 @@ const RANKS: Rank[] = ['a', 'k', 'q', 'j', 't', '9', '8', '7'];
 const RANK_VALUE = Object.fromEntries(RANKS.map((r, i) => [r, RANKS.length - i]));
 
 const createDeck = (): Card[] => {
-    return SUITS.flatMap(suit => RANKS.map(rank => `${suit}${rank}` as Card));
+    const cards: Card[] = [];
+    for (const suit of SUITS) {
+        for (const rank of RANKS) {
+            cards.push(`${suit}${rank}`);
+        }
+    }
+    return cards;
 };
 
 const shuffleDeck = (deck: Card[]): Card[] => {
@@ -204,10 +210,52 @@ const useOmiGameLogic = () => {
         if (currentState.players[0].hand.length === 0) {
             nextPhase = 'scoring';
         }
+        
+        // This is a temporary state to show the won trick
+        const tempState = { ...currentState, scores: newScores, trick: currentState.trick, currentPlayerIndex: winnerId, leadSuit: null };
 
-        return { ...currentState, scores: newScores, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase };
+        setTimeout(() => {
+            setGameState(gs => {
+                if (!gs) return null;
+                // Clear the trick and set the new leader for the next turn
+                const finalState = { ...gs, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase };
+                
+                if (finalState.phase === 'scoring') {
+                    // All tricks are played, now score the round
+                    const { trumpCaller, scores } = finalState;
+                    const newOverallScores = { ...scores, tricks1: 0, tricks2: 0 };
+                    
+                    if(trumpCaller === null) {
+                        initializeGame((finalState.dealerIndex + 1) % 4, newOverallScores);
+                        return null;
+                    }
+                    
+                    const callingTeamIs1 = trumpCaller === 0 || trumpCaller === 2;
+                    
+                    if (callingTeamIs1) {
+                        if (scores.tricks1 >= 5) newOverallScores.team1++;
+                        else newOverallScores.team2 += 2; // Kapothi
+                    } else {
+                        if (scores.tricks2 >= 5) newOverallScores.team2++;
+                        else newOverallScores.team1 += 2; // Kapothi
+                    }
+                    
+                    if (newOverallScores.team1 >= 10 || newOverallScores.team2 >= 10) {
+                        return { ...finalState, scores: newOverallScores, phase: 'finished' };
+                    } else {
+                        const newDealer = (finalState.dealerIndex + 1) % 4;
+                        initializeGame(newDealer, newOverallScores);
+                        return null;
+                    }
+                }
+                
+                return finalState;
+            });
+        }, 1000); // Wait 1 second before clearing the trick
 
-    }, []);
+        return tempState; // Return the temporary state immediately
+
+    }, [initializeGame]);
 
     const handlePlayCard = (card: Card) => {
         setGameState(gs => {
@@ -227,45 +275,7 @@ const useOmiGameLogic = () => {
             let newState: OmiGameState = { ...gs, players: newPlayers, trick: newTrick, leadSuit: newLeadSuit, currentPlayerIndex: (gs.currentPlayerIndex + 1) % 4 };
 
             if(newTrick.length === 4) {
-                 setTimeout(() => {
-                    setGameState(currentState => {
-                       if (!currentState) return null;
-                       const updatedState = endTrick(currentState);
-                       
-                       // After trick ends, check if round is over
-                       if (updatedState.phase === 'scoring') {
-                           const { trumpCaller, scores } = updatedState;
-                           const newOverallScores = { ...scores, tricks1: 0, tricks2: 0 };
-                           
-                           if(trumpCaller === null) {
-                               // This case shouldn't happen if trumping phase is handled correctly, but as a fallback
-                               initializeGame((updatedState.dealerIndex + 1) % 4, newOverallScores);
-                               return null;
-                           }
-                           
-                           const callingTeamIs1 = trumpCaller === 0 || trumpCaller === 2;
-                           
-                           if (callingTeamIs1) {
-                               if (scores.tricks1 >= 5) newOverallScores.team1++;
-                               else newOverallScores.team2 += 2; // Kapothi
-                           } else {
-                               if (scores.tricks2 >= 5) newOverallScores.team2++;
-                               else newOverallScores.team1 += 2; // Kapothi
-                           }
-                           
-                           if (newOverallScores.team1 >= 10 || newOverallScores.team2 >= 10) {
-                                return { ...updatedState, scores: newOverallScores, phase: 'finished' };
-                           } else {
-                               // Start new round
-                               const newDealer = (updatedState.dealerIndex + 1) % 4;
-                               initializeGame(newDealer, newOverallScores);
-                               return null; // Let initialize handle the new state
-                           }
-                       }
-                       
-                       return updatedState;
-                    });
-                }, 1000);
+                 newState = endTrick(newState);
             }
 
             return newState;
