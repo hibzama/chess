@@ -1,3 +1,4 @@
+
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -211,6 +212,9 @@ function MultiplayerGame() {
     
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
+        const joinerRef = doc(db, 'users', user.uid);
+        const creatorRef = doc(db, 'users', room.createdBy.uid);
+        const batch = writeBatch(db);
 
         try {
             const currentRoomDoc = await getDoc(roomRef);
@@ -221,13 +225,37 @@ function MultiplayerGame() {
             const creatorColor = room.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
-            await updateDoc(roomRef, {
+            // 1. Update Room Status
+            batch.update(roomRef, {
                 status: 'in-progress',
                 player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
                 players: [...room.players, user.uid],
                 capturedByP1: [], capturedByP2: [], moveHistory: [],
                 currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
             });
+
+            // 2. Process Wagers for BOTH players
+            if (room.wager > 0) {
+                const wagerAmount = room.wager;
+                
+                // Deduct from creator and create transaction
+                batch.update(creatorRef, { balance: increment(-wagerAmount) });
+                batch.set(doc(collection(db, 'transactions')), {
+                    userId: room.createdBy.uid, type: 'wager', amount: wagerAmount, status: 'completed',
+                    description: `Wager for ${room.gameType} game vs ${userData.firstName}`,
+                    gameRoomId: room.id, createdAt: serverTimestamp()
+                });
+
+                // Deduct from joiner and create transaction
+                batch.update(joinerRef, { balance: increment(-wagerAmount) });
+                 batch.set(doc(collection(db, 'transactions')), {
+                    userId: user.uid, type: 'wager', amount: wagerAmount, status: 'completed',
+                    description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
+                    gameRoomId: room.id, createdAt: serverTimestamp()
+                });
+            }
+
+            await batch.commit();
 
             toast({ title: "Game Joined!", description: "The match is starting now."});
     

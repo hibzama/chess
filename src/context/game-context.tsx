@@ -1,3 +1,4 @@
+
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
@@ -328,7 +329,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const wager = roomData.wager || 0;
                 let myPayout = 0;
 
-                if (iAmResigner) {
+                 if (iAmResigner) {
                     const pieceCount = roomData.winner?.resignerPieceCount || 0;
                     let refundRate = 0;
                     if (pieceCount >= 6) refundRate = 0.50;
@@ -599,4 +600,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
-
