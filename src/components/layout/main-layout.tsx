@@ -58,8 +58,10 @@ const NotificationBell = () => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const router = useRouter();
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
+        setIsMounted(true);
         if (!user) return;
         const q = query(
             collection(db, 'notifications'), 
@@ -92,7 +94,7 @@ const NotificationBell = () => {
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
                     <Bell />
-                    {unreadCount > 0 && (
+                    {isMounted && unreadCount > 0 && (
                         <div className="absolute top-1 right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-xs flex items-center justify-center">
                             {unreadCount}
                         </div>
