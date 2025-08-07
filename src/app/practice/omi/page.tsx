@@ -229,9 +229,9 @@ const OmiGameUI = () => {
             <GameHeader scores={scores} trumpSuit={trumpSuit} />
 
             <div className="relative flex-1 w-full flex items-center justify-center my-4">
-                 <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isDealer={dealerIndex === 2} />
-                 <PlayerDisplay player={players[1]} position="left-12 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
-                 <PlayerDisplay player={players[3]} position="right-12 top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
+                <PlayerDisplay player={players[2]} position="top-[-4rem] left-1/2 -translate-x-1/2" isDealer={dealerIndex === 2} />
+                <PlayerDisplay player={players[1]} position="left-[-4rem] top-1/2 -translate-y-1/2" isDealer={dealerIndex === 1} />
+                <PlayerDisplay player={players[3]} position="right-[-4rem] top-1/2 -translate-y-1/2" isDealer={dealerIndex === 3} />
 
                  <div className="absolute w-[450px] h-[300px] bg-[#65a30d]/50 rounded-3xl border-8 border-[#1a1a1a] shadow-2xl overflow-hidden">
                     <div className="absolute inset-0 bg-black/10"></div>
@@ -296,5 +296,4 @@ export default function OmiPage() {
         </OmiGameProvider>
     );
 }
-
 
