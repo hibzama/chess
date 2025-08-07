@@ -111,11 +111,12 @@ const PlayerDisplay = ({ player, position, isDealer }) => {
 
 const TrickArea = ({ trick }) => {
     const basePositions = [
-        { top: '50%', left: '50%', transform: 'translate(-50%, 0%) rotate(0deg)' }, // Player 0 (You)
-        { top: '50%', left: '50%', transform: 'translate(-100%, -50%) rotate(90deg)' }, // Player 1 (Left)
-        { top: '50%', left: '50%', transform: 'translate(-50%, -100%) rotate(0deg)' }, // Player 2 (Partner)
-        { top: '50%', left: '50%', transform: 'translate(0%, -50%) rotate(-90deg)' }, // Player 3 (Right)
+        { top: 'calc(50% + 20px)', left: '50%', transform: 'translate(-50%, -50%) rotate(0deg)' },     // Player 0 (Bottom)
+        { top: '50%', left: 'calc(50% - 65px)', transform: 'translate(-50%, -50%) rotate(90deg)' },   // Player 1 (Left)
+        { top: 'calc(50% - 20px)', left: '50%', transform: 'translate(-50%, -50%) rotate(180deg)' },  // Player 2 (Top)
+        { top: '50%', left: 'calc(50% + 65px)', transform: 'translate(-50%, -50%) rotate(-90deg)' }, // Player 3 (Right)
     ];
+
 
     return (
         <div className="relative w-full h-full">
@@ -295,4 +296,5 @@ export default function OmiPage() {
         </OmiGameProvider>
     );
 }
+
 
