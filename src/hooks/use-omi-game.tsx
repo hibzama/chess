@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, createContext, useContext } fr
 
 // Types
 type Suit = 's' | 'h' | 'd' | 'c';
-type Rank = 'a' | 'k' | 'q' | 'j' | 't' | '9' | '8' | '7' | '6' | '5' | '4' | '3' | '2';
+type Rank = 'a' | 'k' | 'q' | 'j' | 't' | '9' | '8' | '7';
 type Card = `${Suit}${Rank}`;
 type Player = { id: number; name: string; hand: Card[]; isBot: boolean };
 type Trick = { player: number; card: Card }[];
@@ -25,7 +25,7 @@ interface OmiGameState {
 }
 
 const SUITS: Suit[] = ['s', 'h', 'd', 'c'];
-const RANKS: Rank[] = ['a', 'k', 'q', 'j', 't', '9', '8', '7', '6', '5', '4', '3', '2'];
+const RANKS: Rank[] = ['a', 'k', 'q', 'j', 't', '9', '8', '7'];
 const RANK_VALUE = Object.fromEntries(RANKS.map((r, i) => [r, RANKS.length - i]));
 
 const createDeck = (): Card[] => {
@@ -54,14 +54,14 @@ const useOmiGameLogic = () => {
         setGameState({
             phase: 'dealing',
             players,
-            deck: shuffleDeck(createDeck()), // Ensure a fresh deck is created and shuffled
+            deck: shuffleDeck(createDeck()),
             trick: [],
             trumpSuit: null,
             leadSuit: null,
             currentPlayerIndex: (dealerIdx + 1) % 4,
             dealerIndex: dealerIdx,
             trumpCaller: null,
-            scores: { ...scores, tricks1: 0, tricks2: 0 }, // Reset trick counts for the new round
+            scores: { ...scores, tricks1: 0, tricks2: 0 },
         });
     }, []);
 
@@ -134,7 +134,7 @@ const useOmiGameLogic = () => {
             return () => clearTimeout(timeout);
         }
 
-    }, [gameState?.phase, gameState?.currentPlayerIndex, gameState?.players, gameState?.deck, gameState?.trick, gameState?.leadSuit, gameState?.trumpSuit, getBotMove]);
+    }, [gameState, getBotMove]);
 
     // Action handlers
     const handleSelectTrump = (suit: Suit) => {
@@ -142,8 +142,8 @@ const useOmiGameLogic = () => {
             if (!gs || gs.phase !== 'trumping') return gs;
             const newDeck = [...gs.deck];
             const newPlayers = JSON.parse(JSON.stringify(gs.players));
-            // deal remaining cards
-            for(let i=0; i < 9; i++) {
+            // deal remaining 4 cards
+            for(let i=0; i < 4; i++) {
                 for(let p=0; p < 4; p++) {
                     if (newDeck.length > 0) {
                         newPlayers[p].hand.push(newDeck.pop()!);
@@ -246,10 +246,10 @@ const useOmiGameLogic = () => {
                            const callingTeamIs1 = trumpCaller === 0 || trumpCaller === 2;
                            
                            if (callingTeamIs1) {
-                               if (scores.tricks1 >= 7) newOverallScores.team1++;
+                               if (scores.tricks1 >= 5) newOverallScores.team1++;
                                else newOverallScores.team2 += 2; // Kapothi
                            } else {
-                               if (scores.tricks2 >= 7) newOverallScores.team2++;
+                               if (scores.tricks2 >= 5) newOverallScores.team2++;
                                else newOverallScores.team1 += 2; // Kapothi
                            }
                            
