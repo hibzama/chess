@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -182,11 +182,8 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const { method, resignerDetails } = winnerDetails;
                 let { winnerId } = winnerDetails;
 
-                // Deduct wagers first
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', roomData.player2.uid);
-                transaction.update(creatorRef, { balance: increment(-wager) });
-                transaction.update(joinerRef, { balance: increment(-wager) });
                 
                 const winnerObject: GameRoom['winner'] = { uid: null, method };
     
@@ -412,9 +409,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
                 return;
             }
-
-            if (!room.turnStartTime) return; // FIX: Ensure turnStartTime exists
-
+            
             const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
             const currentIsCreator = room.currentPlayer === room.createdBy.color;
 
@@ -610,3 +605,4 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
+
