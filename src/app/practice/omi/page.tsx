@@ -9,74 +9,114 @@ import { cn } from '@/lib/utils';
 import { ArrowLeft, Spade, Heart, Diamond, Club, Repeat, Trophy, Crown } from 'lucide-react';
 import Link from 'next/link';
 
-const suitIcons = {
+const suitIcons: { [key: string]: React.ReactNode } = {
     s: <Spade className="w-full h-full fill-current text-foreground" />,
     h: <Heart className="w-full h-full fill-current text-red-500" />,
     d: <Diamond className="w-full h-full fill-current text-red-500" />,
     c: <Club className="w-full h-full fill-current text-foreground" />,
 };
 
-const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser, style = {}, layoutId }) => {
+const suitColors = {
+    s: 'text-foreground',
+    h: 'text-red-500',
+    d: 'text-red-500',
+    c: 'text-foreground',
+}
+
+const CardPips = ({ rank, suit }: { rank: string, suit: string }) => {
+    const numericRank = parseInt(rank, 10);
+    if (isNaN(numericRank) || numericRank < 7 || numericRank > 10) {
+        // Render large central character for A, K, Q, J
+        return (
+            <div className={cn("absolute inset-0 flex items-center justify-center", suitColors[suit])}>
+                <span className="text-7xl font-bold opacity-80">{rank.toUpperCase()}</span>
+            </div>
+        );
+    }
+    
+    const Icon = suitIcons[suit];
+    
+    // Simplified pip layouts
+    const layouts: { [key: number]: string[] } = {
+        7: ['col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-start-2 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-start-2 row-start-3 place-self-center', 'col-start-2 row-start-4 place-self-center'],
+        8: ['col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-start-2 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-start-2 row-start-4 place-self-center', 'col-span-1 row-start-5 place-self-center', 'col-span-1 row-start-5 place-self-center'],
+        9: ['col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-start-2 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center'],
+        10: ['col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-start-2 place-self-center', 'col-start-2 row-start-2 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center', 'col-span-1 place-self-center'],
+    };
+
+    const gridClass = numericRank === 8 ? 'grid-cols-3 grid-rows-5' : 'grid-cols-3 grid-rows-4';
+    
+    return (
+        <div className={cn("absolute inset-y-8 inset-x-2 grid", gridClass)}>
+            {(layouts[numericRank] || []).map((pos, i) => (
+                <div key={i} className={cn("w-4 h-4", pos, suitColors[suit])}>{Icon}</div>
+            ))}
+        </div>
+    )
+}
+
+const PlayingCard = ({ card, onPlay, isPlayable, isCurrentUser }) => {
     const [suit, rank] = card.split('');
     const Icon = suitIcons[suit];
+    const colorClass = suitColors[suit];
 
     return (
         <motion.div
-            layoutId={layoutId}
+            layoutId={`card-${card}`}
             onClick={() => isPlayable && onPlay(card)}
             className={cn(
-                "w-24 h-36 bg-card rounded-xl shadow-lg flex flex-col justify-between p-2 border-2 border-border relative transition-all duration-300",
+                "w-24 h-36 bg-white rounded-lg shadow-md flex flex-col p-1 border-2 relative transition-all duration-300",
                 isCurrentUser && "cursor-pointer",
-                isPlayable ? "hover:border-primary hover:-translate-y-4 hover:shadow-primary/30" : (isCurrentUser && "cursor-not-allowed opacity-70")
+                isPlayable ? "border-primary hover:-translate-y-4 hover:shadow-primary/30" : "border-black/20",
+                !isPlayable && isCurrentUser && "cursor-not-allowed opacity-60"
             )}
-            style={style}
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
-            <div className="flex items-start justify-start">
-                <span className="text-2xl font-bold">{rank.toUpperCase()}</span>
-                <div className="w-5 h-5 ml-1">{Icon}</div>
+             <div className={cn("absolute top-1 left-1 text-center font-bold", colorClass)}>
+                <span>{rank.toUpperCase()}</span>
+                <div className="w-4 h-4 mx-auto">{Icon}</div>
             </div>
-            <div className="flex items-center justify-center">
-                <div className="w-10 h-10">{Icon}</div>
-            </div>
-            <div className="flex items-end justify-end rotate-180">
-                <span className="text-2xl font-bold">{rank.toUpperCase()}</span>
-                <div className="w-5 h-5 ml-1">{Icon}</div>
+            <CardPips rank={rank} suit={suit}/>
+             <div className={cn("absolute bottom-1 right-1 text-center font-bold rotate-180", colorClass)}>
+                <span>{rank.toUpperCase()}</span>
+                <div className="w-4 h-4 mx-auto">{Icon}</div>
             </div>
         </motion.div>
     );
 };
 
 
-const PlayerDisplay = ({ player, position, isCurrent, isDealer, handSize }) => {
+const PlayerDisplay = ({ player, position, isCurrent, isDealer }) => {
     return (
         <div className={cn("absolute flex flex-col items-center gap-2", position)}>
-            <div className="flex items-center gap-2">
-                 <div className="relative">
-                     <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center font-bold text-xl shadow-inner">{player.name.charAt(0)}</div>
-                     {handSize > 0 && <div className="absolute -top-1 -right-1 text-xs font-bold bg-primary text-primary-foreground rounded-full px-1.5 py-0.5">{handSize}</div>}
-                 </div>
-                 <div className="flex flex-col items-start">
-                    <div className="text-center font-semibold text-sm text-white bg-black/30 rounded-md px-2 py-1">{player.name}</div>
-                    <div className="flex gap-1 mt-1">
-                        {isDealer && <div className="text-xs bg-yellow-400 text-black rounded-full px-2 py-0.5">Dealer</div>}
-                        {isCurrent && <div className="text-xs bg-green-400 text-black rounded-full px-2 py-0.5 animate-pulse">Playing...</div>}
+            <div className="relative">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center font-bold text-xl shadow-inner border-2 border-white/50">{player.name.charAt(0)}</div>
+                {player.hand.length > 0 && 
+                    <div className="absolute -top-2 -right-2 text-xs font-bold bg-primary text-primary-foreground rounded-full h-6 w-6 flex items-center justify-center border-2 border-background">
+                        {player.hand.length}
                     </div>
+                }
+            </div>
+            <div className="flex flex-col items-center">
+                <div className="font-semibold text-sm text-white bg-black/50 rounded-md px-2 py-1 shadow-lg">{player.name}</div>
+                <div className="flex gap-1 mt-1">
+                    {isDealer && <div className="text-xs bg-yellow-400 text-black rounded-full px-2 py-0.5 font-bold">Dealer</div>}
                 </div>
             </div>
+             {isCurrent && <div className="absolute -bottom-5 text-xs bg-green-400 text-black rounded-full px-3 py-1 font-bold animate-pulse shadow-lg">Playing...</div>}
         </div>
     );
 };
 
-const TrickArea = ({ trick }) => {
-    const trickPositions = [
-        { bottom: 'calc(50% - 9rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 0 (You)
-        { left: 'calc(50% - 12rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 1 (Left)
-        { top: 'calc(50% - 9rem)', left: '50%', transform: 'translateX(-50%)' }, // Player 2 (Partner)
-        { right: 'calc(50% - 12rem)', top: '50%', transform: 'translateY(-50%)' }, // Player 3 (Right)
+const TrickArea = ({ trick, players }) => {
+    const basePositions = [
+        { bottom: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%) rotate(0deg)' }, // Player 0 (You)
+        { left: 'calc(50% - 11rem)', top: '50%', transform: 'translateY(-50%) rotate(90deg)' }, // Player 1 (Left)
+        { top: 'calc(50% - 7rem)', left: '50%', transform: 'translateX(-50%) rotate(180deg)' }, // Player 2 (Partner)
+        { right: 'calc(50% - 11rem)', top: '50%', transform: 'translateY(-50%) rotate(-90deg)' }, // Player 3 (Right)
     ];
 
     return (
@@ -84,15 +124,15 @@ const TrickArea = ({ trick }) => {
             <AnimatePresence>
                 {trick.map((play, index) => (
                     <motion.div
-                        key={play.player}
-                        layoutId={`trick-${play.card}`}
+                        key={play.card}
+                        layoutId={`card-${play.card}`}
                         className="absolute"
-                        style={{ ...trickPositions[play.player], zIndex: index }}
+                        style={{ ...basePositions[play.player], zIndex: index }}
                         initial={{ scale: 0, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         transition={{ duration: 0.2 }}
                     >
-                         <PlayingCard card={play.card} onPlay={() => {}} isPlayable={false} isCurrentUser={false} layoutId={null} />
+                         <PlayingCard card={play.card} onPlay={() => {}} isPlayable={false} isCurrentUser={false} />
                     </motion.div>
                 ))}
             </AnimatePresence>
@@ -109,7 +149,7 @@ const TrumpSelector = ({ onSelectTrump, onPass }) => (
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4 py-4">
                 {Object.entries(suitIcons).map(([suit, icon]) => (
-                    <Button key={suit} variant="outline" className="h-20" onClick={() => onSelectTrump(suit)}>
+                    <Button key={suit} variant="outline" className="h-20" onClick={() => onSelectTrump(suit as 's'|'h'|'d'|'c')}>
                         <div className="w-8 h-8">{icon}</div>
                     </Button>
                 ))}
@@ -120,22 +160,22 @@ const TrumpSelector = ({ onSelectTrump, onPass }) => (
 );
 
 const GameHeader = ({ scores, trumpSuit }) => (
-    <div className="w-full max-w-lg mx-auto p-2 bg-black/30 rounded-full flex items-center justify-between text-white shadow-lg">
-        <div className="text-center">
+    <div className="w-full max-w-lg mx-auto p-2 bg-black/40 rounded-full flex items-center justify-between text-white shadow-lg backdrop-blur-sm">
+        <div className="text-center px-4">
             <div className="font-bold text-2xl">{scores.team1}</div>
-            <div className="text-xs">Your Team</div>
+            <div className="text-xs opacity-80">Your Team</div>
         </div>
         <div className="flex flex-col items-center">
-             <div className="font-bold text-lg">Tricks</div>
-             <div className="flex gap-4">
-                <span className="text-xl">{scores.tricks1}</span>
-                <div className="w-8 h-8 p-1 bg-card rounded-full">{trumpSuit ? suitIcons[trumpSuit] : '?'}</div>
-                <span className="text-xl">{scores.tricks2}</span>
+             <div className="font-bold text-sm">Tricks</div>
+             <div className="flex gap-4 items-center">
+                <span className="text-2xl font-bold">{scores.tricks1}</span>
+                <div className="w-10 h-10 p-1.5 bg-card rounded-full shadow-inner">{trumpSuit ? suitIcons[trumpSuit] : '?'}</div>
+                <span className="text-2xl font-bold">{scores.tricks2}</span>
              </div>
         </div>
-        <div className="text-center">
+        <div className="text-center px-4">
              <div className="font-bold text-2xl">{scores.team2}</div>
-             <div className="text-xs">Opponents</div>
+             <div className="text-xs opacity-80">Opponents</div>
         </div>
     </div>
 );
@@ -144,7 +184,7 @@ const GameHeader = ({ scores, trumpSuit }) => (
 const OmiGameUI = () => {
     const { gameState, actions } = useOmiGame();
 
-    if (!gameState) return <div className="text-center">Loading game...</div>;
+    if (!gameState) return <div className="text-center text-white">Loading game...</div>;
     
     const { phase, players, trick, scores, trumpSuit, leadSuit, currentPlayerIndex, dealerIndex } = gameState;
     const { handlePlayCard, handleSelectTrump, handlePass } = actions;
@@ -155,15 +195,15 @@ const OmiGameUI = () => {
     const getPlayableCards = () => {
         if (!isUserTurn) return new Set();
         const hand = userPlayer.hand;
-        const hasLeadSuit = hand.some(card => card.startsWith(leadSuit));
+        const hasLeadSuit = hand.some(card => card.startsWith(leadSuit as string));
         if (!leadSuit || !hasLeadSuit) return new Set(hand);
-        return new Set(hand.filter(card => card.startsWith(leadSuit)));
+        return new Set(hand.filter(card => card.startsWith(leadSuit as string)));
     };
 
     const playableCards = getPlayableCards();
     
     return (
-        <div className="flex flex-col h-full w-full items-center justify-between p-4 bg-green-800 bg-opacity-50 overflow-hidden">
+        <div className="flex flex-col h-full w-full items-center justify-between p-4 overflow-hidden">
             {phase === 'trumping' && isUserTurn && (
                 <TrumpSelector onSelectTrump={handleSelectTrump} onPass={handlePass} />
             )}
@@ -189,48 +229,48 @@ const OmiGameUI = () => {
 
             {/* Players & Table */}
             <div className="relative flex-1 w-full flex items-center justify-center my-4">
-                 {/* Table */}
-                <div className="absolute w-[450px] h-[300px] bg-yellow-800 rounded-3xl border-4 border-yellow-900 shadow-2xl">
-                     <TrickArea trick={trick} />
+                <div className="absolute w-[450px] h-[300px] bg-green-700 rounded-3xl border-8 border-yellow-900 shadow-2xl overflow-hidden">
+                    <div className="absolute inset-0 bg-black/10"></div>
+                    <TrickArea trick={trick} players={players} />
                 </div>
-                 {/* Bots */}
-                <PlayerDisplay player={players[2]} position="top-4 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 2} isDealer={dealerIndex === 2} handSize={players[2].hand.length} />
-                <PlayerDisplay player={players[1]} position="left-4 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 1} isDealer={dealerIndex === 1} handSize={players[1].hand.length} />
-                <PlayerDisplay player={players[3]} position="right-4 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 3} isDealer={dealerIndex === 3} handSize={players[3].hand.length} />
+                <PlayerDisplay player={players[2]} position="top-0 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 2} isDealer={dealerIndex === 2} />
+                <PlayerDisplay player={players[1]} position="left-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 1} isDealer={dealerIndex === 1} />
+                <PlayerDisplay player={players[3]} position="right-0 top-1/2 -translate-y-1/2" isCurrent={currentPlayerIndex === 3} isDealer={dealerIndex === 3} />
             </div>
 
 
             {/* User Player Hand */}
             <div className="relative w-full h-48 flex justify-center items-end">
-                 <PlayerDisplay player={players[0]} position="bottom-[10rem] left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 0} isDealer={dealerIndex === 0} handSize={0} />
-                 <div className="relative w-full h-48 flex justify-center items-end">
-                    {userPlayer.hand.map((card, i) => {
-                        const handSize = userPlayer.hand.length;
-                        const anglePerCard = 10;
-                        const totalAngle = (handSize - 1) * anglePerCard;
-                        const rotation = (i * anglePerCard) - (totalAngle / 2);
-                        const cardOffset = Math.abs(rotation) / 2; // Make center cards higher
-                        
-                        return (
-                            <div
-                                key={card}
-                                className="absolute bottom-0"
-                                style={{
-                                    transform: `rotate(${rotation}deg) translateY(${cardOffset}px)`,
-                                    transformOrigin: `50% 25rem`, // Pivot from a point far below the cards
-                                    zIndex: i,
-                                }}
-                            >
-                                <PlayingCard
-                                    card={card}
-                                    onPlay={handlePlayCard}
-                                    isPlayable={playableCards.has(card)}
-                                    isCurrentUser={true}
-                                    layoutId={`trick-${card}`}
-                                />
-                             </div>
-                        )
-                    })}
+                <PlayerDisplay player={players[0]} position="bottom-44 left-1/2 -translate-x-1/2" isCurrent={currentPlayerIndex === 0} isDealer={dealerIndex === 0} />
+                <div className="relative w-full h-48 flex justify-center items-center -bottom-8">
+                     <AnimatePresence>
+                        {userPlayer.hand.map((card, i) => {
+                            const handSize = userPlayer.hand.length;
+                            const cardWidth = 96; // width of card
+                            const overlap = cardWidth * 0.6; // overlap factor
+                            const totalWidth = (handSize - 1) * overlap + cardWidth;
+                            const startX = -totalWidth / 2;
+                            const x = startX + i * overlap;
+                            
+                            return (
+                                <div
+                                    key={card}
+                                    className="absolute"
+                                    style={{
+                                        transform: `translateX(${x}px)`,
+                                        zIndex: i,
+                                    }}
+                                >
+                                    <PlayingCard
+                                        card={card}
+                                        onPlay={handlePlayCard}
+                                        isPlayable={playableCards.has(card)}
+                                        isCurrentUser={true}
+                                    />
+                                </div>
+                            )
+                        })}
+                    </AnimatePresence>
                 </div>
             </div>
         </div>
@@ -240,7 +280,7 @@ const OmiGameUI = () => {
 export default function OmiPage() {
     return (
         <OmiGameProvider>
-            <div className="w-full max-w-lg mx-auto flex flex-col h-[calc(100vh-2rem)] bg-green-900 rounded-2xl shadow-2xl border-4 border-black">
+            <div className="w-full max-w-lg mx-auto flex flex-col h-[calc(100vh-2rem)] bg-purple-900 rounded-2xl shadow-2xl border-4 border-black bg-[url('https://www.transparenttextures.com/patterns/brick-wall.png')]">
                 <div className="p-2">
                     <Link href="/practice" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors">
                         <ArrowLeft className="w-4 h-4" />
@@ -252,3 +292,4 @@ export default function OmiPage() {
         </OmiGameProvider>
     );
 }
+
