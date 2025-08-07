@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -400,7 +400,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
 
             let p1ServerTime = creatorIsCurrent ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
-            let p2ServerTime = !isCreatorIsCurrent ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
+            let p2ServerTime = !creatorIsCurrent ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
 
             // Clamp time to not exceed the initial time control
             p1ServerTime = Math.min(p1ServerTime, room.timeControl);
@@ -416,9 +416,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 p2Time: opponentTime,
             });
             
-            if (myTime > 0 && opponentTime <= 0) {
-                setWinner(user?.uid || '', room.boardState, 'timeout');
-                if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            if (myTime <= 0) {
+                 const opponentUid = room.players.find(p => p !== user?.uid);
+                 if(opponentUid) {
+                     setWinner(opponentUid, room.boardState, 'timeout');
+                 }
+                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             }
         }, 1000);
 
