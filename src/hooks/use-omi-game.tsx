@@ -102,6 +102,92 @@ const useOmiGameLogic = () => {
         }
         return hand; // Can play any card
     };
+    
+    const endTrick = useCallback(() => {
+        setGameState(currentState => {
+            if (!currentState || currentState.trick.length !== 4) return currentState;
+
+            const { trick, trumpSuit } = currentState;
+            let winningPlay = trick[0];
+            const leadSuitOfTrick = trick[0].card[0] as Suit;
+
+            for (let i = 1; i < trick.length; i++) {
+                const currentPlay = trick[i];
+                const winningSuit = winningPlay.card[0] as Suit;
+                const currentSuit = currentPlay.card[0] as Suit;
+                const winningRank = RANK_VALUE[winningPlay.card[1] as Rank];
+                const currentRank = RANK_VALUE[currentPlay.card[1] as Rank];
+
+                if (winningSuit === trumpSuit) {
+                    if (currentSuit === trumpSuit && currentRank > winningRank) {
+                        winningPlay = currentPlay;
+                    }
+                } else {
+                    if (currentSuit === trumpSuit) {
+                        winningPlay = currentPlay;
+                    } else if (currentSuit === leadSuitOfTrick && currentRank > winningRank) {
+                        winningPlay = currentPlay;
+                    }
+                }
+            }
+
+            const winnerId = winningPlay.player;
+            const newScores = { ...currentState.scores };
+            if (winnerId === 0 || winnerId === 2) {
+                newScores.tricks1++;
+            } else {
+                newScores.tricks2++;
+            }
+
+            let nextPhase: GamePhase = 'playing';
+            if (currentState.players[0].hand.length === 0) {
+                nextPhase = 'scoring';
+            }
+            
+            // Set state to show the winning card, then clear
+            setTimeout(() => {
+                setGameState(gs => {
+                    if (!gs) return null;
+                    const finalState = { ...gs, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase, scores: newScores };
+                    
+                    if (finalState.phase === 'scoring') {
+                        const { trumpCaller, scores } = finalState;
+                        const newOverallScores = { team1: scores.team1, team2: scores.team2 };
+                        
+                        if(trumpCaller === null) {
+                            initializeGame((finalState.dealerIndex + 1) % 4, newOverallScores);
+                            return null;
+                        }
+                        
+                        const callingTeamIs1 = trumpCaller === 0 || trumpCaller === 2;
+                        
+                        if (callingTeamIs1) {
+                            if (scores.tricks1 >= 5) newOverallScores.team1++;
+                            else newOverallScores.team2 += 2; // Kapothi
+                        } else {
+                            if (scores.tricks2 >= 5) newOverallScores.team2++;
+                            else newOverallScores.team1 += 2; // Kapothi
+                        }
+                        
+                        if (newOverallScores.team1 >= 10 || newOverallScores.team2 >= 10) {
+                            return { ...finalState, scores: newOverallScores, phase: 'finished' };
+                        } else {
+                            const newDealer = (finalState.dealerIndex + 1) % 4;
+                            initializeGame(newDealer, newOverallScores);
+                            return null;
+                        }
+                    }
+                    
+                    return finalState;
+                });
+            }, 1500);
+
+            // This state is temporary, just to keep cards on screen
+            return { ...currentState, scores: newScores, currentPlayerIndex: winnerId, leadSuit: null };
+        });
+
+    }, [initializeGame]);
+
 
     // Game Flow Effects
     useEffect(() => {
@@ -132,6 +218,7 @@ const useOmiGameLogic = () => {
 
         // Playing phase (bot)
         if (gameState.phase === 'playing' && gameState.players[gameState.currentPlayerIndex].isBot) {
+            if (gameState.trick.length === 4) return;
             const timeout = setTimeout(() => {
                 const botPlayer = gameState.players[gameState.currentPlayerIndex];
                 const cardToPlay = getBotMove(botPlayer, gameState.trick, gameState.leadSuit, gameState.trumpSuit);
@@ -173,92 +260,9 @@ const useOmiGameLogic = () => {
         });
     };
     
-    const endTrick = useCallback((currentState: OmiGameState) => {
-        const { trick, trumpSuit } = currentState;
-        if (trick.length !== 4) return currentState;
-
-        let winningPlay = trick[0];
-        const leadSuit = trick[0].card[0] as Suit;
-
-        for (let i = 1; i < trick.length; i++) {
-            const currentPlay = trick[i];
-            const winningSuit = winningPlay.card[0] as Suit;
-            const currentSuit = currentPlay.card[0] as Suit;
-            const winningRank = RANK_VALUE[winningPlay.card[1] as Rank];
-            const currentRank = RANK_VALUE[currentPlay.card[1] as Rank];
-
-            if (winningSuit === trumpSuit) {
-                if (currentSuit === trumpSuit && currentRank > winningRank) {
-                    winningPlay = currentPlay;
-                }
-            } else {
-                if (currentSuit === trumpSuit) {
-                    winningPlay = currentPlay;
-                } else if (currentSuit === leadSuit && currentRank > winningRank) {
-                    winningPlay = currentPlay;
-                }
-            }
-        }
-
-        const winnerId = winningPlay.player;
-        const newScores = { ...currentState.scores };
-        if (winnerId === 0 || winnerId === 2) {
-            newScores.tricks1++;
-        } else {
-            newScores.tricks2++;
-        }
-
-        let nextPhase: GamePhase = 'playing';
-        if (currentState.players[0].hand.length === 0) {
-            nextPhase = 'scoring';
-        }
-        
-        const tempState = { ...currentState, scores: newScores, trick: currentState.trick, currentPlayerIndex: winnerId, leadSuit: null };
-
-        setTimeout(() => {
-            setGameState(gs => {
-                if (!gs) return null;
-                const finalState = { ...gs, trick: [], currentPlayerIndex: winnerId, leadSuit: null, phase: nextPhase, scores: newScores };
-                
-                if (finalState.phase === 'scoring') {
-                    const { trumpCaller, scores } = finalState;
-                    const newOverallScores = { team1: scores.team1, team2: scores.team2 };
-                    
-                    if(trumpCaller === null) {
-                        initializeGame((finalState.dealerIndex + 1) % 4, newOverallScores);
-                        return null;
-                    }
-                    
-                    const callingTeamIs1 = trumpCaller === 0 || trumpCaller === 2;
-                    
-                    if (callingTeamIs1) {
-                        if (scores.tricks1 >= 5) newOverallScores.team1++;
-                        else newOverallScores.team2 += 2; // Kapothi
-                    } else {
-                        if (scores.tricks2 >= 5) newOverallScores.team2++;
-                        else newOverallScores.team1 += 2; // Kapothi
-                    }
-                    
-                    if (newOverallScores.team1 >= 10 || newOverallScores.team2 >= 10) {
-                        return { ...finalState, scores: newOverallScores, phase: 'finished' };
-                    } else {
-                        const newDealer = (finalState.dealerIndex + 1) % 4;
-                        initializeGame(newDealer, newOverallScores);
-                        return null;
-                    }
-                }
-                
-                return finalState;
-            });
-        }, 1500);
-
-        return tempState;
-
-    }, [initializeGame]);
-
     const handlePlayCard = (card: Card) => {
         setGameState(gs => {
-            if (!gs || gs.phase !== 'playing') return gs;
+            if (!gs || gs.phase !== 'playing' || gs.trick.length === 4) return gs;
             
             const player = gs.players[gs.currentPlayerIndex];
             const newHand = player.hand.filter(c => c !== card);
@@ -271,10 +275,18 @@ const useOmiGameLogic = () => {
                 newLeadSuit = card[0] as Suit;
             }
 
-            let newState: OmiGameState = { ...gs, players: newPlayers, trick: newTrick, leadSuit: newLeadSuit, currentPlayerIndex: (gs.currentPlayerIndex + 1) % 4 };
+            const isTrickComplete = newTrick.length === 4;
 
-            if(newTrick.length === 4) {
-                 newState = endTrick(newState);
+            const newState: OmiGameState = { 
+                ...gs, 
+                players: newPlayers, 
+                trick: newTrick, 
+                leadSuit: newLeadSuit, 
+                currentPlayerIndex: isTrickComplete ? gs.currentPlayerIndex : (gs.currentPlayerIndex + 1) % 4 
+            };
+
+            if(isTrickComplete) {
+                 endTrick();
             }
 
             return newState;
