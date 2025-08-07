@@ -81,122 +81,12 @@ export const announceNewGame = functions.firestore
   });
 
 
-export const processCommissions = functions.firestore
-    .document('game_rooms/{gameRoomId}')
-    .onUpdate(async (change, context) => {
-        const gameRoomId = context.params.gameRoomId;
-        const beforeData = change.before.data();
-        const afterData = change.after.data();
-
-        // 1. Only run when a game is completed and not on a draw
-        if (beforeData.status === 'completed' || afterData.status !== 'completed' || afterData.draw) {
-            return null;
-        }
-
-        const gameWager = afterData.wager || 0;
-        if (gameWager <= 0) {
-            functions.logger.log(`Game ${gameRoomId}: Skipping commissions for zero wager game.`);
-            return null;
-        }
-
-        const playerIds = afterData.players || [];
-        if (playerIds.length < 2) {
-            functions.logger.log(`Not enough players in game room ${gameRoomId} to process commissions.`);
-            return null;
-        }
-
-        const db = admin.firestore();
-        const batch = db.batch();
-
-        // 2. Iterate through EACH player in the game to check for their referrers
-        for (const playerId of playerIds) {
-            const userDoc = await db.collection('users').doc(playerId).get();
-            if (!userDoc.exists) {
-                functions.logger.warn(`Player ${playerId} not found, skipping their commission chain.`);
-                continue;
-            }
-
-            const userData = userDoc.data();
-            if (!userData) continue;
-
-            const referredBy = userData.referredBy;
-            const referralChain = userData.referralChain || [];
-
-            // 3. Process Regular User Commission (Level 1)
-            if (referredBy) {
-                const referrerDoc = await db.collection('users').doc(referredBy).get();
-                if (referrerDoc.exists && referrerDoc.data()?.role === 'user') {
-                    const l1Count = referrerDoc.data()?.l1Count || 0;
-                    const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
-                    const commissionAmount = gameWager * l1Rate;
-
-                    if (commissionAmount > 0) {
-                        functions.logger.log(`Paying L1 commission of ${commissionAmount} to ${referredBy} from player ${playerId}'s game.`);
-                        const commissionTxRef = db.collection('transactions').doc();
-                        batch.set(commissionTxRef, {
-                            userId: referredBy,
-                            fromUserId: playerId,
-                            type: 'commission',
-                            amount: commissionAmount,
-                            level: 1,
-                            gameRoomId: gameRoomId,
-                            status: 'completed',
-                            description: `L1 commission from ${userData.firstName}`,
-                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                        });
-                        batch.update(db.collection('users').doc(referredBy), {
-                            balance: admin.firestore.FieldValue.increment(commissionAmount),
-                        });
-                    }
-                }
-            }
-
-            // 4. Process Marketing Partner Commissions (Up to 20 Levels)
-            if (referralChain.length > 0) {
-                const marketerCommissionRate = 0.03;
-                const commissionAmount = gameWager * marketerCommissionRate;
-
-                if (commissionAmount > 0) {
-                    const relevantChain = referralChain.slice(-20);
-
-                    for (let i = 0; i < relevantChain.length; i++) {
-                        const marketerId = relevantChain[i];
-                        const level = referralChain.indexOf(marketerId) + 1;
-
-                        functions.logger.log(`Paying L${level} marketing commission of ${commissionAmount} to ${marketerId} from player ${playerId}'s game.`);
-
-                        const commissionTxRef = db.collection('transactions').doc();
-                        batch.set(commissionTxRef, {
-                            userId: marketerId,
-                            fromUserId: playerId,
-                            type: 'commission',
-                            amount: commissionAmount,
-                            level: level,
-                            gameRoomId: gameRoomId,
-                            status: 'completed',
-                            description: `Level ${level} marketing commission from ${userData.firstName}`,
-                            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                        });
-                        batch.update(db.collection('users').doc(marketerId), {
-                            marketingBalance: admin.firestore.FieldValue.increment(commissionAmount),
-                        });
-                    }
-                }
-            }
-        }
-
-        try {
-            await batch.commit();
-            functions.logger.log(`Successfully committed commission batch for game ${gameRoomId}.`);
-        } catch (error) {
-            functions.logger.error(`Error committing commission batch for game ${gameRoomId}:`, error);
-        }
-        
-        return null;
-    });
-
+// NOTE: The primary commission logic has been moved into the `handleJoinGame`
+// transaction in `src/app/game/multiplayer/[id]/page.tsx` to ensure commissions
+// are paid when the game starts. This Cloud Function remains for other purposes.
 
 // This function triggers whenever a payout transaction is created for a game winner.
+// It is now only used for the (currently disabled) event system.
 export const updateEventProgress = functions.firestore
   .document('transactions/{transactionId}')
   .onCreate(async (snap, context) => {
@@ -284,4 +174,3 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
-
