@@ -218,6 +218,14 @@ export default function DailyBonusClaimPage() {
             </Card>
         );
     }
+    
+    const claimedBonusIds = new Set(claimedHistory.map(h => h.bonusId));
+    const availableBonuses = bonuses.filter(b => {
+        if (claimedBonusIds.has(b.id)) return false;
+        const expiryTime = new Date(b.startTime.toDate().getTime() + (b.durationHours * 60 * 60 * 1000));
+        if (expiryTime < new Date()) return false;
+        return true;
+    });
 
     return (
         <Tabs defaultValue="available">
@@ -233,7 +241,7 @@ export default function DailyBonusClaimPage() {
                             <Skeleton className="h-96 w-full" />
                         </>
                     ) : 
-                     bonuses.length > 0 ? bonuses.map(b => <BonusCard key={b.id} bonus={b} />) : (
+                     availableBonuses.length > 0 ? availableBonuses.map(b => <BonusCard key={b.id} bonus={b} />) : (
                          <div className="col-span-2 flex flex-col items-center justify-center text-center gap-4 py-12">
                             <Gift className="w-16 h-16 text-muted-foreground" />
                             <h2 className="text-2xl font-bold">No Active Daily Bonuses</h2>
