@@ -49,9 +49,11 @@ export default function EventsPage() {
         }
 
         // Fetch active events
-        const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true), orderBy('createdAt', 'desc'));
+        const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true));
         const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
             const eventsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Event));
+            // Sort client-side to avoid needing a composite index
+            eventsData.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
             setAvailableEvents(eventsData);
             setLoading(false);
         });
@@ -240,4 +242,3 @@ export default function EventsPage() {
         </Tabs>
     );
 }
-
