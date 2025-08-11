@@ -1,77 +1,56 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
-    function isAuth() {
-      return request.auth != null;
-    }
-
+  
     function isUser(userId) {
-      return isAuth() && request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
     function isAdmin() {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Default deny all
+    // Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
-    
-    // Allow admins to read/write anything
-    match /{path=**} {
+
+    // Admin full access
+    match /{document=**} {
       allow read, write: if isAdmin();
     }
-
-    // Settings collection
-    match /settings/{settingId} {
-      // Allow any authenticated user (including server-side flows) to read settings
-      allow read: if isAuth();
-      // Only admins can write settings
-      allow write: if isAdmin();
-    }
     
-    // Users collection
-    match /users/{userId} {
-      // Users can read/write their own document
-      allow read, write: if isUser(userId);
-      // Other authenticated users can read public profiles
-      allow read: if isAuth();
-    }
-
-    // Game Rooms can be read by anyone to populate lobbies
+    // Allow public read for specific, non-sensitive collections
     match /game_rooms/{roomId} {
       allow read: if true;
-      // Write/update rules should be more specific if needed
-      // For now, only authenticated users can create/update
-      allow write: if isAuth();
     }
     
-    // Game chat messages
-    match /game_rooms/{roomId}/messages/{messageId} {
-      allow read, write: if isAuth();
+    match /users/{userId} {
+        // A user can update their own document
+        allow update, write: if isUser(userId);
+        // Any authenticated user can read a user's public profile data
+        allow read: if request.auth != null;
     }
     
-    // Other collections can be added here
     match /marketing_applications/{appId} {
-      allow create; // Anyone can apply
-      allow read, update, delete: if isAdmin();
+        allow create: if true;
     }
     
-    match /transactions/{txId} {
-       allow read, create: if isAuth();
-       allow update: if isAdmin();
+    // The server-side mailer needs to read this config.
+    // It contains no sensitive data.
+    match /settings/mailerConfig {
+      allow read: if true;
     }
     
-    match /chats/{chatId} {
-        allow read, write: if isAuth() && resource.data.users[request.auth.uid].exists == true;
+    // Allow authenticated users to manage their own transactions and friend requests
+    match /transactions/{transactionId} {
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
-    match /chats/{chatId}/messages/{messageId} {
-       allow read, write: if isAuth();
+    match /friend_requests/{requestId} {
+        allow read, create, delete: if request.auth != null;
     }
-
   }
 }
