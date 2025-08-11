@@ -209,9 +209,6 @@ export const updateEventProgress = functions.firestore
     const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
     
-    // It's a win, regardless of resignation or not, for event purposes.
-    // The payout amount itself determines if it was a resign win or full win.
-    
     // 3. Correctly calculate net earning. This is simply the payout amount minus the wager.
     const netEarning = transaction.amount - wagerAmount;
     
@@ -287,4 +284,3 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
-
