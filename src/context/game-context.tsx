@@ -519,6 +519,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
         // If game is not over, proceed with turn switch
         if (isMultiplayer && room) {
+            // Update local state immediately for instant feedback
+            updateAndSaveState(updatedGameState);
+
             const roomRef = doc(db, 'game_rooms', room.id);
             const now = Timestamp.now();
             const elapsedSeconds = room.turnStartTime ? Math.max(0, (now.toMillis() - room.turnStartTime.toMillis()) / 1000) : 0;
@@ -550,16 +553,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 }
             }
     
-            await updateDoc(roomRef, updatePayload);
-        } else {
-            setGameState(prevState => {
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem(storageKey, JSON.stringify(updatedGameState));
-                }
-                return updatedGameState;
+            // Perform the Firestore update in the background
+            updateDoc(roomRef, updatePayload).catch(error => {
+                console.error("Failed to sync move with Firestore:", error);
+                // Here you might want to add logic to handle a failed sync,
+                // e.g., show a warning to the user.
             });
+
+        } else {
+            // This is for practice mode
+            updateAndSaveState(updatedGameState);
         }
-    }, [gameState, isMultiplayer, room, gameType, storageKey, setWinner, user]);
+    }, [gameState, isMultiplayer, room, gameType, storageKey, setWinner, user, updateAndSaveState]);
     
 
     const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
