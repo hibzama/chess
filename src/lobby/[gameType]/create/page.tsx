@@ -49,7 +49,8 @@ export default function CreateGamePage() {
             return;
         }
 
-        if (userData.balance < wagerAmount) {
+        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+        if (totalBalance < wagerAmount) {
             toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
@@ -57,7 +58,6 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
