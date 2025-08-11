@@ -206,32 +206,30 @@ export const updateEventProgress = functions.firestore
       return null;
     }
 
-    // 2. Ensure the winner did not resign.
-    if (transaction.resignerId && transaction.winnerId === transaction.resignerId) {
-        functions.logger.log(`Exiting event progress: Winner ${transaction.winnerId} was the resigner.`);
-        return null;
-    }
-
     const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
-    // 3. Correctly calculate net earning.
+    
+    // It's a win, regardless of resignation or not, for event purposes.
+    // The payout amount itself determines if it was a resign win or full win.
+    
+    // 3. Correctly calculate net earning. This is simply the payout amount minus the wager.
     const netEarning = transaction.amount - wagerAmount;
-
-    // Get all active events.
-    const eventsRef = admin.firestore().collection('events');
+    
+    const db = admin.firestore();
+    const eventsRef = db.collection('events');
     const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
 
     if (activeEventsSnapshot.empty) {
       return null;
     }
 
-    const batch = admin.firestore().batch();
+    const batch = db.batch();
     let hasUpdates = false;
 
     // Iterate through each active event.
     for (const eventDoc of activeEventsSnapshot.docs) {
       const event = eventDoc.data();
-      const enrollmentRef = admin.firestore().collection('users').doc(winnerId).collection('event_enrollments').doc(event.id);
+      const enrollmentRef = db.collection('users').doc(winnerId).collection('event_enrollments').doc(event.id);
       
       const enrollmentSnap = await enrollmentRef.get();
       
@@ -243,7 +241,7 @@ export const updateEventProgress = functions.firestore
               
               // 4. Update progress based on event type.
               if (event.targetType === 'winningMatches') {
-                  // A win is a win, as long as they are the winnerId and not the resigner
+                  // A win is a win. Check if the wager meets the minimum requirement.
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
@@ -266,7 +264,7 @@ export const updateEventProgress = functions.firestore
                   if (newProgress >= event.targetAmount) {
                       updatePayload.status = 'completed';
                       if(event.rewardAmount > 0) {
-                          batch.update(admin.firestore().collection('users').doc(winnerId), {
+                          batch.update(db.collection('users').doc(winnerId), {
                               bonusBalance: admin.firestore.FieldValue.increment(event.rewardAmount)
                           });
                       }
