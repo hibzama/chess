@@ -3,66 +3,47 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if a user is an admin
+
+    // Helper functions
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Rules for the 'users' collection
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins can read/write anything
+    match /{path=**} {
+        allow read, write: if isAdmin();
+    }
+    
+    // Users can read/write their own data
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId || isAdmin();
-    }
-
-    // Rules for 'event_enrollments' subcollection
-    match /users/{userId}/event_enrollments/{enrollmentId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
-    }
-
-    // Rules for the 'game_rooms' collection
-    match /game_rooms/{gameId} {
-        allow read: if request.auth.uid != null;
-        allow create: if request.auth.uid != null;
-        allow update, delete: if resource.data.createdBy.uid == request.auth.uid || isAdmin();
+      allow read, update: if isOwner(userId);
     }
     
-    // Rules for game chat messages
-    match /game_rooms/{gameId}/messages/{messageId} {
-      allow read, write: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(gameId)).data.players;
+    // Specific collection rules
+    match /game_rooms/{roomId} {
+        allow read: if true; // Public read for lobbies
+        allow write: if request.auth != null; // Any authenticated user can create/join
     }
-
-    // Rules for the 'transactions' collection
+    
     match /transactions/{transactionId} {
-        allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || request.auth.uid == resource.data.userId;
-        allow create: if request.auth.uid != null;
-        allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        allow read, write: if isOwner(get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId);
     }
     
-    // Rules for friend requests
-    match /friend_requests/{requestId} {
-        allow read, write, delete: if request.auth.uid == resource.data.toId || request.auth.uid == resource.data.fromId || isAdmin();
-    }
-
-    // Rules for notifications
-    match /notifications/{notificationId} {
-        allow read, write, update: if request.auth.uid == resource.data.userId;
-    }
-
-    // Rules for marketing applications
-    match /marketing_applications/{applicationId} {
-      allow create: if request.auth.uid == null || request.auth.uid != null; // Anyone can apply
-      allow read, update: if isAdmin();
-    }
-    
-    // Rules for events
-    match /events/{eventId} {
-        allow read: if request.auth.uid != null;
-        allow create, update, delete: if isAdmin();
-    }
-
-    // Rules for settings
     match /settings/{settingId} {
-      allow read, write: if isAdmin();
+        allow read, write: if isAdmin();
+    }
+
+    match /marketing_applications/{appId} {
+        allow create: if true; // Anyone can apply
     }
   }
 }
