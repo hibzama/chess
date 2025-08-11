@@ -202,17 +202,19 @@ export const updateEventProgress = functions.firestore
     const transaction = snap.data();
 
     // 1. Ensure this is a valid winning payout transaction.
-    if (transaction.type !== 'payout' || !transaction.winnerId) {
+    if (transaction.type !== 'payout' || !transaction.userId) {
       return null;
     }
-
-    const winnerId = transaction.winnerId;
-    const wagerAmount = transaction.gameWager || 0;
-    // 2. Correctly calculate net earning. A payout transaction's 'amount' is what the user received.
-    const netEarning = transaction.amount - wagerAmount;
     
-    // A payout always implies a win for event purposes.
+    // The user who received the payout is the winner for event purposes.
+    const winnerId = transaction.userId;
+    const wagerAmount = transaction.gameWager || 0;
+    
+    // A payout always implies a win.
     const isWin = true; 
+    
+    // Net earning is what the user received minus their original stake.
+    const netEarning = transaction.amount - wagerAmount;
 
     const db = admin.firestore();
     const eventsRef = db.collection('events');
@@ -238,9 +240,8 @@ export const updateEventProgress = functions.firestore
           if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
               let progressIncrement = 0;
               
-              // 3. Update progress based on event type.
               if (event.targetType === 'winningMatches' && isWin) {
-                  // A win is a win, as long as they are the winnerId.
+                  // If the event requires a minimum wager, check it. Otherwise, any win counts.
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
@@ -258,7 +259,7 @@ export const updateEventProgress = functions.firestore
                       progress: admin.firestore.FieldValue.increment(progressIncrement) 
                   };
 
-                  // 4. If the new progress meets or exceeds the target, mark as completed and give reward.
+                  // If the new progress meets or exceeds the target, mark as completed and give reward.
                   if (newProgress >= event.targetAmount) {
                       updatePayload.status = 'completed';
                       if (event.rewardAmount > 0) {
@@ -273,7 +274,7 @@ export const updateEventProgress = functions.firestore
       }
     }
 
-    // 5. Commit the batch if there are any updates.
+    // Commit the batch if there are any updates.
     if (hasUpdates) {
       try {
         await batch.commit();
@@ -285,5 +286,3 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
-
-    
