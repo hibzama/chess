@@ -205,17 +205,12 @@ export const updateEventProgress = functions.firestore
     if (transaction.type !== 'payout' || !transaction.winnerId) {
       return null;
     }
-
-    // 2. Ensure the winner did not resign.
-    if (transaction.resignerId && transaction.winnerId === transaction.resignerId) {
-        functions.logger.log(`Exiting event progress: Winner ${transaction.winnerId} was the resigner.`);
-        return null;
-    }
     
-    const isActualWin = !transaction.resignerId || transaction.resignerId !== transaction.winnerId;
+    // A payout means there was a winner, regardless of how.
+    const isWin = true; 
     const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
-    // 3. Correctly calculate net earning.
+    // 2. Correctly calculate net earning.
     const netEarning = transaction.amount - wagerAmount;
 
     const db = admin.firestore();
@@ -243,9 +238,9 @@ export const updateEventProgress = functions.firestore
           if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
               let progressIncrement = 0;
               
-              // 4. Update progress based on event type.
-              if (event.targetType === 'winningMatches' && isActualWin) {
-                  // A win is a win, as long as they are the winnerId and not the resigner
+              // 3. Update progress based on event type.
+              if (event.targetType === 'winningMatches' && isWin) {
+                  // A win is a win, as long as they are the winnerId
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
@@ -263,7 +258,7 @@ export const updateEventProgress = functions.firestore
                       progress: admin.firestore.FieldValue.increment(progressIncrement) 
                   };
 
-                  // If the new progress meets or exceeds the target, mark as completed and give reward.
+                  // 4. If the new progress meets or exceeds the target, mark as completed and give reward.
                   if (newProgress >= event.targetAmount) {
                       updatePayload.status = 'completed';
                       if (event.rewardAmount > 0) {
