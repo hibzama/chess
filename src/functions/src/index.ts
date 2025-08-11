@@ -194,6 +194,7 @@ export const processCommissions = functions.firestore
         return null;
     });
 
+
 // This function triggers whenever a payout transaction is created for a game winner.
 export const updateEventProgress = functions.firestore
   .document('transactions/{transactionId}')
@@ -321,4 +322,3 @@ export const updateEventProgress = functions.firestore
     return null;
   });
 
-    
