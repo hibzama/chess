@@ -213,26 +213,22 @@ function MultiplayerGame() {
     
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
-        const creatorRef = doc(db, 'users', room.createdBy.uid);
         const joinerRef = doc(db, 'users', user.uid);
-
-
+    
         try {
             await runTransaction(db, async (transaction) => {
                 // --- READ PHASE ---
                 const roomDoc = await transaction.get(roomRef);
-                const creatorDoc = await transaction.get(creatorRef);
                 const joinerDoc = await transaction.get(joinerRef);
-
+    
                 if (!roomDoc.exists() || roomDoc.data().status !== 'waiting') {
                     throw new Error("Room not available");
                 }
-                if (!creatorDoc.exists() || !joinerDoc.exists()) {
-                    throw new Error("One of the players could not be found.");
+                if (!joinerDoc.exists()) {
+                    throw new Error("Your user data could not be found.");
                 }
                 
                 const roomData = roomDoc.data();
-                const creatorData = creatorDoc.data();
                 const joinerData = joinerDoc.data();
                 
                 // --- WRITE PHASE ---
@@ -249,20 +245,11 @@ function MultiplayerGame() {
     
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-
-                    // Deduct from creator
-                    const creatorBonusWagered = Math.min(wagerAmount, creatorData?.bonusBalance || 0);
-                    const creatorMainWagered = wagerAmount - creatorBonusWagered;
-                    
-                    const creatorUpdate: any = {};
-                    if(creatorBonusWagered > 0) creatorUpdate.bonusBalance = increment(-creatorBonusWagered);
-                    if(creatorMainWagered > 0) creatorUpdate.balance = increment(-creatorMainWagered);
-                    transaction.update(creatorRef, creatorUpdate);
-
-                    // Deduct from joiner
+    
+                    // Deduct from joiner's balance
                     const joinerBonusWagered = Math.min(wagerAmount, joinerData.bonusBalance || 0);
                     const joinerMainWagered = wagerAmount - joinerBonusWagered;
-
+    
                     const joinerUpdate: any = {};
                     if(joinerBonusWagered > 0) joinerUpdate.bonusBalance = increment(-joinerBonusWagered);
                     if(joinerMainWagered > 0) joinerUpdate.balance = increment(-joinerMainWagered);
