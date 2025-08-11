@@ -200,6 +200,7 @@ export const updateEventProgress = functions.firestore
   .document('transactions/{transactionId}')
   .onCreate(async (snap, context) => {
     const transaction = snap.data();
+    const db = admin.firestore();
 
     // 1. Ensure this is a valid winning payout transaction.
     if (transaction.type !== 'payout' || !transaction.winnerId) {
@@ -207,16 +208,15 @@ export const updateEventProgress = functions.firestore
     }
     
     // The user who received the payout is the winner for event purposes.
-    const winnerId = transaction.winnerId;
+    const winnerId = transaction.userId;
     const wagerAmount = transaction.gameWager || 0;
     
-    // A payout always implies a win.
+    // A payout always implies a win, regardless of method (checkmate, timeout, resign).
     const isWin = true; 
     
     // Net earning is what the user received minus their original stake.
     const netEarning = transaction.amount - wagerAmount;
 
-    const db = admin.firestore();
     const eventsRef = db.collection('events');
     const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
 
@@ -286,3 +286,5 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
+
+    

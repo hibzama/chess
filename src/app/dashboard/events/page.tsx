@@ -90,12 +90,12 @@ export default function EventsPage() {
             // Sort client-side to avoid needing a composite index
             eventsData.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
             setAvailableEvents(eventsData);
-            setLoading(false);
         });
 
         // Fetch user's enrolled events
         const enrollmentsRef = collection(db, 'users', user.uid, 'event_enrollments');
         const unsubEnrollments = onSnapshot(enrollmentsRef, async (snapshot) => {
+            setLoading(true);
             const enrollmentsDataPromises = snapshot.docs.map(async (enrollmentDoc) => {
                 const enrollment = { ...enrollmentDoc.data(), id: enrollmentDoc.id } as Enrollment;
                 const eventDoc = await getDoc(doc(db, 'events', enrollment.eventId));
@@ -106,6 +106,7 @@ export default function EventsPage() {
             });
             const enrollmentsData = await Promise.all(enrollmentsDataPromises);
             setEnrolledEvents(enrollmentsData.filter(e => e.eventDetails));
+            setLoading(false);
         });
         
         return () => {
@@ -163,8 +164,8 @@ export default function EventsPage() {
 
     const alreadyEnrolledIds = new Set(enrolledEvents.map(e => e.eventId));
     
-    const activeEnrolledEvents = enrolledEvents.filter(e => e.status === 'enrolled');
-    const historyEvents = enrolledEvents.filter(e => e.status === 'completed' || e.status === 'expired');
+    const activeEnrolledEvents = enrolledEvents.filter(e => e.status === 'enrolled' && e.expiresAt.toDate() > new Date());
+    const historyEvents = enrolledEvents.filter(e => e.status !== 'enrolled' || e.expiresAt.toDate() <= new Date());
 
 
     const renderProgressDetails = (enrollment: Enrollment) => {
@@ -307,7 +308,8 @@ export default function EventsPage() {
                         historyEvents.map(enrollment => {
                             if (!enrollment.eventDetails) return null;
                             const progressPercentage = Math.min(100, (enrollment.progress / enrollment.eventDetails.targetAmount) * 100);
-                            
+                            const isExpired = enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() <= new Date();
+
                             return (
                                 <Card key={enrollment.id} className="flex flex-col opacity-70">
                                     <CardHeader className="text-center">
@@ -315,7 +317,7 @@ export default function EventsPage() {
                                             <History className="w-8 h-8 text-muted-foreground" />
                                         </div>
                                         <CardTitle className="text-2xl">{enrollment.eventDetails.title}</CardTitle>
-                                        <Badge variant={enrollment.status === 'completed' ? 'default' : 'destructive'} className="w-fit mx-auto">{enrollment.status}</Badge>
+                                        <Badge variant={enrollment.status === 'completed' ? 'default' : 'destructive'} className="w-fit mx-auto">{isExpired ? 'Expired' : 'Completed'}</Badge>
                                     </CardHeader>
                                     <CardContent className="space-y-4 flex-1">
                                         <div className="space-y-2">
@@ -346,3 +348,4 @@ export default function EventsPage() {
     );
 }
 
+    
