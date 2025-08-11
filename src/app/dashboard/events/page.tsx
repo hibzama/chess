@@ -12,7 +12,7 @@ import { useAuth } from '@/context/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 
 export interface Event {
@@ -22,7 +22,7 @@ export interface Event {
     targetAmount: number;
     enrollmentFee: number;
     rewardAmount: number;
-    durationDays: number;
+    durationHours: number;
     isActive: boolean;
     minWager?: number;
     createdAt?: any;
@@ -36,6 +36,36 @@ export interface Enrollment {
     expiresAt: Timestamp;
     eventDetails?: Event;
 }
+
+const Countdown = ({ expiryTimestamp }: { expiryTimestamp: Timestamp }) => {
+    const [timeLeft, setTimeLeft] = useState('');
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = new Date();
+            const expiry = expiryTimestamp.toDate();
+            const distance = expiry.getTime() - now.getTime();
+
+            if (distance < 0) {
+                setTimeLeft('Expired');
+                clearInterval(interval);
+                return;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
+            setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [expiryTimestamp]);
+
+    return <p className="text-center text-sm text-muted-foreground">{timeLeft}</p>;
+}
+
 
 export default function EventsPage() {
     const { user, userData } = useAuth();
@@ -106,8 +136,7 @@ export default function EventsPage() {
             }
 
             // Create enrollment documents
-            const expiryDate = new Date();
-            expiryDate.setDate(expiryDate.getDate() + event.durationDays);
+            const expiryDate = new Date(Date.now() + event.durationHours * 60 * 60 * 1000);
             
             const enrollmentData = {
                 eventId: event.id,
@@ -180,7 +209,7 @@ export default function EventsPage() {
                                             <p className="text-green-400">LKR {event.rewardAmount.toFixed(2)}</p>
                                         </div>
                                     </div>
-                                    <p className="text-xs text-muted-foreground text-center">You will have {event.durationDays} days to complete this event after enrolling.</p>
+                                    <p className="text-xs text-muted-foreground text-center">You will have {event.durationHours} hours to complete this event after enrolling.</p>
                                 </CardContent>
                                 <CardFooter>
                                     <Button className="w-full" onClick={() => handleEnroll(event)} disabled={isEnrolling === event.id}>
@@ -206,7 +235,6 @@ export default function EventsPage() {
                         enrolledEvents.map(enrollment => {
                             if (!enrollment.eventDetails) return null;
                             const progressPercentage = Math.min(100, (enrollment.progress / enrollment.eventDetails.targetAmount) * 100);
-                            const timeLeft = formatDistanceToNow(enrollment.expiresAt.toDate(), { addSuffix: true });
                             
                             return (
                                 <Card key={enrollment.id} className="flex flex-col">
@@ -230,8 +258,8 @@ export default function EventsPage() {
                                             <p className="text-xl font-bold text-green-400">LKR {enrollment.eventDetails.rewardAmount.toFixed(2)}</p>
                                         </div>
                                     </CardContent>
-                                    <CardFooter className="text-center text-sm text-muted-foreground">
-                                       {enrollment.status === 'enrolled' ? `Expires ${timeLeft}` : `Completed on ${format(enrollment.expiresAt.toDate(), 'PP')}`}
+                                    <CardFooter>
+                                        <Countdown expiryTimestamp={enrollment.expiresAt} />
                                     </CardFooter>
                                 </Card>
                             )

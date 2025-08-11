@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar as CalendarIcon, Gift, Users, DollarSign, Target, PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Calendar as CalendarIcon, Gift, Users, DollarSign, Target, PlusCircle, Trash2, Edit, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -25,7 +25,7 @@ export interface Event {
     targetAmount: number;
     enrollmentFee: number;
     rewardAmount: number;
-    durationDays: number;
+    durationHours: number;
     isActive: boolean;
     minWager?: number;
     createdAt?: any;
@@ -48,7 +48,7 @@ export default function ManageEventsPage() {
         targetAmount: 10,
         enrollmentFee: 100,
         rewardAmount: 500,
-        durationDays: 7,
+        durationHours: 168, // Default to 7 days
         isActive: false,
         minWager: 0,
     });
@@ -149,7 +149,7 @@ export default function ManageEventsPage() {
             await addDoc(collection(db, 'events'), eventPayload);
             toast({ title: 'Success!', description: 'New event has been created.' });
             setIsCreateDialogOpen(false); // Close dialog on success
-             setNewEvent({ title: '', targetType: 'winningMatches', targetAmount: 10, enrollmentFee: 100, rewardAmount: 500, durationDays: 7, isActive: false, minWager: 0 }); // Reset form
+             setNewEvent({ title: '', targetType: 'winningMatches', targetAmount: 10, enrollmentFee: 100, rewardAmount: 500, durationHours: 168, isActive: false, minWager: 0 }); // Reset form
         } catch (error) {
             console.error("Error creating event:", error);
             toast({ variant: "destructive", title: 'Error', description: 'Failed to create event.' });
@@ -159,7 +159,7 @@ export default function ManageEventsPage() {
     };
     
     const handleChange = (field: keyof Event, value: any) => {
-        const isNumericField = ['targetAmount', 'enrollmentFee', 'rewardAmount', 'durationDays', 'minWager'].includes(field);
+        const isNumericField = ['targetAmount', 'enrollmentFee', 'rewardAmount', 'durationHours', 'minWager'].includes(field);
         setNewEvent(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
     };
 
@@ -213,8 +213,8 @@ export default function ManageEventsPage() {
                                 <Input id="rewardAmount" type="number" value={newEvent.rewardAmount} onChange={(e) => handleChange('rewardAmount', e.target.value)} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="durationDays">Duration (in days)</Label>
-                                <Input id="durationDays" type="number" value={newEvent.durationDays} onChange={(e) => handleChange('durationDays', e.target.value)} />
+                                <Label htmlFor="durationHours" className="flex items-center gap-2"><Clock/> Duration (in hours)</Label>
+                                <Input id="durationHours" type="number" value={newEvent.durationHours} onChange={(e) => handleChange('durationHours', e.target.value)} />
                             </div>
                              <div className="flex items-center space-x-2">
                                 <Switch id="isActive" checked={newEvent.isActive} onCheckedChange={(v) => handleChange('isActive', v)} />
