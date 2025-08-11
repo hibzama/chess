@@ -213,16 +213,27 @@ function MultiplayerGame() {
     
         setIsJoining(true);
         const roomRef = doc(db, 'game_rooms', room.id);
+        const creatorRef = doc(db, 'users', room.createdBy.uid);
+        const joinerRef = doc(db, 'users', user.uid);
+
 
         try {
             await runTransaction(db, async (transaction) => {
-                const currentRoomDoc = await transaction.get(roomRef);
-                if (!currentRoomDoc.exists() || currentRoomDoc.data().status !== 'waiting') {
+                // --- READ PHASE ---
+                const roomDoc = await transaction.get(roomRef);
+                const creatorDoc = await transaction.get(creatorRef);
+
+                if (!roomDoc.exists() || roomDoc.data().status !== 'waiting') {
                     throw new Error("Room not available");
                 }
-                const roomData = currentRoomDoc.data();
+                if (!creatorDoc.exists()) {
+                    throw new Error("Game creator not found");
+                }
+                const roomData = roomDoc.data();
+                const creatorData = creatorDoc.data();
                 
                 // --- WRITE PHASE ---
+                // Update Room
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 transaction.update(roomRef, {
@@ -235,9 +246,8 @@ function MultiplayerGame() {
     
                 if (roomData.wager > 0) {
                     const wagerAmount = roomData.wager;
-                     // Deduct from creator
-                    const creatorRef = doc(db, 'users', roomData.createdBy.uid);
-                    const creatorData = (await transaction.get(creatorRef)).data();
+
+                    // Deduct from creator
                     const creatorBonusWagered = Math.min(wagerAmount, creatorData?.bonusBalance || 0);
                     const creatorMainWagered = wagerAmount - creatorBonusWagered;
                     
@@ -247,7 +257,6 @@ function MultiplayerGame() {
                     transaction.update(creatorRef, creatorUpdate);
 
                     // Deduct from joiner
-                    const joinerRef = doc(db, 'users', user.uid);
                     const joinerBonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
                     const joinerMainWagered = wagerAmount - joinerBonusWagered;
 
