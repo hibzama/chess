@@ -205,16 +205,16 @@ export const updateEventProgress = functions.firestore
     if (transaction.type !== 'payout' || !transaction.winnerId) {
       return null;
     }
-    
-    // A payout means there was a winner. This is a valid win.
-    const isWin = true; 
+
     const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
-    // 2. Correctly calculate net earning.
+    // 2. Correctly calculate net earning. A payout transaction's 'amount' is what the user received.
     const netEarning = transaction.amount - wagerAmount;
+    
+    // A payout always implies a win for event purposes.
+    const isWin = true; 
 
     const db = admin.firestore();
-    // Get all active events.
     const eventsRef = db.collection('events');
     const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
 
@@ -240,10 +240,12 @@ export const updateEventProgress = functions.firestore
               
               // 3. Update progress based on event type.
               if (event.targetType === 'winningMatches' && isWin) {
+                  // A win is a win, as long as they are the winnerId.
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
               } else if (event.targetType === 'totalEarnings') {
+                  // Only count positive net earnings towards progress.
                   if (netEarning > 0) { 
                       progressIncrement = netEarning;
                   }
