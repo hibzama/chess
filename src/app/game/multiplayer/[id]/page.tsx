@@ -222,15 +222,18 @@ function MultiplayerGame() {
                 // --- READ PHASE ---
                 const roomDoc = await transaction.get(roomRef);
                 const creatorDoc = await transaction.get(creatorRef);
+                const joinerDoc = await transaction.get(joinerRef);
 
                 if (!roomDoc.exists() || roomDoc.data().status !== 'waiting') {
                     throw new Error("Room not available");
                 }
-                if (!creatorDoc.exists()) {
-                    throw new Error("Game creator not found");
+                if (!creatorDoc.exists() || !joinerDoc.exists()) {
+                    throw new Error("One of the players could not be found.");
                 }
+                
                 const roomData = roomDoc.data();
                 const creatorData = creatorDoc.data();
+                const joinerData = joinerDoc.data();
                 
                 // --- WRITE PHASE ---
                 // Update Room
@@ -257,7 +260,7 @@ function MultiplayerGame() {
                     transaction.update(creatorRef, creatorUpdate);
 
                     // Deduct from joiner
-                    const joinerBonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
+                    const joinerBonusWagered = Math.min(wagerAmount, joinerData.bonusBalance || 0);
                     const joinerMainWagered = wagerAmount - joinerBonusWagered;
 
                     const joinerUpdate: any = {};
