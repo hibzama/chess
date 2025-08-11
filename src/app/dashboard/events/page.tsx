@@ -153,7 +153,6 @@ export default function EventsPage() {
         const batch = writeBatch(db);
         const userRef = doc(db, 'users', user.uid);
         const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-        const masterEnrollmentRef = doc(db, 'event_enrollments', event.id, 'users', user.uid);
 
         try {
             if (event.enrollmentFee > 0) {
@@ -171,7 +170,6 @@ export default function EventsPage() {
                 expiresAt: Timestamp.fromDate(expiryDate)
             };
             batch.set(enrollmentRef, enrollmentData);
-            batch.set(masterEnrollmentRef, { enrolledAt: serverTimestamp() });
 
             await batch.commit();
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
