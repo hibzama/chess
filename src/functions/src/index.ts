@@ -283,3 +283,5 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
+
+    
