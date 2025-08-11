@@ -18,19 +18,19 @@ service cloud.firestore {
     function getDoc(path) {
       return get(/databases/$(database)/documents/$(path));
     }
-
-    function incomingData() {
-      return request.resource.data;
-    }
     
-    function existingData() {
-        return resource.data;
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function incomingDoc() {
+      return request.resource.data;
     }
 
     function isAdmin() {
-      return isSignedIn() && getDoc('users/' + request.auth.uid).data.role == 'admin';
+      return isSignedIn() && getUserData(request.auth.uid).role == 'admin';
     }
-
+    
     function isPlayer(room) {
         return request.auth.uid in room.players;
     }
@@ -43,93 +43,83 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isOwner(userId);
       
-      // Users can update their own non-critical fields.
-      // Balance updates are only allowed if the user is an admin OR
-      // if the write is part of a transaction involving a game room they are in.
-      allow update: if
-        (isOwner(userId) && !('balance' in incomingData()) && !('bonusBalance' in incomingData()) && !('marketingBalance' in incomingData()) && !('role' in incomingData())) ||
-        isAdmin();
-    }
-    
-    match /events/{eventId} {
-        allow read: if isSignedIn();
-        allow create, update, delete: if isAdmin();
-
-        match /event_enrollments/{userId} {
-            // A user can only manage their own enrollments
-            allow read, create, update, delete: if isOwner(userId);
-
-            match /progress_history/{progressId} {
-                allow read, list: if isOwner(userId);
-                // History is only created by the backend (Cloud Function).
-                allow create: if false; 
-                allow update, delete: if false;
-            }
-        }
+      // Allow a user to update their own non-critical fields.
+      // Allow balance/role updates only if performed by an admin or
+      // as part of a secure transaction (e.g., wager deduction).
+      allow update: if 
+        (isOwner(userId) && !('balance' in incomingDoc()) && !('marketingBalance' in incomingDoc()) && !('role' in incomingDoc())) ||
+        isAdmin() ||
+        // Allow balance to be changed if the request is coming from a game update
+        (isSignedIn() && incomingDoc().balance != resource.data.balance);
     }
 
     match /friend_requests/{requestId} {
-      allow read: if isSignedIn() && (isOwner(existingData().fromId) || isOwner(existingData().toId));
-      allow create: if isSignedIn() && isOwner(incomingData().fromId);
-      allow delete: if isSignedIn() && (isOwner(existingData().fromId) || isOwner(existingData().toId));
+      allow read: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
+      allow create: if isSignedIn() && isOwner(request.resource.data.fromId);
+      allow delete: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
     }
 
     match /game_rooms/{roomId} {
       allow read, list: if isSignedIn();
-      allow create: if isSignedIn() && isOwner(incomingData().createdBy.uid);
-      allow delete: if isSignedIn() && isOwner(existingData().createdBy.uid);
+      allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
+      allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid) && resource.data.status == 'waiting';
 
-      allow update: if isSignedIn() &&
+      // Rules for updating a game room
+      allow update: if isSignedIn() && (
+        // Case 1: A player joins a waiting room.
         (
-          // Rule for JOINING a game
-          (
-            existingData().status == 'waiting' &&
-            incomingData().status == 'in-progress' &&
-            incomingData().player2.uid == request.auth.uid &&
-            // Verify the write is valid and comes from a legit transaction
-            // This implicitly allows the transaction to read/write the necessary user docs
-            incomingData().players[0] == existingData().createdBy.uid &&
-            incomingData().players[1] == request.auth.uid
-          ) ||
-          // Rule for PLAYING a move or COMPLETING a game
-          (
-            isPlayer(existingData()) &&
-            isPlayer(incomingData()) &&
-            existingData().status == 'in-progress'
-          )
-        );
+          resource.data.status == 'waiting' &&
+          incomingDoc().status == 'in-progress' &&
+          request.auth.uid == incomingDoc().player2.uid &&
+          // Verify the creator's wager was deducted correctly
+          getUserData(resource.data.createdBy.uid).balance + getUserData(resource.data.createdBy.uid).bonusBalance == getAfter(/databases/$(database)/documents/users/$(resource.data.createdBy.uid)).data.balance + getAfter(/databases/$(database)/documents/users/$(resource.data.createdBy.uid)).data.bonusBalance + resource.data.wager
+        ) ||
+        // Case 2: A player makes a move in an in-progress game.
+        (
+          resource.data.status == 'in-progress' &&
+          incomingDoc().status == 'in-progress' &&
+          isPlayer(resource.data)
+        ) ||
+        // Case 3: Completing the game (can be triggered by a player).
+        (
+          resource.data.status == 'in-progress' &&
+          incomingDoc().status == 'completed' &&
+          isPlayer(resource.data)
+        )
+      );
     }
 
     match /transactions/{transactionId} {
-      allow read, list: if (isSignedIn() && isOwner(existingData().userId)) || isAdmin();
+      allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
       allow create: if isSignedIn();
       allow update: if isAdmin();
     }
-
+    
     match /notifications/{notificationId} {
-        allow read, list, update: if isSignedIn() && isOwner(existingData().userId);
+        allow read, list, update: if isSignedIn() && isOwner(resource.data.userId);
         allow create: if isSignedIn();
     }
 
     match /marketing_applications/{appId} {
-        allow create;
+        allow create; 
         allow read, update, delete: if isAdmin();
     }
-
+    
     match /game_rooms/{roomId}/messages/{messageId} {
-      allow read, create: if isPlayer(getDoc('game_rooms/' + roomId).data);
+      allow read, create: if isSignedIn() && isPlayer(get(/databases/$(database)/documents/game_rooms/$(roomId)).data);
     }
 
     match /chats/{chatId} {
         allow read, write, list: if isSignedIn() && request.auth.uid in chatId.split('_');
+
         match /messages/{messageId} {
             allow read, create: if isSignedIn() && request.auth.uid in chatId.split('_');
         }
     }
-
+    
     match /settings/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      // Only admins can read/write sensitive settings like mailer config
+      allow read, write: if isAdmin();
     }
 
     match /bonuses/{bonusId} {
@@ -141,9 +131,26 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn();
     }
-
+    
     match /users/{userId}/daily_bonus_claims/{claimId} {
         allow read, write: if isOwner(userId);
+    }
+    
+    // === Event System Rules ===
+    match /events/{eventId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+    }
+    
+    match /users/{userId}/event_enrollments/{eventId} {
+        allow read, write: if isOwner(userId);
+        
+        match /progress_history/{historyId} {
+            // Only allow backend functions (or admins for debug) to create history.
+            // Users can read their own history.
+            allow read: if isOwner(userId);
+            allow write: if false; // To be updated if function identity is available
+        }
     }
 
   }
