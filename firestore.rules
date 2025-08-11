@@ -3,52 +3,72 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check for admin role
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-    // Helper function to check if a user is authenticated
+    // Reusable helper functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Users Collection
-    match /users/{userId} {
-      // Admins can read/write any user document
-      allow read, write: if isAdmin();
-      // Users can only read/write their own document
-      allow read, update: if request.auth.uid == userId;
-      // Anyone can create a user (for registration)
-      allow create: if true;
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
-    // Friend Requests Collection
-    match /friend_requests/{requestId} {
-      // Users can create a request
-      allow create: if isSignedIn();
-      // Users can read/delete their own sent/received requests
-      allow read, delete: if isSignedIn() && (request.resource.data.fromId == request.auth.uid || request.resource.data.toId == request.auth.uid);
-      // Admins can read/delete any request
-      allow read, delete: if isAdmin();
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getRole() == 'admin';
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if !isSignedIn(); // Allow user creation during sign-up
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+
+      // User Subcollections
+      match /event_enrollments/{enrollmentId} {
+        allow read, write, create: if isOwner(userId);
+      }
+      match /daily_bonus_claims/{claimId} {
+         allow read, write, create: if isOwner(userId);
+      }
+    }
+
+    // Settings Collection (Admin only)
+    match /settings/{docId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Bonuses Collection (Admin write, User read)
+    match /bonuses/{bonusId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+    }
+    
+    // Daily Bonus Claims (Counter, Admin can view)
+    match /dailyBonusClaims/{bonusId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn();
     }
     
     // Game Rooms Collection
     match /game_rooms/{roomId} {
-        // Anyone signed in can read public rooms (for lobby)
-        allow read: if isSignedIn();
-        // Allow creating a room if signed in
-        allow create: if isSignedIn();
-        // Allow players in the room or admins to update/delete
-        allow update, delete: if (isSignedIn() && request.auth.uid in resource.data.players) || isAdmin();
-        
-        // Messages subcollection
-        match /messages/{messageId} {
-             allow read, create: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players) || isAdmin();
-        }
-    }
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.createdBy.uid == request.auth.uid || request.auth.uid in resource.data.players || isAdmin());
 
+      match /messages/{messageId} {
+        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      }
+    }
+    
     // Chats Collection
     match /chats/{chatId} {
         allow read, update, create: if isSignedIn() && request.auth.uid in resource.data.users;
@@ -57,82 +77,41 @@ service cloud.firestore {
         }
     }
 
-    // Marketing Applications Collection
-    match /marketing_applications/{appId} {
-      // Anyone can create an application
-      allow create: if true;
-      // Only admins can read/update applications
-      allow read, update: if isAdmin();
-    }
-    
     // Transactions Collection
     match /transactions/{transactionId} {
-        // Users can create and read their own transactions
-        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-        allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
-        // Admins can read/update all transactions
+      allow read: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+      allow create: if isSignedIn();
+      allow update: if isAdmin();
+    }
+
+    // Marketing Applications
+    match /marketing_applications/{appId} {
+        allow create: if true; // Open for anyone to apply
         allow read, update: if isAdmin();
     }
-    
-    // Settings Collection (Admin only)
-    match /settings/{settingId} {
-      allow read, write: if isAdmin();
-    }
-    
-    // Notifications Collection
-    match /notifications/{notificationId} {
-      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
-      // Creation is handled by backend functions
-    }
-    
-    // =============================================================
-    // EVENT SYSTEM RULES
-    // =============================================================
 
-    // Events collection can be read by any signed-in user, but only written by admins.
-    // Cloud Functions can also read this collection.
+    // Friend Requests
+    match /friend_requests/{reqId} {
+        allow read, delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        allow create: if isSignedIn();
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+        allow read, update: if isSignedIn() && isOwner(resource.data.userId);
+        allow create: if isSignedIn();
+    }
+    
+    // Events System
     match /events/{eventId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-    
-    // This is the master list of enrollments for admin viewing.
-    // Users need to be able to create their own record here when they enroll.
+
     match /event_enrollments/{eventId}/users/{userId} {
-        allow read: if isAdmin();
-        // A user can create/write their own enrollment record.
-        allow create, write: if request.auth.uid == userId;
+      allow read: if isAdmin() || isOwner(userId);
+      // This rule allows a user to create their own enrollment record during the batch write
+      allow create, write: if isOwner(userId);
     }
-
-    // This is the user's private list of their enrollments.
-    // They have full control over documents inside this subcollection.
-    match /users/{userId}/event_enrollments/{enrollmentId} {
-      allow read, write: if request.auth.uid == userId;
-    }
-    
-     // =============================================================
-    // DAILY BONUS RULES
-    // =============================================================
-
-    // Bonuses can be read by any signed-in user, but only written by admins.
-    match /bonuses/{bonusId} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin();
-    }
-
-    // This collection stores the count of claims for each bonus.
-    // Users need to be able to update this when they claim.
-    match /dailyBonusClaims/{bonusId} {
-        // Anyone can read claim counts
-        allow read: if true;
-        // Users can update (increment) the count when claiming
-        allow write: if isSignedIn();
-    }
-
-    // This is the user's private list of their claimed bonuses.
-    match /users/{userId}/daily_bonus_claims/{claimId} {
-        allow read, write: if request.auth.uid == userId;
-    }
-
   }
 }
