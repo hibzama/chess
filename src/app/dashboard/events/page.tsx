@@ -13,6 +13,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { formatDistanceToNow, format } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
 
 export interface Event {
     id: string;
@@ -99,7 +100,7 @@ export default function EventsPage() {
         try {
             // Deduct enrollment fee
             if (event.enrollmentFee > 0) {
-                 batch.update(userRef, { balance: -event.enrollmentFee });
+                 batch.update(userRef, { balance: increment(-event.enrollmentFee) });
             }
 
             // Create enrollment documents
