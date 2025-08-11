@@ -206,14 +206,20 @@ export const updateEventProgress = functions.firestore
       return null;
     }
 
+    // 2. Ensure the winner did not resign.
+    if (transaction.resignerId && transaction.winnerId === transaction.resignerId) {
+        functions.logger.log(`Exiting event progress: Winner ${transaction.winnerId} was the resigner.`);
+        return null;
+    }
+    
+    const isActualWin = !transaction.resignerId || transaction.resignerId !== transaction.winnerId;
     const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
-    
-    // 2. Correctly calculate net earning. This is the profit.
+    // 3. Correctly calculate net earning.
     const netEarning = transaction.amount - wagerAmount;
-    const isWin = !transaction.resignerId || transaction.resignerId !== winnerId;
 
     const db = admin.firestore();
+    // Get all active events.
     const eventsRef = db.collection('events');
     const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
 
@@ -237,9 +243,9 @@ export const updateEventProgress = functions.firestore
           if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
               let progressIncrement = 0;
               
-              // 3. Update progress based on event type.
-              if (event.targetType === 'winningMatches' && isWin) {
-                  // A win is a win, as long as they are the winnerId and not the resigner.
+              // 4. Update progress based on event type.
+              if (event.targetType === 'winningMatches' && isActualWin) {
+                  // A win is a win, as long as they are the winnerId and not the resigner
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
                   }
@@ -253,15 +259,14 @@ export const updateEventProgress = functions.firestore
               if (progressIncrement > 0) {
                   hasUpdates = true;
                   const newProgress = (enrollment.progress || 0) + progressIncrement;
-                  
                   const updatePayload: { [key: string]: any } = { 
                       progress: admin.firestore.FieldValue.increment(progressIncrement) 
                   };
 
-                  // 4. If the new progress meets or exceeds the target, mark as completed and add reward.
+                  // If the new progress meets or exceeds the target, mark as completed and give reward.
                   if (newProgress >= event.targetAmount) {
                       updatePayload.status = 'completed';
-                      if(event.rewardAmount > 0) {
+                      if (event.rewardAmount > 0) {
                           batch.update(db.collection('users').doc(winnerId), {
                               bonusBalance: admin.firestore.FieldValue.increment(event.rewardAmount)
                           });
