@@ -286,7 +286,7 @@ export const updateEventProgress = functions.firestore
 
 
 /**
- * Sends a custom email to all registered users.
+ * Sends a custom email to a list of users or all users.
  * This is a callable function invoked from the admin panel.
  */
 export const sendBulkEmail = functions.https.onCall(async (data, context) => {
@@ -295,14 +295,12 @@ export const sendBulkEmail = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('permission-denied', 'Only admins can send bulk emails.');
   }
 
-  const { subject, body } = data;
+  const { subject, body, recipients } = data;
   if (!subject || !body) {
     throw new functions.https.HttpsError('invalid-argument', 'The function must be called with "subject" and "body" arguments.');
   }
 
   // 2. Configure Nodemailer
-  // IMPORTANT: You MUST configure these environment variables in your Firebase project.
-  // firebase functions:config:set mailer.host="your_smtp_host" mailer.port=587 mailer.user="your_email" mailer.pass="your_password"
   const mailerConfig = functions.config().mailer;
   if (!mailerConfig || !mailerConfig.host || !mailerConfig.user || !mailerConfig.pass) {
     throw new functions.https.HttpsError('failed-precondition', 'Mailer is not configured. Please set mailer environment variables.');
@@ -318,15 +316,20 @@ export const sendBulkEmail = functions.https.onCall(async (data, context) => {
     },
   });
 
-  // 3. Fetch all users
-  const usersSnapshot = await admin.firestore().collection('users').get();
-  const emails = usersSnapshot.docs.map(doc => doc.data().email).filter(email => email);
+  // 3. Determine recipients
+  let emails: string[] = [];
+  if (Array.isArray(recipients) && recipients.length > 0) {
+      emails = recipients;
+  } else {
+      const usersSnapshot = await admin.firestore().collection('users').get();
+      emails = usersSnapshot.docs.map(doc => doc.data().email).filter(email => email);
+  }
 
   if (emails.length === 0) {
     return { success: true, message: 'No users found to email.' };
   }
 
-  // 4. Send email to all users
+  // 4. Send email to recipients
   const mailOptions = {
     from: `"Nexbattle" <${mailerConfig.user}>`,
     bcc: emails, // Use BCC to send to all users without revealing other recipients
@@ -343,3 +346,4 @@ export const sendBulkEmail = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', 'Failed to send email.');
   }
 });
+
