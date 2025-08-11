@@ -47,17 +47,20 @@ export async function sendEmail(input: MailerInput): Promise<void> {
     html: input.body,
   };
 
-  // Use Promise.all to send all emails in parallel for efficiency
-  await Promise.all(
-    input.recipients.map(recipient => {
-      return transporter.sendMail({
+  // Send emails sequentially to avoid rate-limiting issues
+  for (const recipient of input.recipients) {
+    try {
+      await transporter.sendMail({
         ...mailOptions,
         to: recipient.email,
         // You can add personalization here if needed
         // html: input.body.replace('{{firstName}}', recipient.firstName),
       });
-    })
-  );
+    } catch (error) {
+        console.error(`Failed to send email to ${recipient.email}:`, error);
+        // We can decide to throw or continue. For a bulk mailer, continuing is often better.
+    }
+  }
 }
 
 const mailerFlow = ai.defineFlow(
@@ -70,5 +73,3 @@ const mailerFlow = ai.defineFlow(
     await sendEmail(input);
   }
 );
-
-    
