@@ -1,19 +1,23 @@
 
+
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy, History } from 'lucide-react';
+import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy, History as HistoryIcon, Swords } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export interface Event {
     id: string;
@@ -35,6 +39,14 @@ export interface Enrollment {
     status: 'enrolled' | 'completed' | 'expired';
     expiresAt: Timestamp;
     eventDetails?: Event;
+}
+
+interface ProgressHistoryItem {
+    id: string;
+    gameId: string;
+    opponentName: string;
+    increment: number;
+    timestamp: Timestamp;
 }
 
 const USDT_RATE = 310;
@@ -74,6 +86,7 @@ export default function EventsPage() {
     const { toast } = useToast();
     const [availableEvents, setAvailableEvents] = useState<Event[]>([]);
     const [enrolledEvents, setEnrolledEvents] = useState<Enrollment[]>([]);
+    const [progressHistory, setProgressHistory] = useState<{ [eventId: string]: ProgressHistoryItem[] }>({});
     const [loading, setLoading] = useState(true);
     const [isEnrolling, setIsEnrolling] = useState<string | null>(null);
 
@@ -83,16 +96,13 @@ export default function EventsPage() {
             return;
         }
 
-        // Fetch active events
         const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true));
         const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
             const eventsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Event));
-            // Sort client-side to avoid needing a composite index
             eventsData.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
             setAvailableEvents(eventsData);
         });
 
-        // Fetch user's enrolled events
         const enrollmentsRef = collection(db, 'users', user.uid, 'event_enrollments');
         const unsubEnrollments = onSnapshot(enrollmentsRef, async (snapshot) => {
             setLoading(true);
@@ -115,6 +125,19 @@ export default function EventsPage() {
         };
     }, [user]);
 
+    const fetchProgressHistory = async (eventId: string) => {
+        if (!user || progressHistory[eventId]) return;
+
+        const historyQuery = query(
+            collection(db, 'users', user.uid, 'event_enrollments', eventId, 'progress_history'),
+            orderBy('timestamp', 'desc')
+        );
+
+        const historySnapshot = await getDocs(historyQuery);
+        const historyData = historySnapshot.docs.map(d => ({ ...d.data(), id: d.id } as ProgressHistoryItem));
+        setProgressHistory(prev => ({...prev, [eventId]: historyData}));
+    }
+
     const handleEnroll = async (event: Event) => {
         if (!user || !userData) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
@@ -133,12 +156,10 @@ export default function EventsPage() {
         const masterEnrollmentRef = doc(db, 'event_enrollments', event.id, 'users', user.uid);
 
         try {
-            // Deduct enrollment fee
             if (event.enrollmentFee > 0) {
                  batch.update(userRef, { balance: increment(-event.enrollmentFee) });
             }
 
-            // Create enrollment documents
             const expiryDate = new Date();
             expiryDate.setHours(expiryDate.getHours() + event.durationHours);
             
@@ -285,8 +306,40 @@ export default function EventsPage() {
                                             <p className="text-xl font-bold text-green-400">LKR {enrollment.eventDetails.rewardAmount.toFixed(2)}</p>
                                         </div>
                                     </CardContent>
-                                    <CardFooter>
+                                    <CardFooter className="flex-col gap-2">
                                         <Countdown expiryTimestamp={enrollment.expiresAt} />
+                                        <Dialog>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" className="w-full" onClick={() => fetchProgressHistory(enrollment.id)}>
+                                                    <HistoryIcon className="mr-2"/> History
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Progress History for "{enrollment.eventDetails.title}"</DialogTitle>
+                                                </DialogHeader>
+                                                <ScrollArea className="h-72">
+                                                    <Table>
+                                                        <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Vs Opponent</TableHead><TableHead>Progress</TableHead></TableRow></TableHeader>
+                                                        <TableBody>
+                                                            {progressHistory[enrollment.id] ? progressHistory[enrollment.id].length > 0 ? (
+                                                                progressHistory[enrollment.id].map(h => (
+                                                                    <TableRow key={h.id}>
+                                                                        <TableCell>{h.timestamp ? format(h.timestamp.toDate(), 'PPp') : 'N/A'}</TableCell>
+                                                                        <TableCell>{h.opponentName}</TableCell>
+                                                                        <TableCell>
+                                                                            {enrollment.eventDetails?.targetType === 'winningMatches' ? '+1 Win' : `+LKR ${h.increment.toFixed(2)}`}
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                ))
+                                                            ) : (
+                                                                <TableRow><TableCell colSpan={3} className="text-center">No progress yet.</TableCell></TableRow>
+                                                            ) : <TableRow><TableCell colSpan={3} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
+                                                        </TableBody>
+                                                    </Table>
+                                                </ScrollArea>
+                                            </DialogContent>
+                                        </Dialog>
                                     </CardFooter>
                                 </Card>
                             )
@@ -314,7 +367,7 @@ export default function EventsPage() {
                                 <Card key={enrollment.id} className="flex flex-col opacity-70">
                                     <CardHeader className="text-center">
                                          <div className="mx-auto p-3 bg-muted/50 rounded-full w-fit mb-2">
-                                            <History className="w-8 h-8 text-muted-foreground" />
+                                            <HistoryIcon className="w-8 h-8 text-muted-foreground" />
                                         </div>
                                         <CardTitle className="text-2xl">{enrollment.eventDetails.title}</CardTitle>
                                         <Badge variant={enrollment.status === 'completed' ? 'default' : 'destructive'} className="w-fit mx-auto">{isExpired ? 'Expired' : 'Completed'}</Badge>
@@ -337,7 +390,7 @@ export default function EventsPage() {
                         })
                      ) : (
                          <div className="col-span-full flex flex-col items-center justify-center text-center gap-4 py-12">
-                            <History className="w-16 h-16 text-muted-foreground" />
+                            <HistoryIcon className="w-16 h-16 text-muted-foreground" />
                             <h2 className="text-2xl font-bold">No Event History</h2>
                             <p className="text-muted-foreground">Your completed and expired events will appear here.</p>
                         </div>
@@ -347,5 +400,3 @@ export default function EventsPage() {
         </Tabs>
     );
 }
-
-    
