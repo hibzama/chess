@@ -1,56 +1,108 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    function isUser(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
 
+    // Helper function to check for admin role
     function isAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Default Deny
+    // Default deny all reads and writes
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Admin full access
-    match /{document=**} {
+    // Allow admins to read and write everything
+    match /{path=**} {
       allow read, write: if isAdmin();
     }
     
-    // Allow public read for specific, non-sensitive collections
+    // Users Collection Rules
+    match /users/{userId} {
+      // Any authenticated user can read any profile (for profiles, chats, etc)
+      allow read: if request.auth != null;
+      // Only the user themselves can write to their document
+      allow write: if request.auth.uid == userId;
+
+      // Event enrollment subcollection rules
+      match /event_enrollments/{eventId} {
+        // A user can read/write their own enrollments
+        allow read, write: if request.auth.uid == userId;
+      }
+      
+      // Daily bonus claims subcollection rules
+       match /daily_bonus_claims/{bonusId} {
+        // A user can read/write their own claims
+        allow read, write: if request.auth.uid == userId;
+      }
+    }
+
+    // Game Rooms are public to read, but only authenticated can write
     match /game_rooms/{roomId} {
       allow read: if true;
+      allow create, update, delete: if request.auth != null;
     }
     
-    match /users/{userId} {
-        // A user can update their own document
-        allow update, write: if isUser(userId);
-        // Any authenticated user can read a user's public profile data
-        allow read: if request.auth != null;
-    }
-    
-    match /marketing_applications/{appId} {
-        allow create: if true;
-    }
-    
-    // The server-side mailer needs to read this config.
-    // It contains no sensitive data.
-    match /settings/mailerConfig {
-      allow read: if true;
-    }
-    
-    // Allow authenticated users to manage their own transactions and friend requests
-    match /transactions/{transactionId} {
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-    }
-    
+    // Friend requests can be read by involved parties, created/deleted by sender
     match /friend_requests/{requestId} {
-        allow read, create, delete: if request.auth != null;
+        allow read: if request.auth != null && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        allow create: if request.auth.uid == request.resource.data.fromId;
+        allow delete: if request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId;
+    }
+
+    // Transactions can only be created by the user, and read by the user
+    match /transactions/{transactionId} {
+      allow read: if request.auth.uid == resource.data.userId;
+      allow create: if request.auth.uid == request.resource.data.userId;
+    }
+
+    // Marketing applications can be created by anyone, read by admin
+    match /marketing_applications/{appId} {
+      allow create: if true;
+      allow read, update: if isAdmin();
+    }
+    
+    // Notifications can be read/updated by the user they are for
+    match /notifications/{notificationId} {
+        allow read, update: if request.auth.uid == resource.data.userId;
+        allow create: if request.auth != null; // Functions or users can create
+    }
+    
+    // Anyone can read marketing content like blogs/guides
+    match /marketing/{docId} {
+        allow read: if true;
+    }
+    
+    // Settings can be read by anyone (for client-side config), only written by admin
+    match /settings/{settingId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+    
+    // Events can be read by any user
+    match /events/{eventId} {
+      allow read: if request.auth != null;
+    }
+    
+    // Allow users to see who is enrolled in an event
+    match /event_enrollments/{eventId}/users/{userId} {
+      allow read, create: if request.auth.uid == userId;
+    }
+    
+    // Daily bonus counters can be read by any user, written to by any user (functions handle security)
+    match /dailyBonusClaims/{bonusId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Chats can be read/written by participants
+    match /chats/{chatId} {
+        allow read, write: if request.auth.uid in resource.data.users;
+        
+        match /messages/{messageId} {
+             allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
     }
   }
 }
