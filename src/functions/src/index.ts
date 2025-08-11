@@ -204,11 +204,11 @@ export const updateEventProgress = functions.firestore
 
     // 1. Ensure this is a valid winning payout transaction.
     // The winner is the user who received the payout.
-    if (transaction.type !== 'payout' || !transaction.userId) {
+    if (transaction.type !== 'payout' || !transaction.winnerId) {
       return null;
     }
 
-    const winnerId = transaction.userId;
+    const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
     const gameId = transaction.gameRoomId;
 
@@ -237,7 +237,9 @@ export const updateEventProgress = functions.firestore
         const opponentDoc = await db.collection('users').doc(opponentId).get();
         if(opponentDoc.exists()) {
             const opponentData = opponentDoc.data();
-            opponentName = `${opponentData?.firstName} ${opponentData?.lastName}`;
+            if (opponentData) {
+              opponentName = `${opponentData.firstName} ${opponentData.lastName}`;
+            }
         }
     }
 
@@ -321,4 +323,3 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
-
