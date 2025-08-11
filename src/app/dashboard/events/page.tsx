@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy } from 'lucide-react';
+import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy, History } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
@@ -162,6 +162,10 @@ export default function EventsPage() {
     }
 
     const alreadyEnrolledIds = new Set(enrolledEvents.map(e => e.eventId));
+    
+    const activeEnrolledEvents = enrolledEvents.filter(e => e.status === 'enrolled');
+    const historyEvents = enrolledEvents.filter(e => e.status === 'completed' || e.status === 'expired');
+
 
     const renderProgressDetails = (enrollment: Enrollment) => {
         if(!enrollment.eventDetails) return null;
@@ -188,9 +192,10 @@ export default function EventsPage() {
                     <h1 className="text-3xl font-bold">Events & Challenges</h1>
                     <p className="text-muted-foreground">Join events to earn exclusive rewards.</p>
                 </div>
-                 <TabsList className="grid grid-cols-2">
+                 <TabsList className="grid grid-cols-3">
                     <TabsTrigger value="available">Available</TabsTrigger>
-                    <TabsTrigger value="enrolled">My Events</TabsTrigger>
+                    <TabsTrigger value="active">Active</TabsTrigger>
+                    <TabsTrigger value="history">History</TabsTrigger>
                 </TabsList>
             </div>
             
@@ -248,12 +253,12 @@ export default function EventsPage() {
                     )}
                 </div>
             </TabsContent>
-            <TabsContent value="enrolled">
+            <TabsContent value="active">
                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                     {loading ? (
                          [...Array(3)].map((_, i) => <Skeleton key={i} className="h-96 w-full" />)
-                    ) : enrolledEvents.length > 0 ? (
-                        enrolledEvents.map(enrollment => {
+                    ) : activeEnrolledEvents.length > 0 ? (
+                        activeEnrolledEvents.map(enrollment => {
                             if (!enrollment.eventDetails) return null;
                             const progressPercentage = Math.min(100, (enrollment.progress / enrollment.eventDetails.targetAmount) * 100);
                             
@@ -294,6 +299,50 @@ export default function EventsPage() {
                     )}
                  </div>
             </TabsContent>
+            <TabsContent value="history">
+                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                    {loading ? (
+                         [...Array(3)].map((_, i) => <Skeleton key={i} className="h-96 w-full" />)
+                    ) : historyEvents.length > 0 ? (
+                        historyEvents.map(enrollment => {
+                            if (!enrollment.eventDetails) return null;
+                            const progressPercentage = Math.min(100, (enrollment.progress / enrollment.eventDetails.targetAmount) * 100);
+                            
+                            return (
+                                <Card key={enrollment.id} className="flex flex-col opacity-70">
+                                    <CardHeader className="text-center">
+                                         <div className="mx-auto p-3 bg-muted/50 rounded-full w-fit mb-2">
+                                            <History className="w-8 h-8 text-muted-foreground" />
+                                        </div>
+                                        <CardTitle className="text-2xl">{enrollment.eventDetails.title}</CardTitle>
+                                        <Badge variant={enrollment.status === 'completed' ? 'default' : 'destructive'} className="w-fit mx-auto">{enrollment.status}</Badge>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4 flex-1">
+                                        <div className="space-y-2">
+                                             <div className="flex justify-between text-sm font-medium">
+                                                <span>Final Progress</span>
+                                                <span>{renderProgressDetails(enrollment)}</span>
+                                            </div>
+                                            <Progress value={progressPercentage} />
+                                        </div>
+                                         <div className="p-4 bg-secondary/50 rounded-lg text-center space-y-1">
+                                            <p className="text-sm text-muted-foreground">Reward</p>
+                                            <p className="text-xl font-bold text-green-400">LKR {enrollment.eventDetails.rewardAmount.toFixed(2)}</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })
+                     ) : (
+                         <div className="col-span-full flex flex-col items-center justify-center text-center gap-4 py-12">
+                            <History className="w-16 h-16 text-muted-foreground" />
+                            <h2 className="text-2xl font-bold">No Event History</h2>
+                            <p className="text-muted-foreground">Your completed and expired events will appear here.</p>
+                        </div>
+                    )}
+                 </div>
+            </TabsContent>
         </Tabs>
     );
 }
+

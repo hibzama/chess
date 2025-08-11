@@ -202,12 +202,12 @@ export const updateEventProgress = functions.firestore
     const transaction = snap.data();
 
     // 1. Ensure this is a valid winning payout transaction.
-    if (transaction.type !== 'payout' || !transaction.userId) {
+    if (transaction.type !== 'payout' || !transaction.winnerId) {
       return null;
     }
     
     // The user who received the payout is the winner for event purposes.
-    const winnerId = transaction.userId;
+    const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
     
     // A payout always implies a win.
