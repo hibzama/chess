@@ -11,9 +11,13 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
-import PromotionsCarousel from './promotions-carousel';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
+import BonusDisplay, { type DepositBonus } from './bonus-display';
+import EventDisplay from './event-display';
+import DailyBonusDisplay from './daily-bonus-display';
+import type { Event } from './events/page';
+
 
 export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
@@ -23,6 +27,11 @@ export default function DashboardPage() {
         totalEarning: 0,
     });
     const [statsLoading, setStatsLoading] = useState(true);
+
+    const [depositBonus, setDepositBonus] = useState<DepositBonus | null>(null);
+    const [events, setEvents] = useState<Event[]>([]);
+    const [hasDailyBonus, setHasDailyBonus] = useState(false);
+    const [promotionsLoading, setPromotionsLoading] = useState(true);
 
     const USDT_RATE = 310;
 
@@ -48,6 +57,57 @@ export default function DashboardPage() {
             
         }
     }, [user]);
+
+    useEffect(() => {
+        let bonusLoaded = false;
+        let eventsLoaded = false;
+        let dailyBonusLoaded = false;
+
+        const checkLoading = () => {
+            if (bonusLoaded && eventsLoaded && dailyBonusLoaded) {
+                setPromotionsLoading(false);
+            }
+        };
+
+        const bonusRef = doc(db, 'settings', 'depositBonus');
+        const bonusUnsub = onSnapshot(bonusRef, (docSnap) => {
+            if (docSnap.exists() && docSnap.data().isActive) {
+                setDepositBonus(docSnap.data() as DepositBonus);
+            } else {
+                setDepositBonus(null);
+            }
+            bonusLoaded = true;
+            checkLoading();
+        });
+
+        const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true), limit(1));
+        const eventsUnsub = onSnapshot(eventsQuery, (snapshot) => {
+            const eventsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Event));
+            setEvents(eventsData);
+            eventsLoaded = true;
+            checkLoading();
+        });
+
+        const dailyBonusQuery = query(collection(db, 'bonuses'), where('isActive', '==', true), limit(1));
+        const dailyBonusUnsub = onSnapshot(dailyBonusQuery, (snapshot) => {
+            setHasDailyBonus(!snapshot.empty);
+            dailyBonusLoaded = true;
+            checkLoading();
+        });
+
+        return () => {
+            bonusUnsub();
+            eventsUnsub();
+            dailyBonusUnsub();
+        };
+    }, []);
+
+    const promotionItems = [
+        ...(depositBonus ? [{ type: 'bonus', data: depositBonus, id: 'deposit-bonus' }] : []),
+        ...(hasDailyBonus ? [{ type: 'dailyBonus', data: {}, id: 'daily-bonus' }] : []),
+        ...events.map(event => ({ type: 'event', data: event, id: event.id }))
+    ];
+
 
     if (loading) {
         return (
@@ -115,7 +175,18 @@ export default function DashboardPage() {
         </p>
       </div>
       
-       <PromotionsCarousel />
+       {promotionsLoading ? (
+           <Skeleton className="h-48 w-full" />
+       ) : promotionItems.length > 0 && (
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {promotionItems.map(item => {
+                   if (item.type === 'bonus') return <BonusDisplay key={item.id}/>;
+                   if (item.type === 'dailyBonus') return <DailyBonusDisplay key={item.id}/>;
+                   if (item.type === 'event') return <EventDisplay key={item.id} event={item.data as Event}/>
+                   return null;
+               })}
+           </div>
+       )}
 
       <div className="grid gap-6">
         <div className="grid grid-cols-2 gap-6">
