@@ -1,79 +1,78 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Users can only write to their own document.
+    // Any authenticated user can read public profile data of another user.
     match /users/{userId} {
-      allow read;
-      allow write: if request.auth.uid == userId;
-
-      match /event_enrollments/{enrollmentId} {
-        allow read, write: if request.auth.uid == userId;
-        match /progress_history/{historyId} {
-          allow read: if request.auth.uid == userId;
-        }
-      }
-      
-      match /daily_bonus_claims/{claimId} {
-        allow read, write: if request.auth.uid == userId;
-      }
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    match /game_rooms/{roomId} {
-      allow read;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth.uid in resource.data.players;
-      
-      match /messages/{messageId} {
-        allow read, create: if get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players.hasAny([request.auth.uid]);
-      }
+    // Allow marketing applications to be created. Only admins can manage them.
+    match /marketing_applications/{appId} {
+      allow create;
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    match /notifications/{notificationId} {
-      allow read, write: if request.auth.uid == resource.data.userId;
-    }
-
-    match /settings/{settingId} {
-      allow read;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
+    // Users can create transactions. They can only manage their own transactions. Admins can manage all.
     match /transactions/{transactionId} {
+      allow create;
       allow read, write: if request.auth.uid == resource.data.userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Authenticated users can create/read game rooms. Only players in the game can update it.
+    match /game_rooms/{roomId} {
+      allow read, create, delete: if request.auth != null;
+      allow update: if request.auth != null && (resource.data.players.hasAny([request.auth.uid]) || request.auth.uid == resource.data.createdBy.uid);
+    }
+    
+    // Players in a game can send and read messages in that game's chat.
+    match /game_rooms/{roomId}/messages/{messageId} {
+      allow read, create: if request.auth != null && get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players.hasAny([request.auth.uid]);
+    }
+
+    // Settings can be read by anyone, but only written by admins.
+    match /settings/{settingId} {
+        allow read;
+        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Authenticated users can manage friend requests.
     match /friend_requests/{requestId} {
-      allow read, write: if request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId;
-      allow create: if request.auth.uid == request.resource.data.fromId;
+      allow read, create, delete: if request.auth != null;
     }
     
-    match /marketing_applications/{appId} {
-        allow read, write; // Generally admin-only, but open for simplicity of create
+    // Users can only manage their own notifications.
+    match /notifications/{notificationId} {
+      allow read, write: if request.auth.uid == resource.data.userId;
     }
-
-    match /events/{eventId} {
-      allow read;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      
-      match /users/{userId} {
-        allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || request.auth.uid == userId;
-      }
-    }
-
+    
+    // Bonuses can be read by any user, but only written by admins.
     match /bonuses/{bonusId} {
-      allow read;
-      allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    match /dailyBonusClaims/{bonusId} {
-       allow read, write: if request.auth != null;
+        allow read: if request.auth != null;
+        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
-    match /chats/{chatId} {
-        allow read, write: if request.auth.uid in resource.data.users;
-        
-        match /messages/{messageId} {
-            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-        }
+    // Any authenticated user can interact with the daily bonus claims counter.
+    match /dailyBonusClaims/{bonusId} {
+        allow read, write: if request.auth != null;
+    }
+    
+    // Events can be read by anyone, but only managed by admins.
+    match /events/{eventId} {
+        allow read: if request.auth != null;
+        allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users can only manage their own event enrollments and history.
+    match /users/{userId}/event_enrollments/{enrollmentId} {
+        allow read, write: if request.auth.uid == userId;
+    }
+    match /users/{userId}/event_enrollments/{enrollmentId}/progress_history/{progressId} {
+        allow read: if request.auth.uid == userId;
     }
   }
 }

@@ -226,31 +226,14 @@ function MultiplayerGame() {
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
                 const [creatorDoc, joinerDoc] = await Promise.all([transaction.get(creatorRef), transaction.get(joinerRef)]);
-                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("One of the players does not exist");
-                const creatorData = creatorDoc.data();
-                const joinerData = joinerDoc.data();
-    
-                const allPlayerInfo = [
-                    { playerData: creatorData, playerId: roomData.createdBy.uid },
-                    { playerData: joinerData, playerId: user.uid }
-                ];
-    
-                const referrerDocs: { [key: string]: DocumentData | undefined } = {};
-                for (const { playerData } of allPlayerInfo) {
-                    if (playerData.referredBy) {
-                        const referrerRef = doc(db, 'users', playerData.referredBy);
-                        referrerDocs[playerData.referredBy] = (await transaction.get(referrerRef)).data();
-                    }
-                    if (playerData.referralChain) {
-                        for (const marketerId of playerData.referralChain) {
-                            const marketerRef = doc(db, 'users', marketerId);
-                            referrerDocs[marketerId] = (await transaction.get(marketerRef)).data();
-                        }
-                    }
+                
+                if (!creatorDoc.exists() || !joinerDoc.exists()) {
+                    throw new Error("One of the players does not exist");
                 }
     
                 // --- WRITE PHASE ---
                 const creatorColor = roomData.createdBy.color;
+                const joinerData = joinerDoc.data();
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 transaction.update(roomRef, {
                     status: 'in-progress',
@@ -261,8 +244,13 @@ function MultiplayerGame() {
                 });
     
                 if (roomData.wager > 0) {
-                    const wagerAmount = roomData.wager;
-    
+                     const wagerAmount = roomData.wager;
+                     const creatorData = creatorDoc.data();
+                     const allPlayerInfo = [
+                        { playerData: creatorData, playerId: roomData.createdBy.uid },
+                        { playerData: joinerData, playerId: user.uid }
+                    ];
+
                     for (const { playerData, playerId } of allPlayerInfo) {
                         const opponentName = playerId === creatorData.uid ? joinerData.firstName : creatorData.firstName;
                         const bonusWagered = Math.min(wagerAmount, playerData.bonusBalance || 0);
@@ -280,34 +268,6 @@ function MultiplayerGame() {
                             wagerSource: { main: mainWagered, bonus: bonusWagered },
                             gameRoomId: room.id, createdAt: serverTimestamp()
                         });
-    
-                        if (playerData.referredBy) {
-                            const referrerData = referrerDocs[playerData.referredBy];
-                            if (referrerData && referrerData.role === 'user') {
-                                const l1Count = referrerData.l1Count || 0;
-                                const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
-                                const commissionAmount = wagerAmount * l1Rate;
-                                if (commissionAmount > 0) {
-                                    transaction.update(doc(db, 'users', playerData.referredBy), { balance: increment(commissionAmount) });
-                                    const commTxRef = doc(collection(db, 'transactions'));
-                                    transaction.set(commTxRef, { userId: playerData.referredBy, fromUserId: playerId, type: 'commission', amount: commissionAmount, level: 1, gameRoomId: room.id, status: 'completed', description: `L1 commission from ${playerData.firstName}`, createdAt: serverTimestamp() });
-                                }
-                            }
-                        }
-    
-                        if (playerData.referralChain) {
-                            const marketerCommissionRate = 0.03;
-                            const commissionAmount = wagerAmount * marketerCommissionRate;
-                            if (commissionAmount > 0) {
-                                for (let i = 0; i < playerData.referralChain.length && i < 20; i++) {
-                                    const marketerId = playerData.referralChain[i];
-                                    const level = i + 1;
-                                    transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
-                                    const commTxRef = doc(collection(db, 'transactions'));
-                                    transaction.set(commTxRef, { userId: marketerId, fromUserId: playerId, type: 'commission', amount: commissionAmount, level, gameRoomId: room.id, status: 'completed', description: `Level ${level} marketing commission from ${playerData.firstName}`, createdAt: serverTimestamp() });
-                                }
-                            }
-                        }
                     }
                 }
             });
@@ -319,6 +279,8 @@ function MultiplayerGame() {
             if (error.message === 'Room not available') {
                  toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
                  router.push(`/lobby/${room.gameType}`);
+            } else if (error.message.includes('permission')) {
+                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again. Missing or insufficient permissions.`});
             } else {
                  toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again. ${error.message}`});
             }
