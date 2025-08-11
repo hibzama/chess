@@ -204,11 +204,11 @@ export const updateEventProgress = functions.firestore
 
     // 1. Ensure this is a valid winning payout transaction.
     // The winner is the user who received the payout.
-    if (transaction.type !== 'payout' || !transaction.winnerId) {
+    const winnerId = transaction.userId;
+    if (transaction.type !== 'payout' || !winnerId) {
       return null;
     }
 
-    const winnerId = transaction.winnerId;
     const wagerAmount = transaction.gameWager || 0;
     const gameId = transaction.gameRoomId;
 
@@ -216,21 +216,25 @@ export const updateEventProgress = functions.firestore
       return null; // Exit if there's no game ID.
     }
 
-    // 2. Ensure the winner did not resign.
-    if (transaction.resignerId && winnerId === transaction.resignerId) {
+    // 2. Fetch game details to find opponent name and confirm the winner.
+    const gameDoc = await db.collection('game_rooms').doc(gameId).get();
+    if (!gameDoc.exists) return null;
+    const gameData = gameDoc.data();
+    if (!gameData || gameData.winner?.uid !== winnerId) {
+        // This transaction isn't for a game winner, or data is inconsistent.
+        return null;
+    }
+
+    // 3. Ensure the winner did not resign.
+    if (gameData.winner.resignerId && winnerId === gameData.winner.resignerId) {
         functions.logger.log(`Exiting event progress: Winner ${winnerId} was the resigner.`);
         return null;
     }
 
-    // 3. Correctly calculate net earning.
+    // 4. Correctly calculate net earning.
     const netEarning = transaction.amount - wagerAmount;
 
-    // 4. Fetch game details to find opponent name.
-    const gameDoc = await db.collection('game_rooms').doc(gameId).get();
-    if (!gameDoc.exists) return null;
-    const gameData = gameDoc.data();
-    if (!gameData) return null;
-
+    // 5. Fetch opponent name.
     const opponentId = gameData.players.find((p: string) => p !== winnerId);
     let opponentName = 'Unknown Player';
     if (opponentId) {
@@ -255,20 +259,20 @@ export const updateEventProgress = functions.firestore
     const batch = db.batch();
     let hasUpdates = false;
 
-    // 5. Iterate through each active event.
+    // 6. Iterate through each active event.
     for (const eventDoc of activeEventsSnapshot.docs) {
       const event = eventDoc.data();
       const enrollmentRef = db.collection('users').doc(winnerId).collection('event_enrollments').doc(event.id);
       
       const enrollmentSnap = await enrollmentRef.get();
       
-      // 6. Check if user is enrolled in this event and the event is not expired/completed.
+      // 7. Check if user is enrolled in this event and the event is not expired/completed.
       if (enrollmentSnap.exists) {
           const enrollment = enrollmentSnap.data();
           if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
               let progressIncrement = 0;
               
-              // 7. Update progress based on event type.
+              // 8. Update progress based on event type.
               if (event.targetType === 'winningMatches') {
                   if (!event.minWager || wagerAmount >= event.minWager) {
                       progressIncrement = 1;
@@ -311,7 +315,7 @@ export const updateEventProgress = functions.firestore
       }
     }
 
-    // 8. Commit the batch if there are any updates.
+    // 9. Commit the batch if there are any updates.
     if (hasUpdates) {
       try {
         await batch.commit();
