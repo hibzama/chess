@@ -1,117 +1,112 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Reusable helper functions
-    function isSignedIn() {
+  
+    // Helper Functions
+    function isUserAuthenticated() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-
-    function getRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
+    
     function isAdmin() {
-      return isSignedIn() && getRole() == 'admin';
+      return isUserAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Default deny all
-    match /{document=**} {
+    // Default Deny
+    match /{path=**} {
       allow read, write: if false;
     }
 
     // Users Collection
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if !isSignedIn(); // Allow user creation during sign-up
+      allow read: if isUserAuthenticated();
+      allow create: if !isUserAuthenticated(); // User creation during signup
       allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isAdmin();
-
-      // User Subcollections
-      match /event_enrollments/{enrollmentId} {
-        allow read, write, create: if isOwner(userId);
-      }
-      match /daily_bonus_claims/{claimId} {
-         allow read, write, create: if isOwner(userId);
-      }
-    }
-
-    // Settings Collection (Admin only)
-    match /settings/{docId} {
-      allow read, write: if isAdmin();
     }
     
-    // Bonuses Collection (Admin write, User read)
-    match /bonuses/{bonusId} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin();
+    // Friend Requests
+    match /friend_requests/{requestId} {
+      allow read, create, delete: if isUserAuthenticated();
     }
     
-    // Daily Bonus Claims (Counter, Admin can view)
-    match /dailyBonusClaims/{bonusId} {
-        allow read: if isSignedIn();
-        allow write: if isSignedIn();
-    }
-    
-    // Game Rooms Collection
-    match /game_rooms/{roomId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && (resource.data.createdBy.uid == request.auth.uid || request.auth.uid in resource.data.players || isAdmin());
-
-      match /messages/{messageId} {
-        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-      }
-    }
-    
-    // Chats Collection
-    match /chats/{chatId} {
-        allow read, update, create: if isSignedIn() && request.auth.uid in resource.data.users;
-        match /messages/{messageId} {
-            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-        }
+    // Notifications
+    match /notifications/{notificationId} {
+        allow read, update, delete: if isUserAuthenticated() && isOwner(resource.data.userId);
+        allow create: if isUserAuthenticated();
     }
 
-    // Transactions Collection
+    // Transactions
     match /transactions/{transactionId} {
-      allow read: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
-      allow create: if isSignedIn();
+      allow read, create: if isUserAuthenticated();
       allow update: if isAdmin();
+    }
+    
+    // Game Rooms
+    match /game_rooms/{roomId} {
+        allow read: if isUserAuthenticated();
+        allow create: if isUserAuthenticated();
+        allow update, delete: if isUserAuthenticated() && (isOwner(resource.data.createdBy.uid) || request.auth.uid in resource.data.players);
+    }
+    
+    // Game Chat
+    match /game_rooms/{roomId}/messages/{messageId} {
+      allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+    }
+    
+    // Chats
+    match /chats/{chatId} {
+      allow read, update: if isUserAuthenticated() && request.auth.uid in resource.data.users;
+      allow create: if isUserAuthenticated();
+    }
+    
+    match /chats/{chatId}/messages/{messageId} {
+       allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
     }
 
     // Marketing Applications
     match /marketing_applications/{appId} {
-        allow create: if true; // Open for anyone to apply
         allow read, update: if isAdmin();
-    }
-
-    // Friend Requests
-    match /friend_requests/{reqId} {
-        allow read, delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
-        allow create: if isSignedIn();
-    }
-
-    // Notifications
-    match /notifications/{notifId} {
-        allow read, update: if isSignedIn() && isOwner(resource.data.userId);
-        allow create: if isSignedIn();
+        allow create: if request.auth == null || isUserAuthenticated();
     }
     
-    // Events System
-    match /events/{eventId} {
-      allow read: if isSignedIn();
+    // Settings Collection (Admin controlled)
+    match /settings/{settingId} {
+      allow read: if isUserAuthenticated();
       allow write: if isAdmin();
     }
-
+    
+    // Event System Rules
+    match /events/{eventId} {
+      allow read: if isUserAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    match /users/{userId}/event_enrollments/{enrollmentId} {
+      allow read, create, update: if isOwner(userId);
+    }
+    
     match /event_enrollments/{eventId}/users/{userId} {
-      allow read: if isAdmin() || isOwner(userId);
-      // This rule allows a user to create their own enrollment record during the batch write
-      allow create, write: if isOwner(userId);
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+    }
+    
+    // Bonus Rules
+    match /bonuses/{bonusId} {
+      allow read: if isUserAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    match /dailyBonusClaims/{bonusId} {
+      allow read, write: if isUserAuthenticated();
+    }
+    
+     match /users/{userId}/daily_bonus_claims/{claimId} {
+        allow read, create: if isOwner(userId);
     }
   }
 }
