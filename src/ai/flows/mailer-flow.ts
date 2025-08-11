@@ -3,6 +3,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import * as nodemailer from 'nodemailer';
 
 const EmailRecipientSchema = z.object({
   id: z.string(),
@@ -20,19 +23,41 @@ const MailerInputSchema = z.object({
 export type MailerInput = z.infer<typeof MailerInputSchema>;
 
 export async function sendEmail(input: MailerInput): Promise<void> {
-  // In a real app, you would integrate with an email service like SendGrid,
-  // Mailgun, or use Nodemailer with a configured transport.
-  // The Genkit flow would handle iterating through recipients and calling
-  // the email service for each one.
+  const settingsRef = doc(db, 'settings', 'mailerConfig');
+  const settingsSnap = await getDoc(settingsRef);
 
-  console.log(`Simulating sending email with subject: "${input.subject}"`);
-  console.log(`Body: ${input.body}`);
-  console.log(`Sending to ${input.recipients.length} recipients:`);
-  input.recipients.forEach(r => console.log(`- ${r.firstName} ${r.lastName} <${r.email}>`));
+  if (!settingsSnap.exists()) {
+    throw new Error('Mailer configuration not found. Please set it up in the admin panel.');
+  }
+  const config = settingsSnap.data();
 
-  // This is a placeholder. A real implementation would involve a loop
-  // and actual email sending logic. For now, we just resolve to simulate success.
-  return Promise.resolve();
+  const transporter = nodemailer.createTransport({
+    host: config.host,
+    port: parseInt(config.port, 10),
+    secure: parseInt(config.port, 10) === 465, // true for 465, false for other ports
+    auth: {
+      user: config.user,
+      pass: config.pass,
+    },
+  });
+
+  const mailOptions = {
+    from: `"${config.fromName || 'Nexbattle'}" <${config.user}>`,
+    subject: input.subject,
+    html: input.body,
+  };
+
+  // Use Promise.all to send all emails in parallel for efficiency
+  await Promise.all(
+    input.recipients.map(recipient => {
+      return transporter.sendMail({
+        ...mailOptions,
+        to: recipient.email,
+        // You can add personalization here if needed
+        // html: input.body.replace('{{firstName}}', recipient.firstName),
+      });
+    })
+  );
 }
 
 const mailerFlow = ai.defineFlow(
@@ -45,3 +70,5 @@ const mailerFlow = ai.defineFlow(
     await sendEmail(input);
   }
 );
+
+    
