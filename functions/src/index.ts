@@ -11,7 +11,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import * as nodemailer from "nodemailer";
 
 admin.initializeApp();
 
@@ -283,74 +282,3 @@ export const updateEventProgress = functions.firestore
 
     return null;
   });
-
-
-/**
- * Sends a custom email to a list of users or all users.
- * This is a callable function invoked from the admin panel.
- */
-export const sendBulkEmail = functions.https.onCall(async (data, context) => {
-  // 1. Check if the user is an admin
-  if (!context.auth?.token.admin) {
-    throw new functions.https.HttpsError('permission-denied', 'Only admins can send bulk emails.');
-  }
-
-  const { subject, body, recipients } = data;
-  if (!subject || !body) {
-    throw new functions.https.HttpsError('invalid-argument', 'The function must be called with "subject" and "body" arguments.');
-  }
-
-  try {
-    // 2. Configure Nodemailer
-    const mailerConfig = functions.config().mailer;
-    if (!mailerConfig || !mailerConfig.host || !mailerConfig.user || !mailerConfig.pass) {
-        throw new functions.https.HttpsError('failed-precondition', 'Mailer is not configured. Please set mailer environment variables in Firebase Functions config.');
-    }
-    
-    const transporter = nodemailer.createTransport({
-        host: mailerConfig.host,
-        port: Number(mailerConfig.port) || 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-        user: mailerConfig.user,
-        pass: mailerConfig.pass,
-        },
-    });
-
-    // 3. Determine recipients
-    let emails: string[] = [];
-    if (Array.isArray(recipients) && recipients.length > 0) {
-        emails = recipients;
-    } else {
-        const usersSnapshot = await admin.firestore().collection('users').get();
-        emails = usersSnapshot.docs.map(doc => doc.data().email).filter(email => email);
-    }
-
-    if (emails.length === 0) {
-        return { success: true, message: 'No users found to email.' };
-    }
-
-    // 4. Send email to recipients
-    const mailOptions = {
-        from: `"Nexbattle" <${mailerConfig.user}>`,
-        bcc: emails, // Use BCC to send to all users without revealing other recipients
-        subject: subject,
-        html: body,
-    };
-
-    await transporter.sendMail(mailOptions);
-    functions.logger.log(`Bulk email sent to ${emails.length} users.`);
-    return { success: true, message: `Email sent to ${emails.length} users.` };
-
-  } catch (error: any) {
-    functions.logger.error('Error sending bulk email:', error);
-    if (error.code === 'auth/invalid-credential') {
-         throw new functions.https.HttpsError('unauthenticated', 'Invalid mailer credentials.');
-    }
-    // Check for HttpsError to avoid re-wrapping it
-    if (error instanceof functions.https.HttpsError) {
-        throw error;
-    }
-    throw new functions.https.HttpsError('internal', 'An unexpected error occurred while trying to send the email.');
-  }
-});
