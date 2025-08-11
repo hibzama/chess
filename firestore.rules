@@ -3,102 +3,135 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
+    // Helper function to check for admin role
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Helper function to check if a user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    // Default deny all
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // Users collection
+    // Users Collection
     match /users/{userId} {
-      allow read: if true;
-      allow write: if isOwner(userId) || isAdmin();
-      
-      // Subcollections for a user
-      match /event_enrollments/{eventId} {
-        allow read, write: if isOwner(userId);
-      }
-      match /daily_bonus_claims/{bonusId} {
-         allow read, write: if isOwner(userId);
-      }
-    }
-    
-    // Settings collection
-    match /settings/{docId} {
-        allow read: if true;
-        allow write: if isAdmin();
+      // Admins can read/write any user document
+      allow read, write: if isAdmin();
+      // Users can only read/write their own document
+      allow read, update: if request.auth.uid == userId;
+      // Anyone can create a user (for registration)
+      allow create: if true;
     }
 
-    // Game Rooms
-    match /game_rooms/{roomId} {
-        allow read: if true;
-        allow create: if request.auth != null;
-        allow update, delete: if request.auth != null && (resource.data.createdBy.uid == request.auth.uid || (resource.data.player2 != null && resource.data.player2.uid == request.auth.uid) || isAdmin());
-        
-        match /messages/{messageId} {
-            allow read: if request.auth != null && request.auth.uid in resource.data.players;
-            allow create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-        }
-    }
-    
-    // Transactions
-    match /transactions/{transactionId} {
-        allow read, write: if isAdmin() || (request.auth != null && get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId == request.auth.uid);
-        allow create: if request.auth != null;
-    }
-
-    // Friend Requests
+    // Friend Requests Collection
     match /friend_requests/{requestId} {
-        allow read, write: if request.auth != null && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
-        allow create: if request.auth != null;
+      // Users can create a request
+      allow create: if isSignedIn();
+      // Users can read/delete their own sent/received requests
+      allow read, delete: if isSignedIn() && (request.resource.data.fromId == request.auth.uid || request.resource.data.toId == request.auth.uid);
+      // Admins can read/delete any request
+      allow read, delete: if isAdmin();
     }
     
-    // Chats
-    match /chats/{chatId} {
-        allow read, update: if request.auth != null && request.auth.uid in resource.data.users;
-        allow create: if request.auth != null;
+    // Game Rooms Collection
+    match /game_rooms/{roomId} {
+        // Anyone signed in can read public rooms (for lobby)
+        allow read: if isSignedIn();
+        // Allow creating a room if signed in
+        allow create: if isSignedIn();
+        // Allow players in the room or admins to update/delete
+        allow update, delete: if (isSignedIn() && request.auth.uid in resource.data.players) || isAdmin();
         
+        // Messages subcollection
         match /messages/{messageId} {
-            allow read, create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+             allow read, create: if (isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players) || isAdmin();
         }
     }
-    
-    // Notifications
-    match /notifications/{notificationId} {
-        allow read, write: if request.auth != null && request.auth.uid == resource.data.userId;
-        allow create: if request.auth != null;
+
+    // Chats Collection
+    match /chats/{chatId} {
+        allow read, update, create: if isSignedIn() && request.auth.uid in resource.data.users;
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
     }
 
-    // Marketing Applications
+    // Marketing Applications Collection
     match /marketing_applications/{appId} {
-        allow create: if true;
-        allow read, write: if isAdmin();
+      // Anyone can create an application
+      allow create: if true;
+      // Only admins can read/update applications
+      allow read, update: if isAdmin();
     }
     
-    // Events
+    // Transactions Collection
+    match /transactions/{transactionId} {
+        // Users can create and read their own transactions
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+        // Admins can read/update all transactions
+        allow read, update: if isAdmin();
+    }
+    
+    // Settings Collection (Admin only)
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+    
+    // Notifications Collection
+    match /notifications/{notificationId} {
+      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Creation is handled by backend functions
+    }
+    
+    // =============================================================
+    // EVENT SYSTEM RULES
+    // =============================================================
+
+    // Events collection can be read by any signed-in user, but only written by admins.
+    // Cloud Functions can also read this collection.
     match /events/{eventId} {
-      allow read: if request.auth != null;
+      allow read: if isSignedIn();
       allow write: if isAdmin();
     }
     
-    // Master list of event enrollments for admin view
+    // This is the master list of enrollments for admin viewing.
+    // Users need to be able to create their own record here when they enroll.
     match /event_enrollments/{eventId}/users/{userId} {
-      // Allow a user to create/write their own enrollment record here
-      allow read, write: if isOwner(userId) || isAdmin();
+        allow read: if isAdmin();
+        // A user can create/write their own enrollment record.
+        allow create, write: if request.auth.uid == userId;
+    }
+
+    // This is the user's private list of their enrollments.
+    // They have full control over documents inside this subcollection.
+    match /users/{userId}/event_enrollments/{enrollmentId} {
+      allow read, write: if request.auth.uid == userId;
     }
     
-    // Daily bonus claim counters
+     // =============================================================
+    // DAILY BONUS RULES
+    // =============================================================
+
+    // Bonuses can be read by any signed-in user, but only written by admins.
+    match /bonuses/{bonusId} {
+        allow read: if isSignedIn();
+        allow write: if isAdmin();
+    }
+
+    // This collection stores the count of claims for each bonus.
+    // Users need to be able to update this when they claim.
     match /dailyBonusClaims/{bonusId} {
+        // Anyone can read claim counts
         allow read: if true;
-        allow write: if isAdmin() || request.auth != null;
+        // Users can update (increment) the count when claiming
+        allow write: if isSignedIn();
+    }
+
+    // This is the user's private list of their claimed bonuses.
+    match /users/{userId}/daily_bonus_claims/{claimId} {
+        allow read, write: if request.auth.uid == userId;
     }
 
   }
