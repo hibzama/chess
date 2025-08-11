@@ -222,53 +222,39 @@ function MultiplayerGame() {
                 }
                 const roomData = currentRoomDoc.data();
                 
-                // Read all required docs before writing
-                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
-                const joinerRef = doc(db, 'users', user.uid);
-                const [creatorDoc, joinerDoc] = await Promise.all([transaction.get(creatorRef), transaction.get(joinerRef)]);
-                
-                if (!creatorDoc.exists() || !joinerDoc.exists()) {
-                    throw new Error("One of the players does not exist");
-                }
-    
                 // --- WRITE PHASE ---
                 const creatorColor = roomData.createdBy.color;
-                const joinerData = joinerDoc.data();
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 transaction.update(roomRef, {
                     status: 'in-progress',
-                    player2: { uid: user.uid, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
+                    player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
                     players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
                 });
     
                 if (roomData.wager > 0) {
-                     const wagerAmount = roomData.wager;
-                     const creatorData = creatorDoc.data();
-                     const allPlayerInfo = [
-                        { playerData: creatorData, playerId: roomData.createdBy.uid },
-                        { playerData: joinerData, playerId: user.uid }
-                    ];
+                    const wagerAmount = roomData.wager;
+                     // Deduct from creator
+                    const creatorRef = doc(db, 'users', roomData.createdBy.uid);
+                    const creatorData = (await transaction.get(creatorRef)).data();
+                    const creatorBonusWagered = Math.min(wagerAmount, creatorData?.bonusBalance || 0);
+                    const creatorMainWagered = wagerAmount - creatorBonusWagered;
+                    
+                    const creatorUpdate: any = {};
+                    if(creatorBonusWagered > 0) creatorUpdate.bonusBalance = increment(-creatorBonusWagered);
+                    if(creatorMainWagered > 0) creatorUpdate.balance = increment(-creatorMainWagered);
+                    transaction.update(creatorRef, creatorUpdate);
 
-                    for (const { playerData, playerId } of allPlayerInfo) {
-                        const opponentName = playerId === creatorData.uid ? joinerData.firstName : creatorData.firstName;
-                        const bonusWagered = Math.min(wagerAmount, playerData.bonusBalance || 0);
-                        const mainWagered = wagerAmount - bonusWagered;
-    
-                        const updatePayload: any = {};
-                        if (bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
-                        if (mainWagered > 0) updatePayload.balance = increment(-mainWagered);
-                        transaction.update(doc(db, 'users', playerId), updatePayload);
-    
-                        const wagerTxRef = doc(collection(db, 'transactions'));
-                        transaction.set(wagerTxRef, {
-                            userId: playerId, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${roomData.gameType} vs ${opponentName}`,
-                            wagerSource: { main: mainWagered, bonus: bonusWagered },
-                            gameRoomId: room.id, createdAt: serverTimestamp()
-                        });
-                    }
+                    // Deduct from joiner
+                    const joinerRef = doc(db, 'users', user.uid);
+                    const joinerBonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
+                    const joinerMainWagered = wagerAmount - joinerBonusWagered;
+
+                    const joinerUpdate: any = {};
+                    if(joinerBonusWagered > 0) joinerUpdate.bonusBalance = increment(-joinerBonusWagered);
+                    if(joinerMainWagered > 0) joinerUpdate.balance = increment(-joinerMainWagered);
+                    transaction.update(joinerRef, joinerUpdate);
                 }
             });
     
@@ -279,8 +265,6 @@ function MultiplayerGame() {
             if (error.message === 'Room not available') {
                  toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
                  router.push(`/lobby/${room.gameType}`);
-            } else if (error.message.includes('permission')) {
-                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again. Missing or insufficient permissions.`});
             } else {
                  toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again. ${error.message}`});
             }
