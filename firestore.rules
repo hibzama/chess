@@ -6,6 +6,7 @@ service cloud.firestore {
     // =================================
     // Helper Functions
     // =================================
+
     function isSignedIn() {
       return request.auth != null;
     }
@@ -19,118 +20,115 @@ service cloud.firestore {
     }
 
     // =================================
-    // User and Profile Rules
+    // Collections
     // =================================
+
     match /users/{userId} {
-      // Any signed-in user can read another user's profile.
-      allow read: if isSignedIn();
-
-      // A user can only create their own document.
+      allow read: if isSignedIn() || isAdmin();
       allow create: if isOwner(userId);
-
-      // A user can update their own document, but cannot change their role or balance directly.
-      // Admins can update any field.
-      allow update: if (isOwner(userId) && 
-                      request.resource.data.role == resource.data.role &&
-                      request.resource.data.balance == resource.data.balance &&
-                      request.resource.data.marketingBalance == resource.data.marketingBalance
-                     ) || isAdmin();
-
-      // Rules for user subcollections
-      match /event_enrollments/{eventId} {
-        allow read, create, update: if isOwner(userId);
-      }
-      match /daily_bonus_claims/{claimId} {
-        allow read, create: if isOwner(userId);
-      }
+      // Users can update their own non-critical info. Admins can update anything.
+      // Balance updates are handled by backend functions/transactions, not direct user updates.
+      allow update: if (isOwner(userId) && !('balance' in request.resource.data) && !('bonusBalance' in request.resource.data) && !('marketingBalance' in request.resource.data) && !('role' in request.resource.data) && !('wins' in request.resource.data)) || isAdmin();
     }
-
-    // =================================
-    // Game and Lobby Rules
-    // =================================
+    
+    match /friend_requests/{requestId} {
+      allow read, delete: if isSignedIn() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
+      allow create: if isSignedIn() && isOwner(request.resource.data.fromId);
+    }
+    
     match /game_rooms/{roomId} {
-      allow list, read: if isSignedIn();
+      allow read, list: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.createdBy.uid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.createdBy.uid == request.auth.uid;
 
-      // Allow joining a waiting room, or updating an in-progress game by a participant.
-      allow update: if isSignedIn() && (
-        // Joining a game
-        (resource.data.status == 'waiting' && request.resource.data.status == 'in-progress' && request.resource.data.player2.uid == request.auth.uid) ||
-        // Playing a move in an active game
-        (request.auth.uid in resource.data.players && resource.data.status == 'in-progress')
-      );
-
-      // Chat within a game room
-      match /messages/{messageId} {
-        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-      }
-    }
-
-    // =================================
-    // Social and Community Rules
-    // =================================
-    match /friend_requests/{requestId} {
-      allow read: if isSignedIn() && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid);
-      allow create: if isSignedIn() && request.resource.data.fromId == request.auth.uid;
-      allow delete: if isSignedIn() && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid);
+      // This complex rule allows various game state updates: joining, playing moves, and completing the game.
+      allow update: if isSignedIn() && 
+        (
+          // Rule for JOINING a room
+          (
+            resource.data.status == 'waiting' &&
+            request.resource.data.status == 'in-progress' &&
+            request.resource.data.player2.uid == request.auth.uid &&
+            !(request.auth.uid in resource.data.players)
+          ) ||
+          // Rule for MAKING A MOVE in a game
+          (
+            request.auth.uid in resource.data.players &&
+            resource.data.status == 'in-progress' &&
+            request.resource.data.status == 'in-progress'
+          ) ||
+          // Rule for COMPLETING a game (win/loss/draw)
+          (
+            request.auth.uid in resource.data.players &&
+            resource.data.status == 'in-progress' &&
+            request.resource.data.status == 'completed'
+          )
+        );
     }
     
-    match /chats/{chatId} {
-      allow read, write: if isSignedIn() && request.auth.uid in chatId.split('_');
-      match /messages/{messageId} {
-        allow read, create: if isSignedIn() && request.auth.uid in chatId.split('_');
-      }
+    match /game_rooms/{roomId}/messages/{messageId} {
+      allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
     }
-
-    // =================================
-    // Financial and Transaction Rules
-    // =================================
+    
     match /transactions/{transactionId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
+      allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
       allow create: if isSignedIn();
       allow update: if isAdmin();
     }
     
-    // =================================
-    // Events and Bonuses
-    // =================================
-    match /events/{eventId} {
-      allow read, list: if isSignedIn();
-      allow create, update, delete: if isAdmin();
-    }
-    
-    match /event_enrollments/{eventId}/users/{userId} {
-      // User can create their own enrollment record.
-      allow create: if isOwner(userId);
-    }
-
-    match /bonuses/{bonusId} {
-      allow read, list: if isSignedIn();
-      allow create, update, delete: if isAdmin();
-    }
-    
-    match /dailyBonusClaims/{claimId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn(); // Allow creation/update during bonus claim transaction
-    }
-
-    // =================================
-    // Admin and System Rules
-    // =================================
     match /notifications/{notificationId} {
-      allow read, update: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn();
+        allow read, list, update: if isSignedIn() && isOwner(resource.data.userId);
+        allow create: if isSignedIn();
     }
     
     match /marketing_applications/{appId} {
-      allow create: if isSignedIn();
-      allow read, update, delete: if isAdmin();
+        allow create; 
+        allow read, update, delete: if isAdmin();
+    }
+    
+    match /chats/{chatId} {
+        allow read, write: if isSignedIn() && request.auth.uid in resource.data.users;
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
     }
     
     match /settings/{docId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
+    }
+    
+    match /bonuses/{bonusId} {
+        allow read, list: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+    }
+    
+    match /dailyBonusClaims/{claimId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
+    }
+    
+    match /users/{userId}/daily_bonus_claims/{claimId} {
+        allow read, write: if isOwner(userId);
+    }
+
+    // --- Event System Rules ---
+    match /events/{eventId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // This is for admin tracking of who enrolled.
+    match /event_enrollments/{eventId}/users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      // Allow a user to create their own enrollment tracking doc.
+      allow create: if isOwner(userId);
+    }
+
+    // This is the user's actual enrollment data.
+    match /users/{userId}/event_enrollments/{enrollmentId} {
+      // A user can read and write to their own event enrollments.
+      allow read, write: if isOwner(userId);
     }
   }
 }
