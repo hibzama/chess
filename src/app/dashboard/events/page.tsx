@@ -5,7 +5,7 @@ import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2 } from 'lucide-react';
+import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
@@ -36,6 +36,8 @@ export interface Enrollment {
     expiresAt: Timestamp;
     eventDetails?: Event;
 }
+
+const USDT_RATE = 310;
 
 const Countdown = ({ expiryTimestamp }: { expiryTimestamp: Timestamp }) => {
     const [timeLeft, setTimeLeft] = useState('');
@@ -136,7 +138,8 @@ export default function EventsPage() {
             }
 
             // Create enrollment documents
-            const expiryDate = new Date(Date.now() + event.durationHours * 60 * 60 * 1000);
+            const expiryDate = new Date();
+            expiryDate.setHours(expiryDate.getHours() + event.durationHours);
             
             const enrollmentData = {
                 eventId: event.id,
@@ -159,6 +162,24 @@ export default function EventsPage() {
     }
 
     const alreadyEnrolledIds = new Set(enrolledEvents.map(e => e.eventId));
+
+    const renderProgressDetails = (enrollment: Enrollment) => {
+        if(!enrollment.eventDetails) return null;
+
+        if (enrollment.eventDetails.targetType === 'winningMatches') {
+            return (
+                <span className='flex items-center gap-1.5'><Trophy className="w-4 h-4 text-yellow-400" /> {enrollment.progress.toLocaleString()} / {enrollment.eventDetails.targetAmount.toLocaleString()} Wins</span>
+            )
+        }
+        if(enrollment.eventDetails.targetType === 'totalEarnings') {
+             return (
+                 <div className='text-center'>
+                    <p>LKR {enrollment.progress.toFixed(2)} / {enrollment.eventDetails.targetAmount.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">~{(enrollment.progress / USDT_RATE).toFixed(2)} / {(enrollment.eventDetails.targetAmount / USDT_RATE).toFixed(2)} USDT</p>
+                </div>
+            )
+        }
+    }
 
     return (
         <Tabs defaultValue="available">
@@ -249,7 +270,7 @@ export default function EventsPage() {
                                         <div className="space-y-2">
                                             <div className="flex justify-between text-sm font-medium">
                                                 <span>Progress</span>
-                                                <span>{enrollment.progress.toLocaleString()} / {enrollment.eventDetails.targetAmount.toLocaleString()}</span>
+                                                <span>{renderProgressDetails(enrollment)}</span>
                                             </div>
                                             <Progress value={progressPercentage} />
                                         </div>
@@ -276,4 +297,3 @@ export default function EventsPage() {
         </Tabs>
     );
 }
-
