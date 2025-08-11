@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Mail, Server, Key, User, Loader2 } from 'lucide-react';
+import { Mail, Server, Key, User, Loader2, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import Link from 'next/link';
 
 export default function MailerSettingsPage() {
     const [config, setConfig] = useState({
@@ -69,7 +70,7 @@ export default function MailerSettingsPage() {
                     <Server className="h-4 w-4" />
                     <AlertTitle>SMTP Provider</AlertTitle>
                     <AlertDescription>
-                        You can use services like Gmail, Brevo (Sendinblue), Mailgun, etc. You may need to generate an "App Password" if you are using a service like Gmail with 2-Factor Authentication enabled.
+                        You can use services like Brevo (Sendinblue), Mailgun, etc. If you are using Gmail, please follow the special instructions below.
                     </AlertDescription>
                 </Alert>
                 <div className="grid md:grid-cols-2 gap-6">
@@ -87,6 +88,13 @@ export default function MailerSettingsPage() {
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="pass" className="flex items-center gap-2"><Key/> Password/App Password</Label>
+                         <Alert variant="destructive" className="mb-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Important: Using Gmail?</AlertTitle>
+                            <AlertDescription>
+                                If you use Gmail with 2-Factor Authentication, you MUST generate and use an <Link href="https://myaccount.google.com/apppasswords" target="_blank" className="font-bold underline">App Password</Link>. Your regular password will not work.
+                            </AlertDescription>
+                        </Alert>
                         <Input id="pass" type="password" placeholder="••••••••••••" value={config.pass} onChange={(e) => handleChange('pass', e.target.value)} />
                     </div>
                 </div>
@@ -104,5 +112,3 @@ export default function MailerSettingsPage() {
         </Card>
     )
 }
-
-    
