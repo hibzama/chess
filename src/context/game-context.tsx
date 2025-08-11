@@ -428,12 +428,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 p2Time: opponentTime,
             });
             
-            if (myTime <= 0 && user) {
-                 const opponentUid = room.players.find(p => p !== user.uid);
-                 if(opponentUid) {
-                     setWinner(opponentUid, room.boardState, 'timeout');
-                 }
-                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            if ((creatorIsCurrent && p1ServerTime <= 0) || (!creatorIsCurrent && p2ServerTime <= 0)) {
+                if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                const winnerId = room.players.find(p => p !== (creatorIsCurrent ? room.createdBy.uid : room.player2?.uid));
+                if (winnerId) {
+                    setWinner(winnerId, room.boardState, 'timeout');
+                }
             }
         }, 1000);
 
@@ -482,13 +482,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         };
         
         const updatedGameState = updateLogic(gameState);
+        updateAndSaveState(updatedGameState); // Optimistic update
         
         // --- Check for Game Over Conditions ---
         if (gameType === 'chess') {
             const game = new Chess(boardState);
             if (game.isCheckmate()) {
                 const winnerColor = gameState.currentPlayer;
-                const winnerUid = room?.createdBy.color === winnerColor ? room?.createdBy.uid : room?.player2?.uid;
+                const winnerUid = isMultiplayer ? (room?.createdBy.color === winnerColor ? room?.createdBy.uid : room?.player2?.uid) : 'p1';
                 setWinner(winnerUid!, boardState, 'checkmate');
                 return;
             } else if (game.isDraw()) {
@@ -507,21 +508,18 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }));
             
             if (whitePieces === 0) {
-                 const winnerUid = room?.createdBy.color === 'b' ? room?.createdBy.uid : room?.player2?.uid;
+                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'b' ? room?.createdBy.uid : room?.player2?.uid) : 'p2';
                 setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             } else if (blackPieces === 0) {
-                 const winnerUid = room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.player2?.uid;
+                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.player2?.uid) : 'p1';
                  setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             }
         }
     
-        // If game is not over, proceed with turn switch
+        // If game is not over, proceed with turn switch for multiplayer
         if (isMultiplayer && room) {
-            // Update local state immediately for instant feedback
-            updateAndSaveState(updatedGameState);
-
             const roomRef = doc(db, 'game_rooms', room.id);
             const now = Timestamp.now();
             const elapsedSeconds = room.turnStartTime ? Math.max(0, (now.toMillis() - room.turnStartTime.toMillis()) / 1000) : 0;
@@ -553,16 +551,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 }
             }
     
-            // Perform the Firestore update in the background
-            updateDoc(roomRef, updatePayload).catch(error => {
-                console.error("Failed to sync move with Firestore:", error);
-                // Here you might want to add logic to handle a failed sync,
-                // e.g., show a warning to the user.
-            });
-
-        } else {
-            // This is for practice mode
-            updateAndSaveState(updatedGameState);
+            await updateDoc(roomRef, updatePayload);
         }
     }, [gameState, isMultiplayer, room, gameType, storageKey, setWinner, user, updateAndSaveState]);
     
