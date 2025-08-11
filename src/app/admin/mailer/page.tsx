@@ -71,25 +71,34 @@ export default function MailerPage() {
             return;
         }
 
-        let recipients: User[] = [];
+        let recipientUsers: User[] = [];
         if (sendTo === 'all') {
-            recipients = allUsers;
+            recipientUsers = allUsers;
         } else {
             if (selectedUsers.size === 0) {
                 toast({ variant: 'destructive', title: 'Error', description: 'Please select at least one user.' });
                 return;
             }
-            recipients = allUsers.filter(u => selectedUsers.has(u.id));
+            recipientUsers = allUsers.filter(u => selectedUsers.has(u.id));
         }
+
+        // Convert to plain objects before sending to the server action
+        const plainRecipients = recipientUsers.map(u => ({
+            id: u.id,
+            email: u.email,
+            firstName: u.firstName,
+            lastName: u.lastName
+        }));
+
 
         setIsSending(true);
         try {
             await sendEmail({
                 subject,
                 body,
-                recipients,
+                recipients: plainRecipients,
             });
-            toast({ title: 'Success!', description: `Email is being sent to ${recipients.length} user(s).` });
+            toast({ title: 'Success!', description: `Email is being sent to ${plainRecipients.length} user(s).` });
             setSubject('');
             setBody('');
             setSelectedUsers(new Set());
