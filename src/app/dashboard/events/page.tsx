@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2 } from 'lucide-react';
@@ -24,6 +24,7 @@ export interface Event {
     rewardAmount: number;
     durationDays: number;
     isActive: boolean;
+    createdAt?: any;
 }
 
 export interface Enrollment {
