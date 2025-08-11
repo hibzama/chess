@@ -1,4 +1,5 @@
 
+
 'use client'
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -102,10 +103,19 @@ export default function MyRoomsPage() {
     const handleCancelRoom = async (roomId: string, wager: number) => {
         if (!user) return;
         const roomRef = doc(db, 'game_rooms', roomId);
+        const userRef = doc(db, 'users', user.uid);
         
         try {
-            await deleteDoc(roomRef);
-            toast({ title: "Room Cancelled", description: "The room has been removed." });
+            const batch = writeBatch(db);
+            batch.delete(roomRef);
+
+            if (wager > 0) {
+                 batch.update(userRef, { balance: increment(wager) });
+            }
+
+            await batch.commit();
+
+            toast({ title: "Room Cancelled", description: "The room has been removed and your wager refunded." });
         } catch (error) {
             console.error("Failed to cancel room:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to cancel the room.' });

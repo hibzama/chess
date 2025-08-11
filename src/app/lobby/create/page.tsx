@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState } from 'react';
@@ -7,7 +8,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,31 +49,35 @@ export default function CreateGamePage() {
             return;
         }
 
-        if (userData.balance < wagerAmount) {
+        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+        if (totalBalance < wagerAmount) {
             toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
 
         setIsCreating(true);
-        const batch = writeBatch(db);
 
         try {
-            // 1. Deduct wager from user's balance
+            const batch = writeBatch(db);
             const userRef = doc(db, 'users', user.uid);
-            if(wagerAmount > 0) {
-                batch.update(userRef, {
-                    balance: increment(-wagerAmount)
-                });
-            }
 
+            // Deduct wager from balance
+            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
+            const mainWagered = wagerAmount - bonusWagered;
+            const updatePayload: any = {};
+            if(bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
+            if(mainWagered > 0) updatePayload.balance = increment(-mainWagered);
+            batch.update(userRef, updatePayload);
+            
             // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            // 2. Create the game room document
-            const roomData = {
+            // Create the game room document
+            const roomRef = doc(collection(db, 'game_rooms'));
+            batch.set(roomRef, {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -86,11 +91,9 @@ export default function CreateGamePage() {
                 players: [user.uid],
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
-            };
-
-            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            });
             
-            // 3. Create a transaction log for the wager
+            // Create a transaction log for the wager
             if(wagerAmount > 0) {
                 const transactionRef = doc(collection(db, 'transactions'));
                 batch.set(transactionRef, {
@@ -108,19 +111,11 @@ export default function CreateGamePage() {
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
 
-            // 4. Navigate to the game room page
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your wager has been refunded.' });
-            
-            // Revert balance deduction if room creation fails
-             if (wagerAmount > 0) {
-                 const userRef = doc(db, 'users', user.uid);
-                 await updateDoc(userRef, { balance: increment(wagerAmount) });
-             }
-
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your balance has not been changed.' });
         } finally {
             setIsCreating(false);
         }

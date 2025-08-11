@@ -159,14 +159,28 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
+        const userRef = doc(db, 'users', user.uid);
     
         try {
-            await deleteDoc(roomRef);
+            const batch = writeBatch(db);
+            // Delete the room
+            batch.delete(roomRef);
+
+            // Refund the creator's wager
+            if (room.wager > 0) {
+                 batch.update(userRef, { balance: increment(room.wager) });
+
+                 // Optionally, find and delete the original wager transaction
+                 // This part can be complex, so a refund transaction might be simpler.
+                 // For now, we'll just refund the balance.
+            }
+            
+            await batch.commit();
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -212,61 +226,53 @@ function MultiplayerGame() {
         }
     
         setIsJoining(true);
+        const batch = writeBatch(db);
         const roomRef = doc(db, 'game_rooms', room.id);
         const joinerRef = doc(db, 'users', user.uid);
     
         try {
-            await runTransaction(db, async (transaction) => {
-                // --- READ PHASE ---
-                const roomDoc = await transaction.get(roomRef);
-                const joinerDoc = await transaction.get(joinerRef);
-    
-                if (!roomDoc.exists() || roomDoc.data().status !== 'waiting') {
-                    throw new Error("Room not available");
-                }
-                if (!joinerDoc.exists()) {
-                    throw new Error("Your user data could not be found.");
-                }
-                
-                const roomData = roomDoc.data();
-                const joinerData = joinerDoc.data();
-                
-                // --- WRITE PHASE ---
-                // Update Room
-                const creatorColor = roomData.createdBy.color;
-                const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-                transaction.update(roomRef, {
-                    status: 'in-progress',
-                    player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
-                    players: [...roomData.players, user.uid],
-                    capturedByP1: [], capturedByP2: [], moveHistory: [],
-                    currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
-                });
-    
-                if (roomData.wager > 0) {
-                    const wagerAmount = roomData.wager;
-    
-                    // Deduct from joiner's balance
-                    const joinerBonusWagered = Math.min(wagerAmount, joinerData.bonusBalance || 0);
-                    const joinerMainWagered = wagerAmount - joinerBonusWagered;
-    
-                    const joinerUpdate: any = {};
-                    if(joinerBonusWagered > 0) joinerUpdate.bonusBalance = increment(-joinerBonusWagered);
-                    if(joinerMainWagered > 0) joinerUpdate.balance = increment(-joinerMainWagered);
-                    transaction.update(joinerRef, joinerUpdate);
-                }
+             // Deduct from joiner's balance
+            const wagerAmount = room.wager;
+            const joinerBonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
+            const joinerMainWagered = wagerAmount - joinerBonusWagered;
+
+            const joinerUpdate: any = {};
+            if(joinerBonusWagered > 0) joinerUpdate.bonusBalance = increment(-joinerBonusWagered);
+            if(joinerMainWagered > 0) joinerUpdate.balance = increment(-joinerMainWagered);
+            batch.update(joinerRef, joinerUpdate);
+
+            // Update Room
+            const creatorColor = room.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            batch.update(roomRef, {
+                status: 'in-progress',
+                player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
+                players: [...room.players, user.uid],
+                capturedByP1: [], capturedByP2: [], moveHistory: [],
+                currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
             });
-    
+            
+             // Create a transaction log for the joiner's wager
+            if(wagerAmount > 0) {
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'wager',
+                    amount: wagerAmount,
+                    status: 'completed',
+                    description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
+                    gameRoomId: room.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+            
+            await batch.commit();
+
             toast({ title: "Game Joined!", description: "The match is starting now." });
     
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            if (error.message === 'Room not available') {
-                 toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
-                 router.push(`/lobby/${room.gameType}`);
-            } else {
-                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again. ${error.message}`});
-            }
+            toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again. ${error.message}`});
         } finally {
             setIsJoining(false);
         }
