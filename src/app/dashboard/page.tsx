@@ -11,8 +11,7 @@ import { useEffect, useState, useRef } from 'react';
 import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
-import BonusDisplay from './bonus-display';
-import DailyBonusDisplay from './daily-bonus-display';
+import PromotionsCarousel from './promotions-carousel';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 
@@ -116,10 +115,7 @@ export default function DashboardPage() {
         </p>
       </div>
       
-       <div className="grid grid-cols-2 gap-6">
-            <BonusDisplay />
-            <DailyBonusDisplay />
-       </div>
+       <PromotionsCarousel />
 
       <div className="grid gap-6">
         <div className="grid grid-cols-2 gap-6">

@@ -27,6 +27,7 @@ export interface Event {
     rewardAmount: number;
     durationDays: number;
     isActive: boolean;
+    minWager?: number;
     createdAt?: any;
     updatedAt?: any;
 }
@@ -48,7 +49,8 @@ export default function ManageEventsPage() {
         enrollmentFee: 100,
         rewardAmount: 500,
         durationDays: 7,
-        isActive: false
+        isActive: false,
+        minWager: 0,
     });
     const [events, setEvents] = useState<Event[]>([]);
     const [enrolledUsers, setEnrolledUsers] = useState<{ [key: string]: EnrolledUser[] }>({});
@@ -134,15 +136,20 @@ export default function ManageEventsPage() {
         }
         setSaving(true);
         try {
-            const eventPayload = {
+            const eventPayload: any = {
                 ...newEvent,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
+
+            if (newEvent.targetType !== 'winningMatches') {
+                delete eventPayload.minWager;
+            }
+
             await addDoc(collection(db, 'events'), eventPayload);
             toast({ title: 'Success!', description: 'New event has been created.' });
             setIsCreateDialogOpen(false); // Close dialog on success
-             setNewEvent({ title: '', targetType: 'winningMatches', targetAmount: 10, enrollmentFee: 100, rewardAmount: 500, durationDays: 7, isActive: false }); // Reset form
+             setNewEvent({ title: '', targetType: 'winningMatches', targetAmount: 10, enrollmentFee: 100, rewardAmount: 500, durationDays: 7, isActive: false, minWager: 0 }); // Reset form
         } catch (error) {
             console.error("Error creating event:", error);
             toast({ variant: "destructive", title: 'Error', description: 'Failed to create event.' });
@@ -152,7 +159,7 @@ export default function ManageEventsPage() {
     };
     
     const handleChange = (field: keyof Event, value: any) => {
-        const isNumericField = ['targetAmount', 'enrollmentFee', 'rewardAmount', 'durationDays'].includes(field);
+        const isNumericField = ['targetAmount', 'enrollmentFee', 'rewardAmount', 'durationDays', 'minWager'].includes(field);
         setNewEvent(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
     };
 
@@ -190,6 +197,13 @@ export default function ManageEventsPage() {
                                 <Label htmlFor="targetAmount">Target Amount</Label>
                                 <Input id="targetAmount" type="number" value={newEvent.targetAmount} onChange={(e) => handleChange('targetAmount', e.target.value)} />
                             </div>
+                             {newEvent.targetType === 'winningMatches' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="minWager">Minimum Wager for Wins (LKR)</Label>
+                                    <Input id="minWager" type="number" value={newEvent.minWager} onChange={(e) => handleChange('minWager', e.target.value)} />
+                                    <p className="text-xs text-muted-foreground">A win only counts if the wager was this amount or higher. Set to 0 to ignore.</p>
+                                </div>
+                             )}
                              <div className="space-y-2">
                                 <Label htmlFor="enrollmentFee">Enrollment Fee (LKR)</Label>
                                 <Input id="enrollmentFee" type="number" value={newEvent.enrollmentFee} onChange={(e) => handleChange('enrollmentFee', e.target.value)} />
@@ -271,4 +285,3 @@ export default function ManageEventsPage() {
         </div>
     );
 }
-

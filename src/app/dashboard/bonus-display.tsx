@@ -97,17 +97,17 @@ export default function BonusDisplay() {
     : 'Bonus Rate';
 
   return (
-    <Card className="h-full border-accent bg-accent/10 flex flex-col">
+    <Card className="h-full border-accent bg-accent/10 flex flex-col items-center text-center">
         <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-                <Gift className="w-6 h-6 text-accent" />
-                <span className="text-accent">Limited Time Deposit Bonus!</span>
-            </CardTitle>
-             <CardDescription>
+            <div className="mx-auto p-3 bg-accent/10 rounded-full w-fit mb-2">
+                <Gift className="w-8 h-8 text-accent" />
+            </div>
+            <CardTitle className="text-lg text-accent">Limited Time Deposit Bonus!</CardTitle>
+             <CardDescription className="text-accent/80">
                 A special promotion is active. Deposit now to earn extra rewards.
             </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 flex-1 flex flex-col justify-center">
+        <CardContent className="space-y-4 flex-1 flex flex-col justify-center items-center">
              <div className="bg-background/50 p-4 rounded-lg text-center">
                 <p className="text-3xl font-bold">{bonusText}</p>
                 <p className="text-xs text-muted-foreground">{bonusDescription}</p>
@@ -117,8 +117,8 @@ export default function BonusDisplay() {
                 <p className="text-xl font-bold text-accent">{countdown}</p>
             </div>
         </CardContent>
-         <CardContent>
-             <Button asChild className="w-full bg-primary hover:bg-primary/90">
+         <CardContent className="w-full">
+             <Button asChild className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
                 <Link href="/dashboard/wallet">Make Deposit <ArrowRight className="ml-2"/></Link>
             </Button>
         </CardContent>

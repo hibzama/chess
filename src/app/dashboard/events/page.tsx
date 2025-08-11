@@ -24,6 +24,7 @@ export interface Event {
     rewardAmount: number;
     durationDays: number;
     isActive: boolean;
+    minWager?: number;
     createdAt?: any;
 }
 
@@ -165,6 +166,9 @@ export default function EventsPage() {
                                                 : `Earn LKR ${event.targetAmount.toLocaleString()}`
                                             }
                                         </p>
+                                        {event.targetType === 'winningMatches' && event.minWager && event.minWager > 0 && (
+                                            <p className="text-xs text-muted-foreground">(Min. Wager: LKR {event.minWager})</p>
+                                        )}
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 text-center text-sm">
                                         <div>

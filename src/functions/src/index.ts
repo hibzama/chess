@@ -256,13 +256,19 @@ export const updateEventProgress = functions.firestore
               if (progressIncrement > 0) {
                   hasUpdates = true;
                   const newProgress = (enrollment.progress || 0) + progressIncrement;
+                  
                   const updatePayload: { [key: string]: any } = { 
                       progress: admin.firestore.FieldValue.increment(progressIncrement) 
                   };
 
-                  // If the new progress meets or exceeds the target, mark as completed.
+                  // If the new progress meets or exceeds the target, mark as completed and add reward.
                   if (newProgress >= event.targetAmount) {
                       updatePayload.status = 'completed';
+                      if(event.rewardAmount > 0) {
+                          batch.update(admin.firestore().collection('users').doc(winnerId), {
+                              bonusBalance: admin.firestore.FieldValue.increment(event.rewardAmount)
+                          });
+                      }
                   }
                   batch.update(enrollmentRef, updatePayload);
               }
