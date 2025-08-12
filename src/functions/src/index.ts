@@ -1,11 +1,15 @@
 
-
 import * as functions from "firebase-functions";
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import axios from "axios";
 
-admin.initializeApp();
+// Correctly initialize Firebase Admin with databaseURL
+admin.initializeApp({
+  credential: admin.credential.applicationDefault(),
+  databaseURL: `https://${process.env.GCLOUD_PROJECT}.firebaseio.com`,
+});
+
 const db = admin.firestore();
 
 // This function triggers whenever a new document is created in 'game_rooms'
@@ -95,7 +99,7 @@ export const processCommissions = functions.firestore
 
             for (const playerId of playerIds) {
                 const userDoc = await db.collection('users').doc(playerId).get();
-                if (!userDoc.exists()) {
+                if (!userDoc.exists) {
                     functions.logger.warn(`Player ${playerId} not found, skipping their commission chain.`);
                     continue;
                 }
@@ -282,7 +286,7 @@ export const updateEventProgressOnGameEnd = functions.firestore
 });
 
 
-export const enrollInEvent = onCall({ cors: true }, async (request) => {
+export const enrollInEvent = onCall({ cors: true, region: 'us-central1' }, async (request) => {
     if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
@@ -297,39 +301,38 @@ export const enrollInEvent = onCall({ cors: true }, async (request) => {
     const userRef = db.collection('users').doc(userId);
     const eventRef = db.collection('events').doc(eventId);
     const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
-
-    const userDoc = await userRef.get();
-    const eventDoc = await eventRef.get();
-
-    if (!userDoc.exists()) {
-        throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
-    }
-    if (!eventDoc.exists()) {
-        throw new functions.https.HttpsError('not-found', 'The event does not exist.');
-    }
-
-    const userData = userDoc.data()!;
-    const eventData = eventDoc.data()!;
-    
-    if (!eventData.isActive) {
-        throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
-    }
-    if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
-        throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
-    }
-    
-    const enrollmentFee = Number(feeFromClient);
-    const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-
-    if (totalBalance < enrollmentFee) {
-        throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
-    }
     
     try {
         return await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            const eventDoc = await transaction.get(eventRef);
             const enrollmentDoc = await transaction.get(enrollmentRef);
-            if (enrollmentDoc.exists()) {
+            
+            if (!userDoc.exists()) {
+                throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
+            }
+            if (!eventDoc.exists()) {
+                throw new functions.https.HttpsError('not-found', 'The event does not exist.');
+            }
+             if (enrollmentDoc.exists) {
                 throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
+            }
+
+            const userData = userDoc.data()!;
+            const eventData = eventDoc.data()!;
+            
+            if (!eventData.isActive) {
+                throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
+            }
+            if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+                throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
+            }
+            
+            const enrollmentFee = Number(feeFromClient);
+            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+
+            if (totalBalance < enrollmentFee) {
+                throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
             }
 
             const bonusDeduction = Math.min((userData.bonusBalance || 0), enrollmentFee);
@@ -368,7 +371,7 @@ export const enrollInEvent = onCall({ cors: true }, async (request) => {
     }
 });
 
-export const joinGame = onCall({ cors: true }, async (request) => {
+export const joinGame = onCall({ cors: true, region: 'us-central1' }, async (request) => {
     if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
@@ -432,5 +435,3 @@ export const joinGame = onCall({ cors: true }, async (request) => {
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred.', error.message);
     }
 });
-
-    
