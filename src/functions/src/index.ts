@@ -1,29 +1,26 @@
 
-
 import { onCall } from "firebase-functions/v2/https";
+import { onDocumentCreated, onUpdate } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import { logger } from "firebase-functions";
 import { firestore } from "firebase-admin";
 import * as functions from "firebase-functions";
 
-// Initialize with databaseURL for Realtime Database triggers if any, and for general stability.
-admin.initializeApp({
-    databaseURL: "https://nexbattle-ymmmq.firebaseio.com",
-});
+admin.initializeApp();
 
-
-// This function triggers whenever a new document is created in 'game_rooms'
-// This is a v1 function and is left as-is since it's not a callable function causing the issue.
-export const announceNewGame = functions.firestore
-  .document("game_rooms/{roomId}")
-  .onCreate(async (snap, context) => {
+export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (event) => {
+    const snap = event.data;
+    if (!snap) {
+        logger.log("No data associated with the event");
+        return;
+    }
     const roomData = snap.data();
-    const roomId = context.params.roomId;
+    const roomId = event.params.roomId;
 
     if (!roomData || roomData.isPrivate === true) {
       logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
-      return null;
+      return;
     }
 
     let telegramBotToken;
@@ -35,11 +32,11 @@ export const announceNewGame = functions.firestore
         "Ensure it is set by running: " +
         "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
       );
-      return null;
+      return;
     }
 
     const chatId = "@nexbattlerooms";
-    const siteUrl = "http://nexbattle.com";
+    const siteUrl = "https://nexbattle.com";
 
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
@@ -72,127 +69,121 @@ export const announceNewGame = functions.firestore
     } catch (error: any) {
       logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
+});
 
-    return null;
-  });
+export const processCommissions = onUpdate('game_rooms/{gameRoomId}', async (event) => {
+    const db = admin.firestore();
+    const gameRoomId = event.params.gameRoomId;
+    const beforeData = event.data?.before.data();
+    const afterData = event.data?.after.data();
 
-export const processCommissions = functions.firestore
-    .document('game_rooms/{gameRoomId}')
-    .onUpdate(async (change, context) => {
-        const db = admin.firestore();
-        const gameRoomId = context.params.gameRoomId;
-        const beforeData = change.before.data();
-        const afterData = change.after.data();
+    if (!beforeData || !afterData) return;
 
-        if (beforeData.status !== 'completed' && afterData.status === 'completed' && !afterData.draw) {
-            const gameWager = afterData.wager || 0;
-            if (gameWager <= 0) {
-                logger.log(`Game ${gameRoomId}: Skipping commissions for zero wager game.`);
-                return null;
+    if (beforeData.status !== 'completed' && afterData.status === 'completed' && !afterData.draw) {
+        const gameWager = afterData.wager || 0;
+        if (gameWager <= 0) {
+            logger.log(`Game ${gameRoomId}: Skipping commissions for zero wager game.`);
+            return;
+        }
+
+        const playerIds = afterData.players || [];
+        if (playerIds.length < 2) {
+            logger.log(`Not enough players in game room ${gameRoomId} to process commissions.`);
+            return;
+        }
+
+        const batch = db.batch();
+
+        for (const playerId of playerIds) {
+            const userDoc = await db.collection('users').doc(playerId).get();
+            if (!userDoc.exists) {
+                logger.warn(`Player ${playerId} not found, skipping their commission chain.`);
+                continue;
             }
 
-            const playerIds = afterData.players || [];
-            if (playerIds.length < 2) {
-                logger.log(`Not enough players in game room ${gameRoomId} to process commissions.`);
-                return null;
-            }
+            const userData = userDoc.data();
+            if (!userData) continue;
 
-            const batch = db.batch();
+            const referredBy = userData.referredBy;
+            const referralChain = userData.referralChain || [];
 
-            for (const playerId of playerIds) {
-                const userDoc = await db.collection('users').doc(playerId).get();
-                if (!userDoc.exists) {
-                    logger.warn(`Player ${playerId} not found, skipping their commission chain.`);
-                    continue;
-                }
-
-                const userData = userDoc.data();
-                if (!userData) continue;
-
-                const referredBy = userData.referredBy;
-                const referralChain = userData.referralChain || [];
-
-                if (referredBy) {
-                    const referrerDoc = await db.collection('users').doc(referredBy).get();
-                    if (referrerDoc.exists && referrerDoc.data()?.role === 'user') {
-                        const l1Count = referrerDoc.data()?.l1Count || 0;
-                        const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
-                        const commissionAmount = gameWager * l1Rate;
-
-                        if (commissionAmount > 0) {
-                            logger.log(`Paying L1 commission of ${commissionAmount} to ${referredBy} from player ${playerId}'s game.`);
-                            const commissionTxRef = db.collection('transactions').doc();
-                            batch.set(commissionTxRef, {
-                                userId: referredBy,
-                                fromUserId: playerId,
-                                type: 'commission',
-                                amount: commissionAmount,
-                                level: 1,
-                                gameRoomId: gameRoomId,
-                                status: 'completed',
-                                description: `L1 commission from ${userData.firstName}`,
-                                createdAt: firestore.FieldValue.serverTimestamp(),
-                            });
-                            batch.update(db.collection('users').doc(referredBy), {
-                                balance: firestore.FieldValue.increment(commissionAmount),
-                            });
-                        }
-                    }
-                }
-
-                if (referralChain.length > 0) {
-                    const marketerCommissionRate = 0.03;
-                    const commissionAmount = gameWager * marketerCommissionRate;
+            if (referredBy) {
+                const referrerDoc = await db.collection('users').doc(referredBy).get();
+                if (referrerDoc.exists && referrerDoc.data()?.role === 'user') {
+                    const l1Count = referrerDoc.data()?.l1Count || 0;
+                    const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
+                    const commissionAmount = gameWager * l1Rate;
 
                     if (commissionAmount > 0) {
-                        const relevantChain = referralChain.slice(-20);
-
-                        for (let i = 0; i < relevantChain.length; i++) {
-                            const marketerId = relevantChain[i];
-                            const level = referralChain.indexOf(marketerId) + 1;
-
-                            logger.log(`Paying L${level} marketing commission of ${commissionAmount} to ${marketerId} from player ${playerId}'s game.`);
-
-                            const commissionTxRef = db.collection('transactions').doc();
-                            batch.set(commissionTxRef, {
-                                userId: marketerId,
-                                fromUserId: playerId,
-                                type: 'commission',
-                                amount: commissionAmount,
-                                level: level,
-                                gameRoomId: gameRoomId,
-                                status: 'completed',
-                                description: `Level ${level} marketing commission from ${userData.firstName}`,
-                                createdAt: firestore.FieldValue.serverTimestamp(),
-                            });
-                            batch.update(db.collection('users').doc(marketerId), {
-                                marketingBalance: firestore.FieldValue.increment(commissionAmount),
-                            });
-                        }
+                        logger.log(`Paying L1 commission of ${commissionAmount} to ${referredBy} from player ${playerId}'s game.`);
+                        const commissionTxRef = db.collection('transactions').doc();
+                        batch.set(commissionTxRef, {
+                            userId: referredBy,
+                            fromUserId: playerId,
+                            type: 'commission',
+                            amount: commissionAmount,
+                            level: 1,
+                            gameRoomId: gameRoomId,
+                            status: 'completed',
+                            description: `L1 commission from ${userData.firstName}`,
+                            createdAt: firestore.FieldValue.serverTimestamp(),
+                        });
+                        batch.update(db.collection('users').doc(referredBy), {
+                            balance: firestore.FieldValue.increment(commissionAmount),
+                        });
                     }
                 }
             }
 
-            try {
-                await batch.commit();
-                logger.log(`Successfully committed commission batch for game ${gameRoomId}.`);
-            } catch (error) {
-                logger.error(`Error committing commission batch for game ${gameRoomId}:`, error);
+            if (referralChain.length > 0) {
+                const marketerCommissionRate = 0.03;
+                const commissionAmount = gameWager * marketerCommissionRate;
+
+                if (commissionAmount > 0) {
+                    const relevantChain = referralChain.slice(-20);
+
+                    for (let i = 0; i < relevantChain.length; i++) {
+                        const marketerId = relevantChain[i];
+                        const level = referralChain.indexOf(marketerId) + 1;
+
+                        logger.log(`Paying L${level} marketing commission of ${commissionAmount} to ${marketerId} from player ${playerId}'s game.`);
+
+                        const commissionTxRef = db.collection('transactions').doc();
+                        batch.set(commissionTxRef, {
+                            userId: marketerId,
+                            fromUserId: playerId,
+                            type: 'commission',
+                            amount: commissionAmount,
+                            level: level,
+                            gameRoomId: gameRoomId,
+                            status: 'completed',
+                            description: `Level ${level} marketing commission from ${userData.firstName}`,
+                            createdAt: firestore.FieldValue.serverTimestamp(),
+                        });
+                        batch.update(db.collection('users').doc(marketerId), {
+                            marketingBalance: firestore.FieldValue.increment(commissionAmount),
+                        });
+                    }
+                }
             }
         }
 
-        return null;
-    });
+        try {
+            await batch.commit();
+            logger.log(`Successfully committed commission batch for game ${gameRoomId}.`);
+        } catch (error) {
+            logger.error(`Error committing commission batch for game ${gameRoomId}:`, error);
+        }
+    }
+});
 
-export const updateEventProgressOnGameEnd = functions.firestore
-  .document('game_rooms/{gameId}')
-  .onUpdate(async (change, context) => {
+export const updateEventProgressOnGameEnd = onUpdate('game_rooms/{gameId}', async (event) => {
     const db = admin.firestore();
-    const beforeData = change.before.data();
-    const gameData = change.after.data();
-    const gameId = context.params.gameId;
+    const beforeData = event.data?.before.data();
+    const gameData = event.data?.after.data();
+    const gameId = event.params.gameId;
 
-    if (beforeData.status === 'completed' || gameData.status !== 'completed') {
+    if (!beforeData || !gameData || beforeData.status === 'completed' || gameData.status !== 'completed') {
       return null;
     }
 
@@ -242,18 +233,18 @@ export const updateEventProgressOnGameEnd = functions.firestore
             const eventDoc = await db.collection('events').doc(enrollment.eventId).get();
             if (!eventDoc.exists()) continue;
 
-            const event = eventDoc.data();
-            if (!event || !event.isActive || enrollment.expiresAt.toDate() < new Date()) continue;
+            const eventData = eventDoc.data();
+            if (!eventData || !eventData.isActive || enrollment.expiresAt.toDate() < new Date()) continue;
             
             let progressIncrement = 0;
             let shouldLogHistory = false;
 
-            if (event.targetType === 'winningMatches') {
+            if (eventData.targetType === 'winningMatches') {
                 shouldLogHistory = true;
-                if (isWinner && (!event.minWager || wagerAmount >= event.minWager)) {
+                if (isWinner && (!eventData.minWager || wagerAmount >= eventData.minWager)) {
                     progressIncrement = 1;
                 }
-            } else if (event.targetType === 'totalEarnings') {
+            } else if (eventData.targetType === 'totalEarnings') {
                  shouldLogHistory = true;
                 if (netEarning > 0) {
                     progressIncrement = netEarning;
@@ -276,11 +267,11 @@ export const updateEventProgressOnGameEnd = functions.firestore
                         progress: firestore.FieldValue.increment(progressIncrement) 
                     };
 
-                    if (newProgress >= event.targetAmount) {
+                    if (newProgress >= eventData.targetAmount) {
                         updatePayload.status = 'completed';
-                        if (event.rewardAmount > 0) {
+                        if (eventData.rewardAmount > 0) {
                             batch.update(db.collection('users').doc(playerId), {
-                                bonusBalance: firestore.FieldValue.increment(event.rewardAmount)
+                                bonusBalance: firestore.FieldValue.increment(eventData.rewardAmount)
                             });
                         }
                     }
