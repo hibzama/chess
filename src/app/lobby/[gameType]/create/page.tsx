@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { useState } from 'react';
@@ -57,12 +58,26 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
+            const batch = writeBatch(db);
+            const userRef = doc(db, 'users', user.uid);
+
+            // Deduct wager from balance
+            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
+            const mainWagered = wagerAmount - bonusWagered;
+            const updatePayload: any = {};
+            if(bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
+            if(mainWagered > 0) updatePayload.balance = increment(-mainWagered);
+            batch.update(userRef, updatePayload);
+            
+            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            const roomData = {
+            // Create the game room document
+            const roomRef = doc(collection(db, 'game_rooms'));
+            batch.set(roomRef, {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -77,16 +92,31 @@ export default function CreateGamePage() {
                 players: [user.uid],
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
-            };
-
-            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            });
+            
+            // Create a transaction log for the wager
+            if(wagerAmount > 0) {
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'wager',
+                    amount: wagerAmount,
+                    status: 'completed',
+                    description: `Wager for ${gameName} game`,
+                    gameRoomId: roomRef.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+            
+            await batch.commit();
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your balance has not been changed.' });
         } finally {
             setIsCreating(false);
         }
@@ -181,3 +211,4 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
