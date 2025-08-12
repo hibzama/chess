@@ -167,8 +167,7 @@ export default function EventsPage() {
             // Firestore security rules will validate this transaction
             batch.update(userRef, { 
                 balance: increment(-event.enrollmentFee),
-                enrollingEventFee: event.enrollmentFee, // For rule validation
-                enrollingEventId: event.id // For rule validation
+                enrollingEventId: event.id // Pass eventId for security rule check
             });
 
             const expiryDate = new Date();
@@ -193,8 +192,8 @@ export default function EventsPage() {
             toast({ variant: 'destructive', title: 'Enrollment Failed', description: 'Could not enroll in the event. Please check your balance and try again.' });
         } finally {
             setIsEnrolling(null);
-            // Clean up the temporary fields regardless of success or failure
-            updateDoc(userRef, { enrollingEventId: deleteField(), enrollingEventFee: deleteField() }).catch(() => {});
+            // Clean up the temporary field used for security rules
+            updateDoc(userRef, { enrollingEventId: deleteField() }).catch(() => {});
         }
     }
 
@@ -419,4 +418,3 @@ export default function EventsPage() {
         </Tabs>
     );
 }
-
