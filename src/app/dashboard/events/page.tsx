@@ -151,9 +151,10 @@ export default function EventsPage() {
         setIsEnrolling(event.id);
         
         try {
-            const enrollInEventFunction = httpsCallable(functions, 'enrollInEvent');
+            const enrollInEventFunction = httpsCallable(functions, 'enrollInEvent', { region: 'us-central1' });
             const result = await enrollInEventFunction({ 
                 eventId: event.id,
+                enrollmentFee: event.enrollmentFee // Pass the fee from the client
             });
             
             const data = result.data as { success: boolean; message: string };
@@ -400,3 +401,5 @@ export default function EventsPage() {
         </Tabs>
     );
 }
+
+    

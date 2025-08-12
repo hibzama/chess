@@ -244,7 +244,7 @@ function MultiplayerGame() {
             });
 
             // Step 2: If wager deduction is successful, call Cloud Function to join.
-            const joinGame = httpsCallable(functions, 'joinGame');
+            const joinGame = httpsCallable(functions, 'joinGame', { region: 'us-central1' });
             const result = await joinGame({ roomId: room.id });
             const data = result.data as { success: boolean, message: string };
 
@@ -443,3 +443,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    
