@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, getDoc, doc, documentId, where, getDocs, serverTimestamp, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, getDoc, doc, documentId, where, getDocs, serverTimestamp, updateDoc, deleteDoc, collectionGroup } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,35 +74,56 @@ export default function ManageEventsPage() {
     }, []);
 
     const fetchEnrolledUsers = async (eventId: string) => {
-        if (enrolledUsers[eventId]) return;
-        
-        const enrollmentsRef = collection(db, 'event_enrollments', eventId, 'users');
-        const enrollmentsSnap = await getDocs(enrollmentsRef);
-        
-        if (enrollmentsSnap.empty) {
-            setEnrolledUsers(prev => ({ ...prev, [eventId]: [] }));
-            return;
-        }
+        if (enrolledUsers[eventId]) return; // Data already fetched
+    
+        try {
+            // Query the collection group to find all enrollments for a specific eventId
+            const enrollmentsQuery = query(
+                collectionGroup(db, 'event_enrollments'),
+                where('eventId', '==', eventId)
+            );
+    
+            const enrollmentsSnapshot = await getDocs(enrollmentsQuery);
+    
+            if (enrollmentsSnapshot.empty) {
+                setEnrolledUsers(prev => ({ ...prev, [eventId]: [] }));
+                return;
+            }
+    
+            const userIds = enrollmentsSnapshot.docs.map(d => d.data().userId);
+            const enrollmentDataMap = new Map(enrollmentsSnapshot.docs.map(d => [d.data().userId, d.data()]));
+            
+            if (userIds.length === 0) {
+                 setEnrolledUsers(prev => ({ ...prev, [eventId]: [] }));
+                 return;
+            }
 
-        const userIds = enrollmentsSnap.docs.map(d => d.id);
-        const users: EnrolledUser[] = [];
-        const enrollmentDataMap = new Map(enrollmentsSnap.docs.map(d => [d.id, d.data()]));
-
-        for (let i = 0; i < userIds.length; i += 10) {
-            const batchUids = userIds.slice(i, i + 10);
-            const usersQuery = query(collection(db, 'users'), where(documentId(), 'in', batchUids));
-            const userDocs = await getDocs(usersQuery);
-            userDocs.forEach(doc => {
-                const enrollmentData = enrollmentDataMap.get(doc.id);
-                users.push({ 
-                    ...doc.data(), 
-                    uid: doc.id,
-                    progress: enrollmentData?.progress || 0,
-                    status: enrollmentData?.status || 'enrolled',
-                } as EnrolledUser);
-            });
+            const users: EnrolledUser[] = [];
+    
+            // Fetch user documents in batches of 10
+            for (let i = 0; i < userIds.length; i += 10) {
+                const batchUids = userIds.slice(i, i + 10);
+                const usersQuery = query(collection(db, 'users'), where(documentId(), 'in', batchUids));
+                const userDocs = await getDocs(usersQuery);
+    
+                userDocs.forEach(doc => {
+                    const enrollmentData = enrollmentDataMap.get(doc.id);
+                    if (enrollmentData) {
+                        users.push({
+                            ...doc.data(),
+                            uid: doc.id,
+                            progress: enrollmentData.progress || 0,
+                            status: enrollmentData.status || 'enrolled',
+                        } as EnrolledUser);
+                    }
+                });
+            }
+            
+            setEnrolledUsers(prev => ({ ...prev, [eventId]: users }));
+        } catch (error) {
+            console.error("Error fetching enrolled users: ", error);
+            toast({ variant: 'destructive', title: "Error", description: "Failed to fetch enrolled users. Check console and security rules." });
         }
-        setEnrolledUsers(prev => ({ ...prev, [eventId]: users }));
     };
     
     const handleUpdateEvent = async (eventId: string, updatedData: Partial<Event>) => {
