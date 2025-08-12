@@ -319,13 +319,17 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
       const eventRef = db.collection('events').doc(eventId);
       const enrollmentRef = db.collection('users').doc(userId).collection('event_enrollments').doc(eventId);
       
-      const [eventDoc, enrollmentDoc] = await Promise.all([
+      const [eventDoc, enrollmentDoc, userDoc] = await Promise.all([
           transaction.get(eventRef),
-          transaction.get(enrollmentRef)
+          transaction.get(enrollmentRef),
+          transaction.get(db.collection('users').doc(userId))
       ]);
 
       if (!eventDoc.exists) {
         throw new functions.https.HttpsError('not-found', 'Event not found.');
+      }
+      if (!userDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'User data not found.');
       }
        if (enrollmentDoc.exists) {
         throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
@@ -340,9 +344,9 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
       }
 
-      // Enrollment Logic
-      const expiryDate = new Date();
-      expiryDate.setHours(expiryDate.getHours() + eventData.durationHours);
+      // Enrollment Logic - Corrected Date Calculation
+      const now = new Date();
+      const expiryDate = new Date(now.getTime() + eventData.durationHours * 60 * 60 * 1000);
 
       const enrollmentPayload = {
         eventId: eventId,
