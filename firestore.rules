@@ -4,112 +4,86 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function isAdmin() {
-      // Check if the requesting user has the 'admin' role in their user document.
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Rules for the 'users' collection
     match /users/{userId} {
-      // Admins can read any user document. Authenticated users can read their own.
-      allow get: if isAdmin() || isOwner(userId);
-      // Admins can list all users.
-      allow list: if isAdmin();
-      // Users can only create their own document.
-      allow create: if isOwner(userId);
-      // Users can only update their own document.
-      // Admins can update any user document.
-      allow update: if isOwner(userId) || isAdmin();
-
-      // Rules for the 'event_enrollments' subcollection
-      match /event_enrollments/{enrollmentId} {
-        // A user can read their own enrollment documents.
-        allow get, list: if isOwner(userId);
-        // A user can create their own enrollment document.
-        allow create: if isOwner(userId);
-        // Admins can also read any user's enrollments.
-        allow get, list: if isAdmin();
-
-         // Rules for progress history within an enrollment
-        match /progress_history/{progressId} {
-            // Only the user who owns the enrollment can read the progress.
-            allow read: if isOwner(userId);
-        }
-      }
-    }
-
-    // Rules for the 'game_rooms' collection
-    match /game_rooms/{gameId} {
-      // Any authenticated user can read game rooms (for lobbies).
       allow read: if request.auth != null;
-      // Any authenticated user can create a game room.
-      allow create: if request.auth != null;
-      // Only players in the game can update it.
-      allow update: if request.auth != null && request.auth.uid in resource.data.players;
-      // Only the creator can delete a waiting room.
-      allow delete: if request.auth != null && request.auth.uid == resource.data.createdBy.uid;
-
-      // Rules for the 'messages' subcollection within a game room
-      match /messages/{messageId} {
-        // Only players in the game can read or write messages.
-        allow read, write: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(gameId)).data.players;
-      }
+      allow create: if request.auth.uid == userId;
+      
+      allow update: if request.auth.uid == userId;
     }
     
-    match /chats/{chatId} {
-      // Only users involved in the chat can read/write.
-      allow read, update, delete: if request.auth != null && request.auth.uid in resource.data.users;
-      match /messages/{messageId} {
-         allow read, create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-      }
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth.uid == userId || isAdmin();
     }
-
-    // Rules for the 'transactions' collection
+    
     match /transactions/{transactionId} {
-      // Admins can manage all transactions.
-      allow read, list, update: if isAdmin();
-      // Users can create their own transactions and read their history.
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow read: if request.auth.uid == resource.data.userId;
+        allow create: if request.auth != null;
+        allow read: if isAdmin();
+        allow update: if isAdmin();
+    }
+
+    match /game_rooms/{roomId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+                      // Allow a user to join a waiting game
+                      (request.resource.data.status == 'in-progress' && 
+                       resource.data.status == 'waiting' &&
+                       request.resource.data.player2.uid == request.auth.uid) ||
+                      // Allow a player in the game to update it while it's in-progress
+                      (resource.data.players[0] == request.auth.uid || 
+                       resource.data.players[1] == request.auth.uid)
+                    );
+      allow delete: if request.auth != null && resource.data.createdBy.uid == request.auth.uid;
+      
+      match /messages/{messageId} {
+        allow read: if request.auth.uid in resource.data.players;
+        allow create: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      }
     }
     
-     match /marketing_applications/{appId} {
-        allow create: if request.auth == null || request.auth != null; // Anyone can apply
-        allow read, update: if isAdmin();
-     }
-     
-      match /settings/{settingId} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
-      }
+    match /marketing_applications/{appId} {
+      allow create: if request.auth == null;
+      allow read, update: if isAdmin();
+    }
 
-    // Rules for the 'events' collection
-    match /events/{eventId} {
-      // Any authenticated user can read event details.
-      allow read: if request.auth != null;
-      // Admins can create, update, or delete events.
-      allow write: if isAdmin();
+    match /chats/{chatId} {
+      allow read, write: if request.auth.uid in resource.data.users;
+      
+      match /messages/{messageId} {
+        allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
+    }
+    
+    match /friend_requests/{requestId} {
+      allow read, create, delete: if request.auth.uid == request.resource.data.fromId || request.auth.uid == request.resource.data.toId;
+    }
+
+    match /settings/{settingId} {
+        allow read: if true;
+        allow write: if isAdmin();
     }
     
     match /bonuses/{bonusId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    match /dailyBonusClaims/{bonusId} {
+        allow read: if true;
+        allow write: if request.auth != null;
+    }
+    
+    match /events/{eventId} {
         allow read: if request.auth != null;
         allow write: if isAdmin();
     }
 
-    match /dailyBonusClaims/{bonusId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null; // User and Admin can write (increment)
-    }
-
-    // Rules for the 'notifications' collection
     match /notifications/{notificationId} {
-      // Users can only read and update (mark as read) their own notifications.
-      allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
-      // Cloud Functions can create notifications. Users cannot.
-      allow create: if false; 
+      allow read, update: if request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null; // Server-side or trusted client
     }
   }
 }
