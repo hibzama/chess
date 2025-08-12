@@ -1,285 +1,229 @@
 
-
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/onCall";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
-import * as functions from "firebase-functions";
+import {onCall} from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import axios from "axios";
+import {logger} from "firebase-functions";
 
 admin.initializeApp();
 
-// This function triggers whenever a new document is created in 'game_rooms'
-export const announceNewGame = functions.firestore
-  .document("game_rooms/{roomId}")
-  .onCreate(async (snap, context) => {
-    const roomData = snap.data();
-    const roomId = context.params.roomId; // Correct way to get wildcard ID
-
-    // Exit if the function is triggered with no data, or for a private room
-    if (!roomData || roomData.isPrivate === true) {
-      functions.logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
-      return null;
+export const createGameRoom = onCall({cors: true}, async (request) => {
+    if (!request.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-
-    let telegramBotToken;
-    try {
-      telegramBotToken = functions.config().telegram.token;
-    } catch (error) {
-      functions.logger.error(
-        "Could not retrieve telegram.token from Functions config. " +
-        "Ensure it is set by running: " +
-        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
-      );
-      return null;
-    }
-
-    const chatId = "@nexbattlerooms"; // Your Telegram group username
-    const siteUrl = "http://nexbattle.com";
-
-    // Prepare message components with fallbacks
-    const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
-    const wager = roomData.wager || 0;
-    const createdBy = roomData.createdBy?.name || "A Player";
-    const timeControlValue = roomData.timeControl;
-    const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
-    const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
-
-    // Log the variables to ensure they are being read correctly
-    functions.logger.log(`Preparing message for Room ID: ${roomId}`);
-    functions.logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
-
-    // Construct the message string carefully
-    const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
-      `<b>Player:</b> ${createdBy}\n` +
-      `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
-      `<b>Time:</b> ${timeControl}\n\n` +
-      `<i>Room ID:</i> <code>${roomId}</code>\n\n` +
-      `<a href="${gameLink}">Click Here to Join Game</a>\n\n` +
-      `<i>This room will expire in 3 minutes if no one joins.</i>`;
-
-    const telegramApiUrl =
-      `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
+    const userId = request.auth.uid;
+    const {gameType, wager, timeControl, isPrivate, pieceColor} = request.data;
+    const db = admin.firestore();
+    const userRef = db.collection('users').doc(userId);
 
     try {
-      await axios.post(telegramApiUrl, {
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML',
-      });
-      functions.logger.log(`Successfully sent message for Room ID: ${roomId}`);
-    } catch (error: any) {
-      functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
-    }
+        const userDoc = await userRef.get();
+        if (!userDoc.exists) {
+            throw new functions.https.HttpsError('not-found', 'User data not found.');
+        }
+        const userData = userDoc.data()!;
 
-    return null;
-  });
-
-
-export const processCommissions = functions.firestore
-    .document('game_rooms/{gameRoomId}')
-    .onUpdate(async (change, context) => {
-        const gameRoomId = context.params.gameRoomId;
-        const beforeData = change.before.data();
-        const afterData = change.after.data();
-
-        // 1. Only run when a game is completed and not on a draw
-        if (beforeData.status !== 'completed' && afterData.status === 'completed' && !afterData.draw) {
-            const gameWager = afterData.wager || 0;
-            if (gameWager <= 0) {
-                functions.logger.log(`Game ${gameRoomId}: Skipping commissions for zero wager game.`);
-                return null;
-            }
-
-            const playerIds = afterData.players || [];
-            if (playerIds.length < 2) {
-                functions.logger.log(`Not enough players in game room ${gameRoomId} to process commissions.`);
-                return null;
-            }
-
-            const db = admin.firestore();
-            const batch = db.batch();
-
-            // 2. Iterate through EACH player in the game to check for their referrers
-            for (const playerId of playerIds) {
-                const userDoc = await db.collection('users').doc(playerId).get();
-                if (!userDoc.exists) {
-                    functions.logger.warn(`Player ${playerId} not found, skipping their commission chain.`);
-                    continue;
-                }
-
-                const userData = userDoc.data();
-                if (!userData) continue;
-
-                const referredBy = userData.referredBy;
-                const referralChain = userData.referralChain || [];
-
-                // 3. Process Regular User Commission (Level 1)
-                if (referredBy) {
-                    const referrerDoc = await db.collection('users').doc(referredBy).get();
-                    if (referrerDoc.exists && referrerDoc.data()?.role === 'user') {
-                        const l1Count = referrerDoc.data()?.l1Count || 0;
-                        const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
-                        const commissionAmount = gameWager * l1Rate;
-
-                        if (commissionAmount > 0) {
-                            functions.logger.log(`Paying L1 commission of ${commissionAmount} to ${referredBy} from player ${playerId}'s game.`);
-                            const commissionTxRef = db.collection('transactions').doc();
-                            batch.set(commissionTxRef, {
-                                userId: referredBy,
-                                fromUserId: playerId,
-                                type: 'commission',
-                                amount: commissionAmount,
-                                level: 1,
-                                gameRoomId: gameRoomId,
-                                status: 'completed',
-                                description: `L1 commission from ${userData.firstName}`,
-                                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                            });
-                            batch.update(db.collection('users').doc(referredBy), {
-                                balance: admin.firestore.FieldValue.increment(commissionAmount),
-                            });
-                        }
-                    }
-                }
-
-                // 4. Process Marketing Partner Commissions (Up to 20 Levels)
-                if (referralChain.length > 0) {
-                    const marketerCommissionRate = 0.03;
-                    const commissionAmount = gameWager * marketerCommissionRate;
-
-                    if (commissionAmount > 0) {
-                        const relevantChain = referralChain.slice(-20);
-
-                        for (let i = 0; i < relevantChain.length; i++) {
-                            const marketerId = relevantChain[i];
-                            const level = referralChain.indexOf(marketerId) + 1;
-
-                            functions.logger.log(`Paying L${level} marketing commission of ${commissionAmount} to ${marketerId} from player ${playerId}'s game.`);
-
-                            const commissionTxRef = db.collection('transactions').doc();
-                            batch.set(commissionTxRef, {
-                                userId: marketerId,
-                                fromUserId: playerId,
-                                type: 'commission',
-                                amount: commissionAmount,
-                                level: level,
-                                gameRoomId: gameRoomId,
-                                status: 'completed',
-                                description: `Level ${level} marketing commission from ${userData.firstName}`,
-                                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                            });
-                            batch.update(db.collection('users').doc(marketerId), {
-                                marketingBalance: admin.firestore.FieldValue.increment(commissionAmount),
-                            });
-                        }
-                    }
-                }
-            }
-
-            try {
-                await batch.commit();
-                functions.logger.log(`Successfully committed commission batch for game ${gameRoomId}.`);
-            } catch (error) {
-                functions.logger.error(`Error committing commission batch for game ${gameRoomId}:`, error);
-            }
+        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+        if (totalBalance < wager) {
+            throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds.');
         }
 
-        return null;
-    });
+        const roomRef = db.collection('game_rooms').doc();
+        const batch = db.batch();
 
+        const bonusWagered = Math.min(wager, userData.bonusBalance || 0);
+        const mainWagered = wager - bonusWagered;
+        const updatePayload: {[key: string]: any} = {};
+        if (bonusWagered > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(-bonusWagered);
+        if (mainWagered > 0) updatePayload.balance = admin.firestore.FieldValue.increment(-mainWagered);
+        batch.update(userRef, updatePayload);
+        
+        let finalPieceColor = pieceColor;
+        if (pieceColor === 'random') {
+            finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
+        }
 
-// This function triggers whenever a payout transaction is created for a game winner.
-export const updateEventProgress = functions.firestore
-  .document('transactions/{transactionId}')
-  .onCreate(async (snap, context) => {
-    const transaction = snap.data();
+        batch.set(roomRef, {
+            gameType,
+            wager,
+            timeControl,
+            isPrivate,
+            status: 'waiting',
+            createdBy: {
+                uid: userId,
+                name: `${userData.firstName} ${userData.lastName}`,
+                color: finalPieceColor,
+                photoURL: userData.photoURL || ''
+            },
+            players: [userId],
+            p1Time: timeControl,
+            p2Time: timeControl,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
+        });
 
-    // 1. Ensure this is a valid winning payout transaction.
-    if (transaction.type !== 'payout' || !transaction.winnerId) {
-      return null;
-    }
-
-    // 2. Ensure the winner did not resign.
-    if (transaction.resignerId && transaction.winnerId === transaction.resignerId) {
-        functions.logger.log(`Exiting event progress: Winner ${transaction.winnerId} was the resigner.`);
-        return null;
-    }
-
-    const winnerId = transaction.winnerId;
-    const wagerAmount = transaction.gameWager || 0;
-    // 3. Correctly calculate net earning.
-    const netEarning = transaction.amount - wagerAmount;
-
-    // Get all active events.
-    const eventsRef = admin.firestore().collection('events');
-    const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
-
-    if (activeEventsSnapshot.empty) {
-      return null;
-    }
-
-    const batch = admin.firestore().batch();
-    let hasUpdates = false;
-
-    // Iterate through each active event.
-    for (const eventDoc of activeEventsSnapshot.docs) {
-      const event = eventDoc.data();
-      const enrollmentRef = admin.firestore().collection('users').doc(winnerId).collection('event_enrollments').doc(event.id);
-      
-      const enrollmentSnap = await enrollmentRef.get();
-      
-      // Check if user is enrolled in this event and the event is not expired/completed.
-      if (enrollmentSnap.exists) {
-          const enrollment = enrollmentSnap.data();
-          if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
-              let progressIncrement = 0;
-              
-              // 4. Update progress based on event type.
-              if (event.targetType === 'winningMatches') {
-                  // A win is a win, as long as they are the winnerId and not the resigner
-                  if (!event.minWager || wagerAmount >= event.minWager) {
-                      progressIncrement = 1;
-                  }
-              } else if (event.targetType === 'totalEarnings') {
-                  // Only count positive net earnings towards progress.
-                  if (netEarning > 0) { 
-                      progressIncrement = netEarning;
-                  }
-              }
-
-              if (progressIncrement > 0) {
-                  hasUpdates = true;
-                  const newProgress = (enrollment.progress || 0) + progressIncrement;
-                  const updatePayload: { [key: string]: any } = { 
-                      progress: admin.firestore.FieldValue.increment(progressIncrement) 
-                  };
-
-                  // If the new progress meets or exceeds the target, mark as completed.
-                  if (newProgress >= event.targetAmount) {
-                      updatePayload.status = 'completed';
-                  }
-                  batch.update(enrollmentRef, updatePayload);
-              }
-          }
-      }
-    }
-
-    // 5. Commit the batch if there are any updates.
-    if (hasUpdates) {
-      try {
+        if (wager > 0) {
+            const transactionRef = db.collection('transactions').doc();
+            batch.set(transactionRef, {
+                userId,
+                type: 'wager',
+                amount: wager,
+                status: 'completed',
+                description: `Wager for ${gameType} game`,
+                gameRoomId: roomRef.id,
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
         await batch.commit();
-        functions.logger.log(`Successfully updated event progress for user ${winnerId}.`);
-      } catch (error) {
-        functions.logger.error(`Error committing event progress for user ${winnerId}:`, error);
-      }
+        return {success: true, roomId: roomRef.id, message: 'Room created successfully!'};
+    } catch (error: any) {
+        logger.error('Error in createGameRoom:', error);
+        throw new functions.https.HttpsError('internal', error.message || 'An unexpected error occurred.');
+    }
+});
+
+
+export const joinGame = onCall({cors: true}, async (request) => {
+    if (!request.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    
+    const {roomId} = request.data;
+    const userId = request.auth.uid;
+
+    if (!roomId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Room ID is required.');
+    }
+    
+    const db = admin.firestore();
+    const roomRef = db.collection('game_rooms').doc(roomId);
+    const joinerRef = db.collection('users').doc(userId);
+
+    try {
+        const joinerDoc = await joinerRef.get();
+        if (!joinerDoc.exists()) {
+            throw new functions.https.HttpsError('not-found', 'Your user profile could not be found.');
+        }
+        const joinerData = joinerDoc.data()!;
+
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists()) {
+                throw new functions.https.HttpsError('not-found', 'Game room not found.');
+            }
+            const roomData = roomDoc.data()!;
+
+            if (roomData.status !== 'waiting') {
+                throw new functions.https.HttpsError('failed-precondition', 'This room is no longer available.');
+            }
+            if (roomData.createdBy.uid === userId) {
+                throw new functions.https.HttpsError('failed-precondition', 'You cannot join your own game.');
+            }
+            if (roomData.players.includes(userId)) {
+                throw new functions.https.HttpsError('failed-precondition', 'You are already in this room.');
+            }
+
+            const creatorColor = roomData.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+
+            transaction.update(roomRef, {
+                status: 'in-progress',
+                player2: {uid: userId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || ''},
+                players: admin.firestore.FieldValue.arrayUnion(userId),
+                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        return {success: true, message: 'Game joined successfully'};
+    } catch (error: any) {
+        logger.error('Error joining game transaction:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the room.', error.message);
+    }
+});
+
+
+export const enrollInEvent = onCall({cors: true}, async (request) => {
+    if (!request.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
-    return null;
-  });
+    const userId = request.auth.uid;
+    const {eventId, enrollmentFee} = request.data;
+    
+    if (!eventId || typeof enrollmentFee !== 'number') {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a valid "eventId" and "enrollmentFee".');
+    }
+    
+    const db = admin.firestore();
+    const userRef = db.collection('users').doc(userId);
+    const eventRef = db.collection('events').doc(eventId);
+    const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
+
+    try {
+        const userDoc = await userRef.get();
+        const eventDoc = await eventRef.get();
+    
+        if (!userDoc.exists()) {
+            throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
+        }
+        if (!eventDoc.exists()) {
+            throw new functions.https.HttpsError('not-found', 'The event does not exist.');
+        }
+        
+        const userData = userDoc.data()!;
+        const eventData = eventDoc.data()!;
+
+        await db.runTransaction(async (transaction) => {
+            const freshEnrollmentDoc = await transaction.get(enrollmentRef);
+            if (freshEnrollmentDoc.exists) {
+                throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
+            }
+        
+            if (!eventData.isActive) {
+                throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
+            }
+            if (eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+                throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
+            }
+        
+            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+            if (totalBalance < enrollmentFee) {
+                throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
+            }
+        
+            const bonusDeduction = Math.min((userData.bonusBalance || 0), enrollmentFee);
+            const mainDeduction = enrollmentFee - bonusDeduction;
+
+            const userUpdate: {[key: string]: any} = {};
+            if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
+            if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
+            
+            transaction.update(userRef, userUpdate);
+
+            const now = new Date();
+            const durationHours = Number(eventData.durationHours);
+            const expiryDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
+
+            transaction.set(enrollmentRef, {
+                eventId: eventId,
+                userId: userId,
+                status: 'enrolled',
+                progress: 0,
+                enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt: admin.firestore.Timestamp.fromDate(expiryDate)
+            });
+
+            transaction.update(eventRef, {enrolledCount: admin.firestore.FieldValue.increment(1)});
+        });
+        
+        return {success: true, message: 'Enrolled successfully!'};
+    } catch (error: any) {
+        logger.error('Error in enrollInEvent:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', error.message || 'An unexpected error occurred.');
+    }
+});
