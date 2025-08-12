@@ -7,8 +7,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '@/lib/firebase';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock } from 'lucide-react';
+import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -58,65 +58,32 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            const batch = writeBatch(db);
-            const userRef = doc(db, 'users', user.uid);
-
-            // Deduct wager from balance
-            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
-            const mainWagered = wagerAmount - bonusWagered;
-            const updatePayload: any = {};
-            if(bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
-            if(mainWagered > 0) updatePayload.balance = increment(-mainWagered);
-            batch.update(userRef, updatePayload);
+            const createRoomFunction = httpsCallable(functions, 'createGameRoom', { region: 'us-central1' });
             
-            // Handle random piece color selection
-            let finalPieceColor = pieceColor;
-            if (pieceColor === 'random') {
-                finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
-            }
-            
-            // Create the game room document
-            const roomRef = doc(collection(db, 'game_rooms'));
-            batch.set(roomRef, {
+            const result = await createRoomFunction({
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
                 isPrivate: roomPrivacy === 'private',
-                status: 'waiting',
-                createdBy: {
-                    uid: user.uid,
-                    name: `${userData.firstName} ${userData.lastName}`,
-                    color: finalPieceColor,
-                    photoURL: userData.photoURL || ''
-                },
-                players: [user.uid],
-                createdAt: serverTimestamp(),
-                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
+                pieceColor: pieceColor,
             });
-            
-            // Create a transaction log for the wager
-            if(wagerAmount > 0) {
-                const transactionRef = doc(collection(db, 'transactions'));
-                batch.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'wager',
-                    amount: wagerAmount,
-                    status: 'completed',
-                    description: `Wager for ${gameName} game`,
-                    gameRoomId: roomRef.id,
-                    createdAt: serverTimestamp()
-                });
+
+            const data = result.data as { success: boolean; message: string; roomId?: string };
+
+            if (!data.success || !data.roomId) {
+                throw new Error(data.message || 'Failed to create the room.');
             }
             
-            await batch.commit();
-            
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+            router.push(`/game/multiplayer/${data.roomId}`);
 
-            router.push(`/game/multiplayer/${roomRef.id}`);
-
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your balance has not been changed.' });
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error', 
+                description: error.message || 'Failed to create the room. Your balance has not been changed.' 
+            });
         } finally {
             setIsCreating(false);
         }
@@ -203,7 +170,7 @@ export default function CreateGamePage() {
                         </div>
 
                         <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
-                            {isCreating ? 'Creating Game...' : 'Create Game & Wait for Opponent'}
+                            {isCreating ? <Loader2 className="animate-spin" /> : 'Create Game & Wait for Opponent'}
                         </Button>
                     </CardContent>
                 </Card>

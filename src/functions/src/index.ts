@@ -1,4 +1,5 @@
 
+
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import axios from "axios";
@@ -299,6 +300,82 @@ export const updateEventProgressOnGameEnd = functions.firestore
     return null;
 });
 
+export const createGameRoom = onCall({ cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    const userId = request.auth.uid;
+    const { gameType, wager, timeControl, isPrivate, pieceColor } = request.data;
+    const db = admin.firestore();
+    const userRef = db.collection('users').doc(userId);
+
+    try {
+        const userDoc = await userRef.get();
+        if (!userDoc.exists()) {
+            throw new functions.https.HttpsError('not-found', 'User data not found.');
+        }
+        const userData = userDoc.data()!;
+
+        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+        if (totalBalance < wager) {
+            throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds.');
+        }
+
+        const roomRef = db.collection('game_rooms').doc();
+        const batch = db.batch();
+
+        const bonusWagered = Math.min(wager, userData.bonusBalance || 0);
+        const mainWagered = wager - bonusWagered;
+        const updatePayload: { [key: string]: any } = {};
+        if (bonusWagered > 0) updatePayload.bonusBalance = firestore.FieldValue.increment(-bonusWagered);
+        if (mainWagered > 0) updatePayload.balance = firestore.FieldValue.increment(-mainWagered);
+        batch.update(userRef, updatePayload);
+        
+        let finalPieceColor = pieceColor;
+        if (pieceColor === 'random') {
+            finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
+        }
+
+        batch.set(roomRef, {
+            gameType,
+            wager,
+            timeControl,
+            isPrivate,
+            status: 'waiting',
+            createdBy: {
+                uid: userId,
+                name: `${userData.firstName} ${userData.lastName}`,
+                color: finalPieceColor,
+                photoURL: userData.photoURL || ''
+            },
+            players: [userId],
+            p1Time: timeControl,
+            p2Time: timeControl,
+            createdAt: firestore.FieldValue.serverTimestamp(),
+            expiresAt: firestore.Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
+        });
+
+        if (wager > 0) {
+            const transactionRef = db.collection('transactions').doc();
+            batch.set(transactionRef, {
+                userId,
+                type: 'wager',
+                amount: wager,
+                status: 'completed',
+                description: `Wager for ${gameType} game`,
+                gameRoomId: roomRef.id,
+                createdAt: firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        await batch.commit();
+        return { success: true, roomId: roomRef.id, message: 'Room created successfully!' };
+    } catch (error: any) {
+        logger.error('Error in createGameRoom:', error);
+        throw new functions.https.HttpsError('internal', error.message || 'An unexpected error occurred.');
+    }
+});
+
 
 export const enrollInEvent = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
@@ -320,7 +397,6 @@ export const enrollInEvent = onCall({ cors: true }, async (request) => {
     try {
         const userDoc = await userRef.get();
         const eventDoc = await eventRef.get();
-        const enrollmentDoc = await enrollmentRef.get();
     
         if (!userDoc.exists()) {
             throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
@@ -328,26 +404,28 @@ export const enrollInEvent = onCall({ cors: true }, async (request) => {
         if (!eventDoc.exists()) {
             throw new functions.https.HttpsError('not-found', 'The event does not exist.');
         }
-        if (enrollmentDoc.exists) {
-            throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
-        }
-    
+        
         const userData = userDoc.data()!;
         const eventData = eventDoc.data()!;
-    
-        if (!eventData.isActive) {
-            throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
-        }
-        if (eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
-            throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
-        }
-    
-        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if (totalBalance < enrollmentFee) {
-            throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
-        }
-    
+
         await db.runTransaction(async (transaction) => {
+            const freshEnrollmentDoc = await transaction.get(enrollmentRef);
+            if (freshEnrollmentDoc.exists) {
+                throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
+            }
+        
+            if (!eventData.isActive) {
+                throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
+            }
+            if (eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+                throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
+            }
+        
+            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+            if (totalBalance < enrollmentFee) {
+                throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
+            }
+        
             const bonusDeduction = Math.min((userData.bonusBalance || 0), enrollmentFee);
             const mainDeduction = enrollmentFee - bonusDeduction;
 
@@ -407,7 +485,7 @@ export const joinGame = onCall({ cors: true }, async (request) => {
         }
         const joinerData = joinerDoc.data()!;
 
-        return await db.runTransaction(async (transaction) => {
+        await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
             if (!roomDoc.exists()) {
                 throw new functions.https.HttpsError('not-found', 'Game room not found.');
@@ -433,9 +511,9 @@ export const joinGame = onCall({ cors: true }, async (request) => {
                 players: firestore.FieldValue.arrayUnion(userId),
                 turnStartTime: firestore.FieldValue.serverTimestamp(),
             });
-
-            return { success: true, message: 'Game joined successfully' };
         });
+
+        return { success: true, message: 'Game joined successfully' };
     } catch (error: any) {
         logger.error('Error joining game transaction:', error);
         if (error instanceof functions.https.HttpsError) {
