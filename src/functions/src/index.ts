@@ -14,6 +14,7 @@ import * as admin from "firebase-admin";
 import axios from "axios";
 
 admin.initializeApp();
+const db = admin.firestore();
 
 // This function triggers whenever a new document is created in 'game_rooms'
 export const announceNewGame = functions.firestore
@@ -103,7 +104,6 @@ export const processCommissions = functions.firestore
                 return null;
             }
 
-            const db = admin.firestore();
             const batch = db.batch();
 
             // 2. Iterate through EACH player in the game to check for their referrers
@@ -207,7 +207,6 @@ export const updateEventProgressOnGameEnd = functions.firestore
       return null;
     }
 
-    const db = admin.firestore();
     const batch = db.batch();
     const wagerAmount = gameData.wager || 0;
     const playerIds = gameData.players || [];
@@ -303,27 +302,139 @@ export const updateEventProgressOnGameEnd = functions.firestore
 });
 
 
-export const updateEventEnrolledCount = functions.firestore
-  .document('users/{userId}/event_enrollments/{enrollmentId}')
-  .onCreate(async (snap, context) => {
-    const enrollmentData = snap.data();
-    const eventId = enrollmentData.eventId;
-    
-    if (!eventId) {
-      functions.logger.error("No eventId found on new enrollment document");
-      return null;
-    }
+export const enrollInEvent = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+  }
 
-    const eventRef = admin.firestore().collection('events').doc(eventId);
-    
-    try {
-      await eventRef.update({
-        enrolledCount: admin.firestore.FieldValue.increment(1)
-      });
-      functions.logger.log(`Successfully incremented enrolledCount for event ${eventId}`);
-    } catch (error) {
-      functions.logger.error(`Error incrementing enrolledCount for event ${eventId}:`, error);
+  const userId = context.auth.uid;
+  const { eventId } = data;
+
+  if (!eventId) {
+    throw new functions.https.HttpsError('invalid-argument', 'The function must be called with an "eventId" argument.');
+  }
+
+  try {
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection('users').doc(userId);
+      const eventRef = db.collection('events').doc(eventId);
+      const enrollmentRef = db.collection('users').doc(userId).collection('event_enrollments').doc(eventId);
+
+      const userDoc = await transaction.get(userRef);
+      const eventDoc = await transaction.get(eventRef);
+      const enrollmentDoc = await transaction.get(enrollmentRef);
+
+      if (!userDoc.exists || !eventDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'User or Event not found.');
+      }
+      if (enrollmentDoc.exists) {
+        throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
+      }
+
+      const eventData = eventDoc.data()!;
+      const userData = userDoc.data()!;
+
+      if (!eventData.isActive) {
+        throw new functions.https.HttpsError('failed-precondition', 'This event is not active.');
+      }
+      if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+        throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
+      }
+      if (userData.balance < eventData.enrollmentFee) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient Funds.');
+      }
+
+      const expiryDate = new Date();
+      expiryDate.setHours(expiryDate.getHours() + eventData.durationHours);
+
+      const enrollmentPayload = {
+        eventId: eventId,
+        userId: userId,
+        status: 'enrolled',
+        progress: 0,
+        enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromDate(expiryDate)
+      };
+
+      transaction.set(enrollmentRef, enrollmentPayload);
+      transaction.update(eventRef, { enrolledCount: admin.firestore.FieldValue.increment(1) });
+      transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(-eventData.enrollmentFee) });
+    });
+
+    return { success: true, message: 'Enrolled successfully!' };
+  } catch (error: any) {
+     functions.logger.error('Error enrolling in event:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
     }
-    
-    return null;
-  });
+    throw new functions.https.HttpsError('internal', 'An unexpected error occurred.', error.message);
+  }
+});
+
+
+export const joinGameAndDeductWager = functions.https.onCall(async (data, context) => {
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+  }
+  
+  const { roomId } = data;
+  const userId = context.auth.uid;
+
+  if (!roomId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Room ID is required.');
+  }
+
+  try {
+     await db.runTransaction(async (transaction) => {
+        const roomRef = db.collection('game_rooms').doc(roomId);
+        const joinerRef = db.collection('users').doc(userId);
+
+        const roomDoc = await transaction.get(roomRef);
+        const joinerDoc = await transaction.get(joinerRef);
+
+        if (!roomDoc.exists || !joinerDoc.exists()) {
+            throw new functions.https.HttpsError('not-found', 'Room or user not found.');
+        }
+
+        const roomData = roomDoc.data()!;
+        const joinerData = joinerDoc.data()!;
+
+        if (roomData.status !== 'waiting') {
+            throw new functions.https.HttpsError('failed-precondition', 'This room is no longer available.');
+        }
+
+        const wagerAmount = roomData.wager;
+        const totalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
+        if (totalBalance < wagerAmount) {
+            throw new functions.https.HttpsError('failed-precondition', 'Insufficient Funds.');
+        }
+
+        // Deduct wager
+        const bonusWagered = Math.min(wagerAmount, joinerData.bonusBalance || 0);
+        const mainWagered = wagerAmount - bonusWagered;
+        const joinerUpdate: { [key: string]: any } = {};
+        if (bonusWagered > 0) joinerUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusWagered);
+        if (mainWagered > 0) joinerUpdate.balance = admin.firestore.FieldValue.increment(-mainWagered);
+        transaction.update(joinerRef, joinerUpdate);
+        
+        // Update room
+        const creatorColor = roomData.createdBy.color;
+        const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+        transaction.update(roomRef, {
+            status: 'in-progress',
+            player2: { uid: userId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
+            players: admin.firestore.FieldValue.arrayUnion(userId),
+            turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    });
+
+    return { success: true, message: 'Game joined successfully' };
+
+  } catch (error: any) {
+    functions.logger.error('Error joining game:', error);
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    throw new functions.https.HttpsError('internal', 'An unexpected error occurred.', error.message);
+  }
+});

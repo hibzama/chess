@@ -1,7 +1,7 @@
 
 'use client'
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment, deleteField, runTransaction } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { httpsCallable } from 'firebase/functions';
 
 export interface Event {
     id: string;
@@ -147,51 +148,19 @@ export default function EventsPage() {
             return;
         }
         setIsEnrolling(event.id);
-    
-        try {
-            await runTransaction(db, async (transaction) => {
-                const userRef = doc(db, 'users', user.uid);
-                const eventRef = doc(db, 'events', event.id);
-                const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-    
-                const userDoc = await transaction.get(userRef);
-                const eventDoc = await transaction.get(eventRef);
-                const enrollmentDoc = await transaction.get(enrollmentRef);
 
-                if (!userDoc.exists() || !eventDoc.exists()) throw new Error("User or Event not found.");
-                if (enrollmentDoc.exists()) throw new Error("You are already enrolled in this event.");
-    
-                const currentEventData = eventDoc.data() as Event;
-                const currentUserData = userDoc.data();
-    
-                if (currentEventData.maxEnrollees && currentEventData.maxEnrollees > 0 && (currentEventData.enrolledCount || 0) >= currentEventData.maxEnrollees) {
-                    throw new Error("This event has reached its maximum number of participants.");
-                }
-    
-                if (currentUserData.balance < currentEventData.enrollmentFee) {
-                    throw new Error(`Insufficient Funds. You need LKR ${currentEventData.enrollmentFee.toFixed(2)}.`);
-                }
-    
-                const expiryDate = new Date();
-                expiryDate.setHours(expiryDate.getHours() + currentEventData.durationHours);
-    
-                const enrollmentPayload = {
-                    eventId: event.id,
-                    userId: user.uid,
-                    status: 'enrolled',
-                    progress: 0,
-                    enrolledAt: serverTimestamp(),
-                    expiresAt: Timestamp.fromDate(expiryDate)
-                };
-    
-                transaction.set(enrollmentRef, enrollmentPayload);
-                transaction.update(eventRef, { enrolledCount: increment(1) }); 
-                transaction.update(userRef, {
-                    balance: increment(-currentEventData.enrollmentFee),
-                });
-            });
-    
-            toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
+        try {
+            const enrollInEvent = httpsCallable(functions, 'enrollInEvent');
+            const result = await enrollInEvent({ eventId: event.id });
+            
+            const data = result.data as { success: boolean, message: string };
+
+            if(data.success) {
+                toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
+            } else {
+                throw new Error(data.message || 'Failed to enroll in event.');
+            }
+            
         } catch (error: any) {
             console.error("Enrollment failed: ", error);
             toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'Could not enroll in the event. Please try again.' });

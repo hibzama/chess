@@ -5,7 +5,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import CheckersBoard from '@/components/game/checkers-board';
 import GameLayout from '@/components/game/game-layout';
 import { GameProvider, useGame } from '@/context/game-context';
 import { formatTime } from '@/lib/time';
+import { httpsCallable } from 'firebase/functions';
 
 type GameRoom = {
     id: string;
@@ -219,57 +220,21 @@ function MultiplayerGame() {
     const handleJoinGame = async () => {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
-        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if(totalBalance < room.wager) {
-            toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have enough balance to join this game."});
-            return;
-        }
-    
         setIsJoining(true);
         try {
-            await runTransaction(db, async (transaction) => {
-                const roomRef = doc(db, 'game_rooms', room.id);
-                const joinerRef = doc(db, 'users', user.uid);
-                
-                const roomDoc = await transaction.get(roomRef);
-                const joinerDoc = await transaction.get(joinerRef);
+            const joinGame = httpsCallable(functions, 'joinGameAndDeductWager');
+            const result = await joinGame({ roomId: room.id });
+            const data = result.data as { success: boolean, message: string };
 
-                if (!roomDoc.exists() || !joinerDoc.exists()) {
-                    throw new Error("Room or user not found.");
-                }
-
-                if (roomDoc.data().status !== 'waiting') {
-                    throw new Error("This room is no longer available.");
-                }
-
-                // Deduct from joiner's balance
-                const wagerAmount = room.wager;
-                const joinerCurrentData = joinerDoc.data();
-                const joinerBonusWagered = Math.min(wagerAmount, joinerCurrentData.bonusBalance || 0);
-                const joinerMainWagered = wagerAmount - joinerBonusWagered;
-
-                const joinerUpdate: any = {};
-                if(joinerBonusWagered > 0) joinerUpdate.bonusBalance = increment(-joinerBonusWagered);
-                if(joinerMainWagered > 0) joinerUpdate.balance = increment(-joinerMainWagered);
-                transaction.update(joinerRef, joinerUpdate);
-
-                // Update Room
-                const creatorColor = room.createdBy.color;
-                const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-                transaction.update(roomRef, {
-                    status: 'in-progress',
-                    player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
-                    players: [...room.players, user.uid],
-                    capturedByP1: [], capturedByP2: [], moveHistory: [],
-                    currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
-                });
-            });
-
-            toast({ title: "Game Joined!", description: "The match is starting now." });
+            if(data.success) {
+                 toast({ title: "Game Joined!", description: "The match is starting now." });
+            } else {
+                throw new Error(data.message || 'Failed to join game.');
+            }
     
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            toast({ variant: 'destructive', title: "Error", description: `Could not join the game. Please try again. ${error.message}`});
+            toast({ variant: 'destructive', title: "Error", description: error.message || 'Could not join the game. Please try again.'});
         } finally {
             setIsJoining(false);
         }
