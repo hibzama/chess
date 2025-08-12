@@ -154,7 +154,6 @@ export default function EventsPage() {
             const enrollInEventFunction = httpsCallable(functions, 'enrollInEvent');
             const result = await enrollInEventFunction({ 
                 eventId: event.id,
-                enrollmentFee: event.enrollmentFee,
             });
             
             const data = result.data as { success: boolean; message: string };
