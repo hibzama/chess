@@ -144,54 +144,25 @@ export default function EventsPage() {
     }
 
     const handleEnroll = async (event: Event) => {
-        if (!user || !userData) {
+        if (!user) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
             return;
         }
         setIsEnrolling(event.id);
-        const userRef = doc(db, 'users', user.uid);
         
         try {
-            await runTransaction(db, async (transaction) => {
-                const userDoc = await transaction.get(userRef);
-                if (!userDoc.exists()) throw new Error("User data not found.");
-                
-                const currentData = userDoc.data();
-                const fee = event.enrollmentFee || 0;
-                const totalBalance = (currentData.balance || 0) + (currentData.bonusBalance || 0);
-    
-                if (totalBalance < fee) {
-                    throw new Error("Insufficient funds to enroll.");
-                }
-    
-                const bonusDeduction = Math.min(currentData.bonusBalance || 0, fee);
-                const mainDeduction = fee - bonusDeduction;
-    
-                const userUpdate: { [key: string]: any } = {};
-                if (mainDeduction > 0) userUpdate.balance = increment(-mainDeduction);
-                if (bonusDeduction > 0) userUpdate.bonusBalance = increment(-bonusDeduction);
-    
-                transaction.update(userRef, userUpdate);
-            });
-    
-            const enrollInEvent = httpsCallable(functions, 'enrollInEvent');
-            const result = await enrollInEvent({ eventId: event.id });
+            const enrollInEventFunction = httpsCallable(functions, 'enrollInEvent');
+            const result = await enrollInEventFunction({ eventId: event.id });
             
             const data = result.data as { success: boolean; message: string };
             if (!data.success) {
-                throw new Error(data.message || 'Failed to enroll. Your fee will be refunded.');
+                throw new Error(data.message || 'Failed to enroll in the event.');
             }
     
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
         } catch (error: any) {
             console.error("Enrollment failed: ", error);
-            const fee = event.enrollmentFee || 0;
-            if (fee > 0) {
-                 await updateDoc(userRef, { balance: increment(fee) });
-                 toast({ variant: 'destructive', title: 'Enrollment Failed', description: `${error.message} Your fee has been refunded to your main balance.` });
-            } else {
-                 toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message });
-            }
+            toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'An unknown error occurred.' });
         } finally {
             setIsEnrolling(null);
         }

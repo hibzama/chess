@@ -1,4 +1,5 @@
 
+'use client'
 
 /**
  * Import function triggers from their respective submodules:
@@ -303,72 +304,89 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
 
 export const enrollInEvent = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-  }
-
-  const userId = context.auth.uid;
-  const { eventId } = data;
-
-  if (!eventId) {
-    throw new functions.https.HttpsError('invalid-argument', 'The function must be called with an "eventId" argument.');
-  }
-
-  try {
-    await db.runTransaction(async (transaction) => {
-      const eventRef = db.collection('events').doc(eventId);
-      const enrollmentRef = db.collection('users').doc(userId).collection('event_enrollments').doc(eventId);
-      
-      const eventDoc = await transaction.get(eventRef);
-      const enrollmentDoc = await transaction.get(enrollmentRef);
-
-      if (!eventDoc.exists()) {
-        throw new functions.https.HttpsError('not-found', 'Event not found.');
-      }
-      
-      const eventData = eventDoc.data();
-      if (!eventData) {
-        throw new functions.https.HttpsError('data-loss', 'Event data is missing or corrupt.');
-      }
-
-      if (enrollmentDoc.exists) {
-        throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
-      }
-      
-      if (!eventData.isActive) {
-        throw new functions.https.HttpsError('failed-precondition', 'This event is not active.');
-      }
-      if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
-        throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
-      }
-
-      // Enrollment Logic
-      const now = new Date();
-      // Ensure durationHours is treated as a number
-      const durationHours = Number(eventData.durationHours);
-      const expiryDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
-
-      const enrollmentPayload = {
-        eventId: eventId,
-        userId: userId,
-        status: 'enrolled',
-        progress: 0,
-        enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: admin.firestore.Timestamp.fromDate(expiryDate)
-      };
-
-      transaction.set(enrollmentRef, enrollmentPayload);
-      transaction.update(eventRef, { enrolledCount: admin.firestore.FieldValue.increment(1) });
-    });
-
-    return { success: true, message: 'Enrolled successfully!' };
-  } catch (error: any) {
-     functions.logger.error('Error enrolling in event:', error);
-    if (error instanceof functions.https.HttpsError) {
-      throw error;
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    throw new functions.https.HttpsError('internal', 'An unexpected error occurred during enrollment.', error.message);
-  }
+
+    const userId = context.auth.uid;
+    const { eventId } = data;
+
+    if (!eventId) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with an "eventId" argument.');
+    }
+
+    const userRef = db.collection('users').doc(userId);
+    const eventRef = db.collection('events').doc(eventId);
+    const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            const eventDoc = await transaction.get(eventRef);
+            const enrollmentDoc = await transaction.get(enrollmentRef);
+
+            if (!userDoc.exists()) {
+                throw new functions.https.HttpsError('not-found', 'User not found.');
+            }
+            if (!eventDoc.exists()) {
+                throw new functions.https.HttpsError('not-found', 'Event not found.');
+            }
+            if (enrollmentDoc.exists) {
+                throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
+            }
+            
+            const userData = userDoc.data()!;
+            const eventData = eventDoc.data()!;
+
+            if (!eventData.isActive) {
+                throw new functions.https.HttpsError('failed-precondition', 'This event is not active.');
+            }
+            if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+                throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
+            }
+
+            const fee = Number(eventData.enrollmentFee) || 0;
+            const userBalance = Number(userData.balance) || 0;
+            const userBonusBalance = Number(userData.bonusBalance) || 0;
+            const totalBalance = userBalance + userBonusBalance;
+            
+            if (totalBalance < fee) {
+                throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
+            }
+
+            const bonusDeduction = Math.min(userBonusBalance, fee);
+            const mainDeduction = fee - bonusDeduction;
+
+            const userUpdate: { [key: string]: any } = {};
+            if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
+            if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
+            transaction.update(userRef, userUpdate);
+
+            const now = new Date();
+            const durationHours = Number(eventData.durationHours);
+            const expiryDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
+
+            const enrollmentPayload = {
+                eventId: eventId,
+                userId: userId,
+                status: 'enrolled',
+                progress: 0,
+                enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
+                expiresAt: admin.firestore.Timestamp.fromDate(expiryDate)
+            };
+
+            transaction.set(enrollmentRef, enrollmentPayload);
+            transaction.update(eventRef, { enrolledCount: admin.firestore.FieldValue.increment(1) });
+        });
+
+        return { success: true, message: 'Enrolled successfully!' };
+    } catch (error: any) {
+        functions.logger.error('Error in enrollInEvent transaction:', error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred during enrollment.', error.message);
+    }
 });
 
 
