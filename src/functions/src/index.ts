@@ -301,14 +301,12 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
 
 export const enrollInEvent = onCall({ cors: true }, async (request) => {
-    const { data, context } = request;
-
-    if (!context.auth) {
+    if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
-    const userId = context.auth.uid;
-    const { eventId, enrollmentFee } = data;
+    const userId = request.auth.uid;
+    const { eventId, enrollmentFee } = request.data;
     
     if (!eventId || typeof enrollmentFee !== 'number') {
         throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a valid "eventId" and "enrollmentFee".');
@@ -387,13 +385,12 @@ export const enrollInEvent = onCall({ cors: true }, async (request) => {
 
 
 export const joinGame = onCall({ cors: true }, async (request) => {
-    const { data, context } = request;
-    if (!context.auth) {
+    if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     
-    const { roomId } = data;
-    const userId = context.auth.uid;
+    const { roomId } = request.data;
+    const userId = request.auth.uid;
 
     if (!roomId) {
         throw new functions.https.HttpsError('invalid-argument', 'Room ID is required.');
