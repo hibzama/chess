@@ -298,3 +298,28 @@ export const updateEventProgressOnGameEnd = functions.firestore
     
     return null;
 });
+
+export const updateEventEnrolledCount = functions.firestore
+  .document('users/{userId}/event_enrollments/{enrollmentId}')
+  .onCreate(async (snap, context) => {
+    const enrollmentData = snap.data();
+    const eventId = enrollmentData.eventId;
+    
+    if (!eventId) {
+      functions.logger.error("No eventId found on new enrollment document");
+      return null;
+    }
+
+    const eventRef = admin.firestore().collection('events').doc(eventId);
+    
+    try {
+      await eventRef.update({
+        enrolledCount: admin.firestore.FieldValue.increment(1)
+      });
+      functions.logger.log(`Successfully incremented enrolledCount for event ${eventId}`);
+    } catch (error) {
+      functions.logger.error(`Error incrementing enrolledCount for event ${eventId}:`, error);
+    }
+    
+    return null;
+  });

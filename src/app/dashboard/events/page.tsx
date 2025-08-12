@@ -185,7 +185,8 @@ export default function EventsPage() {
                 };
     
                 transaction.set(enrollmentRef, enrollmentPayload);
-                transaction.update(eventRef, { enrolledCount: increment(1) });
+                // The enrolledCount will now be handled by a Cloud Function.
+                // transaction.update(eventRef, { enrolledCount: increment(1) }); 
                 transaction.update(userRef, {
                     balance: increment(-currentEventData.enrollmentFee),
                 });
