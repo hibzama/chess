@@ -2,81 +2,122 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allows admin full access, and authenticated users to read their own data.
+
+    // Helper functions
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isProfileOwner(userId) {
+        return request.auth.uid == userId;
+    }
+
+    function isUpdatingOwnProfile(userId) {
+      return isOwner(userId) &&
+             request.resource.data.keys().hasOnly(['firstName', 'lastName', 'phone', 'photoURL', 'address', 'city', 'country', 'gender', 'binancePayId']);
+    }
+
+    function isEnrollingInEvent(userId) {
+        let enrollmentPath = /databases/$(database)/documents/users/$(userId)/event_enrollments/$(request.resource.id);
+        let eventPath = /databases/$(database)/documents/events/$(request.resource.id);
+        
+        return exists(enrollmentPath) == false &&
+               existsAfter(enrollmentPath) == true &&
+               getAfter(enrollmentPath).data.userId == userId &&
+               request.resource.data.balance == resource.data.balance - get(/databases/$(database)/documents/events/$(getAfter(enrollmentPath).data.eventId)).data.enrollmentFee;
+    }
+
+
+    // USER DATA
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      // Anyone can read a user's public profile data
+      allow read;
       
-      // Allow users to create their own profile.
-      allow create: if request.auth != null && request.auth.uid == userId;
+      // A user can only create their own document
+      allow create: if isOwner(userId);
 
-      // Allow users to update their own profile, but NOT their balance or role.
-      // Balance is only allowed to change via a transaction from a Cloud Function or a specific client-side transaction.
-      allow update: if request.auth != null && request.auth.uid == userId &&
-                      !('balance' in request.resource.data) && 
-                      !('bonusBalance' in request.resource.data) &&
-                      !('marketingBalance' in request.resource.data) &&
-                      !('role' in request.resource.data) &&
-                      !('emailVerified' in request.resource.data);
-    }
-    
-    match /users/{userId} {
-      // Allow a user to update their own balance ONLY IF they are also creating an event enrollment.
-      // This is a specific rule to allow the event enrollment transaction.
-      allow update: if request.auth != null && request.auth.uid == userId &&
-                      getAfter(/databases/$(database)/documents/users/$(userId)/event_enrollments/$(request.resource.data.enrollingEventId)).data.eventId == request.resource.data.enrollingEventId;
-    }
-    
-    // Marketing applications can be created by anyone.
-    match /marketing_applications/{appId} {
-      allow create: if true;
+      // A user can update their own profile fields
+      allow update: if isUpdatingOwnProfile(userId) || isEnrollingInEvent(userId);
+      
+      match /event_enrollments/{enrollmentId} {
+        allow read, create: if isOwner(userId);
+        
+        match /progress_history/{progressId} {
+            allow read: if isOwner(userId);
+        }
+      }
+      
+      match /daily_bonus_claims/{claimId} {
+          allow read, create: if isOwner(userId);
+      }
     }
 
-    // Settings can only be read by authenticated users.
-    match /settings/{settingId} {
-      allow read: if request.auth != null;
-    }
-    
-    // Events can be read by any authenticated user.
-    match /events/{eventId} {
-        allow get, list: if request.auth != null;
-    }
-    
-    // A user can read and write to their own event_enrollments subcollection.
-    match /users/{userId}/event_enrollments/{enrollmentId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+    // TRANSACTIONS
+    match /transactions/{transactionId} {
+      allow read, create: if isOwner(request.resource.data.userId);
+      allow update: if isOwner(resource.data.userId); // Allow updating own transaction status (e.g., cancel)
     }
 
-    // Public game rooms can be listed by any authenticated user.
+    // GAME ROOMS
     match /game_rooms/{roomId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.createdBy.uid == request.auth.uid;
-      // Allow updates only by players in the game, and only if the game is not completed.
-      allow update: if request.auth != null && request.auth.uid in resource.data.players && resource.data.status != 'completed';
-      allow delete: if request.auth != null && request.auth.uid == resource.data.createdBy.uid;
+      // Anyone can read a public room, but only players can read a private one
+      allow get: if resource.data.isPrivate == false || request.auth.uid in resource.data.players;
+      allow list: if resource.data.isPrivate == false; // Only list public rooms
+
+      // Any authenticated user can create a room
+      allow create: if request.auth != null;
+
+      // Only players in the game can make updates (moves, joins)
+      allow update: if request.auth.uid in resource.data.players;
+
+      // Only the creator can delete a waiting room
+      allow delete: if resource.data.status == 'waiting' && request.auth.uid == resource.data.createdBy.uid;
+
+      // Chat messages within a room
+      match /messages/{messageId} {
+        allow read, create: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      }
     }
     
-    // Game chat messages can be read/written by players in the game.
-    match /game_rooms/{roomId}/messages/{messageId} {
-        allow read, create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-    }
-    
-    // Chats can be read/updated by participants.
-    match /chats/{chatId} {
-        allow read, update: if request.auth != null && request.auth.uid in resource.data.users;
-    }
-    
-     match /chats/{chatId}/messages/{messageId} {
-      allow read, create: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-    }
-    
-    // Notifications can be read/updated only by the recipient.
-    match /notifications/{notifId} {
-        allow read, update: if request.auth != null && request.auth.uid == resource.data.userId;
+    // MARKETING
+    match /marketing_applications/{appId} {
+      allow create; // Anyone can apply
     }
 
-    // Default deny all other reads/writes.
-    match /{document=**} {
-      allow read, write: if false;
+    // NOTIFICATIONS
+    match /notifications/{notificationId} {
+      allow read, update: if isOwner(resource.data.userId);
     }
+    
+    // CHATS
+    match /chats/{chatId} {
+      // You can only read/write to chats you are a part of
+      allow read, update, delete: if request.auth.uid in resource.data.users.keys();
+      
+      match /messages/{messageId} {
+        allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users.keys();
+      }
+    }
+
+    // SETTINGS (Admin Only)
+    match /settings/{settingId} {
+      allow read; // All users may need to read some settings
+    }
+    
+    // BONUSES
+    match /bonuses/{bonusId} {
+        allow read; // All users can read active bonuses
+    }
+    
+    match /dailyBonusClaims/{bonusId} {
+        allow update, read; // All users need to read/update the counter
+    }
+    
+    // EVENTS
+    match /events/{eventId} {
+        allow get, list: if request.auth != null; // Any authenticated user can list/get events
+        allow update: if getAfter(/databases/$(database)/documents/users/$(request.auth.uid)/event_enrollments/$(eventId)).data.userId == request.auth.uid; // Allow updating the count via transaction
+    }
+    
   }
 }
