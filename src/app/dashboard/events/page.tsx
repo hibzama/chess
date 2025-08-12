@@ -154,7 +154,7 @@ export default function EventsPage() {
             const enrollInEventFunction = httpsCallable(functions, 'enrollInEvent', { region: 'us-central1' });
             const result = await enrollInEventFunction({ 
                 eventId: event.id,
-                enrollmentFee: event.enrollmentFee // Pass the fee from the client
+                enrollmentFee: event.enrollmentFee
             });
             
             const data = result.data as { success: boolean; message: string };
@@ -165,7 +165,11 @@ export default function EventsPage() {
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
         } catch (error: any) {
             console.error("Enrollment failed: ", error);
-            toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'An unknown error occurred.' });
+            if (error.code === 'already-exists') {
+                 toast({ variant: 'destructive', title: 'Already Enrolled', description: "You are already enrolled in this event." });
+            } else {
+                 toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'An unknown error occurred.' });
+            }
         } finally {
             setIsEnrolling(null);
         }
@@ -401,5 +405,3 @@ export default function EventsPage() {
         </Tabs>
     );
 }
-
-    
