@@ -201,9 +201,24 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
     for (const playerId of playerIds) {
         const isWinner = playerId === winnerId;
-        const netEarning = isWinner ? (wagerAmount * 0.8) : -wagerAmount;
-
         const opponentId = playerIds.find((p: string) => p !== playerId);
+        const resigned = gameData.winner?.resignerId === opponentId; // Check if the *opponent* resigned
+        
+        // Calculate net earning based on win/loss/resignation
+        let netEarning = -wagerAmount; // Default loss
+        if(gameData.draw) {
+            netEarning = wagerAmount * -0.1; // Draw
+        } else if (isWinner) {
+             if (gameData.winner?.resignerId) { // Win by resignation
+                 netEarning = wagerAmount * 0.05;
+             } else { // Standard win
+                 netEarning = wagerAmount * 0.8;
+             }
+        } else if (gameData.winner?.resignerId === playerId) { // I resigned
+            netEarning = wagerAmount * -0.25;
+        }
+
+
         let opponentName = 'Unknown';
         if (opponentId) {
             const opponentDoc = await db.collection('users').doc(opponentId).get();
@@ -233,7 +248,8 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
             if (event.targetType === 'winningMatches') {
                 shouldLogHistory = true;
-                if (isWinner && gameData.winner?.resignerId !== opponentId && (!event.minWager || wagerAmount >= event.minWager)) {
+                // A win is a win, as long as the user is the winnerId
+                if (isWinner && (!event.minWager || wagerAmount >= event.minWager)) {
                     progressIncrement = 1;
                 }
             } else if (event.targetType === 'totalEarnings') {
@@ -285,7 +301,6 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
 
 export const enrollInEvent = onCall({ cors: true }, async (request) => {
-    const db = admin.firestore();
     if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
@@ -296,42 +311,45 @@ export const enrollInEvent = onCall({ cors: true }, async (request) => {
     if (!eventId || typeof enrollmentFee !== 'number') {
         throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a valid "eventId" and "enrollmentFee".');
     }
-    
+
+    const db = admin.firestore();
     const userRef = db.collection('users').doc(userId);
     const eventRef = db.collection('events').doc(eventId);
     const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
 
+    // Perform reads outside of the transaction
+    const userDoc = await userRef.get();
+    const eventDoc = await eventRef.get();
+    const enrollmentDoc = await enrollmentRef.get();
+
+    if (!userDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
+    }
+    if (!eventDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'The event does not exist.');
+    }
+    if (enrollmentDoc.exists) {
+        throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
+    }
+
+    const userData = userDoc.data()!;
+    const eventData = eventDoc.data()!;
+
+    if (!eventData.isActive) {
+        throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
+    }
+    if (eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+        throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
+    }
+
+    const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+    if (totalBalance < enrollmentFee) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
+    }
+
+    // Run writes in a transaction
     try {
         await db.runTransaction(async (transaction) => {
-            const userDoc = await transaction.get(userRef);
-            const eventDoc = await transaction.get(eventRef);
-            const enrollmentDoc = await transaction.get(enrollmentRef);
-
-            if (!userDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
-            }
-            if (!eventDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'The event does not exist.');
-            }
-            if (enrollmentDoc.exists) {
-                throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
-            }
-            
-            const userData = userDoc.data()!;
-            const eventData = eventDoc.data()!;
-            
-            if (!eventData.isActive) {
-                throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
-            }
-            if (eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
-                throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
-            }
-
-            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-            if (totalBalance < enrollmentFee) {
-                throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
-            }
-
             const bonusDeduction = Math.min((userData.bonusBalance || 0), enrollmentFee);
             const mainDeduction = enrollmentFee - bonusDeduction;
 
@@ -360,16 +378,12 @@ export const enrollInEvent = onCall({ cors: true }, async (request) => {
         return { success: true, message: 'Enrolled successfully!' };
     } catch (error: any) {
         logger.error('Error in enrollInEvent transaction:', error);
-        if (error instanceof functions.https.HttpsError) {
-             throw error;
-        }
-        throw new functions.https.HttpsError('internal', error.message || 'An unexpected error occurred.');
+        throw new functions.https.HttpsError('internal', error.message || 'An unexpected error occurred during the transaction.');
     }
 });
 
 
 export const joinGame = onCall({ cors: true }, async (request) => {
-    const db = admin.firestore();
     if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
@@ -381,38 +395,37 @@ export const joinGame = onCall({ cors: true }, async (request) => {
         throw new functions.https.HttpsError('invalid-argument', 'Room ID is required.');
     }
 
+    const db = admin.firestore();
     const roomRef = db.collection('game_rooms').doc(roomId);
     const joinerRef = db.collection('users').doc(userId);
 
+    // Perform reads outside of transaction
+    const joinerDoc = await joinerRef.get();
+    if (!joinerDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'Your user profile could not be found.');
+    }
+    const joinerData = joinerDoc.data()!;
+
+    const roomDoc = await roomRef.get();
+    if (!roomDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'Game room not found.');
+    }
+    const roomData = roomDoc.data()!;
+
+    // Perform validation checks
+    if (roomData.status !== 'waiting') {
+        throw new functions.https.HttpsError('failed-precondition', 'This room is no longer available.');
+    }
+    if (roomData.createdBy.uid === userId) {
+        throw new functions.https.HttpsError('failed-precondition', 'You cannot join your own game.');
+    }
+    if (roomData.players.includes(userId)) {
+        throw new functions.https.HttpsError('failed-precondition', 'You are already in this room.');
+    }
+
+    // Run writes in a transaction
     try {
-        const joinerDoc = await joinerRef.get();
-        if (!joinerDoc.exists()) {
-            throw new functions.https.HttpsError('not-found', 'Your user profile could not be found.');
-        }
-        const joinerData = joinerDoc.data();
-        if (!joinerData) {
-            throw new functions.https.HttpsError('data-loss', 'Your user profile data is corrupt.');
-        }
-
         await db.runTransaction(async (transaction) => {
-            const roomDoc = await transaction.get(roomRef);
-
-            if (!roomDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'Game room not found.');
-            }
-            
-            const roomData = roomDoc.data();
-            if (!roomData) {
-                throw new functions.https.HttpsError('data-loss', 'Game room data is corrupt.');
-            }
-
-            if (roomData.status !== 'waiting') {
-                throw new functions.https.HttpsError('failed-precondition', 'This room is no longer available.');
-            }
-            if (roomData.createdBy.uid === userId) {
-                throw new functions.https.HttpsError('failed-precondition', 'You cannot join your own game.');
-            }
-            
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
 
@@ -426,11 +439,8 @@ export const joinGame = onCall({ cors: true }, async (request) => {
 
         return { success: true, message: 'Game joined successfully' };
     } catch (error: any) {
-        logger.error('Error joining game:', error);
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
-        }
-        throw new functions.https.HttpsError('internal', 'An unexpected error occurred.', error.message);
+        logger.error('Error joining game transaction:', error);
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the room.', error.message);
     }
 });
 
