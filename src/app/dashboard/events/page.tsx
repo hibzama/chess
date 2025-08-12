@@ -143,13 +143,38 @@ export default function EventsPage() {
     }
 
     const handleEnroll = async (event: Event) => {
-        if (!user) {
+        if (!user || !userData) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
             return;
         }
         setIsEnrolling(event.id);
 
         try {
+            const fee = event.enrollmentFee || 0;
+            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+            if (totalBalance < fee) {
+                throw new Error('Insufficient Funds.');
+            }
+
+            // Step 1: Deduct fee in a transaction
+            const userRef = doc(db, 'users', user.uid);
+            await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) {
+                    throw new Error("User not found.");
+                }
+                const currentData = userDoc.data();
+                const bonusDeduction = Math.min(currentData.bonusBalance || 0, fee);
+                const mainDeduction = fee - bonusDeduction;
+
+                const userUpdate: { [key: string]: any } = {};
+                if (bonusDeduction > 0) userUpdate.bonusBalance = increment(-bonusDeduction);
+                if (mainDeduction > 0) userUpdate.balance = increment(-mainDeduction);
+
+                transaction.update(userRef, userUpdate);
+            });
+
+            // Step 2: Call cloud function to enroll
             const enrollInEvent = httpsCallable(functions, 'enrollInEvent');
             const result = await enrollInEvent({ eventId: event.id });
             
@@ -163,7 +188,13 @@ export default function EventsPage() {
             
         } catch (error: any) {
             console.error("Enrollment failed: ", error);
-            toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'Could not enroll in the event. Please try again.' });
+            // If cloud function fails, we need to refund the user.
+            // This is a simplified refund, a more robust system might use a transactions log.
+             const fee = event.enrollmentFee || 0;
+             const userRef = doc(db, 'users', user.uid);
+             await updateDoc(userRef, { balance: increment(fee) }); // Refund to main balance for simplicity
+
+            toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'Could not enroll in the event. Your fee has been refunded.' });
         } finally {
             setIsEnrolling(null);
         }

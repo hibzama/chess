@@ -316,44 +316,27 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
 
   try {
     await db.runTransaction(async (transaction) => {
-      const userRef = db.collection('users').doc(userId);
       const eventRef = db.collection('events').doc(eventId);
       const enrollmentRef = db.collection('users').doc(userId).collection('event_enrollments').doc(eventId);
 
-      const userDoc = await transaction.get(userRef);
       const eventDoc = await transaction.get(eventRef);
       const enrollmentDoc = await transaction.get(enrollmentRef);
 
-      if (!userDoc.exists || !eventDoc.exists()) {
-        throw new functions.https.HttpsError('not-found', 'User or Event not found.');
+      if (!eventDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'Event not found.');
       }
       if (enrollmentDoc.exists) {
         throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
       }
 
       const eventData = eventDoc.data()!;
-      const userData = userDoc.data()!;
-
+      
       if (!eventData.isActive) {
         throw new functions.https.HttpsError('failed-precondition', 'This event is not active.');
       }
-      if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+       if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
         throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
       }
-      
-      const fee = eventData.enrollmentFee || 0;
-      const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-
-      if (totalBalance < fee) {
-        throw new functions.https.HttpsError('failed-precondition', 'Insufficient Funds.');
-      }
-
-      // Deduct fee from balances
-      const bonusDeduction = Math.min(userData.bonusBalance || 0, fee);
-      const mainDeduction = fee - bonusDeduction;
-      const userUpdate: { [key: string]: any } = {};
-      if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
-      if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
 
       const expiryDate = new Date();
       expiryDate.setHours(expiryDate.getHours() + eventData.durationHours);
@@ -369,7 +352,6 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
 
       transaction.set(enrollmentRef, enrollmentPayload);
       transaction.update(eventRef, { enrolledCount: admin.firestore.FieldValue.increment(1) });
-      transaction.update(userRef, userUpdate);
     });
 
     return { success: true, message: 'Enrolled successfully!' };
@@ -383,7 +365,7 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
 });
 
 
-export const joinGameAndDeductWager = functions.https.onCall(async (data, context) => {
+export const joinGame = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
   }
@@ -395,15 +377,15 @@ export const joinGameAndDeductWager = functions.https.onCall(async (data, contex
     throw new functions.https.HttpsError('invalid-argument', 'Room ID is required.');
   }
 
-  try {
-     await db.runTransaction(async (transaction) => {
-        const roomRef = db.collection('game_rooms').doc(roomId);
-        const joinerRef = db.collection('users').doc(userId);
+  const roomRef = db.collection('game_rooms').doc(roomId);
+  const joinerRef = db.collection('users').doc(userId);
 
+  try {
+    await db.runTransaction(async (transaction) => {
         const roomDoc = await transaction.get(roomRef);
         const joinerDoc = await transaction.get(joinerRef);
 
-        if (!roomDoc.exists || !joinerDoc.exists()) {
+        if (!roomDoc.exists() || !joinerDoc.exists()) {
             throw new functions.https.HttpsError('not-found', 'Room or user not found.');
         }
 
@@ -413,25 +395,10 @@ export const joinGameAndDeductWager = functions.https.onCall(async (data, contex
         if (roomData.status !== 'waiting') {
             throw new functions.https.HttpsError('failed-precondition', 'This room is no longer available.');
         }
-
-        const wagerAmount = roomData.wager || 0;
-        const totalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
-        if (totalBalance < wagerAmount) {
-            throw new functions.https.HttpsError('failed-precondition', 'Insufficient Funds.');
-        }
-
-        // Deduct wager
-        const bonusDeduction = Math.min(joinerData.bonusBalance || 0, wagerAmount);
-        const mainDeduction = wagerAmount - bonusDeduction;
-
-        const joinerUpdate: { [key: string]: any } = {};
-        if (bonusDeduction > 0) joinerUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
-        if (mainDeduction > 0) joinerUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
-        transaction.update(joinerRef, joinerUpdate);
         
-        // Update room
         const creatorColor = roomData.createdBy.color;
         const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+
         transaction.update(roomRef, {
             status: 'in-progress',
             player2: { uid: userId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
@@ -441,7 +408,6 @@ export const joinGameAndDeductWager = functions.https.onCall(async (data, contex
     });
 
     return { success: true, message: 'Game joined successfully' };
-
   } catch (error: any) {
     functions.logger.error('Error joining game:', error);
     if (error instanceof functions.https.HttpsError) {
@@ -450,3 +416,4 @@ export const joinGameAndDeductWager = functions.https.onCall(async (data, contex
     throw new functions.https.HttpsError('internal', 'An unexpected error occurred.', error.message);
   }
 });
+
