@@ -310,61 +310,59 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
     }
 
     const userId = context.auth.uid;
-    const { eventId } = data;
+    const { eventId, enrollmentFee } = data;
 
-    if (!eventId) {
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with an "eventId" argument.');
+    if (!eventId || typeof enrollmentFee !== 'number') {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with an "eventId" and a numeric "enrollmentFee".');
     }
 
     const userRef = db.collection('users').doc(userId);
     const eventRef = db.collection('events').doc(eventId);
     const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
 
+    // Perform reads outside the transaction for stability
     try {
+        const userDoc = await userRef.get();
+        const eventDoc = await eventRef.get();
+        const enrollmentDoc = await enrollmentRef.get();
+
+        if (!userDoc.exists()) {
+            throw new functions.https.HttpsError('not-found', 'Your user data could not be found. Please try again.');
+        }
+        if (!eventDoc.exists()) {
+            throw new functions.https.HttpsError('not-found', 'The event you are trying to join does not exist or has been removed.');
+        }
+        if (enrollmentDoc.exists()) {
+            throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
+        }
+
+        const userData = userDoc.data()!;
+        const eventData = eventDoc.data()!;
+
+        if (!eventData.isActive) {
+            throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
+        }
+        if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+            throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
+        }
+
+        const userBalance = Number(userData.balance) || 0;
+        const userBonusBalance = Number(userData.bonusBalance) || 0;
+        const totalBalance = userBalance + userBonusBalance;
+
+        if (totalBalance < enrollmentFee) {
+            throw new functions.https.HttpsError('failed-precondition', 'You have insufficient funds to enroll in this event.');
+        }
+
+        // Run the writes in a transaction
         await db.runTransaction(async (transaction) => {
-            const userDoc = await transaction.get(userRef);
-            const eventDoc = await transaction.get(eventRef);
-            const enrollmentDoc = await transaction.get(enrollmentRef);
-
-            if (!userDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'User data not found. Please try again.');
-            }
-            if (!eventDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'Event not found or has been removed.');
-            }
-            if (enrollmentDoc.exists) {
-                throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
-            }
-            
-            const userData = userDoc.data();
-            const eventData = eventDoc.data();
-            
-            if (!userData || !eventData) {
-                throw new functions.https.HttpsError('data-loss', 'Critical user or event data is missing.');
-            }
-
-            if (!eventData.isActive) {
-                throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
-            }
-            if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
-                throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
-            }
-
-            const fee = Number(eventData.enrollmentFee) || 0;
-            const userBalance = Number(userData.balance) || 0;
-            const userBonusBalance = Number(userData.bonusBalance) || 0;
-            const totalBalance = userBalance + userBonusBalance;
-            
-            if (totalBalance < fee) {
-                throw new functions.https.HttpsError('failed-precondition', 'You have insufficient funds to enroll in this event.');
-            }
-
-            const bonusDeduction = Math.min(userBonusBalance, fee);
-            const mainDeduction = fee - bonusDeduction;
+            const bonusDeduction = Math.min(userBonusBalance, enrollmentFee);
+            const mainDeduction = enrollmentFee - bonusDeduction;
 
             const userUpdate: { [key: string]: any } = {};
             if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
             if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
+            
             transaction.update(userRef, userUpdate);
 
             const now = new Date();
@@ -385,12 +383,13 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
         });
 
         return { success: true, message: 'Enrolled successfully!' };
+
     } catch (error: any) {
-        functions.logger.error('Error in enrollInEvent transaction:', error);
-        if (error instanceof functions.https.HttpsError) {
-            throw error;
+        functions.logger.error('Error in enrollInEvent function:', error);
+        if (error.code && error.message) { // It's an HttpsError
+             throw error;
         }
-        throw new functions.https.HttpsError('internal', 'An unexpected error occurred during enrollment. Please try again.', error.message);
+        throw new functions.https.HttpsError('internal', 'An unexpected server error occurred during enrollment.');
     }
 });
 
@@ -411,24 +410,25 @@ export const joinGame = functions.https.onCall(async (data, context) => {
   const joinerRef = db.collection('users').doc(userId);
 
   try {
+    const joinerDoc = await joinerRef.get();
+     if (!joinerDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'Your user profile could not be found.');
+    }
+    const joinerData = joinerDoc.data();
+     if (!joinerData) {
+        throw new functions.https.HttpsError('data-loss', 'Your user profile data is corrupt.');
+    }
+
     await db.runTransaction(async (transaction) => {
         const roomDoc = await transaction.get(roomRef);
-        const joinerDoc = await transaction.get(joinerRef);
 
         if (!roomDoc.exists()) {
             throw new functions.https.HttpsError('not-found', 'Game room not found.');
         }
-        if (!joinerDoc.exists()) {
-             throw new functions.https.HttpsError('not-found', 'Your user profile could not be found.');
-        }
-
+        
         const roomData = roomDoc.data();
         if (!roomData) {
             throw new functions.https.HttpsError('data-loss', 'Game room data is corrupt.');
-        }
-        const joinerData = joinerDoc.data();
-        if (!joinerData) {
-            throw new functions.https.HttpsError('data-loss', 'Your user profile data is corrupt.');
         }
 
         if (roomData.status !== 'waiting') {
@@ -458,4 +458,3 @@ export const joinGame = functions.https.onCall(async (data, context) => {
     throw new functions.https.HttpsError('internal', 'An unexpected error occurred.', error.message);
   }
 });
-
