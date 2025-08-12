@@ -1,4 +1,5 @@
 
+
 'use client'
 
 /**
@@ -328,15 +329,19 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
             if (!userDoc.exists()) {
                 throw new functions.https.HttpsError('not-found', 'User not found.');
             }
-            if (!eventDoc.exists()) {
+             if (!eventDoc.exists()) {
                 throw new functions.https.HttpsError('not-found', 'Event not found.');
             }
             if (enrollmentDoc.exists) {
                 throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
             }
             
-            const userData = userDoc.data()!;
-            const eventData = eventDoc.data()!;
+            const userData = userDoc.data();
+            const eventData = eventDoc.data();
+
+            if (!userData || !eventData) {
+                 throw new functions.https.HttpsError('data-loss', 'User or Event data is missing.');
+            }
 
             if (!eventData.isActive) {
                 throw new functions.https.HttpsError('failed-precondition', 'This event is not active.');
