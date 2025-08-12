@@ -217,6 +217,7 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
     for (const playerId of playerIds) {
         const isWinner = playerId === winnerId;
+        // Simplified net earning for event progress
         const netEarning = isWinner ? (wagerAmount * 0.8) : -wagerAmount;
 
         const opponentId = playerIds.find((p: string) => p !== playerId);
@@ -250,7 +251,8 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
             if (event.targetType === 'winningMatches') {
                 shouldLogHistory = true;
-                if (isWinner && (!event.minWager || wagerAmount >= event.minWager)) {
+                // Only count wins, not resignations by the opponent
+                if (isWinner && gameData.winner?.resignerId !== opponentId && (!event.minWager || wagerAmount >= event.minWager)) {
                     progressIncrement = 1;
                 }
             } else if (event.targetType === 'totalEarnings') {
@@ -301,10 +303,6 @@ export const updateEventProgressOnGameEnd = functions.firestore
 });
 
 
-// This cloud function was removed as the logic was moved to the client-side transaction
-// for atomicity. The client now increments the event's enrolledCount directly.
-// See /src/app/dashboard/events/page.tsx -> handleEnroll
-/*
 export const updateEventEnrolledCount = functions.firestore
   .document('users/{userId}/event_enrollments/{enrollmentId}')
   .onCreate(async (snap, context) => {
@@ -329,4 +327,3 @@ export const updateEventEnrolledCount = functions.firestore
     
     return null;
   });
-*/
