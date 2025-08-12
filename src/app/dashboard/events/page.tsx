@@ -142,52 +142,41 @@ export default function EventsPage() {
     }
 
     const handleEnroll = async (event: Event) => {
-        if (!user || !userData) {
+        if (!user) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
             return;
         }
         
         setIsEnrolling(event.id);
-
+    
         try {
             await runTransaction(db, async (transaction) => {
                 const userRef = doc(db, 'users', user.uid);
                 const eventRef = doc(db, 'events', event.id);
                 const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-
-                // Read all data within the transaction
+    
                 const userDoc = await transaction.get(userRef);
                 const eventDoc = await transaction.get(eventRef);
-                const enrollmentDoc = await transaction.get(enrollmentRef);
-
+    
                 if (!userDoc.exists() || !eventDoc.exists()) {
                     throw new Error("User or Event not found.");
                 }
-
-                if (enrollmentDoc.exists()) {
-                    throw new Error("You are already enrolled in this event.");
-                }
-
+    
                 const currentEventData = eventDoc.data() as Event;
                 const currentUserData = userDoc.data();
-
+    
                 if (currentEventData.maxEnrollees && currentEventData.maxEnrollees > 0 && (currentEventData.enrolledCount || 0) >= currentEventData.maxEnrollees) {
                     throw new Error("This event has reached its maximum number of participants.");
                 }
-
+    
                 if (currentUserData.balance < currentEventData.enrollmentFee) {
                     throw new Error(`Insufficient Funds. You need LKR ${currentEventData.enrollmentFee.toFixed(2)}.`);
                 }
-
-                // All checks passed, perform writes
-                transaction.update(userRef, { 
-                    balance: increment(-currentEventData.enrollmentFee),
-                });
-
+    
                 const expiryDate = new Date();
                 expiryDate.setHours(expiryDate.getHours() + currentEventData.durationHours);
-                
-                const enrollmentData = {
+    
+                const enrollmentPayload = {
                     eventId: event.id,
                     userId: user.uid,
                     status: 'enrolled',
@@ -195,10 +184,16 @@ export default function EventsPage() {
                     enrolledAt: serverTimestamp(),
                     expiresAt: Timestamp.fromDate(expiryDate)
                 };
-                transaction.set(enrollmentRef, enrollmentData);
+    
+                transaction.set(enrollmentRef, enrollmentPayload);
                 transaction.update(eventRef, { enrolledCount: increment(1) });
+                transaction.update(userRef, {
+                    balance: increment(-currentEventData.enrollmentFee),
+                    enrollingEventId: event.id, // temporary field for security rule
+                    enrollingEventFee: currentEventData.enrollmentFee // temporary field
+                });
             });
-            
+    
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
         } catch (error: any) {
             console.error("Enrollment failed: ", error);
@@ -430,4 +425,3 @@ export default function EventsPage() {
         </Tabs>
     );
 }
-
