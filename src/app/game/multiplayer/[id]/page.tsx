@@ -170,10 +170,6 @@ function MultiplayerGame() {
             // Refund the creator's wager
             if (room.wager > 0) {
                  batch.update(userRef, { balance: increment(room.wager) });
-
-                 // Optionally, find and delete the original wager transaction
-                 // This part can be complex, so a refund transaction might be simpler.
-                 // For now, we'll just refund the balance.
             }
             
             await batch.commit();
@@ -219,55 +215,54 @@ function MultiplayerGame() {
 
     const handleJoinGame = async () => {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
-    
+        
         setIsJoining(true);
+        const userRef = doc(db, 'users', user.uid);
+        const wagerAmount = room.wager || 0;
+
         try {
-            const wagerAmount = room.wager || 0;
-            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-            if (totalBalance < wagerAmount) {
-                throw new Error('Insufficient Funds.');
-            }
-
-            // Step 1: Deduct wager locally and create transaction log
-            const userRef = doc(db, 'users', user.uid);
+             // Step 1: Client-side transaction to deduct the wager.
             await runTransaction(db, async (transaction) => {
-                 const userDoc = await transaction.get(userRef);
-                 if (!userDoc.exists()) throw new Error("User not found.");
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) throw new Error("Your user profile could not be found.");
+                
+                const currentData = userDoc.data();
+                const totalBalance = (currentData.balance || 0) + (currentData.bonusBalance || 0);
 
-                 const currentData = userDoc.data();
-                 const bonusDeduction = Math.min(currentData.bonusBalance || 0, wagerAmount);
-                 const mainDeduction = wagerAmount - bonusDeduction;
+                if (totalBalance < wagerAmount) {
+                    throw new Error("Insufficient funds to join this game.");
+                }
+                
+                const bonusDeduction = Math.min(currentData.bonusBalance || 0, wagerAmount);
+                const mainDeduction = wagerAmount - bonusDeduction;
 
-                 const userUpdate: { [key: string]: any } = {};
-                 if (bonusDeduction > 0) userUpdate.bonusBalance = increment(-bonusDeduction);
-                 if (mainDeduction > 0) userUpdate.balance = increment(-mainDeduction);
-                 transaction.update(userRef, userUpdate);
-
-                 const txLogRef = doc(collection(db, 'transactions'));
-                 transaction.set(txLogRef, {
-                    userId: user.uid, type: 'wager', amount: wagerAmount,
-                    status: 'completed', description: `Wager for ${room.gameType} game`,
-                    gameRoomId: room.id, createdAt: serverTimestamp()
-                 });
+                const userUpdate: { [key: string]: any } = {};
+                if (bonusDeduction > 0) userUpdate.bonusBalance = increment(-bonusDeduction);
+                if (mainDeduction > 0) userUpdate.balance = increment(-mainDeduction);
+                
+                transaction.update(userRef, userUpdate);
             });
 
-            // Step 2: Call Cloud Function to join the room
+            // Step 2: If wager deduction is successful, call Cloud Function to join.
             const joinGame = httpsCallable(functions, 'joinGame');
             const result = await joinGame({ roomId: room.id });
             const data = result.data as { success: boolean, message: string };
 
-            if(data.success) {
-                 toast({ title: "Game Joined!", description: "The match is starting now." });
-            } else {
-                throw new Error(data.message || 'Failed to join game.');
+            if (!data.success) {
+                throw new Error(data.message || 'Failed to join the game room.');
             }
+
+            toast({ title: "Game Joined!", description: "The match is starting now." });
     
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            // Refund user if any step failed after deduction
-             const userRef = doc(db, 'users', user.uid);
-             await updateDoc(userRef, { balance: increment(room.wager) });
-            toast({ variant: "destructive", title: "Error Joining Game", description: `${error.message}. Your wager has been refunded.`});
+            // If any step fails, refund the user.
+            if (wagerAmount > 0) {
+                await updateDoc(userRef, { balance: increment(wagerAmount) });
+                toast({ variant: "destructive", title: "Error Joining Game", description: `${error.message}. Your wager has been refunded.`});
+            } else {
+                toast({ variant: "destructive", title: "Error Joining Game", description: error.message });
+            }
         } finally {
             setIsJoining(false);
         }

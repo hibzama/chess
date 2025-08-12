@@ -148,53 +148,57 @@ export default function EventsPage() {
             return;
         }
         setIsEnrolling(event.id);
-
+        const userRef = doc(db, 'users', user.uid);
+        
         try {
-            const fee = event.enrollmentFee || 0;
-            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-            if (totalBalance < fee) {
-                throw new Error('Insufficient Funds.');
-            }
-
-            // Step 1: Deduct fee in a transaction
-            const userRef = doc(db, 'users', user.uid);
+            // Step 1: Client-side transaction to deduct the fee.
             await runTransaction(db, async (transaction) => {
                 const userDoc = await transaction.get(userRef);
                 if (!userDoc.exists()) {
-                    throw new Error("User not found.");
+                    throw new Error("User data not found.");
                 }
                 const currentData = userDoc.data();
+                const fee = event.enrollmentFee || 0;
+                const totalBalance = (currentData.balance || 0) + (currentData.bonusBalance || 0);
+
+                if (totalBalance < fee) {
+                    throw new Error("Insufficient funds to enroll.");
+                }
+                
                 const bonusDeduction = Math.min(currentData.bonusBalance || 0, fee);
                 const mainDeduction = fee - bonusDeduction;
 
                 const userUpdate: { [key: string]: any } = {};
                 if (bonusDeduction > 0) userUpdate.bonusBalance = increment(-bonusDeduction);
                 if (mainDeduction > 0) userUpdate.balance = increment(-mainDeduction);
-
+                
                 transaction.update(userRef, userUpdate);
             });
-
-            // Step 2: Call cloud function to enroll
+            
+            // Step 2: If fee deduction is successful, call the Cloud Function to enroll.
             const enrollInEvent = httpsCallable(functions, 'enrollInEvent');
             const result = await enrollInEvent({ eventId: event.id });
-            
             const data = result.data as { success: boolean, message: string };
 
-            if(data.success) {
-                toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
-            } else {
-                throw new Error(data.message || 'Failed to enroll in event.');
+            if (!data.success) {
+                // If cloud function fails, we must refund the user.
+                throw new Error(data.message || 'Failed to enroll in the event. Your fee will be refunded.');
             }
-            
+
+            toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
+
         } catch (error: any) {
             console.error("Enrollment failed: ", error);
-            // If cloud function fails, we need to refund the user.
-            // This is a simplified refund, a more robust system might use a transactions log.
-             const fee = event.enrollmentFee || 0;
-             const userRef = doc(db, 'users', user.uid);
-             await updateDoc(userRef, { balance: increment(fee) }); // Refund to main balance for simplicity
-
-            toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'Could not enroll in the event. Your fee has been refunded.' });
+            // This will catch errors from both the transaction and the cloud function call.
+            // A more robust system would log this failure for manual review/refund.
+            // For now, we attempt a simple refund.
+            const fee = event.enrollmentFee || 0;
+            if (fee > 0) {
+                 await updateDoc(userRef, { balance: increment(fee) });
+                 toast({ variant: 'destructive', title: 'Enrollment Failed', description: `${error.message} Your fee has been refunded to your main balance.` });
+            } else {
+                 toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message });
+            }
         } finally {
             setIsEnrolling(null);
         }

@@ -317,27 +317,21 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
   try {
     await db.runTransaction(async (transaction) => {
       const eventRef = db.collection('events').doc(eventId);
-      const userRef = db.collection('users').doc(userId);
-      const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
+      const enrollmentRef = db.collection('users').doc(userId).collection('event_enrollments').doc(eventId);
       
-      const [eventDoc, userDoc, enrollmentDoc] = await Promise.all([
+      const [eventDoc, enrollmentDoc] = await Promise.all([
           transaction.get(eventRef),
-          transaction.get(userRef),
           transaction.get(enrollmentRef)
       ]);
 
       if (!eventDoc.exists) {
         throw new functions.https.HttpsError('not-found', 'Event not found.');
       }
-      if (!userDoc.exists()) {
-        throw new functions.https.HttpsError('not-found', 'User record not found.');
-      }
-      if (enrollmentDoc.exists) {
+       if (enrollmentDoc.exists) {
         throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
       }
-
+      
       const eventData = eventDoc.data()!;
-      const userData = userDoc.data()!;
       
       if (!eventData.isActive) {
         throw new functions.https.HttpsError('failed-precondition', 'This event is not active.');
@@ -345,25 +339,6 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
       if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
         throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
       }
-
-      // Fee and Balance Logic
-      const fee = eventData.enrollmentFee || 0;
-      const bonusBalance = userData.bonusBalance || 0;
-      const mainBalance = userData.balance || 0;
-      const totalBalance = mainBalance + bonusBalance;
-
-      if (totalBalance < fee) {
-          throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
-      }
-      
-      const bonusDeduction = Math.min(bonusBalance, fee);
-      const mainDeduction = fee - bonusDeduction;
-      
-      const userUpdate: {[key: string]: any} = {};
-      if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
-      if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
-      
-      transaction.update(userRef, userUpdate);
 
       // Enrollment Logic
       const expiryDate = new Date();
@@ -388,7 +363,7 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
     if (error instanceof functions.https.HttpsError) {
       throw error;
     }
-    throw new functions.https.HttpsError('internal', 'An unexpected error occurred.', error.message);
+    throw new functions.https.HttpsError('internal', 'An unexpected error occurred during enrollment.', error.message);
   }
 });
 
@@ -416,9 +391,8 @@ export const joinGame = functions.https.onCall(async (data, context) => {
         if (!roomDoc.exists()) {
             throw new functions.https.HttpsError('not-found', 'Game room not found.');
         }
-
         if (!joinerDoc.exists()) {
-            throw new functions.https.HttpsError('not-found', 'Your user record could not be found.');
+             throw new functions.https.HttpsError('not-found', 'Your user profile could not be found.');
         }
 
         const roomData = roomDoc.data()!;
