@@ -164,9 +164,11 @@ export default function EventsPage() {
         const eventRef = doc(db, 'events', event.id);
 
         try {
+            // Firestore security rules will validate this transaction
             batch.update(userRef, { 
                 balance: increment(-event.enrollmentFee),
-                enrollingEventId: event.id // Temporary field for security rule check
+                enrollingEventFee: event.enrollmentFee, // For rule validation
+                enrollingEventId: event.id // For rule validation
             });
 
             const expiryDate = new Date();
@@ -185,17 +187,14 @@ export default function EventsPage() {
 
             await batch.commit();
             
-            // Clean up the temporary field after successful commit.
-            await updateDoc(userRef, { enrollingEventId: deleteField() });
-
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
         } catch (error) {
             console.error("Enrollment failed: ", error);
             toast({ variant: 'destructive', title: 'Enrollment Failed', description: 'Could not enroll in the event. Please check your balance and try again.' });
-            // Cleanup in case of failure
-            await updateDoc(userRef, { enrollingEventId: deleteField() }).catch(() => {});
         } finally {
             setIsEnrolling(null);
+            // Clean up the temporary fields regardless of success or failure
+            updateDoc(userRef, { enrollingEventId: deleteField(), enrollingEventFee: deleteField() }).catch(() => {});
         }
     }
 
@@ -420,3 +419,4 @@ export default function EventsPage() {
         </Tabs>
     );
 }
+
