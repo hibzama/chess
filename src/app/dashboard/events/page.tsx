@@ -185,8 +185,7 @@ export default function EventsPage() {
                 };
     
                 transaction.set(enrollmentRef, enrollmentPayload);
-                // The enrolledCount will now be handled by a Cloud Function.
-                // transaction.update(eventRef, { enrolledCount: increment(1) }); 
+                transaction.update(eventRef, { enrolledCount: increment(1) }); 
                 transaction.update(userRef, {
                     balance: increment(-currentEventData.enrollmentFee),
                 });
@@ -204,6 +203,14 @@ export default function EventsPage() {
 
     const alreadyEnrolledIds = new Set(enrolledEvents.map(e => e.eventId));
     
+    const displayableAvailableEvents = availableEvents.filter(event => {
+        if (alreadyEnrolledIds.has(event.id)) return false; // Already enrolled
+        if (event.maxEnrollees && event.maxEnrollees > 0 && (event.enrolledCount || 0) >= event.maxEnrollees) {
+            return false; // Event is full
+        }
+        return true;
+    });
+
     const activeEnrolledEvents = enrolledEvents.filter(e => e.status === 'enrolled' && e.expiresAt.toDate() > new Date());
     const historyEvents = enrolledEvents.filter(e => e.status !== 'enrolled' || e.expiresAt.toDate() <= new Date());
 
@@ -244,8 +251,8 @@ export default function EventsPage() {
                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
                     {loading ? (
                         [...Array(3)].map((_, i) => <Skeleton key={i} className="h-96 w-full" />)
-                    ) : availableEvents.filter(e => !alreadyEnrolledIds.has(e.id)).length > 0 ? (
-                        availableEvents.filter(e => !alreadyEnrolledIds.has(e.id)).map(event => (
+                    ) : displayableAvailableEvents.length > 0 ? (
+                        displayableAvailableEvents.map(event => (
                             <Card key={event.id} className="flex flex-col">
                                 <CardHeader className="text-center">
                                     <div className="mx-auto p-3 bg-primary/10 rounded-full w-fit mb-2">
@@ -423,3 +430,4 @@ export default function EventsPage() {
         </Tabs>
     );
 }
+

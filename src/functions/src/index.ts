@@ -1,4 +1,5 @@
 
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -299,6 +300,11 @@ export const updateEventProgressOnGameEnd = functions.firestore
     return null;
 });
 
+
+// This cloud function was removed as the logic was moved to the client-side transaction
+// for atomicity. The client now increments the event's enrolledCount directly.
+// See /src/app/dashboard/events/page.tsx -> handleEnroll
+/*
 export const updateEventEnrolledCount = functions.firestore
   .document('users/{userId}/event_enrollments/{enrollmentId}')
   .onCreate(async (snap, context) => {
@@ -323,3 +329,4 @@ export const updateEventEnrolledCount = functions.firestore
     
     return null;
   });
+*/
