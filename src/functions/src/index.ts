@@ -328,14 +328,17 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
       if (!eventDoc.exists) {
         throw new functions.https.HttpsError('not-found', 'Event not found.');
       }
-      if (!userDoc.exists()) {
+       if (!userDoc.exists()) {
         throw new functions.https.HttpsError('not-found', 'User data not found.');
       }
        if (enrollmentDoc.exists) {
         throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
       }
       
-      const eventData = eventDoc.data()!;
+      const eventData = eventDoc.data();
+      if (!eventData) {
+        throw new functions.https.HttpsError('data-loss', 'Event data is missing or corrupt.');
+      }
       
       if (!eventData.isActive) {
         throw new functions.https.HttpsError('failed-precondition', 'This event is not active.');
@@ -399,8 +402,14 @@ export const joinGame = functions.https.onCall(async (data, context) => {
              throw new functions.https.HttpsError('not-found', 'Your user profile could not be found.');
         }
 
-        const roomData = roomDoc.data()!;
-        const joinerData = joinerDoc.data()!;
+        const roomData = roomDoc.data();
+        if (!roomData) {
+            throw new functions.https.HttpsError('data-loss', 'Game room data is corrupt.');
+        }
+        const joinerData = joinerDoc.data();
+        if (!joinerData) {
+            throw new functions.https.HttpsError('data-loss', 'Your user profile data is corrupt.');
+        }
 
         if (roomData.status !== 'waiting') {
             throw new functions.https.HttpsError('failed-precondition', 'This room is no longer available.');
