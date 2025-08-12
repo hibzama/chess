@@ -7,10 +7,9 @@ import axios from "axios";
 // Correctly initialize Firebase Admin with databaseURL
 admin.initializeApp({
   credential: admin.credential.applicationDefault(),
-  databaseURL: `https://${process.env.GCLOUD_PROJECT}.firebaseio.com`,
+  databaseURL: `https://nexbattle-ymmmq.firebaseio.com`,
 });
 
-const db = admin.firestore();
 
 // This function triggers whenever a new document is created in 'game_rooms'
 export const announceNewGame = functions.firestore
@@ -78,6 +77,7 @@ export const announceNewGame = functions.firestore
 export const processCommissions = functions.firestore
     .document('game_rooms/{gameRoomId}')
     .onUpdate(async (change, context) => {
+        const db = admin.firestore();
         const gameRoomId = context.params.gameRoomId;
         const beforeData = change.before.data();
         const afterData = change.after.data();
@@ -112,7 +112,7 @@ export const processCommissions = functions.firestore
 
                 if (referredBy) {
                     const referrerDoc = await db.collection('users').doc(referredBy).get();
-                    if (referrerDoc.exists() && referrerDoc.data()?.role === 'user') {
+                    if (referrerDoc.exists && referrerDoc.data()?.role === 'user') {
                         const l1Count = referrerDoc.data()?.l1Count || 0;
                         const l1Rate = l1Count >= 20 ? 0.05 : 0.03;
                         const commissionAmount = gameWager * l1Rate;
@@ -186,6 +186,7 @@ export const processCommissions = functions.firestore
 export const updateEventProgressOnGameEnd = functions.firestore
   .document('game_rooms/{gameId}')
   .onUpdate(async (change, context) => {
+    const db = admin.firestore();
     const beforeData = change.before.data();
     const gameData = change.after.data();
     const gameId = context.params.gameId;
@@ -287,52 +288,53 @@ export const updateEventProgressOnGameEnd = functions.firestore
 
 
 export const enrollInEvent = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+    const db = admin.firestore();
     if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
     const userId = request.auth.uid;
-    const { eventId, enrollmentFee: feeFromClient } = request.data;
+    const { eventId, enrollmentFee } = request.data;
     
-    if (!eventId || feeFromClient === undefined) {
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with an "eventId" and "enrollmentFee".');
+    if (!eventId || typeof enrollmentFee !== 'number') {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a valid "eventId" and "enrollmentFee".');
     }
     
     const userRef = db.collection('users').doc(userId);
     const eventRef = db.collection('events').doc(eventId);
     const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
+
+    // Pre-transaction checks
+    const userDoc = await userRef.get();
+    const eventDoc = await eventRef.get();
+    
+    if (!userDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
+    }
+    if (!eventDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'The event does not exist.');
+    }
+    
+    const userData = userDoc.data()!;
+    const eventData = eventDoc.data()!;
+    
+    if (!eventData.isActive) {
+        throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
+    }
+    if (eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
+        throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
+    }
+
+    const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+    if (totalBalance < enrollmentFee) {
+        throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
+    }
     
     try {
-        return await db.runTransaction(async (transaction) => {
-            const userDoc = await transaction.get(userRef);
-            const eventDoc = await transaction.get(eventRef);
+        await db.runTransaction(async (transaction) => {
             const enrollmentDoc = await transaction.get(enrollmentRef);
-            
-            if (!userDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
-            }
-            if (!eventDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'The event does not exist.');
-            }
-             if (enrollmentDoc.exists) {
+            if (enrollmentDoc.exists) {
                 throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
-            }
-
-            const userData = userDoc.data()!;
-            const eventData = eventDoc.data()!;
-            
-            if (!eventData.isActive) {
-                throw new functions.https.HttpsError('failed-precondition', 'This event is not currently active.');
-            }
-            if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
-                throw new functions.https.HttpsError('resource-exhausted', 'This event is full.');
-            }
-            
-            const enrollmentFee = Number(feeFromClient);
-            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-
-            if (totalBalance < enrollmentFee) {
-                throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds to enroll.');
             }
 
             const bonusDeduction = Math.min((userData.bonusBalance || 0), enrollmentFee);
@@ -358,10 +360,9 @@ export const enrollInEvent = onCall({ cors: true, region: 'us-central1' }, async
             });
 
             transaction.update(eventRef, { enrolledCount: admin.firestore.FieldValue.increment(1) });
-            
-            return { success: true, message: 'Enrolled successfully!' };
         });
-
+        
+        return { success: true, message: 'Enrolled successfully!' };
     } catch (error: any) {
         functions.logger.error('Error in enrollInEvent transaction:', error);
         if (error instanceof functions.https.HttpsError) {
@@ -371,7 +372,9 @@ export const enrollInEvent = onCall({ cors: true, region: 'us-central1' }, async
     }
 });
 
+
 export const joinGame = onCall({ cors: true, region: 'us-central1' }, async (request) => {
+    const db = admin.firestore();
     if (!request.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }

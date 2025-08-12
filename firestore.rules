@@ -24,17 +24,14 @@ service cloud.firestore {
       return request.resource.data;
     }
     
-    // Checks if the user is an admin by looking at their user document.
     function isAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Checks if the user is a participant in a chat.
     function isChatParticipant(chatId) {
         return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
     }
 
-    // Helper for event rules
     function isAuthOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
@@ -44,40 +41,31 @@ service cloud.firestore {
     // =================================
 
     match /users/{userId} {
-      // Any signed-in user can read another user's profile (for leaderboards, friend searches, etc.).
       allow read: if isSignedIn();
-
-      // A user can only create their own user document.
       allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
 
-      // Update rules for user profiles and system actions
+      // A user can update their own non-critical data.
+      // Admins can update anything.
+      // System processes (like adding a friend) can also update specific fields.
       allow update: if 
         (isOwner(userId) && !(
-            'balance' in incomingDoc() && incomingDoc().balance != resource.data.balance
-          ) && !(
-            'marketingBalance' in incomingDoc() && incomingDoc().marketingBalance != resource.data.marketingBalance
-          ) && !(
-            'role' in incomingDoc() && incomingDoc().role != resource.data.role
+            'balance' in incomingDoc() || 
+            'marketingBalance' in incomingDoc() || 
+            'bonusBalance' in incomingDoc() ||
+            'role' in incomingDoc() || 
+            'l1Count' in incomingDoc() ||
+            'wins' in incomingDoc()
           )
         ) ||
-        (isSignedIn() && exists(/databases/$(database)/documents/friend_requests/$(request.resource.data.requestId))) ||
-        (isSignedIn() && !(userId in incomingDoc().friends) && (userId in resource.data.friends)) ||
-        isAdmin() ||
-        (isSignedIn() && ('balance' in incomingDoc()));
+        isAdmin();
 
-      // =========================
-      // Event enrollments (private)
-      // =========================
       match /event_enrollments/{enrollmentId} {
         allow read, write, delete: if isAuthOwner(userId) || isAdmin();
-
-        // Progress history (private)
         match /progress_history/{progressId} {
            allow read, write, delete: if isAuthOwner(userId) || isAdmin();
         }
       }
 
-      // Daily bonus claims
       match /daily_bonus_claims/{claimId} {
         allow read, write: if isOwner(userId);
       }
@@ -93,25 +81,15 @@ service cloud.firestore {
       allow list, read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
       allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
-
       allow update: if isSignedIn() && 
+        (
+          (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
+          resource.data.status == 'in-progress'
+        ) ||
         (
           !isOwner(resource.data.createdBy.uid) &&
           resource.data.status == 'waiting' &&
-          request.resource.data.status == 'in-progress' &&
-          request.resource.data.player2.uid == request.auth.uid &&
-          !(request.auth.uid in resource.data.players) &&
-          (request.auth.uid in request.resource.data.players)
-        ) ||
-        (
-          (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
-          resource.data.status == 'in-progress' &&
           request.resource.data.status == 'in-progress'
-        ) ||
-        (
-           (isOwner(resource.data.createdBy.uid) || isOwner(resource.data.player2.uid)) &&
-          resource.data.status == 'in-progress' &&
-          request.resource.data.status == 'completed'
         );
     }
     
@@ -143,10 +121,8 @@ service cloud.firestore {
         }
     }
     
-    // Settings (merged mailer + existing rules)
     match /settings/{docId} {
-      allow read: if isSignedIn(); // From original
-      allow write: if isAdmin();   // From both mailer + original
+      allow read, write: if isAdmin();
     }
     
     match /bonuses/{bonusId} {
@@ -158,18 +134,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn();
     }
-
-    // =========================
-    // Events collection (public viewable, admin manageable)
-    // =========================
+    
     match /events/{eventId} {
        allow get, list: if isSignedIn();
        allow create, update, delete: if isAdmin();
     }
 
-    // =========================
-    // Collection Group Queries
-    // =========================
+    // Allows admins and functions to query across all users for enrollments
     match /{path=**}/event_enrollments/{enrollmentId} {
       allow get, list: if isAdmin();
     }
