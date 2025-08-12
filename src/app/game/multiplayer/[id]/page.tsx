@@ -226,47 +226,44 @@ function MultiplayerGame() {
         }
     
         setIsJoining(true);
-        const batch = writeBatch(db);
-        const roomRef = doc(db, 'game_rooms', room.id);
-        const joinerRef = doc(db, 'users', user.uid);
-    
         try {
-             // Deduct from joiner's balance
-            const wagerAmount = room.wager;
-            const joinerBonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
-            const joinerMainWagered = wagerAmount - joinerBonusWagered;
+            await runTransaction(db, async (transaction) => {
+                const roomRef = doc(db, 'game_rooms', room.id);
+                const joinerRef = doc(db, 'users', user.uid);
+                
+                const roomDoc = await transaction.get(roomRef);
+                const joinerDoc = await transaction.get(joinerRef);
 
-            const joinerUpdate: any = {};
-            if(joinerBonusWagered > 0) joinerUpdate.bonusBalance = increment(-joinerBonusWagered);
-            if(joinerMainWagered > 0) joinerUpdate.balance = increment(-joinerMainWagered);
-            batch.update(joinerRef, joinerUpdate);
+                if (!roomDoc.exists() || !joinerDoc.exists()) {
+                    throw new Error("Room or user not found.");
+                }
 
-            // Update Room
-            const creatorColor = room.createdBy.color;
-            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-            batch.update(roomRef, {
-                status: 'in-progress',
-                player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
-                players: [...room.players, user.uid],
-                capturedByP1: [], capturedByP2: [], moveHistory: [],
-                currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
-            });
-            
-             // Create a transaction log for the joiner's wager
-            if(wagerAmount > 0) {
-                const transactionRef = doc(collection(db, 'transactions'));
-                batch.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'wager',
-                    amount: wagerAmount,
-                    status: 'completed',
-                    description: `Wager for ${room.gameType} game vs ${room.createdBy.name}`,
-                    gameRoomId: room.id,
-                    createdAt: serverTimestamp()
+                if (roomDoc.data().status !== 'waiting') {
+                    throw new Error("This room is no longer available.");
+                }
+
+                // Deduct from joiner's balance
+                const wagerAmount = room.wager;
+                const joinerCurrentData = joinerDoc.data();
+                const joinerBonusWagered = Math.min(wagerAmount, joinerCurrentData.bonusBalance || 0);
+                const joinerMainWagered = wagerAmount - joinerBonusWagered;
+
+                const joinerUpdate: any = {};
+                if(joinerBonusWagered > 0) joinerUpdate.bonusBalance = increment(-joinerBonusWagered);
+                if(joinerMainWagered > 0) joinerUpdate.balance = increment(-joinerMainWagered);
+                transaction.update(joinerRef, joinerUpdate);
+
+                // Update Room
+                const creatorColor = room.createdBy.color;
+                const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+                transaction.update(roomRef, {
+                    status: 'in-progress',
+                    player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
+                    players: [...room.players, user.uid],
+                    capturedByP1: [], capturedByP2: [], moveHistory: [],
+                    currentPlayer: 'w', p1Time: room.timeControl, p2Time: room.timeControl, turnStartTime: serverTimestamp(),
                 });
-            }
-            
-            await batch.commit();
+            });
 
             toast({ title: "Game Joined!", description: "The match is starting now." });
     

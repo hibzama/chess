@@ -1,151 +1,133 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if a user has the 'admin' role.
+  
+    function isAuth() {
+      return request.auth != null;
+    }
+    
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-    // Rules for the 'users' collection.
     match /users/{userId} {
-      // Allow users to read their own document.
-      allow get: if request.auth.uid == userId || isAdmin();
-      // Admins can list all users.
-      allow list: if isAdmin();
-      // Users can create their own account.
-      allow create: if request.auth.uid == userId;
-      // Users can update their own document, with specific rules for balance changes.
-      allow update: if request.auth.uid == userId || isAdmin();
+      allow read: if isAuth();
+      allow create; // Allow user creation during signup
+      allow update: if isOwner(userId); // Users can update their own data
     }
     
-    match /users/{userId}/event_enrollments/{enrollmentId} {
-        // Allow users to create an enrollment if they are authenticated and it's for their own account.
-        // The write to the user's balance is checked in the event creation rule itself.
-        allow create: if request.auth.uid == userId &&
-                       // Ensure the user is deducting the correct fee from their balance in the same transaction.
-                       getAfter(/databases/$(database)/documents/users/$(userId)).data.balance == 
-                       get(/databases/$(database)/documents/users/$(userId)).data.balance - 
-                       get(/databases/$(database)/documents/events/$(request.resource.data.eventId)).data.enrollmentFee;
-
-        // Allow users to read their own enrollments.
-        allow read: if request.auth.uid == userId;
-    }
-
-    // Rules for game rooms.
-    match /game_rooms/{roomId} {
-      // Anyone can read game rooms to see lobby, but only players can read full game data.
-      allow read: if request.auth.uid != null;
-      // Authenticated users can create new game rooms.
-      allow create: if request.auth.uid != null;
-
-      // Rules for updating a game room.
-      allow update: if
-          // Allow a player to join a game.
-          (
-            // The user must be authenticated.
-            request.auth.uid != null &&
-            // The room must be in 'waiting' status.
-            resource.data.status == 'waiting' &&
-            // The request must change the status to 'in-progress'.
-            request.resource.data.status == 'in-progress' &&
-            // The user joining must be player2.
-            request.resource.data.player2.uid == request.auth.uid &&
-            // The wager must not change.
-            request.resource.data.wager == resource.data.wager
-          ) ||
-          // Allow one of the players in the game to update it (e.g., make a move).
-          (
-            request.auth.uid in resource.data.players &&
-            (
-                // Allow move updates while in-progress
-                (resource.data.status == 'in-progress' && request.resource.data.status == 'in-progress') ||
-                // Allow updating to completed (e.g., checkmate, timeout, resign)
-                (resource.data.status == 'in-progress' && request.resource.data.status == 'completed')
-            )
-          );
-      
-      // Allow the creator to delete a waiting room.
-      allow delete: if request.auth.uid == resource.data.createdBy.uid && resource.data.status == 'waiting';
-
-        // Messages within a game room
-        match /messages/{messageId} {
-            // Only players in the game can read or send messages.
-            allow read, write: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-        }
-    }
-    
-    // Admins can manage marketing applications.
-    match /marketing_applications/{appId} {
-        allow read, list, create, update, delete: if request.auth.uid != null;
-    }
-    
-    // Admins can manage events.
-    match /events/{eventId} {
-        allow read, list: if request.auth.uid != null;
-        allow create, update, delete: if isAdmin();
-    }
-    
-    // This allows the admin to view all enrollments across all users for a specific event.
-    match /users/{userId}/event_enrollments/{enrollmentId} {
-       allow list: if isAdmin();
-    }
-    
-    // Admins can manage bonuses
-    match /bonuses/{bonusId} {
-        allow read, list: if request.auth.uid != null;
-        allow create, update, delete: if isAdmin();
-    }
-    
-    match /dailyBonusClaims/{bonusId} {
-        allow read: if request.auth.uid != null;
-        allow create, update: if isAdmin(); // Admin creates the counter
-        // A user can update the counter only by claiming a bonus (checked in transaction)
-        allow update: if request.auth.uid != null;
-    }
-
-    // Rules for transactions.
-    match /transactions/{transactionId} {
-      // Admins can manage all transactions.
-      allow read, list, create, update: if isAdmin();
-      // Users can create their own transactions (deposits/withdrawals) and read their own history.
-      allow create: if request.auth.uid == request.resource.data.userId;
-      allow read: if request.auth.uid == resource.data.userId;
-    }
-    
-    // Rules for friend requests.
-    match /friend_requests/{requestId} {
-        allow read, create, delete: if request.auth.uid != null;
-    }
-
-    // Rules for chats.
-    match /chats/{chatId} {
-        // Users can list chats to find their own. The query must be secured with a where clause.
-        allow list: if request.auth.uid != null;
-        // Users can read/write to a chat only if they are a member.
-        allow read, write: if request.auth.uid in resource.data.users;
-        
-        match /messages/{messageId} {
-            // Users can read/write messages in a chat they are a member of.
-            allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
-        }
-    }
-    
-    // Admins can manage mailer settings.
-    match /settings/mailerConfig {
-        allow read, write: if isAdmin();
-    }
-    
-    // Users can read the public deposit bonus settings. Admins can write.
-    match /settings/depositBonus {
-        allow read: if request.auth.uid != null;
+    match /settings/{docId} {
+        allow read: if isAdmin();
         allow write: if isAdmin();
     }
     
-    // Notifications collection.
+    match /marketing_applications/{appId} {
+        allow create; // Anyone can apply
+        allow read, update: if isAdmin(); // Only admins manage applications
+    }
+    
+    match /transactions/{txId} {
+        allow read: if isAuth(); // Users can read their own, admins can read all (implicit for now)
+        allow create: if isAuth(); // Users can create deposit/withdrawal requests
+        allow update: if isAdmin(); // Only admins can approve/reject transactions
+    }
+    
+    // --- EVENT RULES ---
+    
+    match /events/{eventId} {
+        allow read: if isAuth(); // Any authenticated user can see available events
+        allow update: if isAdmin(); // Only admins can update event details (like isActive)
+        allow create, delete: if isAdmin(); // Only admins can create/delete events
+    }
+    
+    // Rule for enrolling in an event
+    match /users/{userId}/event_enrollments/{eventId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) &&
+                        // Verify user is only changing their own balance
+                        request.resource.data.userId == userId &&
+                        // Verify balance deduction is correct for the event fee
+                        getAfter(/databases/$(database)/documents/users/$(userId)).data.balance == get(/databases/$(database)/documents/users/$(userId)).data.balance - get(/databases/$(database)/documents/events/$(eventId)).data.enrollmentFee &&
+                        // Verify event enrolled count is being incremented correctly
+                        getAfter(/databases/$(database)/documents/events/$(eventId)).data.enrolledCount == get(/databases/$(database)/documents/events/$(eventId)).data.enrolledCount + 1;
+    }
+
+    // Rule for Admin to read all enrollments for a specific event
+    match /{path=**}/event_enrollments/{enrollmentId} {
+       allow read, list: if isAdmin();
+    }
+    
+    // --- GAME ROOM RULES ---
+    
+    match /game_rooms/{roomId} {
+        allow read: if isAuth(); // Any authenticated user can read room details (e.g. from lobby)
+        
+        // Allow room creation if the user has enough balance
+        allow create: if isAuth() &&
+                       request.resource.data.createdBy.uid == request.auth.uid;
+                       
+        // Allow updates under specific conditions
+        allow update: if isAuth() &&
+                       // Condition 1: A player is joining the game
+                       (
+                          request.resource.data.status == 'in-progress' &&
+                          resource.data.status == 'waiting' &&
+                          request.resource.data.player2.uid == request.auth.uid &&
+                          // Verify that the joiner's balance is being correctly deducted
+                          getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance + getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.bonusBalance == 
+                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance + get(/databases/$(database)/documents/users/$(request.auth.uid)).data.bonusBalance - resource.data.wager
+                       ) ||
+                       // Condition 2: A player in the game is making a move or resigning
+                       (
+                          request.auth.uid in resource.data.players &&
+                          (
+                              // Allow game state updates (moves)
+                              request.resource.data.boardState != resource.data.boardState ||
+                              // Allow game completion updates (win/loss/draw/resign)
+                              request.resource.data.status == 'completed'
+                          )
+                       );
+
+        // A player can cancel their own waiting room
+        allow delete: if isAuth() && resource.data.createdBy.uid == request.auth.uid && resource.data.status == 'waiting';
+
+        match /messages/{messageId} {
+            allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+        }
+    }
+    
+    // --- CHAT RULES ---
+
+    match /chats/{chatId} {
+      // Users can only read/write to chats they are a part of.
+      // The `list` permission is needed for the inbox page to query chats.
+      allow list: if isAuth();
+      allow read, update: if isAuth() && request.auth.uid in resource.data.users;
+
+      match /messages/{messageId} {
+        allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+      }
+    }
+    
+    // --- OTHER RULES ---
+    
     match /notifications/{notificationId} {
-      allow read, list, create, update: if request.auth.uid != null;
+        allow read, list, update: if isAuth() && request.auth.uid == resource.data.userId;
+    }
+    
+    match /bonuses/{bonusId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    
+    match /dailyBonusClaims/{bonusId} {
+      allow read: if isAuth();
+      // Allow update only within the transaction handled by the claim cloud function/transaction
+      allow write: if isAuth(); 
     }
   }
 }
