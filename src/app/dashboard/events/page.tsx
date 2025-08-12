@@ -1,12 +1,11 @@
 
-
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy, History as HistoryIcon, Swords } from 'lucide-react';
+import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy, History as HistoryIcon, Swords, Check, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/auth-context';
@@ -18,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 export interface Event {
     id: string;
@@ -29,6 +29,8 @@ export interface Event {
     durationHours: number;
     isActive: boolean;
     minWager?: number;
+    maxEnrollees?: number;
+    enrolledCount?: number;
     createdAt?: any;
 }
 
@@ -47,6 +49,7 @@ interface ProgressHistoryItem {
     opponentName: string;
     increment: number;
     timestamp: Timestamp;
+    result: 'win' | 'loss';
 }
 
 const USDT_RATE = 310;
@@ -143,6 +146,11 @@ export default function EventsPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
             return;
         }
+        
+        if(event.maxEnrollees && event.maxEnrollees > 0 && (event.enrolledCount || 0) >= event.maxEnrollees) {
+            toast({ variant: 'destructive', title: 'Event Full', description: 'This event has reached its maximum number of participants.' });
+            return;
+        }
 
         if (userData.balance < event.enrollmentFee) {
             toast({ variant: 'destructive', title: 'Insufficient Funds', description: `You need LKR ${event.enrollmentFee.toFixed(2)} to enroll.` });
@@ -153,6 +161,7 @@ export default function EventsPage() {
         const batch = writeBatch(db);
         const userRef = doc(db, 'users', user.uid);
         const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
+        const eventRef = doc(db, 'events', event.id);
 
         try {
             if (event.enrollmentFee > 0) {
@@ -170,6 +179,7 @@ export default function EventsPage() {
                 expiresAt: Timestamp.fromDate(expiryDate)
             };
             batch.set(enrollmentRef, enrollmentData);
+            batch.update(eventRef, { enrolledCount: increment(1) });
 
             await batch.commit();
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
@@ -231,6 +241,9 @@ export default function EventsPage() {
                                         <Target className="w-8 h-8 text-primary" />
                                     </div>
                                     <CardTitle className="text-2xl">{event.title}</CardTitle>
+                                    {event.maxEnrollees && event.maxEnrollees > 0 && (
+                                        <Badge variant="secondary" className="w-fit mx-auto">{event.enrolledCount || 0} / {event.maxEnrollees} Enrolled</Badge>
+                                    )}
                                 </CardHeader>
                                 <CardContent className="space-y-4 flex-1">
                                     <div className="p-4 bg-secondary/50 rounded-lg text-center space-y-1">
@@ -258,7 +271,7 @@ export default function EventsPage() {
                                     <p className="text-xs text-muted-foreground text-center">You will have {event.durationHours} hours to complete this event after enrolling.</p>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button className="w-full" onClick={() => handleEnroll(event)} disabled={isEnrolling === event.id}>
+                                    <Button className="w-full" onClick={() => handleEnroll(event)} disabled={isEnrolling === event.id || (!!event.maxEnrollees && event.maxEnrollees > 0 && (event.enrolledCount || 0) >= event.maxEnrollees)}>
                                         {isEnrolling === event.id ? <Loader2 className="animate-spin"/> : `Enroll (LKR ${event.enrollmentFee.toFixed(2)})`}
                                     </Button>
                                 </CardFooter>
@@ -309,7 +322,7 @@ export default function EventsPage() {
                                         <Dialog>
                                             <DialogTrigger asChild>
                                                 <Button variant="outline" className="w-full" onClick={() => fetchProgressHistory(enrollment.id)}>
-                                                    <HistoryIcon className="mr-2"/> History
+                                                    <HistoryIcon className="mr-2"/> View History
                                                 </Button>
                                             </DialogTrigger>
                                             <DialogContent>
@@ -318,21 +331,22 @@ export default function EventsPage() {
                                                 </DialogHeader>
                                                 <ScrollArea className="h-72">
                                                     <Table>
-                                                        <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Vs Opponent</TableHead><TableHead>Progress</TableHead></TableRow></TableHeader>
+                                                        <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Vs Opponent</TableHead><TableHead>Result</TableHead><TableHead>Progress</TableHead></TableRow></TableHeader>
                                                         <TableBody>
                                                             {progressHistory[enrollment.id] ? progressHistory[enrollment.id].length > 0 ? (
                                                                 progressHistory[enrollment.id].map(h => (
                                                                     <TableRow key={h.id}>
                                                                         <TableCell>{h.timestamp ? format(h.timestamp.toDate(), 'PPp') : 'N/A'}</TableCell>
                                                                         <TableCell>{h.opponentName}</TableCell>
-                                                                        <TableCell>
-                                                                            {enrollment.eventDetails?.targetType === 'winningMatches' ? '+1 Win' : `+LKR ${h.increment.toFixed(2)}`}
+                                                                        <TableCell><Badge variant={h.result === 'win' ? 'default' : 'destructive'}>{h.result}</Badge></TableCell>
+                                                                        <TableCell className={cn(h.increment > 0 && "text-green-400")}>
+                                                                            {h.increment > 0 ? (enrollment.eventDetails?.targetType === 'winningMatches' ? '+1 Win' : `+LKR ${h.increment.toFixed(2)}`) : 'N/A'}
                                                                         </TableCell>
                                                                     </TableRow>
                                                                 ))
                                                             ) : (
-                                                                <TableRow><TableCell colSpan={3} className="text-center">No progress yet.</TableCell></TableRow>
-                                                            ) : <TableRow><TableCell colSpan={3} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
+                                                                <TableRow><TableCell colSpan={4} className="text-center">No progress yet.</TableCell></TableRow>
+                                                            ) : <TableRow><TableCell colSpan={4} className="text-center"><Loader2 className="animate-spin mx-auto"/></TableCell></TableRow>}
                                                         </TableBody>
                                                     </Table>
                                                 </ScrollArea>

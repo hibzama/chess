@@ -1,5 +1,4 @@
 
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -195,135 +194,107 @@ export const processCommissions = functions.firestore
     });
 
 
-// This function triggers whenever a payout transaction is created for a game winner.
-export const updateEventProgress = functions.firestore
-  .document('transactions/{transactionId}')
-  .onCreate(async (snap, context) => {
-    const transaction = snap.data();
+export const updateEventProgressOnGameEnd = functions.firestore
+  .document('game_rooms/{gameId}')
+  .onUpdate(async (change, context) => {
+    const beforeData = change.before.data();
+    const gameData = change.after.data();
+    const gameId = context.params.gameId;
+
+    // 1. Only run when a game is completed
+    if (beforeData.status === 'completed' || gameData.status !== 'completed') {
+      return null;
+    }
+
     const db = admin.firestore();
+    const batch = db.batch();
+    const wagerAmount = gameData.wager || 0;
+    const playerIds = gameData.players || [];
+    const winnerId = gameData.winner?.uid || null;
 
-    // 1. Ensure this is a valid winning payout transaction.
-    const winnerId = transaction.userId;
-    if (transaction.type !== 'payout' || !winnerId) {
-      return null;
-    }
+    if (playerIds.length < 2) return null;
 
-    const wagerAmount = transaction.gameWager || 0;
-    const gameId = transaction.gameRoomId;
-    if (!gameId) {
-      return null; // Exit if there's no game ID.
-    }
+    for (const playerId of playerIds) {
+        const isWinner = playerId === winnerId;
+        const netEarning = isWinner ? (wagerAmount * 0.8) : -wagerAmount;
 
-    // 2. Fetch game details to confirm the winner and get opponent details.
-    const gameDoc = await db.collection('game_rooms').doc(gameId).get();
-    if (!gameDoc.exists) {
-      functions.logger.error(`Game room ${gameId} not found.`);
-      return null;
-    }
-    const gameData = gameDoc.data();
-    if (!gameData || gameData.winner?.uid !== winnerId) {
-        functions.logger.log(`Transaction user ${winnerId} is not the winner of game ${gameId}.`);
-        return null;
-    }
+        const opponentId = playerIds.find((p: string) => p !== playerId);
+        let opponentName = 'Unknown';
+        if (opponentId) {
+            const opponentDoc = await db.collection('users').doc(opponentId).get();
+            if (opponentDoc.exists()) {
+                const opponentData = opponentDoc.data();
+                if(opponentData) opponentName = `${opponentData.firstName} ${opponentData.lastName}`;
+            }
+        }
+        
+        // Find active events for this player
+        const enrollmentsRef = db.collection('users').doc(playerId).collection('event_enrollments');
+        const activeEnrollmentsSnapshot = await enrollmentsRef.where('status', '==', 'enrolled').get();
 
-    // 3. Ensure the winner did not resign.
-    if (gameData.winner.resignerId && winnerId === gameData.winner.resignerId) {
-        functions.logger.log(`Exiting event progress: Winner ${winnerId} resigned.`);
-        return null;
-    }
+        if (activeEnrollmentsSnapshot.empty) {
+            continue; // No active events for this player
+        }
 
-    // 4. Correctly calculate net earning.
-    const netEarning = transaction.amount - wagerAmount;
+        for (const enrollmentDoc of activeEnrollmentsSnapshot.docs) {
+            const enrollment = enrollmentDoc.data();
+            const eventDoc = await db.collection('events').doc(enrollment.eventId).get();
+            if (!eventDoc.exists) continue;
 
-    // 5. Fetch opponent name for history logging.
-    const opponentId = gameData.players.find((p: string) => p !== winnerId);
-    let opponentName = 'Unknown Player';
-    if (opponentId) {
-        const opponentDoc = await db.collection('users').doc(opponentId).get();
-        if(opponentDoc.exists()) {
-            const opponentData = opponentDoc.data();
-            if (opponentData) {
-              opponentName = `${opponentData.firstName} ${opponentData.lastName}`;
+            const event = eventDoc.data();
+            if (!event || !event.isActive || enrollment.expiresAt.toDate() < new Date()) continue;
+            
+            let progressIncrement = 0;
+            let shouldLogHistory = false;
+
+            if (event.targetType === 'winningMatches') {
+                shouldLogHistory = true;
+                if (isWinner && (!event.minWager || wagerAmount >= event.minWager)) {
+                    progressIncrement = 1;
+                }
+            } else if (event.targetType === 'totalEarnings') {
+                 shouldLogHistory = true;
+                if (netEarning > 0) {
+                    progressIncrement = netEarning;
+                }
+            }
+
+            if(shouldLogHistory) {
+                 const historyRef = enrollmentDoc.ref.collection('progress_history').doc();
+                 batch.set(historyRef, {
+                    gameId: gameId,
+                    opponentName: opponentName,
+                    increment: progressIncrement,
+                    result: isWinner ? 'win' : 'loss',
+                    timestamp: admin.firestore.FieldValue.serverTimestamp()
+                 });
+
+                 if (progressIncrement > 0) {
+                    const newProgress = (enrollment.progress || 0) + progressIncrement;
+                    const updatePayload: { [key: string]: any } = { 
+                        progress: admin.firestore.FieldValue.increment(progressIncrement) 
+                    };
+
+                    if (newProgress >= event.targetAmount) {
+                        updatePayload.status = 'completed';
+                        if (event.rewardAmount > 0) {
+                            batch.update(db.collection('users').doc(playerId), {
+                                bonusBalance: admin.firestore.FieldValue.increment(event.rewardAmount)
+                            });
+                        }
+                    }
+                    batch.update(enrollmentDoc.ref, updatePayload);
+                 }
             }
         }
     }
 
-    // Get all active events.
-    const eventsRef = db.collection('events');
-    const activeEventsSnapshot = await eventsRef.where('isActive', '==', true).get();
-
-    if (activeEventsSnapshot.empty) {
-      return null;
-    }
-
-    const batch = db.batch();
-    let hasUpdates = false;
-
-    // Iterate through each active event.
-    for (const eventDoc of activeEventsSnapshot.docs) {
-      const event = eventDoc.data();
-      const enrollmentRef = db.collection('users').doc(winnerId).collection('event_enrollments').doc(event.id);
-      
-      const enrollmentSnap = await enrollmentRef.get();
-      
-      // Check if user is enrolled in this event and the event is not expired/completed.
-      if (enrollmentSnap.exists) {
-          const enrollment = enrollmentSnap.data();
-          if (enrollment && enrollment.status === 'enrolled' && enrollment.expiresAt.toDate() > new Date()) {
-              let progressIncrement = 0;
-              
-              // Update progress based on event type.
-              if (event.targetType === 'winningMatches') {
-                  if (!event.minWager || wagerAmount >= event.minWager) {
-                      progressIncrement = 1;
-                  }
-              } else if (event.targetType === 'totalEarnings') {
-                  if (netEarning > 0) { 
-                      progressIncrement = netEarning;
-                  }
-              }
-
-              if (progressIncrement > 0) {
-                  hasUpdates = true;
-                  const newProgress = (enrollment.progress || 0) + progressIncrement;
-                  
-                  // Log progress in a subcollection for history
-                  const historyRef = enrollmentRef.collection('progress_history').doc();
-                  batch.set(historyRef, {
-                    gameId: gameId,
-                    opponentName: opponentName,
-                    increment: progressIncrement,
-                    timestamp: admin.firestore.FieldValue.serverTimestamp()
-                  });
-                  
-                  const updatePayload: { [key: string]: any } = { 
-                      progress: admin.firestore.FieldValue.increment(progressIncrement) 
-                  };
-
-                  // If the new progress meets or exceeds the target, mark as completed and give reward.
-                  if (newProgress >= event.targetAmount) {
-                      updatePayload.status = 'completed';
-                      if (event.rewardAmount > 0) {
-                        batch.update(db.collection('users').doc(winnerId), {
-                            bonusBalance: admin.firestore.FieldValue.increment(event.rewardAmount)
-                        });
-                      }
-                  }
-                  batch.update(enrollmentRef, updatePayload);
-              }
-          }
-      }
-    }
-
-    // Commit the batch if there are any updates.
-    if (hasUpdates) {
-      try {
+    try {
         await batch.commit();
-        functions.logger.log(`Successfully updated event progress for user ${winnerId}.`);
-      } catch (error) {
-        functions.logger.error(`Error committing event progress for user ${winnerId}:`, error);
-      }
+        functions.logger.log(`Successfully updated event progress for game ${gameId}.`);
+    } catch (error) {
+        functions.logger.error(`Error committing event progress for game ${gameId}:`, error);
     }
-
+    
     return null;
-  });
+});

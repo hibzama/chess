@@ -28,6 +28,8 @@ export interface Event {
     durationHours: number;
     isActive: boolean;
     minWager?: number;
+    maxEnrollees?: number; // New field
+    enrolledCount?: number; // New field
     createdAt?: any;
     updatedAt?: any;
 }
@@ -51,6 +53,7 @@ export default function ManageEventsPage() {
         durationHours: 168, // Default to 7 days
         isActive: false,
         minWager: 0,
+        maxEnrollees: 0, // 0 for unlimited
     });
     const [events, setEvents] = useState<Event[]>([]);
     const [enrolledUsers, setEnrolledUsers] = useState<{ [key: string]: EnrolledUser[] }>({});
@@ -71,7 +74,7 @@ export default function ManageEventsPage() {
     }, []);
 
     const fetchEnrolledUsers = async (eventId: string) => {
-        if (enrolledUsers[eventId]) return; // Don't re-fetch
+        if (enrolledUsers[eventId]) return;
         
         const enrollmentsRef = collection(db, 'event_enrollments', eventId, 'users');
         const enrollmentsSnap = await getDocs(enrollmentsRef);
@@ -138,6 +141,7 @@ export default function ManageEventsPage() {
         try {
             const eventPayload: any = {
                 ...newEvent,
+                enrolledCount: 0,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             };
@@ -148,8 +152,8 @@ export default function ManageEventsPage() {
 
             await addDoc(collection(db, 'events'), eventPayload);
             toast({ title: 'Success!', description: 'New event has been created.' });
-            setIsCreateDialogOpen(false); // Close dialog on success
-             setNewEvent({ title: '', targetType: 'winningMatches', targetAmount: 10, enrollmentFee: 100, rewardAmount: 500, durationHours: 168, isActive: false, minWager: 0 }); // Reset form
+            setIsCreateDialogOpen(false); 
+            setNewEvent({ title: '', targetType: 'winningMatches', targetAmount: 10, enrollmentFee: 100, rewardAmount: 500, durationHours: 168, isActive: false, minWager: 0, maxEnrollees: 0 });
         } catch (error) {
             console.error("Error creating event:", error);
             toast({ variant: "destructive", title: 'Error', description: 'Failed to create event.' });
@@ -159,7 +163,7 @@ export default function ManageEventsPage() {
     };
     
     const handleChange = (field: keyof Event, value: any) => {
-        const isNumericField = ['targetAmount', 'enrollmentFee', 'rewardAmount', 'durationHours', 'minWager'].includes(field);
+        const isNumericField = ['targetAmount', 'enrollmentFee', 'rewardAmount', 'durationHours', 'minWager', 'maxEnrollees'].includes(field);
         setNewEvent(prev => ({ ...prev, [field]: isNumericField ? Number(value) : value }));
     };
 
@@ -212,6 +216,11 @@ export default function ManageEventsPage() {
                                 <Label htmlFor="rewardAmount">Reward Amount (LKR)</Label>
                                 <Input id="rewardAmount" type="number" value={newEvent.rewardAmount} onChange={(e) => handleChange('rewardAmount', e.target.value)} />
                             </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="maxEnrollees" className="flex items-center gap-2"><Users/> Max Enrollees</Label>
+                                <Input id="maxEnrollees" type="number" value={newEvent.maxEnrollees} onChange={(e) => handleChange('maxEnrollees', e.target.value)} />
+                                <p className="text-xs text-muted-foreground">Set to 0 for unlimited enrollments.</p>
+                            </div>
                             <div className="space-y-2">
                                 <Label htmlFor="durationHours" className="flex items-center gap-2"><Clock/> Duration (in hours)</Label>
                                 <Input id="durationHours" type="number" value={newEvent.durationHours} onChange={(e) => handleChange('durationHours', e.target.value)} />
@@ -242,7 +251,10 @@ export default function ManageEventsPage() {
                                                 <p className="font-semibold">{event.title}</p>
                                                 <p className="text-sm text-muted-foreground">{event.targetType === 'winningMatches' ? `${event.targetAmount} Wins` : `LKR ${event.targetAmount} Earned`}</p>
                                             </div>
-                                            <Badge variant={event.isActive ? 'default' : 'secondary'}>{event.isActive ? "Active" : "Inactive"}</Badge>
+                                             <div className="flex items-center gap-4">
+                                                <Badge variant="outline">{event.enrolledCount || 0} / {event.maxEnrollees || '∞'} Enrolled</Badge>
+                                                <Badge variant={event.isActive ? 'default' : 'secondary'}>{event.isActive ? "Active" : "Inactive"}</Badge>
+                                            </div>
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent>
