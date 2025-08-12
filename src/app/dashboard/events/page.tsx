@@ -146,7 +146,6 @@ export default function EventsPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
             return;
         }
-        
         setIsEnrolling(event.id);
     
         try {
@@ -157,10 +156,10 @@ export default function EventsPage() {
     
                 const userDoc = await transaction.get(userRef);
                 const eventDoc = await transaction.get(eventRef);
-    
-                if (!userDoc.exists() || !eventDoc.exists()) {
-                    throw new Error("User or Event not found.");
-                }
+                const enrollmentDoc = await transaction.get(enrollmentRef);
+
+                if (!userDoc.exists() || !eventDoc.exists()) throw new Error("User or Event not found.");
+                if (enrollmentDoc.exists()) throw new Error("You are already enrolled in this event.");
     
                 const currentEventData = eventDoc.data() as Event;
                 const currentUserData = userDoc.data();
@@ -189,8 +188,6 @@ export default function EventsPage() {
                 transaction.update(eventRef, { enrolledCount: increment(1) });
                 transaction.update(userRef, {
                     balance: increment(-currentEventData.enrollmentFee),
-                    enrollingEventId: event.id, // temporary field for security rule
-                    enrollingEventFee: currentEventData.enrollmentFee // temporary field
                 });
             });
     
