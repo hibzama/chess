@@ -523,16 +523,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
 
     
-    const resign = useCallback(() => { 
-        if (gameState.gameOver || gameState.isEnding || !user) return; 
-        if (isMultiplayer && room) { 
-            const winnerId = room.players.find((p)=>p !== user.uid) || null; 
-            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
-            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails); 
-        } else { 
-            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
-            setWinner('bot', gameState.boardState, 'resign', resignerDetails); 
-        } 
+    const resign = useCallback(() => {
+        if (gameState.gameOver || gameState.isEnding || !user) return;
+        const resignerDetails = { id: user.uid, pieceCount: gameState.playerPieceCount };
+        if (isMultiplayer && room) {
+            const winnerId = room.players.find((p) => p !== user.uid) || null;
+            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails);
+        } else {
+            setWinner('bot', gameState.boardState, 'resign', resignerDetails);
+        }
     }, [gameState, user, room, isMultiplayer, setWinner]);
     
     const resetGame = useCallback(() => { 
