@@ -164,15 +164,18 @@ export default function EventsPage() {
         const eventRef = doc(db, 'events', event.id);
 
         try {
-            if (event.enrollmentFee > 0) {
-                 batch.update(userRef, { balance: increment(-event.enrollmentFee) });
-            }
+            // Add a temporary field to the user document to satisfy the security rule
+            batch.update(userRef, { 
+                balance: increment(-event.enrollmentFee),
+                enrollingEventId: event.id // This field is read by the security rule
+            });
 
             const expiryDate = new Date();
             expiryDate.setHours(expiryDate.getHours() + event.durationHours);
             
             const enrollmentData = {
                 eventId: event.id,
+                userId: user.uid, // Add userId for rules
                 status: 'enrolled',
                 progress: 0,
                 enrolledAt: serverTimestamp(),
@@ -182,6 +185,10 @@ export default function EventsPage() {
             batch.update(eventRef, { enrolledCount: increment(1) });
 
             await batch.commit();
+
+            // After the successful transaction, remove the temporary field
+            await updateDoc(userRef, { enrollingEventId: '' });
+
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
         } catch (error) {
             console.error("Enrollment failed: ", error);
