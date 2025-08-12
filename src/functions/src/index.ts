@@ -325,13 +325,14 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
       if (!eventDoc.exists()) {
         throw new functions.https.HttpsError('not-found', 'Event not found.');
       }
-      if (enrollmentDoc.exists) {
-        throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
-      }
       
       const eventData = eventDoc.data();
       if (!eventData) {
         throw new functions.https.HttpsError('data-loss', 'Event data is missing or corrupt.');
+      }
+
+      if (enrollmentDoc.exists) {
+        throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
       }
       
       if (!eventData.isActive) {
@@ -343,7 +344,9 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
 
       // Enrollment Logic
       const now = new Date();
-      const expiryDate = new Date(now.getTime() + eventData.durationHours * 60 * 60 * 1000);
+      // Ensure durationHours is treated as a number
+      const durationHours = Number(eventData.durationHours);
+      const expiryDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
 
       const enrollmentPayload = {
         eventId: eventId,
