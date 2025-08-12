@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment, deleteField, runTransaction } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy, History as HistoryIcon, Swords, Check, X } from 'lucide-react';
@@ -147,56 +147,67 @@ export default function EventsPage() {
             return;
         }
         
-        if(event.maxEnrollees && event.maxEnrollees > 0 && (event.enrolledCount || 0) >= event.maxEnrollees) {
-            toast({ variant: 'destructive', title: 'Event Full', description: 'This event has reached its maximum number of participants.' });
-            return;
-        }
-
-        if (userData.balance < event.enrollmentFee) {
-            toast({ variant: 'destructive', title: 'Insufficient Funds', description: `You need LKR ${event.enrollmentFee.toFixed(2)} to enroll.` });
-            return;
-        }
-
         setIsEnrolling(event.id);
-        const batch = writeBatch(db);
-        const userRef = doc(db, 'users', user.uid);
-        const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
-        const eventRef = doc(db, 'events', event.id);
 
         try {
-            // Security rules will validate this transaction based on the existence of the enrollment doc
-            // in the same batch.
-            batch.update(userRef, { 
-                balance: increment(-event.enrollmentFee),
-                enrollingEventId: event.id // This field is used by security rules for validation
+            await runTransaction(db, async (transaction) => {
+                const userRef = doc(db, 'users', user.uid);
+                const eventRef = doc(db, 'events', event.id);
+                const enrollmentRef = doc(db, 'users', user.uid, 'event_enrollments', event.id);
+
+                // Read all data within the transaction
+                const userDoc = await transaction.get(userRef);
+                const eventDoc = await transaction.get(eventRef);
+                const enrollmentDoc = await transaction.get(enrollmentRef);
+
+                if (!userDoc.exists() || !eventDoc.exists()) {
+                    throw new Error("User or Event not found.");
+                }
+
+                if (enrollmentDoc.exists()) {
+                    throw new Error("You are already enrolled in this event.");
+                }
+
+                const currentEventData = eventDoc.data() as Event;
+                const currentUserData = userDoc.data();
+
+                if (currentEventData.maxEnrollees && currentEventData.maxEnrollees > 0 && (currentEventData.enrolledCount || 0) >= currentEventData.maxEnrollees) {
+                    throw new Error("This event has reached its maximum number of participants.");
+                }
+
+                if (currentUserData.balance < currentEventData.enrollmentFee) {
+                    throw new Error(`Insufficient Funds. You need LKR ${currentEventData.enrollmentFee.toFixed(2)}.`);
+                }
+
+                // All checks passed, perform writes
+                transaction.update(userRef, { 
+                    balance: increment(-currentEventData.enrollmentFee),
+                });
+
+                const expiryDate = new Date();
+                expiryDate.setHours(expiryDate.getHours() + currentEventData.durationHours);
+                
+                const enrollmentData = {
+                    eventId: event.id,
+                    userId: user.uid,
+                    status: 'enrolled',
+                    progress: 0,
+                    enrolledAt: serverTimestamp(),
+                    expiresAt: Timestamp.fromDate(expiryDate)
+                };
+                transaction.set(enrollmentRef, enrollmentData);
+                transaction.update(eventRef, { enrolledCount: increment(1) });
             });
-
-            const expiryDate = new Date();
-            expiryDate.setHours(expiryDate.getHours() + event.durationHours);
-            
-            const enrollmentData = {
-                eventId: event.id,
-                userId: user.uid,
-                status: 'enrolled',
-                progress: 0,
-                enrolledAt: serverTimestamp(),
-                expiresAt: Timestamp.fromDate(expiryDate)
-            };
-            batch.set(enrollmentRef, enrollmentData);
-            batch.update(eventRef, { enrolledCount: increment(1) });
-
-            await batch.commit();
             
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
-        } catch (error) {
+        } catch (error: any) {
             console.error("Enrollment failed: ", error);
-            toast({ variant: 'destructive', title: 'Enrollment Failed', description: 'Could not enroll in the event. Please check your balance and try again.' });
+            toast({ variant: 'destructive', title: 'Enrollment Failed', description: error.message || 'Could not enroll in the event. Please try again.' });
         } finally {
             setIsEnrolling(null);
-            // Clean up the temporary field used for security rules after the transaction attempt
-            updateDoc(userRef, { enrollingEventId: deleteField() }).catch((e) => console.log("Cleanup failed (this is often ok):", e));
         }
     }
+
 
     const alreadyEnrolledIds = new Set(enrolledEvents.map(e => e.eventId));
     
@@ -419,3 +430,4 @@ export default function EventsPage() {
         </Tabs>
     );
 }
+
