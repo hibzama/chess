@@ -164,10 +164,9 @@ export default function EventsPage() {
         const eventRef = doc(db, 'events', event.id);
 
         try {
-            // Add a temporary field to the user document to satisfy the security rule
             batch.update(userRef, { 
                 balance: increment(-event.enrollmentFee),
-                enrollingEventId: event.id // This field is read by the security rule
+                enrollingEventId: event.id // Temporary field for security rule check
             });
 
             const expiryDate = new Date();
@@ -175,7 +174,7 @@ export default function EventsPage() {
             
             const enrollmentData = {
                 eventId: event.id,
-                userId: user.uid, // Add userId for rules
+                userId: user.uid,
                 status: 'enrolled',
                 progress: 0,
                 enrolledAt: serverTimestamp(),
@@ -185,15 +184,16 @@ export default function EventsPage() {
             batch.update(eventRef, { enrolledCount: increment(1) });
 
             await batch.commit();
-
-            // After the successful transaction, remove the temporary field
+            
+            // Clean up the temporary field after successful commit.
             await updateDoc(userRef, { enrollingEventId: deleteField() });
 
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
         } catch (error) {
             console.error("Enrollment failed: ", error);
             toast({ variant: 'destructive', title: 'Enrollment Failed', description: 'Could not enroll in the event. Please check your balance and try again.' });
-            // If the transaction failed, we don't need to revert the balance because the batch commit failed.
+            // Cleanup in case of failure
+            await updateDoc(userRef, { enrollingEventId: deleteField() }).catch(() => {});
         } finally {
             setIsEnrolling(null);
         }

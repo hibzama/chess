@@ -31,15 +31,17 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
       
-      allow update: if (isOwner(userId) && 
-                      // Allow users to update their own non-critical fields
-                      (request.resource.data.diff(resource.data).affectedKeys()
-                        .hasOnly(['firstName', 'lastName', 'phone', 'address', 'city', 'country', 'gender', 'photoURL', 'friends', 'equipment'])) ||
-                      // Allow a user's balance to change ONLY when they are enrolling in an event
-                      (isOwner(userId) && request.resource.data.balance != resource.data.balance && 
-                       existsAfter(/databases/$(database)/documents/users/$(userId)/event_enrollments/$(request.resource.data.enrollingEventId))) ||
-                      // Admins can update anything
-                      isAdmin());
+      allow update: if isAdmin() || (isOwner(userId) && (
+            // Allow user to update their own non-critical fields
+            (request.resource.data.balance == resource.data.balance &&
+             request.resource.data.marketingBalance == resource.data.marketingBalance &&
+             request.resource.data.role == resource.data.role &&
+             request.resource.data.wins == resource.data.wins)
+            ||
+            // Allow balance to change ONLY when enrolling in an event in the same transaction
+            (request.resource.data.balance != resource.data.balance &&
+             existsAfter(/databases/$(database)/documents/users/$(userId)/event_enrollments/$(request.resource.data.enrollingEventId)))
+          ));
     }
 
     match /game_rooms/{roomId} {
@@ -99,29 +101,16 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read, list: if isSignedIn();
       allow create, update, delete: if isAdmin();
+    }
 
-       match /event_enrollments/{userId} {
-         allow read, list: if isAdmin();
-       }
-    }
-    
     match /users/{userId}/event_enrollments/{enrollmentId} {
-        allow read: if isOwner(userId) || isAdmin();
-        allow create: if isSignedIn() && isOwner(userId) && request.resource.data.userId == userId; // Ensure user can only write to their own subcollection
-        
-        match /progress_history/{progressId} {
-            allow read: if isOwner(userId);
-            allow write: if false; // Only backend can write here
-        }
-    }
-    
-    match /bonuses/{bonusId} {
-        allow read, list: if isSignedIn();
-        allow create, update, delete: if isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isOwner(userId);
     }
 
     match /dailyBonusClaims/{claimId} {
-      allow read, write: if isSignedIn();
+        allow read, write: if isSignedIn();
     }
 
     match /users/{userId}/daily_bonus_claims/{claimId} {
