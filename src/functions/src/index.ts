@@ -340,9 +340,20 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
       if (eventData.maxEnrollees && eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
         throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
       }
-      if (userData.balance < eventData.enrollmentFee) {
+      
+      const fee = eventData.enrollmentFee || 0;
+      const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+
+      if (totalBalance < fee) {
         throw new functions.https.HttpsError('failed-precondition', 'Insufficient Funds.');
       }
+
+      // Deduct fee from balances
+      const bonusDeduction = Math.min(userData.bonusBalance || 0, fee);
+      const mainDeduction = fee - bonusDeduction;
+      const userUpdate: { [key: string]: any } = {};
+      if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
+      if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
 
       const expiryDate = new Date();
       expiryDate.setHours(expiryDate.getHours() + eventData.durationHours);
@@ -358,7 +369,7 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
 
       transaction.set(enrollmentRef, enrollmentPayload);
       transaction.update(eventRef, { enrolledCount: admin.firestore.FieldValue.increment(1) });
-      transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(-eventData.enrollmentFee) });
+      transaction.update(userRef, userUpdate);
     });
 
     return { success: true, message: 'Enrolled successfully!' };
@@ -403,18 +414,19 @@ export const joinGameAndDeductWager = functions.https.onCall(async (data, contex
             throw new functions.https.HttpsError('failed-precondition', 'This room is no longer available.');
         }
 
-        const wagerAmount = roomData.wager;
+        const wagerAmount = roomData.wager || 0;
         const totalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
         if (totalBalance < wagerAmount) {
             throw new functions.https.HttpsError('failed-precondition', 'Insufficient Funds.');
         }
 
         // Deduct wager
-        const bonusWagered = Math.min(wagerAmount, joinerData.bonusBalance || 0);
-        const mainWagered = wagerAmount - bonusWagered;
+        const bonusDeduction = Math.min(joinerData.bonusBalance || 0, wagerAmount);
+        const mainDeduction = wagerAmount - bonusDeduction;
+
         const joinerUpdate: { [key: string]: any } = {};
-        if (bonusWagered > 0) joinerUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusWagered);
-        if (mainWagered > 0) joinerUpdate.balance = admin.firestore.FieldValue.increment(-mainWagered);
+        if (bonusDeduction > 0) joinerUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
+        if (mainDeduction > 0) joinerUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
         transaction.update(joinerRef, joinerUpdate);
         
         // Update room
