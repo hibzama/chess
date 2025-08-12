@@ -1,4 +1,5 @@
 
+
 'use client'
 import { useState, useEffect } from 'react';
 import { db, functions } from '@/lib/firebase';
@@ -151,47 +152,39 @@ export default function EventsPage() {
         const userRef = doc(db, 'users', user.uid);
         
         try {
-            // Step 1: Client-side transaction to deduct the fee.
             await runTransaction(db, async (transaction) => {
                 const userDoc = await transaction.get(userRef);
-                if (!userDoc.exists()) {
-                    throw new Error("User data not found.");
-                }
+                if (!userDoc.exists()) throw new Error("User data not found.");
+                
                 const currentData = userDoc.data();
                 const fee = event.enrollmentFee || 0;
                 const totalBalance = (currentData.balance || 0) + (currentData.bonusBalance || 0);
-
+    
                 if (totalBalance < fee) {
                     throw new Error("Insufficient funds to enroll.");
                 }
-                
+    
                 const bonusDeduction = Math.min(currentData.bonusBalance || 0, fee);
                 const mainDeduction = fee - bonusDeduction;
-
+    
                 const userUpdate: { [key: string]: any } = {};
-                if (bonusDeduction > 0) userUpdate.bonusBalance = increment(-bonusDeduction);
                 if (mainDeduction > 0) userUpdate.balance = increment(-mainDeduction);
-                
+                if (bonusDeduction > 0) userUpdate.bonusBalance = increment(-bonusDeduction);
+    
                 transaction.update(userRef, userUpdate);
             });
-            
-            // Step 2: If fee deduction is successful, call the Cloud Function to enroll.
+    
             const enrollInEvent = httpsCallable(functions, 'enrollInEvent');
             const result = await enrollInEvent({ eventId: event.id });
-            const data = result.data as { success: boolean, message: string };
-
+            
+            const data = result.data as { success: boolean; message: string };
             if (!data.success) {
-                // If cloud function fails, we must refund the user.
-                throw new Error(data.message || 'Failed to enroll in the event. Your fee will be refunded.');
+                throw new Error(data.message || 'Failed to enroll. Your fee will be refunded.');
             }
-
+    
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
-
         } catch (error: any) {
             console.error("Enrollment failed: ", error);
-            // This will catch errors from both the transaction and the cloud function call.
-            // A more robust system would log this failure for manual review/refund.
-            // For now, we attempt a simple refund.
             const fee = event.enrollmentFee || 0;
             if (fee > 0) {
                  await updateDoc(userRef, { balance: increment(fee) });

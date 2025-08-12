@@ -109,7 +109,7 @@ export const processCommissions = functions.firestore
             // 2. Iterate through EACH player in the game to check for their referrers
             for (const playerId of playerIds) {
                 const userDoc = await db.collection('users').doc(playerId).get();
-                if (!userDoc.exists) {
+                if (!userDoc.exists()) {
                     functions.logger.warn(`Player ${playerId} not found, skipping their commission chain.`);
                     continue;
                 }
@@ -240,7 +240,7 @@ export const updateEventProgressOnGameEnd = functions.firestore
         for (const enrollmentDoc of activeEnrollmentsSnapshot.docs) {
             const enrollment = enrollmentDoc.data();
             const eventDoc = await db.collection('events').doc(enrollment.eventId).get();
-            if (!eventDoc.exists) continue;
+            if (!eventDoc.exists()) continue;
 
             const event = eventDoc.data();
             if (!event || !event.isActive || enrollment.expiresAt.toDate() < new Date()) continue;
@@ -319,19 +319,13 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
       const eventRef = db.collection('events').doc(eventId);
       const enrollmentRef = db.collection('users').doc(userId).collection('event_enrollments').doc(eventId);
       
-      const [eventDoc, enrollmentDoc, userDoc] = await Promise.all([
-          transaction.get(eventRef),
-          transaction.get(enrollmentRef),
-          transaction.get(db.collection('users').doc(userId))
-      ]);
+      const eventDoc = await transaction.get(eventRef);
+      const enrollmentDoc = await transaction.get(enrollmentRef);
 
-      if (!eventDoc.exists) {
+      if (!eventDoc.exists()) {
         throw new functions.https.HttpsError('not-found', 'Event not found.');
       }
-       if (!userDoc.exists()) {
-        throw new functions.https.HttpsError('not-found', 'User data not found.');
-      }
-       if (enrollmentDoc.exists) {
+      if (enrollmentDoc.exists) {
         throw new functions.https.HttpsError('already-exists', 'You are already enrolled in this event.');
       }
       
@@ -347,7 +341,7 @@ export const enrollInEvent = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('resource-exhausted', 'This event has reached its maximum number of participants.');
       }
 
-      // Enrollment Logic - Corrected Date Calculation
+      // Enrollment Logic
       const now = new Date();
       const expiryDate = new Date(now.getTime() + eventData.durationHours * 60 * 60 * 1000);
 
