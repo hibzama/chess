@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment } from 'firebase/firestore';
+import { doc, onSnapshot, Timestamp, updateDoc, writeBatch, getDoc, collection, query, serverTimestamp, where, getDocs, orderBy, increment, deleteField } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Clock, Users, DollarSign, Ban, CheckCircle, Target, Loader2, Trophy, History as HistoryIcon, Swords, Check, X } from 'lucide-react';
@@ -187,12 +187,13 @@ export default function EventsPage() {
             await batch.commit();
 
             // After the successful transaction, remove the temporary field
-            await updateDoc(userRef, { enrollingEventId: '' });
+            await updateDoc(userRef, { enrollingEventId: deleteField() });
 
             toast({ title: 'Successfully Enrolled!', description: `You have joined the "${event.title}" event.` });
         } catch (error) {
             console.error("Enrollment failed: ", error);
-            toast({ variant: 'destructive', title: 'Enrollment Failed', description: 'Could not enroll in the event.' });
+            toast({ variant: 'destructive', title: 'Enrollment Failed', description: 'Could not enroll in the event. Please check your balance and try again.' });
+            // If the transaction failed, we don't need to revert the balance because the batch commit failed.
         } finally {
             setIsEnrolling(null);
         }
