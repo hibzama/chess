@@ -5,8 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
-import { functions } from '@/lib/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -47,8 +47,7 @@ export default function CreateGamePage() {
             return;
         }
 
-        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if (totalBalance < wagerAmount) {
+        if (userData.balance < wagerAmount) {
             toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
@@ -56,25 +55,36 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            const createGameRoomFunction = httpsCallable(functions, 'createGameRoom');
-            const result: any = await createGameRoomFunction({
+            let finalPieceColor = pieceColor;
+            if (pieceColor === 'random') {
+                finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
+            }
+            
+            const roomData = {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
                 isPrivate: roomPrivacy === 'private',
-                pieceColor,
-            });
+                status: 'waiting',
+                createdBy: {
+                    uid: user.uid,
+                    name: `${userData.firstName} ${userData.lastName}`,
+                    color: finalPieceColor,
+                    photoURL: userData.photoURL || ''
+                },
+                players: [user.uid],
+                createdAt: serverTimestamp(),
+                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
+            };
 
-            if (result.data.success) {
-                toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
-                router.push(`/game/multiplayer/${result.data.roomId}`);
-            } else {
-                 throw new Error(result.data.message || 'Failed to create room.');
-            }
+            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            
+            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+            router.push(`/game/multiplayer/${roomRef.id}`);
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to create the room.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room.' });
         } finally {
             setIsCreating(false);
         }
@@ -161,7 +171,7 @@ export default function CreateGamePage() {
                         </div>
 
                         <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
-                            {isCreating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating Game...</> : 'Create Game & Wait for Opponent'}
+                            {isCreating ? 'Creating Game...' : 'Create Game & Wait for Opponent'}
                         </Button>
                     </CardContent>
                 </Card>
