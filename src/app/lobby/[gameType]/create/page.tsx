@@ -57,8 +57,8 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            const createGameRoom = httpsCallable(functions, 'createGameRoom');
-            const result = await createGameRoom({
+            const createGameRoomFunction = httpsCallable(functions, 'createGameRoom');
+            const result = await createGameRoomFunction({
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -172,3 +172,5 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
+    
