@@ -1,47 +1,49 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/onCall";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
 
-import * as functions from "firebase-functions";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import axios from "axios";
+import { logger } from "firebase-functions";
 
 admin.initializeApp();
 
-// This function triggers whenever a new document is created in 'game_rooms'
-export const announceNewGame = functions.firestore
-  .document("game_rooms/{roomId}")
-  .onCreate(async (snap, context) => {
+export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (event) => {
+    const snap = event.data;
+    if (!snap) {
+        logger.log("No data associated with the event");
+        return;
+    }
     const roomData = snap.data();
-    const roomId = context.params.roomId; // Correct way to get wildcard ID
+    const roomId = event.params.roomId;
 
-    // Exit if the function is triggered with no data, or for a private room
     if (!roomData || roomData.isPrivate === true) {
-      functions.logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
-      return null;
+      logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
+      return;
     }
 
     let telegramBotToken;
     try {
-      telegramBotToken = functions.config().telegram.token;
+      const functionsConfig = admin.app().options.config;
+      if (functionsConfig && functionsConfig.telegram) {
+          telegramBotToken = functionsConfig.telegram.token;
+      }
     } catch (error) {
-      functions.logger.error(
-        "Could not retrieve telegram.token from Functions config. " +
-        "Ensure it is set by running: " +
-        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
-      );
-      return null;
+      logger.error("Could not retrieve telegram.token from Functions config.");
+    }
+    
+    if (!telegramBotToken) {
+        logger.error(
+            "Telegram token not found. " +
+            "Ensure it is set by running: " +
+            "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
+        );
+        return;
     }
 
-    const chatId = "@nexbattlerooms"; // Your Telegram group username
-    const siteUrl = "https://nexbattle.com";
 
-    // Prepare message components with fallbacks
+    const chatId = "@nexbattlerooms";
+    const siteUrl = "http://nexbattle.com";
+
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
@@ -49,11 +51,9 @@ export const announceNewGame = functions.firestore
     const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
-    // Log the variables to ensure they are being read correctly
-    functions.logger.log(`Preparing message for Room ID: ${roomId}`);
-    functions.logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
+    logger.log(`Preparing message for Room ID: ${roomId}`);
+    logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
 
-    // Construct the message string carefully
     const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
       `<b>Player:</b> ${createdBy}\n` +
       `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
@@ -71,24 +71,21 @@ export const announceNewGame = functions.firestore
         text: message,
         parse_mode: 'HTML',
       });
-      functions.logger.log(`Successfully sent message for Room ID: ${roomId}`);
+      logger.log(`Successfully sent message for Room ID: ${roomId}`);
     } catch (error: any) {
-      functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
+      logger.error("Error sending message to Telegram:", error.response?.data || error.message);
+    }
+});
+
+
+export const endGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
-    return null;
-  });
-
-
-// v2 HTTPS Callable function to end a game
-export const endGame = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-
-    const { roomId, winnerId, method, resignerDetails } = data;
+    const { roomId, winnerId, method, resignerDetails } = request.data;
     if (!roomId || !method) {
-        throw new functions.https.HttpsError('invalid-argument', 'Room ID and method are required.');
+        throw new HttpsError('invalid-argument', 'Room ID and method are required.');
     }
 
     const db = admin.firestore();
@@ -98,26 +95,26 @@ export const endGame = functions.https.onCall(async (data, context) => {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
             if (!roomDoc.exists) {
-                throw new functions.https.HttpsError('not-found', 'Game room not found.');
+                throw new HttpsError('not-found', 'Game room not found.');
             }
 
             const roomData = roomDoc.data();
             if (!roomData) {
-                 throw new functions.https.HttpsError('not-found', 'Game room data is missing.');
+                 throw new HttpsError('not-found', 'Game room data is missing.');
             }
             if (roomData.status === 'completed') {
-                functions.logger.log(`Game ${roomId} already completed.`);
+                logger.log(`Game ${roomId} already completed.`);
                 return;
             }
             if (roomData.status !== 'in-progress') {
-                throw new functions.https.HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
+                throw new HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
             }
 
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
             if (!joinerId) {
-                throw new functions.https.HttpsError('failed-precondition', 'Game is missing a second player.');
+                throw new HttpsError('failed-precondition', 'Game is missing a second player.');
             }
             
             const creatorRef = db.collection('users').doc(creatorId);
@@ -125,6 +122,7 @@ export const endGame = functions.https.onCall(async (data, context) => {
 
             let creatorPayout = 0;
             let joinerPayout = 0;
+            
             const winnerObject: any = { method };
 
             if (method === 'draw') {
@@ -133,15 +131,23 @@ export const endGame = functions.https.onCall(async (data, context) => {
             } else if (method === 'resign' && resignerDetails) {
                 winnerObject.uid = resignerDetails.id === creatorId ? joinerId : creatorId;
                 winnerObject.resignerId = resignerDetails.id;
+                winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+                
+                let resignerRefundRate = 0;
+                if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
+                else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                else resignerRefundRate = 0.25;
+
+                const opponentPayoutRate = 1.30;
                 
                 if (resignerDetails.id === creatorId) {
-                    creatorPayout = wager * 0.75;
-                    joinerPayout = wager * 1.05;
+                    creatorPayout = wager * resignerRefundRate;
+                    joinerPayout = wager * opponentPayoutRate;
                 } else {
-                    creatorPayout = wager * 1.05;
-                    joinerPayout = wager * 0.75;
+                    creatorPayout = wager * opponentPayoutRate;
+                    joinerPayout = wager * resignerRefundRate;
                 }
-            } else {
+            } else { // Standard win (checkmate, timeout, piece-capture)
                 winnerObject.uid = winnerId;
                 if (winnerId === creatorId) {
                     creatorPayout = wager * 1.8;
@@ -156,14 +162,14 @@ export const endGame = functions.https.onCall(async (data, context) => {
                 transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(creatorPayout) });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
             if (joinerPayout > 0) {
                 transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(joinerPayout) });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    description: `Payout for ${roomData.gameType} game vs ${roomData.createdBy.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
             
@@ -172,10 +178,8 @@ export const endGame = functions.https.onCall(async (data, context) => {
         });
         return { success: true };
     } catch (error: any) {
-        functions.logger.error('Error ending game:', error);
+        logger.error('Error ending game:', error);
         if (error.code) {
              throw error; // Re-throw HttpsError
         }
-        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while ending the game.', error.message);
-    }
-});
+        throw new HttpsError('internal', 'An unexpected
