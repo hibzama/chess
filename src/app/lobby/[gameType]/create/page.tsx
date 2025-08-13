@@ -58,7 +58,7 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            const createRoomFunction = httpsCallable(functions, 'createGameRoom', { region: 'us-central1' });
+            const createRoomFunction = httpsCallable(functions, 'createGameRoom');
             
             const result = await createRoomFunction({
                 gameType,
@@ -178,4 +178,5 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
 
