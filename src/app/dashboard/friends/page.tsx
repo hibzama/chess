@@ -38,7 +38,14 @@ type UserProfile = {
   lastSeen?: any;
 };
 
-const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => (
+const getChatId = (uid1: string, uid2: string) => {
+    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+};
+
+const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
+    const { user } = useAuth();
+    
+    return (
     <Card className="flex items-center p-4 gap-4">
         <button onClick={() => onUserClick(person.uid)} className="relative flex items-center gap-4 text-left flex-grow">
             <Avatar>
@@ -58,7 +65,7 @@ const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { pers
             </div>
         </button>
         <div className="flex gap-2">
-            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(person.uid)}`}><MessageSquare /></Link></Button>}
+            {actionType === 'remove' && user && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(user.uid, person.uid)}`}><MessageSquare /></Link></Button>}
             {actionType !== 'suggestion' && 
                 <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
                      {actionType === 'add' ? <UserPlus /> : <UserMinus />}
@@ -71,14 +78,7 @@ const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { pers
             }
         </div>
     </Card>
-);
-
-const getChatId = (otherUserId: string) => {
-    // This is a placeholder. You'll need to pass the current user's ID
-    // or get it from context to generate the correct chat ID.
-    const currentUserId = "currentUser"; // Replace with actual current user ID
-    return [currentUserId, otherUserId].sort().join('_');
-};
+)};
 
 
 const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string, fromName: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (

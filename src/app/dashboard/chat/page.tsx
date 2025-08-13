@@ -96,6 +96,7 @@ export default function ChatInboxPage() {
                             hasUnread: false,
                         }
                     },
+                    userIds: [user.uid, friend.uid],
                     createdAt: serverTimestamp(),
                     lastMessage: null, // Initialize lastMessage field
                 });
