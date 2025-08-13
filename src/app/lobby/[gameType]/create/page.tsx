@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState } from 'react';
@@ -60,7 +59,6 @@ export default function CreateGamePage() {
             const batch = writeBatch(db);
             const userRef = doc(db, 'users', user.uid);
 
-            // Deduct wager from balance
             const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
             const mainWagered = wagerAmount - bonusWagered;
             const updatePayload: any = {};
@@ -68,13 +66,11 @@ export default function CreateGamePage() {
             if(mainWagered > 0) updatePayload.balance = increment(-mainWagered);
             batch.update(userRef, updatePayload);
             
-            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            // Create the game room document
             const roomRef = doc(collection(db, 'game_rooms'));
             batch.set(roomRef, {
                 gameType,
@@ -92,10 +88,9 @@ export default function CreateGamePage() {
                 p1Time: parseInt(gameTimer),
                 p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
-                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
+                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
             });
             
-            // Create a transaction log for the wager
             if(wagerAmount > 0) {
                 const transactionRef = doc(collection(db, 'transactions'));
                 batch.set(transactionRef, {
@@ -212,3 +207,4 @@ export default function CreateGamePage() {
         </div>
     );
 }
+    

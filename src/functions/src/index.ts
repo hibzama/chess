@@ -1,4 +1,3 @@
-
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -138,3 +137,4 @@ export const joinGame = onCall({ region: 'us-central1', cors: true }, async (req
         throw new HttpsError('internal', 'An unexpected error occurred while joining the room.', error.message);
     }
 });
+    
