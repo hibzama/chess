@@ -3,7 +3,7 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, Gift, ShieldAlert, Mail, Settings, Calendar } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, Gift, ShieldAlert, Mail, Settings, Calendar, ClipboardList } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -143,6 +143,9 @@ export default function AdminLayout({
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/daily-bonus"><SidebarMenuButton tooltip="Daily Bonus Config" isActive={isActive('/admin/daily-bonus')}><Gift /><span>Daily Bonus</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                         <SidebarMenuItem>
+                             <Link href="/admin/tasks"><SidebarMenuButton tooltip="Referral Tasks" isActive={isActive('/admin/tasks')}><ClipboardList /><span>Referral Tasks</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>

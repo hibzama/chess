@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Calendar } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Calendar, ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -126,8 +126,10 @@ const NotificationBell = () => {
 
 export default function MainLayout({
     children,
+    showTaskNavItem = false,
   }: {
-    children: React.ReactNode
+    children: React.ReactNode,
+    showTaskNavItem?: boolean,
   }) {
     const { logout, userData, loading } = useAuth();
     const router = useRouter();
@@ -180,6 +182,11 @@ export default function MainLayout({
                                 <SidebarMenuItem>
                                     <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
+                                 {showTaskNavItem && (
+                                     <SidebarMenuItem>
+                                        <Link href="/dashboard/tasks"><SidebarMenuButton tooltip="Your Tasks" isActive={isMounted && pathname === '/dashboard/tasks'}><ClipboardCheck /><span>Your Tasks</span></SidebarMenuButton></Link>
+                                    </SidebarMenuItem>
+                                 )}
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/profile"><SidebarMenuButton tooltip="My Profile" isActive={isMounted && pathname === '/dashboard/profile'}><User /><span>My Profile</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
@@ -193,7 +200,7 @@ export default function MainLayout({
                                     <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={isMounted && pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                  <SidebarMenuItem>
-                                    <Link href="/dashboard/friends"><SidebarMenuButton tooltip="Friends & Community" isActive={isMounted && pathname.startsWith('/dashboard/friends')}><Users /><span>Friends & Community</span></SidebarMenuButton></Link>
+                                    <Link href="/dashboard/friends"><SidebarMenuButton tooltip="Friends &amp; Community" isActive={isMounted && pathname.startsWith('/dashboard/friends')}><Users /><span>Friends &amp; Community</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/rankings"><SidebarMenuButton tooltip="Rankings" isActive={isMounted && pathname.startsWith('/dashboard/rankings')}><Trophy /><span>Rankings</span></SidebarMenuButton></Link>
@@ -202,7 +209,10 @@ export default function MainLayout({
                                     <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={isMounted && pathname === '/dashboard/equipment'}><Gamepad2 /><span>My Equipment</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer & Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer & Earn</span></SidebarMenuButton></Link>
+                                    <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer &amp; Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer &amp; Earn</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
+                                 <SidebarMenuItem>
+                                    <Link href="/dashboard/bonus-referral"><SidebarMenuButton tooltip="Ref &amp; Earn Bonus" isActive={isMounted && pathname === '/dashboard/bonus-referral'}><Gift /><span>Ref &amp; Earn Bonus</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                  <SidebarMenuItem>
                                     <Link href="/dashboard/chat"><SidebarMenuButton tooltip="Direct Messages" isActive={isMounted && pathname.startsWith('/dashboard/chat')}><MessageSquare /><span>Direct Messages</span></SidebarMenuButton></Link>

@@ -40,6 +40,8 @@ interface UserData {
     role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
     referredBy?: string;
+    taskReferredBy?: string; // For the new task system
+    taskStatus?: any; // To store progress of tasks
     referralChain?: string[];
     createdAt: any;
     l1Count?: number;

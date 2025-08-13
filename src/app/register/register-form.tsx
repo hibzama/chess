@@ -51,6 +51,7 @@ export default function RegisterForm() {
         const country = target.country.value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
+        const aref = searchParams.get('aref'); // New task-based referral
 
         if (password !== confirmPassword) {
             toast({
@@ -125,6 +126,11 @@ export default function RegisterForm() {
                 ipAddress: ipAddress,
                 emailVerified: true, // Allow login by default
             };
+            
+            // Handle new task-based referral link
+            if (aref) {
+                userData.taskReferredBy = aref;
+            }
 
             const directReferrerId = mref || ref;
             if (directReferrerId) {
@@ -258,7 +264,7 @@ export default function RegisterForm() {
                 <p className="text-xs text-muted-foreground px-6 text-center">
                     By creating an account, you agree to our{' '}
                     <Link href="/terms" className="underline hover:text-primary">
-                        Terms & Conditions
+                        Terms &amp; Conditions
                     </Link>
                     .
                 </p>

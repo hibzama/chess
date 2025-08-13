@@ -1,19 +1,24 @@
+
 'use client'
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Users, DollarSign, MessageSquare, List } from 'lucide-react';
+import { Home, Users, DollarSign, MessageSquare, List, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const navItems = [
-    { href: '/dashboard', icon: Home, label: 'Dashboard' },
-    { href: '/dashboard/friends', icon: Users, label: 'Friends' },
-    { href: '/lobby', icon: DollarSign, label: 'Earn' },
-    { href: '/dashboard/chat', icon: MessageSquare, label: 'Messages' },
-    { href: '/dashboard/my-rooms', icon: List, label: 'My Rooms' },
-];
+import { useAuth } from '@/context/auth-context';
 
 export default function MobileBottomNav() {
     const pathname = usePathname();
+    const { userData } = useAuth();
+    
+    const navItems = [
+        { href: '/dashboard', icon: Home, label: 'Dashboard' },
+        { href: '/dashboard/friends', icon: Users, label: 'Friends' },
+        { href: '/lobby', icon: DollarSign, label: 'Earn' },
+        { href: '/dashboard/chat', icon: MessageSquare, label: 'Messages' },
+        ...(userData?.taskReferredBy ? 
+            [{ href: '/dashboard/tasks', icon: Gift, label: 'Tasks' }] :
+            [{ href: '/dashboard/my-rooms', icon: List, label: 'My Rooms' }]),
+    ];
 
     return (
         <div className="fixed bottom-0 left-0 z-50 w-full h-16 bg-card border-t border-border md:hidden">
