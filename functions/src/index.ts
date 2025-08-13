@@ -1,3 +1,4 @@
+
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -178,7 +179,7 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
     const userRef = db.collection('users').doc(userId);
 
     try {
-        await db.runTransaction(async (transaction) => {
+        const roomRef = await db.runTransaction(async (transaction) => {
             const userDoc = await transaction.get(userRef);
             if (!userDoc.exists()) {
                 throw new HttpsError('not-found', 'User data not found.');
@@ -204,8 +205,8 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
 
-            const roomRef = db.collection('game_rooms').doc();
-            transaction.set(roomRef, {
+            const newRoomRef = db.collection('game_rooms').doc();
+            transaction.set(newRoomRef, {
                 gameType,
                 wager,
                 timeControl,
@@ -233,13 +234,14 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
                     amount: wager,
                     status: 'completed',
                     description: `Wager for ${gameType} game`,
-                    gameRoomId: roomRef.id,
+                    gameRoomId: newRoomRef.id,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
+            return newRoomRef;
         });
         
-        return { success: true, message: 'Room created successfully!' };
+        return { success: true, message: 'Room created successfully!', roomId: roomRef.id };
     } catch (error: any) {
         logger.error('Error in createGameRoom:', error);
         if (error instanceof HttpsError) {

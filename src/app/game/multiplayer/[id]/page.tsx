@@ -225,8 +225,8 @@ function MultiplayerGame() {
         }
 
         try {
-            const joinGame = httpsCallable(functions, 'joinGame', { region: 'us-central1' });
-            const result = await joinGame({ roomId: room.id });
+            const joinGameFunction = httpsCallable(functions, 'joinGame');
+            const result = await joinGameFunction({ roomId: room.id });
             const data = result.data as { success: boolean, message: string };
 
             if (!data.success) {
