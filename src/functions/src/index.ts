@@ -1,4 +1,5 @@
 
+'use server';
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -39,6 +40,7 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
         );
         return;
     }
+
 
     const chatId = "@nexbattlerooms";
     const siteUrl = "https://nexbattle.com";
@@ -250,4 +252,111 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
     }
 });
 
-    
+
+export const endGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    const { roomId, winnerId, method, resignerDetails } = request.data;
+
+    if (!roomId || !method) {
+        throw new HttpsError('invalid-argument', 'Room ID and method are required.');
+    }
+
+    const db = admin.firestore();
+    const roomRef = db.collection('game_rooms').doc(roomId);
+
+    try {
+        const result = await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+
+            if (!roomDoc.exists()) {
+                throw new HttpsError('not-found', 'Game room not found.');
+            }
+            const roomData = roomDoc.data()!;
+            
+            if (roomData.status === 'completed') {
+                logger.log('Game already completed, skipping payout.');
+                return { success: true, message: 'Game already completed.'};
+            }
+            if (roomData.status !== 'in-progress') {
+                throw new HttpsError('failed-precondition', 'Game is not in progress.');
+            }
+
+            const wager = roomData.wager || 0;
+            const creatorId = roomData.createdBy.uid;
+            const joinerId = roomData.player2?.uid;
+
+            if (!joinerId) {
+                throw new HttpsError('failed-precondition', 'Game is missing a second player.');
+            }
+
+            let creatorPayout = 0;
+            let joinerPayout = 0;
+            const winnerObject: any = { method };
+
+            if (method === 'draw') {
+                creatorPayout = joinerPayout = wager * 0.9;
+                winnerObject.uid = null;
+            } else if (method === 'resign' && resignerDetails) {
+                winnerObject.uid = resignerDetails.id === creatorId ? joinerId : creatorId;
+                winnerObject.resignerId = resignerDetails.id;
+                const winnerReturn = wager * 1.05;
+                const resignerReturn = wager * 0.75;
+                
+                if (resignerDetails.id === creatorId) {
+                    creatorPayout = resignerReturn;
+                    joinerPayout = winnerReturn;
+                } else {
+                    creatorPayout = winnerReturn;
+                    joinerPayout = resignerReturn;
+                }
+            } else { // Standard win
+                winnerObject.uid = winnerId;
+                if (winnerId === creatorId) {
+                    creatorPayout = wager * 1.8;
+                } else {
+                    joinerPayout = wager * 1.8;
+                }
+                transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
+            }
+
+            // Update balances and log transactions
+            const creatorRef = db.collection('users').doc(creatorId);
+            const joinerRef = db.collection('users').doc(joinerId);
+
+            if (creatorPayout > 0) {
+                transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(creatorPayout) });
+                transaction.set(db.collection('transactions').doc(), {
+                    userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
+                    description: `Payout for ${roomData.gameType} game`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            if (joinerPayout > 0) {
+                transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(joinerPayout) });
+                transaction.set(db.collection('transactions').doc(), {
+                    userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
+                    description: `Payout for ${roomData.gameType} game`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // Finalize room document
+            transaction.update(roomRef, {
+                status: 'completed',
+                winner: winnerObject,
+                draw: method === 'draw',
+            });
+            
+            return { success: true, message: 'Game ended successfully.' };
+        });
+
+        return result;
+
+    } catch (error: any) {
+        logger.error('Error ending game:', error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', 'An unexpected error occurred while ending the game.', error.message);
+    }
+});

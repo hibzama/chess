@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -22,7 +23,6 @@ import CheckersBoard from '@/components/game/checkers-board';
 import GameLayout from '@/components/game/game-layout';
 import { GameProvider, useGame } from '@/context/game-context';
 import { formatTime } from '@/lib/time';
-import { httpsCallable } from 'firebase/functions';
 
 type GameRoom = {
     id: string;
@@ -159,24 +159,14 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
     
         try {
-            const batch = writeBatch(db);
-            // Delete the room
-            batch.delete(roomRef);
-
-            // Refund the creator's wager
-            if (room.wager > 0) {
-                 batch.update(userRef, { balance: increment(room.wager) });
-            }
-            
-            await batch.commit();
+            await deleteDoc(roomRef);
     
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed and your wager refunded.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -212,37 +202,45 @@ function MultiplayerGame() {
 
     }, [room, user, handleCancelRoom]);
 
+
     const handleJoinGame = async () => {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
-        
-        setIsJoining(true);
-
+    
         const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if (totalBalance < room.wager) {
-            toast({ variant: 'destructive', title: "Insufficient Funds", description: `You need at least LKR ${room.wager.toFixed(2)} to join.` });
-            setIsJoining(false);
+        if(totalBalance < room.wager) {
+            toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have enough balance to join this game."});
             return;
         }
-
+    
+        setIsJoining(true);
         try {
             const joinGameFunction = httpsCallable(functions, 'joinGame');
-            const result = await joinGameFunction({ roomId: room.id });
-            const data = result.data as { success: boolean, message: string };
-
-            if (!data.success) {
-                throw new Error(data.message || 'Failed to join the game room.');
+            const result: any = await joinGameFunction({ roomId: room.id });
+           
+            if (result.data.success) {
+                toast({ title: "Game Joined!", description: "The match is starting now."});
+            } else {
+                throw new Error(result.data.message || 'Failed to join game.');
             }
-
-            toast({ title: "Game Joined!", description: "The match is starting now." });
-    
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            toast({ variant: "destructive", title: "Error Joining Game", description: error.message });
+            let errorMessage = 'Could not join the game.';
+            if (error.details && error.details.message) {
+                errorMessage = error.details.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            toast({ variant: 'destructive', title: "Error", description: errorMessage });
+            
+            if(errorMessage === "This room is no longer available.") {
+                router.push(`/lobby/${room.gameType}`);
+            }
+
         } finally {
             setIsJoining(false);
         }
     }
-
 
     if (isGameLoading) {
         return (
@@ -298,8 +296,7 @@ function MultiplayerGame() {
                 </div>
             )
         } else {
-            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-            const hasEnoughBalance = totalBalance >= room.wager;
+            const hasEnoughBalance = (userData.balance || 0) + (userData.bonusBalance || 0) >= room.wager;
 
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
@@ -331,7 +328,7 @@ function MultiplayerGame() {
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
-                                        You need at least LKR {room.wager.toFixed(2)} to join. Your current balance is LKR {totalBalance.toFixed(2)}.
+                                        You need at least LKR {room.wager.toFixed(2)} to join. Your current balance is LKR {((userData.balance || 0) + (userData.bonusBalance || 0)).toFixed(2)}.
                                     </CardDescription>
                                      <Button asChild variant="destructive">
                                         <Link href="/dashboard/wallet"><Wallet className="mr-2"/> Top Up Wallet</Link>
@@ -418,5 +415,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    

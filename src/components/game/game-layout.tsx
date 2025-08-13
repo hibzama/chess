@@ -264,7 +264,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleResign}>Confirm Resignation</AlertDialogAction>
+                <AlertDialogAction onClick={handleResign} className={buttonVariants({ variant: 'destructive' })}>Confirm Resignation</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

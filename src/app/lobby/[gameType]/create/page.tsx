@@ -58,21 +58,19 @@ export default function CreateGamePage() {
 
         try {
             const createGameRoomFunction = httpsCallable(functions, 'createGameRoom');
-            const result = await createGameRoomFunction({
+            const result: any = await createGameRoomFunction({
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
                 isPrivate: roomPrivacy === 'private',
-                pieceColor: pieceColor,
+                pieceColor,
             });
 
-            const data = result.data as { success: boolean, message: string, roomId?: string };
-
-            if (data.success && data.roomId) {
-                 toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
-                 router.push(`/game/multiplayer/${data.roomId}`);
+            if (result.data.success) {
+                toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+                router.push(`/game/multiplayer/${result.data.roomId}`);
             } else {
-                 throw new Error(data.message || 'Failed to create room.');
+                 throw new Error(result.data.message || 'Failed to create room.');
             }
 
         } catch (error: any) {
@@ -164,7 +162,7 @@ export default function CreateGamePage() {
                         </div>
 
                         <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
-                            {isCreating ? <Loader2 className="animate-spin" /> : 'Create Game & Wait for Opponent'}
+                            {isCreating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating Game...</> : 'Create Game & Wait for Opponent'}
                         </Button>
                     </CardContent>
                 </Card>
@@ -172,5 +170,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-
-    
