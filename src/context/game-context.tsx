@@ -1,12 +1,10 @@
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { db, functions } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
-import { httpsCallable } from 'firebase/functions';
 
 type PlayerColor = 'w' | 'b';
 type Player = 'p1' | 'p2';
@@ -164,25 +162,135 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         });
     }, [isMultiplayer, storageKey]);
 
+
+    const handlePayout = useCallback(async (winnerDetails: { winnerId: string | 'draw' | null, method: GameOverReason, resignerDetails?: {id: string, pieceCount: number} | null }) => {
+        if (!roomId || !user) return { myPayout: 0 };
+    
+        try {
+            const payoutResult = await runTransaction(db, async (transaction) => {
+                const roomRef = doc(db, 'game_rooms', roomId as string);
+                const roomDoc = await transaction.get(roomRef);
+    
+                if (!roomDoc.exists() || !roomDoc.data()?.player2) throw "Room not found or not ready";
+                if (roomDoc.data().payoutTransactionId) throw "Payout already processed";
+    
+                const roomData = roomDoc.data() as GameRoom;
+                const wager = roomData.wager;
+                let creatorPayout = 0, joinerPayout = 0;
+                let creatorDesc = '', joinerDesc = '';
+                
+                const { winnerId, method, resignerDetails } = winnerDetails;
+                const winnerObject: GameRoom['winner'] = { uid: null, method };
+    
+                if (resignerDetails) { // Resignation logic
+                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
+                    const opponentPayoutRate = 1.30;
+    
+                    let resignerRefundRate = 0;
+                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
+                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                    else resignerRefundRate = 0.25;
+
+                    if (isCreatorResigner) {
+                        creatorPayout = wager * resignerRefundRate;
+                        joinerPayout = wager * opponentPayoutRate;
+                    } else {
+                        creatorPayout = wager * opponentPayoutRate;
+                        joinerPayout = wager * resignerRefundRate;
+                    }
+                    
+                    creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                    
+                    winnerObject.uid = roomData.players.find(p => p !== resignerDetails.id) || null;
+                    winnerObject.resignerId = resignerDetails.id;
+                    winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+
+                } else if (winnerId === 'draw') { // Draw logic
+                    creatorPayout = joinerPayout = wager * 0.9;
+                    creatorDesc = `Draw refund vs ${roomData.player2.name}`;
+                    joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
+                } else if (winnerId) { // Win/loss logic
+                    const isCreatorWinner = winnerId === roomData.createdBy.uid;
+                    creatorPayout = isCreatorWinner ? wager * 1.8 : 0;
+                    joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
+                    const reason = method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture');
+                    creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
+                    transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
+                    winnerObject.uid = winnerId;
+                }
+    
+                const now = serverTimestamp();
+                const payoutTxId = doc(collection(db, 'transactions')).id;
+    
+                if (creatorPayout > 0) {
+                    transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId });
+                }
+                if (joinerPayout > 0) {
+                    transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId });
+                }
+    
+                transaction.update(roomRef, { 
+                    status: 'completed',
+                    winner: winnerObject,
+                    draw: winnerId === 'draw',
+                    payoutTransactionId: payoutTxId 
+                });
+    
+                return { myPayout: roomData.createdBy.uid === user.uid ? creatorPayout : joinerPayout };
+            });
+            return payoutResult;
+        } catch (error) {
+            if (String(error).includes('Payout already processed')) {
+                 const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
+                 if (roomDoc.exists()) {
+                    const roomData = roomDoc.data() as GameRoom;
+                    const wager = roomData.wager || 0;
+                    const winnerData = roomData.winner;
+                    const resignerDetails = winnerData?.resignerId ? {id: winnerData.resignerId, pieceCount: winnerData.resignerPieceCount || 0} : null;
+
+                    if (resignerDetails) { // Resignation
+                        let refundRate = 0;
+                        if (resignerDetails.pieceCount >= 6) refundRate = 0.50;
+                        else if (resignerDetails.pieceCount >= 3) refundRate = 0.35;
+                        else refundRate = 0.25;
+
+                        return { myPayout: resignerDetails.id === user.uid ? wager * refundRate : wager * 1.30 };
+                    } else if (roomData.draw) { // Draw
+                        return { myPayout: wager * 0.9 };
+                    } else if (winnerData?.uid === user.uid) { // I won
+                        return { myPayout: wager * 1.8 };
+                    }
+                 }
+            } else {
+                 console.error("Payout Transaction failed:", error);
+            }
+            return { myPayout: 0 };
+        }
+    }, [user, roomId, gameType]);
+
     const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerDetails: {id: string, pieceCount: number} | null = null) => {
         if (gameOverHandledRef.current) return;
         setGameState(p => ({...p, isEnding: true}));
-        gameOverHandledRef.current = true;
-
+        
         if (isMultiplayer && roomId && user) {
-            const endGameFunction = httpsCallable(functions, 'endGame');
-            endGameFunction({ roomId, winnerId, method, resignerDetails })
-                .then(result => {
-                    console.log("endGame function success:", result.data);
-                })
-                .catch(error => {
-                    console.error("Error calling endGame function:", error);
+            gameOverHandledRef.current = true;
+            handlePayout({ winnerId, method, resignerDetails }).then(({ myPayout }) => {
+                const winnerIsMe = winnerId === user.uid;
+                updateAndSaveState({ gameOver: true,
+                    winner: winnerId === 'draw' ? 'draw' : (winnerIsMe ? 'p1' : 'p2'),
+                    gameOverReason: method, payoutAmount: myPayout,
                 });
-        } else { // Practice mode logic
+            });
+        } else {
+            gameOverHandledRef.current = true;
             const winner = winnerId === 'bot' ? 'p2' : (winnerId ? 'p1' : 'draw');
             updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method, boardState });
         }
-    }, [updateAndSaveState, isMultiplayer, roomId, user]);
+    }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout]);
 
     // Multiplayer state sync
     useEffect(() => {
@@ -201,13 +309,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const roomData = { id: docSnap.id, ...docSnap.data() } as GameRoom;
             setRoom(roomData);
 
-            if (roomData.status === 'completed' && !gameState.gameOver) {
+            if (roomData.status === 'completed' && !gameOverHandledRef.current) {
+                gameOverHandledRef.current = true;
                 const winnerIsMe = roomData.winner?.uid === user.uid;
                 const iAmResigner = roomData.winner?.resignerId === user.uid;
                 const wager = roomData.wager || 0;
                 let myPayout = 0;
 
-                if (iAmResigner) {
+                 if (iAmResigner) {
                     const pieceCount = roomData.winner?.resignerPieceCount || 0;
                     let refundRate = 0;
                     if (pieceCount >= 6) refundRate = 0.50;
@@ -270,44 +379,41 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         });
 
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, router, gameType, isGameLoading, gameState.gameOver]);
+    }, [isMultiplayer, roomId, user, router, gameType, isGameLoading]);
 
      // Real-time Timer Logic
     useEffect(() => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-        if (gameState.gameOver || !isMounted || !room || room.status !== 'in-progress' || !room.turnStartTime) return;
+        if (gameState.gameOver || !isMounted || !room || room.status !== 'in-progress') return;
 
         timerIntervalRef.current = setInterval(() => {
             if (gameOverHandledRef.current) {
                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
                 return;
             }
-            
-            const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
-            const creatorIsCurrent = room.currentPlayer === room.createdBy.color;
 
-            let p1ServerTime = creatorIsCurrent ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
-            let p2ServerTime = !creatorIsCurrent ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
-            
+            const elapsed = (Timestamp.now().toMillis() - room.turnStartTime.toMillis()) / 1000;
+            const currentIsCreator = room.currentPlayer === room.createdBy.color;
+
+            let p1ServerTime = currentIsCreator ? Math.max(0, room.p1Time - elapsed) : room.p1Time;
+            let p2ServerTime = !currentIsCreator ? Math.max(0, room.p2Time - elapsed) : room.p2Time;
+
+            // Clamp time to not exceed the initial time control
             p1ServerTime = Math.min(p1ServerTime, room.timeControl);
             p2ServerTime = Math.min(p2ServerTime, room.timeControl);
             
             const isCreator = room.createdBy.uid === user?.uid;
-            
-            const myTime = isCreator ? p1ServerTime : p2ServerTime;
-            const opponentTime = isCreator ? p2ServerTime : p1ServerTime;
-
             updateAndSaveState({
-                p1Time: myTime,
-                p2Time: opponentTime,
+                p1Time: isCreator ? p1ServerTime : p2ServerTime,
+                p2Time: !isCreator ? p1ServerTime : p2ServerTime,
             });
             
-            if ((creatorIsCurrent && p1ServerTime <= 0) || (!creatorIsCurrent && p2ServerTime <= 0)) {
-                if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                const winnerId = room.players.find(p => p !== (creatorIsCurrent ? room.createdBy.uid : room.player2?.uid));
-                if (winnerId) {
-                    setWinner(winnerId, room.boardState, 'timeout');
-                }
+            if (p1ServerTime <= 0) {
+                setWinner(room.player2?.uid || '', room.boardState, 'timeout');
+                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+            } else if (p2ServerTime <= 0) {
+                setWinner(room.createdBy.uid, room.boardState, 'timeout');
+                 if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             }
         }, 1000);
 
@@ -356,14 +462,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         };
         
         const updatedGameState = updateLogic(gameState);
-        updateAndSaveState(updatedGameState); // Optimistic update
         
         // --- Check for Game Over Conditions ---
         if (gameType === 'chess') {
             const game = new Chess(boardState);
             if (game.isCheckmate()) {
                 const winnerColor = gameState.currentPlayer;
-                const winnerUid = isMultiplayer ? (room?.createdBy.color === winnerColor ? room?.createdBy.uid : room?.player2?.uid) : 'p1';
+                const winnerUid = room?.createdBy.color === winnerColor ? room?.createdBy.uid : room?.player2?.uid;
                 setWinner(winnerUid!, boardState, 'checkmate');
                 return;
             } else if (game.isDraw()) {
@@ -382,17 +487,17 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }));
             
             if (whitePieces === 0) {
-                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'b' ? room?.createdBy.uid : room?.player2?.uid) : 'p2';
+                 const winnerUid = room?.createdBy.color === 'b' ? room?.createdBy.uid : room?.player2?.uid;
                 setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             } else if (blackPieces === 0) {
-                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.p1ayer2?.uid) : 'p1';
+                 const winnerUid = room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.player2?.uid;
                  setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             }
         }
     
-        // If game is not over, proceed with turn switch for multiplayer
+        // If game is not over, proceed with turn switch
         if (isMultiplayer && room) {
             const roomRef = doc(db, 'game_rooms', room.id);
             const now = Timestamp.now();
@@ -426,8 +531,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }
     
             await updateDoc(roomRef, updatePayload);
+        } else {
+            setGameState(prevState => {
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(storageKey, JSON.stringify(updatedGameState));
+                }
+                return updatedGameState;
+            });
         }
-    }, [gameState, isMultiplayer, room, gameType, storageKey, setWinner, user, updateAndSaveState]);
+    }, [gameState, isMultiplayer, room, gameType, storageKey, setWinner, user]);
     
 
     const loadGameState = useCallback((state: GameState) => { updateAndSaveState(state); }, [updateAndSaveState]);
@@ -441,15 +553,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
 
     
-    const resign = useCallback(() => {
-        if (gameState.gameOver || gameState.isEnding || !user) return;
-        const resignerDetails = { id: user.uid, pieceCount: gameState.playerPieceCount };
-        if (isMultiplayer && room) {
-            const winnerId = room.players.find((p) => p !== user.uid) || null;
-            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails);
-        } else {
-            setWinner('bot', gameState.boardState, 'resign', resignerDetails);
-        }
+    const resign = useCallback(() => { 
+        if (gameState.gameOver || gameState.isEnding || !user) return; 
+        if (isMultiplayer && room) { 
+            const winnerId = room.players.find((p)=>p !== user.uid) || null; 
+            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
+            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails); 
+        } else { 
+            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
+            setWinner('bot', gameState.boardState, 'resign', resignerDetails); 
+        } 
     }, [gameState, user, room, isMultiplayer, setWinner]);
     
     const resetGame = useCallback(() => { 
