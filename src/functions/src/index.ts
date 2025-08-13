@@ -1,4 +1,3 @@
-
 'use server';
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
@@ -41,7 +40,6 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
         return;
     }
 
-
     const chatId = "@nexbattlerooms";
     const siteUrl = "https://nexbattle.com";
 
@@ -79,97 +77,6 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
 });
 
 
-export const joinGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-    
-    const { roomId } = request.data;
-    const userId = request.auth.uid;
-
-    if (!roomId) {
-        throw new HttpsError('invalid-argument', 'Room ID is required.');
-    }
-    
-    const db = admin.firestore();
-    const roomRef = db.collection('game_rooms').doc(roomId);
-    const joinerRef = db.collection('users').doc(userId);
-
-    try {
-        await db.runTransaction(async (transaction) => {
-            const roomDoc = await transaction.get(roomRef);
-            const joinerDoc = await transaction.get(joinerRef);
-
-            if (!roomDoc.exists()) {
-                throw new HttpsError('not-found', 'Game room not found.');
-            }
-            if (!joinerDoc.exists()) {
-                throw new HttpsError('not-found', 'Your user profile could not be found.');
-            }
-
-            const roomData = roomDoc.data()!;
-            const joinerData = joinerDoc.data()!;
-            const wagerAmount = roomData.wager || 0;
-
-            if (roomData.status !== 'waiting') {
-                throw new HttpsError('failed-precondition', 'This room is no longer available.');
-            }
-            if (roomData.createdBy.uid === userId) {
-                throw new HttpsError('failed-precondition', 'You cannot join your own game.');
-            }
-            if (roomData.players.includes(userId)) {
-                throw new HttpsError('failed-precondition', 'You are already in this room.');
-            }
-
-            const totalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
-            if (totalBalance < wagerAmount) {
-                throw new HttpsError('failed-precondition', 'Insufficient funds to join this game.');
-            }
-
-            // Deduct wager from joiner's balance
-            const bonusDeduction = Math.min(joinerData.bonusBalance || 0, wagerAmount);
-            const mainDeduction = wagerAmount - bonusDeduction;
-
-            const userUpdate: { [key: string]: any } = {};
-            if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
-            if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
-            transaction.update(joinerRef, userUpdate);
-
-            // Log the wager transaction for the joiner
-            if (wagerAmount > 0) {
-                const transactionRef = db.collection('transactions').doc();
-                transaction.set(transactionRef, {
-                    userId: userId,
-                    type: 'wager',
-                    amount: wagerAmount,
-                    status: 'completed',
-                    description: `Wager for ${roomData.gameType} game`,
-                    gameRoomId: roomRef.id,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-            }
-
-            // Update the game room
-            const creatorColor = roomData.createdBy.color;
-            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-            transaction.update(roomRef, {
-                status: 'in-progress',
-                player2: { uid: userId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
-                players: admin.firestore.FieldValue.arrayUnion(userId),
-                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
-            });
-        });
-
-        return { success: true, message: 'Game joined successfully' };
-    } catch (error: any) {
-        logger.error('Error joining game transaction:', error);
-        if (error instanceof HttpsError) {
-            throw error;
-        }
-        throw new HttpsError('internal', 'An unexpected error occurred while joining the room.', error.message);
-    }
-});
-
 export const createGameRoom = onCall({ region: 'us-central1', cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
@@ -200,7 +107,6 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
             if (mainWagered > 0) updatePayload.balance = admin.firestore.FieldValue.increment(-mainWagered);
             transaction.update(userRef, updatePayload);
             
-            // Create game room
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
@@ -208,34 +114,23 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
 
             const newRoomRef = db.collection('game_rooms').doc();
             transaction.set(newRoomRef, {
-                gameType,
-                wager,
-                timeControl,
-                isPrivate,
-                status: 'waiting',
+                gameType, wager, timeControl, isPrivate, status: 'waiting',
                 createdBy: {
                     uid: userId,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || ''
                 },
-                players: [userId],
-                p1Time: timeControl,
-                p2Time: timeControl,
+                players: [userId], p1Time: timeControl, p2Time: timeControl,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
             });
 
-            // Log wager transaction
             if (wager > 0) {
                 const transactionRef = db.collection('transactions').doc();
                 transaction.set(transactionRef, {
-                    userId,
-                    type: 'wager',
-                    amount: wager,
-                    status: 'completed',
-                    description: `Wager for ${gameType} game`,
-                    gameRoomId: newRoomRef.id,
+                    userId, type: 'wager', amount: wager, status: 'completed',
+                    description: `Wager for ${gameType} game`, gameRoomId: newRoomRef.id,
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
@@ -245,51 +140,107 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
         return { success: true, message: 'Room created successfully!', roomId: roomRef.id };
     } catch (error: any) {
         logger.error('Error in createGameRoom:', error);
-        if (error instanceof HttpsError) {
-            throw error;
-        }
+        if (error instanceof HttpsError) throw error;
         throw new HttpsError('internal', error.message || 'An unexpected error occurred.');
     }
 });
 
 
-export const endGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
+export const joinGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    const { roomId, winnerId, method, resignerDetails } = request.data;
+    
+    const { roomId } = request.data;
+    const userId = request.auth.uid;
 
-    if (!roomId || !method) {
-        throw new HttpsError('invalid-argument', 'Room ID and method are required.');
+    if (!roomId) {
+        throw new HttpsError('invalid-argument', 'Room ID is required.');
     }
+    
+    const db = admin.firestore();
+    const roomRef = db.collection('game_rooms').doc(roomId);
+    const joinerRef = db.collection('users').doc(userId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            const joinerDoc = await transaction.get(joinerRef);
+
+            if (!roomDoc.exists()) throw new HttpsError('not-found', 'Game room not found.');
+            if (!joinerDoc.exists()) throw new HttpsError('not-found', 'Your user profile could not be found.');
+
+            const roomData = roomDoc.data()!;
+            const joinerData = joinerDoc.data()!;
+            const wagerAmount = roomData.wager || 0;
+
+            if (roomData.status !== 'waiting') throw new HttpsError('failed-precondition', 'This room is no longer available.');
+            if (roomData.createdBy.uid === userId) throw new HttpsError('failed-precondition', 'You cannot join your own game.');
+            if (roomData.players.includes(userId)) throw new HttpsError('failed-precondition', 'You are already in this room.');
+
+            const totalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
+            if (totalBalance < wagerAmount) throw new HttpsError('failed-precondition', 'Insufficient funds to join this game.');
+
+            const bonusDeduction = Math.min(joinerData.bonusBalance || 0, wagerAmount);
+            const mainDeduction = wagerAmount - bonusDeduction;
+            const userUpdate: { [key: string]: any } = {};
+            if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
+            if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
+            transaction.update(joinerRef, userUpdate);
+
+            if (wagerAmount > 0) {
+                const transactionRef = db.collection('transactions').doc();
+                transaction.set(transactionRef, {
+                    userId: userId, type: 'wager', amount: wagerAmount, status: 'completed',
+                    description: `Wager for ${roomData.gameType} game`, gameRoomId: roomRef.id,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+
+            const creatorColor = roomData.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            transaction.update(roomRef, {
+                status: 'in-progress',
+                player2: { uid: userId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
+                players: admin.firestore.FieldValue.arrayUnion(userId),
+                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        });
+
+        return { success: true, message: 'Game joined successfully' };
+    } catch (error: any) {
+        logger.error('Error joining game transaction:', error);
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError('internal', 'An unexpected error occurred while joining the room.', error.message);
+    }
+});
+
+
+export const endGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    
+    const { roomId, winnerId, method, resignerDetails } = request.data;
+    if (!roomId || !method) throw new HttpsError('invalid-argument', 'Room ID and method are required.');
 
     const db = admin.firestore();
     const roomRef = db.collection('game_rooms').doc(roomId);
 
     try {
-        const result = await db.runTransaction(async (transaction) => {
+        await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists()) throw new HttpsError('not-found', 'Game room not found.');
 
-            if (!roomDoc.exists()) {
-                throw new HttpsError('not-found', 'Game room not found.');
-            }
             const roomData = roomDoc.data()!;
-            
             if (roomData.status === 'completed') {
-                logger.log('Game already completed, skipping payout.');
-                return { success: true, message: 'Game already completed.'};
+                logger.log(`Game ${roomId} already completed.`);
+                return; 
             }
-            if (roomData.status !== 'in-progress') {
-                throw new HttpsError('failed-precondition', 'Game is not in progress.');
-            }
+            if (roomData.status !== 'in-progress') throw new HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
 
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
-
-            if (!joinerId) {
-                throw new HttpsError('failed-precondition', 'Game is missing a second player.');
-            }
+            if (!joinerId) throw new HttpsError('failed-precondition', 'Game is missing a second player.');
 
             let creatorPayout = 0;
             let joinerPayout = 0;
@@ -301,17 +252,15 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
             } else if (method === 'resign' && resignerDetails) {
                 winnerObject.uid = resignerDetails.id === creatorId ? joinerId : creatorId;
                 winnerObject.resignerId = resignerDetails.id;
-                const winnerReturn = wager * 1.05;
-                const resignerReturn = wager * 0.75;
                 
                 if (resignerDetails.id === creatorId) {
-                    creatorPayout = resignerReturn;
-                    joinerPayout = winnerReturn;
+                    creatorPayout = wager * 0.75;
+                    joinerPayout = wager * 1.05;
                 } else {
-                    creatorPayout = winnerReturn;
-                    joinerPayout = resignerReturn;
+                    creatorPayout = wager * 1.05;
+                    joinerPayout = wager * 0.75;
                 }
-            } else { // Standard win
+            } else {
                 winnerObject.uid = winnerId;
                 if (winnerId === creatorId) {
                     creatorPayout = wager * 1.8;
@@ -321,10 +270,8 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
                 transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
             }
 
-            // Update balances and log transactions
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
-
             if (creatorPayout > 0) {
                 transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(creatorPayout) });
                 transaction.set(db.collection('transactions').doc(), {
@@ -340,23 +287,12 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
                 });
             }
             
-            // Finalize room document
-            transaction.update(roomRef, {
-                status: 'completed',
-                winner: winnerObject,
-                draw: method === 'draw',
-            });
-            
-            return { success: true, message: 'Game ended successfully.' };
+            transaction.update(roomRef, { status: 'completed', winner: winnerObject, draw: method === 'draw' });
         });
-
-        return result;
-
+        return { success: true };
     } catch (error: any) {
         logger.error('Error ending game:', error);
-        if (error instanceof HttpsError) {
-            throw error;
-        }
+        if (error instanceof HttpsError) throw error;
         throw new HttpsError('internal', 'An unexpected error occurred while ending the game.', error.message);
     }
 });
