@@ -1,9 +1,8 @@
-
-import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import { logger } from "firebase-functions";
+import {logger} from "firebase-functions";
 
 admin.initializeApp();
 
@@ -129,21 +128,21 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
             } else if (method === 'resign' && resignerDetails) {
-                winnerObject.uid = resignerDetails.id === creatorId ? joinerId : creatorId;
-                winnerObject.resignerId = resignerDetails.id;
-                winnerObject.resignerPieceCount = resignerDetails.pieceCount;
-                
+                const opponentPayoutRate = 1.30;
                 let resignerRefundRate = 0;
                 if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
                 else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
                 else resignerRefundRate = 0.25;
 
-                const opponentPayoutRate = 1.30;
-                
-                if (resignerDetails.id === creatorId) {
+                winnerObject.resignerId = resignerDetails.id;
+                winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+
+                if (resignerDetails.id === creatorId) { // Creator resigned
+                    winnerObject.uid = joinerId;
                     creatorPayout = wager * resignerRefundRate;
                     joinerPayout = wager * opponentPayoutRate;
-                } else {
+                } else { // Joiner resigned
+                    winnerObject.uid = creatorId;
                     creatorPayout = wager * opponentPayoutRate;
                     joinerPayout = wager * resignerRefundRate;
                 }
@@ -151,10 +150,12 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
                 winnerObject.uid = winnerId;
                 if (winnerId === creatorId) {
                     creatorPayout = wager * 1.8;
-                } else {
+                } else if (winnerId === joinerId) {
                     joinerPayout = wager * 1.8;
                 }
-                transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
+                if (winnerId) {
+                    transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
+                }
             }
 
             // Payout Logic
@@ -182,4 +183,6 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
         if (error.code) {
              throw error; // Re-throw HttpsError
         }
-        throw new HttpsError('internal', 'An unexpected
+        throw new HttpsError('internal', 'An unexpected error occurred while ending the game.');
+    }
+});

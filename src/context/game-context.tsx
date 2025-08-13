@@ -386,7 +386,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             } else if (blackPieces === 0) {
-                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.player2?.uid) : 'p1';
+                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.p1ayer2?.uid) : 'p1';
                  setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             }
