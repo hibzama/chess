@@ -1,5 +1,4 @@
 
-'use server';
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -250,3 +249,5 @@ export const createGameRoom = onCall({ region: 'us-central1', cors: true }, asyn
         throw new HttpsError('internal', error.message || 'An unexpected error occurred.');
     }
 });
+
+    
