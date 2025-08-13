@@ -1,7 +1,8 @@
+
 {
   "indexes": [
     {
-      "collectionGroup": "event_enrollments",
+      "collectionId": "event_enrollments",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
