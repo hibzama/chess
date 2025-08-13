@@ -1,10 +1,9 @@
-
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
 import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -490,6 +489,7 @@ function MultiplayerGame() {
 export default function MultiplayerGamePage() {
     const { id: roomId } = useParams();
     const [gameType, setGameType] = useState<'chess' | 'checkers' | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchGameType = async () => {
@@ -499,15 +499,20 @@ export default function MultiplayerGamePage() {
                 const roomSnap = await getDoc(roomRef);
                 if (roomSnap.exists()) {
                     setGameType(roomSnap.data().gameType);
+                } else {
+                    setGameType(null); // Room not found
                 }
             } catch (e) {
                 console.error("Could not fetch game type", e);
+                setGameType(null);
+            } finally {
+                setLoading(false);
             }
         }
         fetchGameType();
     }, [roomId]);
 
-    if (!gameType) {
+    if (loading) {
          return (
             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                 <div className="flex flex-col items-center gap-4">
@@ -517,5 +522,27 @@ export default function MultiplayerGamePage() {
             </div>
         )
     }
+
+    if (!gameType) {
+        // Handle room not found case, maybe redirect or show an error message.
+        return (
+             <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
+                <Card className="w-full max-w-lg text-center p-8">
+                    <CardHeader>
+                        <CardTitle className="text-2xl text-destructive">Room Not Found</CardTitle>
+                        <CardDescription>The game room you are looking for does not exist or has expired.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Button asChild><Link href="/lobby">Back to Lobby</Link></Button>
+                    </CardContent>
+                </Card>
+             </div>
+        )
+    }
     
-    return
+    return (
+         <GameProvider gameType={gameType}>
+            <MultiplayerGame />
+        </GameProvider>
+    )
+}
