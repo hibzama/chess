@@ -23,6 +23,8 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
 
     let telegramBotToken;
     try {
+      // For v2 functions, config is accessed differently.
+      // This is a common point of failure. Accessing it directly is better.
       const functionsConfig = admin.app().options.config;
       if (functionsConfig && functionsConfig.telegram) {
           telegramBotToken = functionsConfig.telegram.token;
@@ -213,89 +215,5 @@ export const joinGame = onCall({ region: 'us-central1', cors: true }, async (req
             throw error;
         }
         throw new HttpsError('internal', 'An unexpected error occurred while joining the room.', error.message);
-    }
-});
-
-export const enrollInEvent = onCall({ cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-
-    const userId = request.auth.uid;
-    const { eventId, enrollmentFee } = request.data;
-    
-    if (!eventId || typeof enrollmentFee !== 'number') {
-        throw new HttpsError('invalid-argument', 'The function must be called with a valid "eventId" and "enrollmentFee".');
-    }
-    
-    const db = admin.firestore();
-    const userRef = db.collection('users').doc(userId);
-    const eventRef = db.collection('events').doc(eventId);
-    const enrollmentRef = userRef.collection('event_enrollments').doc(eventId);
-
-    try {
-        const userDoc = await userRef.get();
-        const eventDoc = await eventRef.get();
-    
-        if (!userDoc.exists()) {
-            throw new HttpsError('not-found', 'Your user data could not be found.');
-        }
-        if (!eventDoc.exists()) {
-            throw new HttpsError('not-found', 'The event does not exist.');
-        }
-        
-        const userData = userDoc.data()!;
-        const eventData = eventDoc.data()!;
-
-        await db.runTransaction(async (transaction) => {
-            const freshEnrollmentDoc = await transaction.get(enrollmentRef);
-            if (freshEnrollmentDoc.exists) {
-                throw new HttpsError('already-exists', 'You are already enrolled in this event.');
-            }
-        
-            if (!eventData.isActive) {
-                throw new HttpsError('failed-precondition', 'This event is not currently active.');
-            }
-            if (eventData.maxEnrollees > 0 && (eventData.enrolledCount || 0) >= eventData.maxEnrollees) {
-                throw new HttpsError('resource-exhausted', 'This event is full.');
-            }
-        
-            const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-            if (totalBalance < enrollmentFee) {
-                throw new HttpsError('failed-precondition', 'Insufficient funds to enroll.');
-            }
-        
-            const bonusDeduction = Math.min((userData.bonusBalance || 0), enrollmentFee);
-            const mainDeduction = enrollmentFee - bonusDeduction;
-
-            const userUpdate: {[key: string]: any} = {};
-            if (mainDeduction > 0) userUpdate.balance = admin.firestore.FieldValue.increment(-mainDeduction);
-            if (bonusDeduction > 0) userUpdate.bonusBalance = admin.firestore.FieldValue.increment(-bonusDeduction);
-            
-            transaction.update(userRef, userUpdate);
-
-            const now = new Date();
-            const durationHours = Number(eventData.durationHours);
-            const expiryDate = new Date(now.getTime() + durationHours * 60 * 60 * 1000);
-
-            transaction.set(enrollmentRef, {
-                eventId: eventId,
-                userId: userId,
-                status: 'enrolled',
-                progress: 0,
-                enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
-                expiresAt: admin.firestore.Timestamp.fromDate(expiryDate)
-            });
-
-            transaction.update(eventRef, {enrolledCount: admin.firestore.FieldValue.increment(1)});
-        });
-        
-        return {success: true, message: 'Enrolled successfully!'};
-    } catch (error: any) {
-        logger.error('Error in enrollInEvent:', error);
-        if (error instanceof HttpsError) {
-            throw error;
-        }
-        throw new HttpsError('internal', error.message || 'An unexpected error occurred.');
     }
 });
