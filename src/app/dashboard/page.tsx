@@ -14,9 +14,7 @@ import { cn } from '@/lib/utils';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import BonusDisplay, { type DepositBonus } from './bonus-display';
-import EventDisplay from './event-display';
 import DailyBonusDisplay from './daily-bonus-display';
-import type { Event } from './events/page';
 
 
 export default function DashboardPage() {
@@ -29,7 +27,6 @@ export default function DashboardPage() {
     const [statsLoading, setStatsLoading] = useState(true);
 
     const [depositBonus, setDepositBonus] = useState<DepositBonus | null>(null);
-    const [events, setEvents] = useState<Event[]>([]);
     const [hasDailyBonus, setHasDailyBonus] = useState(false);
     const [promotionsLoading, setPromotionsLoading] = useState(true);
 
@@ -60,11 +57,10 @@ export default function DashboardPage() {
 
     useEffect(() => {
         let bonusLoaded = false;
-        let eventsLoaded = false;
         let dailyBonusLoaded = false;
 
         const checkLoading = () => {
-            if (bonusLoaded && eventsLoaded && dailyBonusLoaded) {
+            if (bonusLoaded && dailyBonusLoaded) {
                 setPromotionsLoading(false);
             }
         };
@@ -80,14 +76,6 @@ export default function DashboardPage() {
             checkLoading();
         });
 
-        const eventsQuery = query(collection(db, 'events'), where('isActive', '==', true), limit(1));
-        const eventsUnsub = onSnapshot(eventsQuery, (snapshot) => {
-            const eventsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Event));
-            setEvents(eventsData);
-            eventsLoaded = true;
-            checkLoading();
-        });
-
         const dailyBonusQuery = query(collection(db, 'bonuses'), where('isActive', '==', true), limit(1));
         const dailyBonusUnsub = onSnapshot(dailyBonusQuery, (snapshot) => {
             setHasDailyBonus(!snapshot.empty);
@@ -97,7 +85,6 @@ export default function DashboardPage() {
 
         return () => {
             bonusUnsub();
-            eventsUnsub();
             dailyBonusUnsub();
         };
     }, []);
@@ -105,7 +92,6 @@ export default function DashboardPage() {
     const promotionItems = [
         ...(depositBonus ? [{ type: 'bonus', data: depositBonus, id: 'deposit-bonus' }] : []),
         ...(hasDailyBonus ? [{ type: 'dailyBonus', data: {}, id: 'daily-bonus' }] : []),
-        ...events.map(event => ({ type: 'event', data: event, id: event.id }))
     ];
 
 
@@ -182,7 +168,6 @@ export default function DashboardPage() {
                {promotionItems.map(item => {
                    if (item.type === 'bonus') return <BonusDisplay key={item.id}/>;
                    if (item.type === 'dailyBonus') return <DailyBonusDisplay key={item.id}/>;
-                   if (item.type === 'event') return <EventDisplay key={item.id} event={item.data as Event}/>
                    return null;
                })}
            </div>

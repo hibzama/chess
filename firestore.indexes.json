@@ -1,20 +1,5 @@
 
 {
-  "indexes": [
-    {
-      "collectionId": "event_enrollments",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "eventId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "enrolledAt",
-          "order": "DESCENDING"
-        }
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }

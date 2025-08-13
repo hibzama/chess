@@ -144,9 +144,6 @@ export default function AdminLayout({
                          <SidebarMenuItem>
                              <Link href="/admin/daily-bonus"><SidebarMenuButton tooltip="Daily Bonus Config" isActive={isActive('/admin/daily-bonus')}><Gift /><span>Daily Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
-                        <SidebarMenuItem>
-                             <Link href="/admin/events/manage"><SidebarMenuButton tooltip="Manage Events" isActive={isActive('/admin/events/manage')}><Calendar /><span>Events</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>
                 <SidebarFooter>

@@ -187,9 +187,6 @@ export default function MainLayout({
                                     <Link href="/dashboard/bonus"><SidebarMenuButton tooltip="Daily Bonus" isActive={isMounted && pathname === '/dashboard/bonus'}><Gift /><span>Daily Bonus</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/events"><SidebarMenuButton tooltip="Events" isActive={isMounted && pathname === '/dashboard/events'}><Calendar /><span>Events</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
                                     <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><List /><span>My Rooms</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
@@ -350,4 +347,3 @@ export default function MainLayout({
         </Dialog>
     )
   }
-
