@@ -23,8 +23,6 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
 
     let telegramBotToken;
     try {
-      // For v2 functions, config is accessed differently.
-      // This is a common point of failure. Accessing it directly is better.
       const functionsConfig = admin.app().options.config;
       if (functionsConfig && functionsConfig.telegram) {
           telegramBotToken = functionsConfig.telegram.token;
@@ -76,83 +74,6 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
       logger.log(`Successfully sent message for Room ID: ${roomId}`);
     } catch (error: any) {
       logger.error("Error sending message to Telegram:", error.response?.data || error.message);
-    }
-});
-
-
-export const createGameRoom = onCall({ region: 'us-central1', cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-    const userId = request.auth.uid;
-    const { gameType, wager, timeControl, isPrivate, pieceColor } = request.data;
-    const db = admin.firestore();
-    const userRef = db.collection('users').doc(userId);
-
-    try {
-        const userDoc = await userRef.get();
-        if (!userDoc.exists) {
-            throw new HttpsError('not-found', 'User data not found.');
-        }
-        const userData = userDoc.data()!;
-
-        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if (totalBalance < wager) {
-            throw new HttpsError('failed-precondition', 'Insufficient funds.');
-        }
-
-        const roomRef = db.collection('game_rooms').doc();
-        const batch = db.batch();
-
-        const bonusWagered = Math.min(wager, userData.bonusBalance || 0);
-        const mainWagered = wager - bonusWagered;
-        const updatePayload: { [key: string]: any } = {};
-        if (bonusWagered > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(-bonusWagered);
-        if (mainWagered > 0) updatePayload.balance = admin.firestore.FieldValue.increment(-mainWagered);
-        batch.update(userRef, updatePayload);
-        
-        let finalPieceColor = pieceColor;
-        if (pieceColor === 'random') {
-            finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
-        }
-
-        batch.set(roomRef, {
-            gameType,
-            wager,
-            timeControl,
-            isPrivate,
-            status: 'waiting',
-            createdBy: {
-                uid: userId,
-                name: `${userData.firstName} ${userData.lastName}`,
-                color: finalPieceColor,
-                photoURL: userData.photoURL || ''
-            },
-            players: [userId],
-            p1Time: timeControl,
-            p2Time: timeControl,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
-        });
-
-        if (wager > 0) {
-            const transactionRef = db.collection('transactions').doc();
-            batch.set(transactionRef, {
-                userId,
-                type: 'wager',
-                amount: wager,
-                status: 'completed',
-                description: `Wager for ${gameType} game`,
-                gameRoomId: roomRef.id,
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-        }
-        
-        await batch.commit();
-        return { success: true, roomId: roomRef.id, message: 'Room created successfully!' };
-    } catch (error: any) {
-        logger.error('Error in createGameRoom:', error);
-        throw new HttpsError('internal', error.message || 'An unexpected error occurred.');
     }
 });
 
