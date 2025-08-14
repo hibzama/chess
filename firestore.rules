@@ -3,73 +3,76 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can read public user data, but only write to their own document.
+    // Users can read public user data and can write to their own document.
     match /users/{userId} {
-      allow read: if request.auth != null;
+      allow read, list: if request.auth != null;
       allow write: if request.auth.uid == userId;
     }
+    
+    // Users can create a friend request for someone else.
+    // They can read/delete a request if they are the sender or receiver.
+    match /friend_requests/{requestId} {
+      allow create: if request.auth.uid == request.resource.data.fromId;
+      allow read, delete: if request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId;
+    }
+    
+    // Authenticated users can create notifications. 
+    // Users can only read their own notifications.
+    match /notifications/{notificationId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth.uid == resource.data.userId;
+    }
 
-    // Secure access to game rooms
+    // Game rooms are public if not private. Players can read private rooms.
+    // Only the creator can create. Players can update/delete.
     match /game_rooms/{roomId} {
       allow read: if resource.data.isPrivate == false || request.auth.uid in resource.data.players;
-      allow create: if request.auth != null;
-      allow update: if request.auth.uid in resource.data.players;
-      allow delete: if request.auth.uid == resource.data.createdBy.uid;
-    }
+      allow create: if request.auth.uid == request.resource.data.createdBy.uid;
+      allow update, delete: if request.auth.uid in resource.data.players;
 
-    // Rules for friend requests
-    match /friend_requests/{requestId} {
-      allow read: if request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId;
-      allow create: if request.auth != null && request.resource.data.fromId == request.auth.uid;
-      allow delete: if request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId;
-    }
-
-    // Users can only read their own notifications
-    match /notifications/{notificationId} {
-      allow read, delete: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth != null;
-    }
-
-    // Users can only manage their own transactions
-    match /transactions/{transactionId} {
-      allow read: if request.auth.uid == resource.data.userId;
-      allow create: if request.auth.uid == request.resource.data.userId;
-    }
-    
-    // Marketing applications can only be read by admins (implicitly through cloud functions)
-    // No direct client read/write access is needed.
-    match /marketing_applications/{appId} {
-      allow read, write: if false; // Handled by backend/admin
-    }
-    
-    // Settings can only be read/written by admins (implicitly through cloud functions/admin panel)
-    match /settings/{settingId} {
-        allow read, write: if false; // Handled by backend/admin
-    }
-
-    // Bonus claims can only be handled by admins
-    match /bonus_claims/{claimId} {
-      allow read: if request.auth != null; // Allow user to read their own claims, will be filtered on client
-      allow create: if request.auth != null && request.resource.data.newUserId == request.auth.uid || request.resource.data.referrerId == request.auth.uid;
-    }
-    
-    match /dailyBonusClaims/{bonusId} {
-        allow read: if request.auth != null;
-    }
-    
-     match /users/{userId}/daily_bonus_claims/{bonusId} {
-        allow read: if request.auth.uid == userId;
-        allow create: if request.auth.uid == userId;
-    }
-
-    // Chat messages can only be read/written by participants of the chat
-    match /chats/{chatId} {
-      allow read, update: if request.auth.uid in resource.data.userIds;
-      
+      // Messages within a game room are accessible only to players of that game.
       match /messages/{messageId} {
-        allow read: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-        allow create: if request.auth.uid == request.resource.data.senderId;
+        allow read, create: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
       }
+    }
+
+    // Users can only read/write their own transactions.
+    match /transactions/{transactionId} {
+      allow read, create, update: if request.auth.uid == resource.data.userId;
+    }
+
+    // Anyone can submit a marketing application.
+    match /marketing_applications/{appId} {
+      allow create: if true;
+    }
+
+    // Settings should be restricted, but readable by authenticated users for now.
+    match /settings/{settingId} {
+      allow read: if request.auth != null;
+    }
+    
+    // Bonus and claim documents can be read by authenticated users.
+    // This allows the client to see available bonuses.
+    match /bonuses/{bonusId} {
+      allow read: if request.auth != null;
+    }
+
+    match /dailyBonusClaims/{claimId} {
+      allow read, write: if request.auth != null; 
+    }
+
+    // Users can only interact with their own bonus claims history.
+    match /users/{userId}/daily_bonus_claims/{claimId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+    
+    match /referral_tasks/{taskId} {
+      allow read: if request.auth != null;
+    }
+    
+    match /bonus_claims/{claimId} {
+       allow read: if request.auth.uid == resource.data.referrerId || request.auth.uid == resource.data.newUserId;
+       allow create: if request.auth != null && (request.auth.uid == request.resource.data.referrerId || request.auth.uid == request.resource.data.newUserId);
     }
   }
 }
