@@ -254,11 +254,12 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
 
-        const usersSnapshot = await db.collection('users').orderBy('createdAt', 'desc').limit(50).get();
+        // Order by wins descending for more relevant suggestions
+        const usersSnapshot = await db.collection('users').orderBy('wins', 'desc').limit(50).get();
 
         const suggestions = usersSnapshot.docs
             .map(doc => ({ uid: doc.id, ...doc.data() }))
-            .filter(u => u.uid && !excludeIds.includes(u.uid)) // Ensure uid exists before checking
+            .filter(u => u.uid && !excludeIds.includes(u.uid))
             .slice(0, 10)
             .map(u => ({
                 uid: u.uid,
@@ -276,6 +277,7 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
         throw new HttpsError('internal', 'An error occurred while fetching friend suggestions.');
     }
 });
+
 
 export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, async (request) => {
     if (!request.auth) {
