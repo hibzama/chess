@@ -50,6 +50,8 @@ interface UserData {
     status?: 'online' | 'offline';
     lastSeen?: any;
     wins?: number;
+    validTaskReferrals?: number;
+    claimedTaskReferralBonus?: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

@@ -125,6 +125,8 @@ export default function RegisterForm() {
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
                 emailVerified: true, // Allow login by default
+                validTaskReferrals: 0,
+                claimedTaskReferralBonus: false,
             };
             
             // Handle new task-based referral link

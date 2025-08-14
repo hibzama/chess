@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, setDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp, setDoc, addDoc, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,36 +119,29 @@ export default function UserTasksPage() {
         
         setIsClaiming(true);
         try {
-            const taskPackage = tasks[0]; // Assuming one active task package for now
-            // Create pending transaction for the new user
-            const newUserBonus = taskPackage.newUserBonus || 0;
-            await addDoc(collection(db, 'transactions'), {
-                userId: user.uid,
-                type: 'task_bonus',
-                amount: newUserBonus,
-                status: 'pending',
-                description: `Bonus for completing: ${taskPackage.title}`,
-                fromUserId: userData.taskReferredBy,
-                createdAt: serverTimestamp()
-            });
-
-            // Create pending transaction for the referrer
-            const referrerCommission = taskPackage.referrerCommission || 0;
-            await addDoc(collection(db, 'transactions'), {
-                userId: userData.taskReferredBy,
-                type: 'task_commission',
-                amount: referrerCommission,
-                status: 'pending',
-                description: `Commission for ${userData.firstName}'s task: ${taskPackage.title}`,
-                fromUserId: user.uid,
-                createdAt: serverTimestamp()
-            });
-
-            // Mark tasks as claimed for the user
+            const taskPackage = tasks[0]; 
             const userRef = doc(db, 'users', user.uid);
-            await updateDoc(userRef, { [`taskStatus.${taskPackage.id}.claimed`]: true });
 
-            toast({ title: 'Rewards Claimed!', description: 'Your bonus is pending admin approval.' });
+            // Add new user bonus and mark as claimed
+            const newUserBonus = taskPackage.newUserBonus || 0;
+            if(newUserBonus > 0) {
+                await updateDoc(userRef, { 
+                    bonusBalance: increment(newUserBonus),
+                    [`taskStatus.${taskPackage.id}.claimed`]: true 
+                });
+            } else {
+                 await updateDoc(userRef, { 
+                    [`taskStatus.${taskPackage.id}.claimed`]: true 
+                });
+            }
+            
+            // Mark the user as a valid referral for the referrer
+            const referrerRef = doc(db, 'users', userData.taskReferredBy);
+            await updateDoc(referrerRef, {
+                validTaskReferrals: increment(1)
+            });
+
+            toast({ title: 'Reward Claimed!', description: `LKR ${newUserBonus.toFixed(2)} has been added to your bonus balance.` });
         } catch (error) {
              console.error(error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not claim rewards.' });
@@ -236,7 +229,7 @@ export default function UserTasksPage() {
                     </CardHeader>
                     <CardFooter>
                          <Button onClick={handleClaimReward} disabled={isClaiming || isClaimed}>
-                            {isClaiming ? <Loader2 className="animate-spin"/> : (isClaimed ? 'Reward Claimed (Pending Approval)' : 'Claim My Bonus &amp; Referrer Commission')}
+                            {isClaiming ? <Loader2 className="animate-spin"/> : (isClaimed ? 'Reward Claimed!' : `Claim Bonus (LKR ${mainTask?.newUserBonus.toFixed(2)})`)}
                         </Button>
                     </CardFooter>
                 </Card>

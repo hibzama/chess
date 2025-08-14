@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Gift, Copy, Share, Users, Clock, Check, X, Loader2, Gamepad2 } from 'lucide-react';
+import { Gift, Copy, Share, Users, Clock, Check, X, Loader2, Gamepad2, Target } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -23,6 +23,7 @@ type UserTaskStatus = {
     tasks: { [taskId: string]: { status: 'pending' | 'completed' | 'submitted'; progress?: number; value?: string } };
     claimed: boolean;
     joinedAt: any;
+    isCompleted: boolean;
 };
 
 export default function BonusReferralPage() {
@@ -31,6 +32,7 @@ export default function BonusReferralPage() {
     const [tasks, setTasks] = useState<any[]>([]);
     const [referrals, setReferrals] = useState<UserTaskStatus[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isClaiming, setIsClaiming] = useState(false);
 
     const referralLink = useMemo(() => {
         if (typeof window !== 'undefined' && user) {
@@ -39,13 +41,28 @@ export default function BonusReferralPage() {
         return '';
     }, [user]);
 
+    const activeTask = useMemo(() => tasks.find(t => t.isActive), [tasks]);
+    
+    const { validReferrals, pendingReferrals } = useMemo(() => {
+        const valid = referrals.filter(r => r.isCompleted);
+        const pending = referrals.filter(r => !r.isCompleted);
+        return { validReferrals: valid, pendingReferrals: pending };
+    }, [referrals]);
+    
+    const canClaimTargetBonus = useMemo(() => {
+        if (!activeTask || !userData) return false;
+        const target = activeTask.referrerTarget || 0;
+        const alreadyClaimed = userData.claimedTaskReferralBonus || false;
+        return validReferrals.length >= target && !alreadyClaimed;
+    }, [activeTask, validReferrals.length, userData]);
+
     useEffect(() => {
         if (!user) {
             setLoading(false);
             return;
         }
         // Fetch active tasks
-        const tasksQuery = query(collection(db, 'referral_tasks'), where('isActive', '==', true));
+        const tasksQuery = query(collection(db, 'referral_tasks'));
         const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
             setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
@@ -55,12 +72,19 @@ export default function BonusReferralPage() {
         const unsubReferrals = onSnapshot(referralsQuery, (snapshot) => {
             const referredUsers = snapshot.docs.map(doc => {
                 const data = doc.data();
+                const userTasks = data.taskStatus || {};
+                let isCompleted = false;
+                if(activeTask && userTasks[activeTask.id]) {
+                    isCompleted = activeTask.subTasks.every((st: any) => userTasks[activeTask.id][st.id]?.status === 'completed');
+                }
+
                 return {
                     userId: doc.id,
                     userName: `${data.firstName} ${data.lastName}`,
                     tasks: data.taskStatus || {},
                     claimed: data.taskStatus?.claimed || false,
-                    joinedAt: data.createdAt
+                    joinedAt: data.createdAt,
+                    isCompleted
                 }
             });
             setReferrals(referredUsers);
@@ -71,20 +95,51 @@ export default function BonusReferralPage() {
             unsubTasks();
             unsubReferrals();
         };
-    }, [user]);
+    }, [user, activeTask]);
 
     const copyLink = () => {
         navigator.clipboard.writeText(referralLink);
         toast({ title: 'Copied!', description: 'Referral link copied to clipboard.' });
     };
-    
-    const getOverallProgress = (userTasks: UserTaskStatus['tasks']) => {
-        const totalTasks = tasks.length;
-        if (totalTasks === 0) return 0;
-        const completedTasks = tasks.filter(task => userTasks[task.id]?.status === 'completed').length;
-        return (completedTasks / totalTasks) * 100;
-    }
 
+    const handleClaimTargetBonus = async () => {
+        if(!user || !activeTask || !canClaimTargetBonus) return;
+        setIsClaiming(true);
+
+        const batch = writeBatch(db);
+        const userRef = doc(db, 'users', user.uid);
+        
+        // Add commission for each valid referral
+        validReferrals.forEach(ref => {
+            const commission = activeTask.referrerCommission || 0;
+            if (commission > 0) {
+                 const commissionRef = doc(collection(db, "transactions"));
+                 batch.set(commissionRef, {
+                    userId: user.uid,
+                    type: 'task_commission',
+                    amount: commission,
+                    status: 'completed',
+                    description: `Commission for ${ref.userName}'s task completion.`,
+                    fromUserId: ref.userId,
+                 });
+                 batch.update(userRef, { balance: increment(commission) });
+            }
+        });
+
+        // Mark bonus as claimed to prevent re-claiming
+        batch.update(userRef, { claimedTaskReferralBonus: true });
+        
+        try {
+            await batch.commit();
+            toast({ title: "Success!", description: "Referral commissions have been added to your wallet."});
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: "Error", description: "Failed to claim commissions."});
+        } finally {
+            setIsClaiming(false);
+        }
+    };
+    
     return (
         <div className="space-y-8">
             <div>
@@ -108,68 +163,70 @@ export default function BonusReferralPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Tasks for Your Referrals</CardTitle>
-                    <CardDescription>New users who join with your link will need to complete these tasks.</CardDescription>
+                    <CardTitle>Your Referral Target</CardTitle>
+                     <CardDescription>Get this many users to complete their tasks to claim your commissions.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    {loading ? <Skeleton className="h-24 w-full" /> : tasks.length > 0 ? (
-                        tasks.map(task => (
-                            <div key={task.id} className="p-4 border rounded-lg flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold">{task.title}</p>
-                                    <p className="text-sm text-muted-foreground">{task.description}</p>
-                                </div>
-                                <div className="text-right">
-                                     <p className="text-sm font-semibold text-green-400">You Get: LKR {task.referrerCommission.toFixed(2)}</p>
-                                    <p className="text-sm font-semibold text-primary">They Get: LKR {task.newUserBonus.toFixed(2)}</p>
-                                </div>
+                <CardContent>
+                    {loading || !activeTask ? <Skeleton className="h-24 w-full" /> : (
+                        <div className="space-y-4">
+                            <Progress value={(validReferrals.length / activeTask.referrerTarget) * 100} />
+                            <div className="flex justify-between items-center font-semibold">
+                                <span>{validReferrals.length} / {activeTask.referrerTarget} Referrals Completed</span>
+                                {canClaimTargetBonus && (
+                                    <Button onClick={handleClaimTargetBonus} disabled={isClaiming}>
+                                        {isClaiming ? <Loader2 className="animate-spin" /> : "Claim Commissions"}
+                                    </Button>
+                                )}
                             </div>
-                        ))
-                    ) : (
-                        <p className="text-center text-muted-foreground py-4">No active tasks configured by the admin yet.</p>
+                        </div>
                     )}
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Your Referral Progress</CardTitle>
+                    <CardTitle>Your Referrals</CardTitle>
                     <CardDescription>Track the progress of users who joined with your link.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>User</TableHead>
-                                <TableHead>Joined</TableHead>
-                                <TableHead>Task Progress</TableHead>
-                                <TableHead>Reward Status</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loading ? <TableRow><TableCell colSpan={4}><Skeleton className="h-10 w-full" /></TableCell></TableRow> : referrals.length > 0 ? (
-                                referrals.map(ref => (
-                                    <TableRow key={ref.userId}>
-                                        <TableCell>{ref.userName}</TableCell>
-                                        <TableCell>{ref.joinedAt ? format(ref.joinedAt.toDate(), 'PP') : 'N/A'}</TableCell>
-                                        <TableCell>
-                                            <Progress value={getOverallProgress(ref.tasks)} className="w-[60%]" />
-                                        </TableCell>
-                                        <TableCell>
-                                            {getOverallProgress(ref.tasks) === 100 ? 
-                                                (ref.claimed ? <Badge variant="default">Claimed</Badge> : <Badge variant="secondary">Pending Claim</Badge>)
-                                                : <Badge variant="outline">In Progress</Badge>}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow><TableCell colSpan={4} className="text-center h-24">No one has joined with your task referral link yet.</TableCell></TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                    <Tabs defaultValue="valid">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="valid">Valid Referrals ({validReferrals.length})</TabsTrigger>
+                            <TabsTrigger value="pending">Pending Referrals ({pendingReferrals.length})</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="valid">
+                            <Table>
+                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Joined</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {loading ? <TableRow><TableCell colSpan={3}><Skeleton className="h-10 w-full" /></TableCell></TableRow> : validReferrals.length > 0 ? (
+                                        validReferrals.map(ref => <ReferralRow key={ref.userId} referral={ref} />)
+                                    ) : <TableRow><TableCell colSpan={3} className="text-center h-24">No valid referrals yet.</TableCell></TableRow>}
+                                </TableBody>
+                            </Table>
+                        </TabsContent>
+                        <TabsContent value="pending">
+                            <Table>
+                                <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Joined</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {loading ? <TableRow><TableCell colSpan={3}><Skeleton className="h-10 w-full" /></TableCell></TableRow> : pendingReferrals.length > 0 ? (
+                                        pendingReferrals.map(ref => <ReferralRow key={ref.userId} referral={ref} />)
+                                    ) : <TableRow><TableCell colSpan={3} className="text-center h-24">No pending referrals.</TableCell></TableRow>}
+                                </TableBody>
+                            </Table>
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
         </div>
     );
 }
 
+const ReferralRow = ({ referral }: { referral: UserTaskStatus }) => (
+    <TableRow>
+        <TableCell>{referral.userName}</TableCell>
+        <TableCell>{referral.joinedAt ? format(referral.joinedAt.toDate(), 'PP') : 'N/A'}</TableCell>
+        <TableCell>
+            {referral.isCompleted ? <Badge variant="default">Completed</Badge> : <Badge variant="outline">In Progress</Badge>}
+        </TableCell>
+    </TableRow>
+);

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Edit, Trash2, ClipboardList, Gamepad2, Users, DollarSign, Check, X, Youtube, Send, Link as LinkIcon, MessageSquare } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, ClipboardList, Gamepad2, Users, DollarSign, Check, X, Youtube, Send, Link as LinkIcon, MessageSquare, Target } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,7 +30,8 @@ export interface Task {
     description: string;
     subTasks: SubTask[];
     newUserBonus: number;
-    referrerCommission: number;
+    referrerCommission: number; // Commission per completed referral
+    referrerTarget: number; // Target number of referrals
     isActive: boolean;
     createdAt: any;
 }
@@ -55,6 +56,7 @@ export default function TasksPage() {
         subTasks: [],
         newUserBonus: 50,
         referrerCommission: 25,
+        referrerTarget: 10,
         isActive: true,
     });
     const [isEditing, setIsEditing] = useState(false);
@@ -76,6 +78,7 @@ export default function TasksPage() {
             subTasks: [],
             newUserBonus: 50,
             referrerCommission: 25,
+            referrerTarget: 10,
             isActive: true,
         });
         setIsEditing(false);
@@ -216,7 +219,7 @@ export default function TasksPage() {
 
                         <Separator />
                         
-                        <div className="grid md:grid-cols-2 gap-4">
+                        <div className="grid md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="newUserBonus" className="flex items-center gap-1"><DollarSign /> New User Bonus (LKR)</Label>
                                 <Input id="newUserBonus" type="number" value={currentTask.newUserBonus} onChange={e => setCurrentTask({ ...currentTask, newUserBonus: Number(e.target.value) })} required />
@@ -225,12 +228,16 @@ export default function TasksPage() {
                                 <Label htmlFor="referrerCommission" className="flex items-center gap-1"><DollarSign /> Referrer Commission (LKR)</Label>
                                 <Input id="referrerCommission" type="number" value={currentTask.referrerCommission} onChange={e => setCurrentTask({ ...currentTask, referrerCommission: Number(e.target.value) })} required />
                             </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="referrerTarget" className="flex items-center gap-1"><Target /> Referrer Target</Label>
+                                <Input id="referrerTarget" type="number" value={currentTask.referrerTarget} onChange={e => setCurrentTask({ ...currentTask, referrerTarget: Number(e.target.value) })} required />
+                            </div>
                         </div>
                         <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
                                 <Label className="text-base">Activate Task Package</Label>
                                 <p className="text-sm text-muted-foreground">
-                                    If active, this set of tasks will be assigned to new users.
+                                    If active, this set of tasks will be assigned to new users. Only one package can be active.
                                 </p>
                             </div>
                             <Switch checked={currentTask.isActive} onCheckedChange={checked => setCurrentTask({ ...currentTask, isActive: checked })} />
@@ -256,10 +263,11 @@ export default function TasksPage() {
                                     <div className="flex-1 space-y-1">
                                         <p className="font-semibold">{task.title}</p>
                                         <p className="text-sm text-muted-foreground">{task.description}</p>
-                                        <div className="flex items-center gap-4 text-xs pt-2">
+                                        <div className="flex items-center gap-4 text-xs pt-2 flex-wrap">
                                             <Badge variant={task.isActive ? 'default' : 'secondary'}>{task.isActive ? 'Active' : 'Inactive'}</Badge>
                                             <span className="flex items-center gap-1"><Users className="w-3 h-3"/> New User: LKR {task.newUserBonus}</span>
                                             <span className="flex items-center gap-1"><DollarSign className="w-3 h-3"/> Referrer: LKR {task.referrerCommission}</span>
+                                            <span className="flex items-center gap-1"><Target className="w-3 h-3"/> Target: {task.referrerTarget} Referrals</span>
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
