@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -38,45 +39,46 @@ type UserProfile = {
   lastSeen?: any;
 };
 
-const getChatId = (currentUserId: string, otherUserId: string) => {
-    return [currentUserId, otherUserId].sort().join('_');
-};
+const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: any, person: UserProfile, onAction: (person: UserProfile) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
+    const getChatId = (currentUserId: string, otherUserId: string) => {
+        return [currentUserId, otherUserId].sort().join('_');
+    };
 
-const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: any, person: UserProfile, onAction: (person: UserProfile) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => (
-    <Card className="flex items-center p-4 gap-4">
-        <button onClick={() => onUserClick(person.uid)} className="relative flex items-center gap-4 text-left flex-grow">
-            <Avatar>
-                <AvatarImage src={person.photoURL} />
-                <AvatarFallback>{person.firstName?.[0]}{person.lastName?.[0]}</AvatarFallback>
-            </Avatar>
-             {person.status === 'online' && <div className="absolute top-0 left-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />}
-            <div className="flex-grow">
-                <p className="font-semibold">{person.firstName} {person.lastName}</p>
-                {person.status === 'online' ? (
-                    <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">Online</Badge>
-                ) : (
-                     <p className="text-xs text-muted-foreground">
-                        {person.lastSeen ? `Last seen ${formatDistanceToNowStrict(person.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'}
-                    </p>
-                )}
+    return (
+        <Card className="flex items-center p-4 gap-4">
+            <button onClick={() => onUserClick(person.uid)} className="relative flex items-center gap-4 text-left flex-grow">
+                <Avatar>
+                    <AvatarImage src={person.photoURL} />
+                    <AvatarFallback>{person.firstName?.[0]}{person.lastName?.[0]}</AvatarFallback>
+                </Avatar>
+                {person.status === 'online' && <div className="absolute top-0 left-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />}
+                <div className="flex-grow">
+                    <p className="font-semibold">{person.firstName} {person.lastName}</p>
+                    {person.status === 'online' ? (
+                        <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">Online</Badge>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">
+                            {person.lastSeen ? `Last seen ${formatDistanceToNowStrict(person.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'}
+                        </p>
+                    )}
+                </div>
+            </button>
+            <div className="flex gap-2">
+                {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(currentUser.uid, person.uid)}`}><MessageSquare /></Link></Button>}
+                {actionType !== 'suggestion' && 
+                    <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person)} disabled={loading}>
+                        {actionType === 'add' ? <UserPlus /> : <UserMinus />}
+                    </Button>
+                }
+                {actionType === 'suggestion' && 
+                    <Button variant="outline" size="icon" onClick={() => onAction(person)} disabled={loading}>
+                        <UserPlus />
+                    </Button>
+                }
             </div>
-        </button>
-        <div className="flex gap-2">
-            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(currentUser.uid, person.uid)}`}><MessageSquare /></Link></Button>}
-            {actionType !== 'suggestion' && 
-                <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person)} disabled={loading}>
-                     {actionType === 'add' ? <UserPlus /> : <UserMinus />}
-                </Button>
-            }
-             {actionType === 'suggestion' && 
-                <Button variant="outline" size="icon" onClick={() => onAction(person)} disabled={loading}>
-                    <UserPlus />
-                </Button>
-            }
-        </div>
-    </Card>
-);
-
+        </Card>
+    );
+}
 
 const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string, fromName: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (
      <Card className="flex items-center p-4 gap-4">
