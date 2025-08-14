@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -57,10 +57,6 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            // Determine how much to take from each wallet
-            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
-            const mainWagered = wagerAmount - bonusWagered;
-
             // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
@@ -78,8 +74,8 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    wagerFromBonus: bonusWagered,
-                    wagerFromMain: mainWagered
+                    wagerFromBonus: 0,
+                    wagerFromMain: 0
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
@@ -88,7 +84,6 @@ export default function CreateGamePage() {
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
 
-            // Don't deduct funds on creation, deduct when opponent joins.
             const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });

@@ -101,6 +101,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         last_changed: rtdbServerTimestamp(),
       };
       
+      const isOnlineForDatabase = {
+        state: 'online',
+        last_changed: rtdbServerTimestamp(),
+      };
+
       const isOfflineForFirestore = {
           status: 'offline',
           lastSeen: serverTimestamp(),

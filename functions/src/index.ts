@@ -80,6 +80,122 @@ export const announceNewGame = functions.firestore
     return null;
   });
 
+export const joinGame = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    
+    const { roomId } = data;
+    if (!roomId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Room ID is required.');
+    }
+
+    const joinerId = context.auth.uid;
+    const db = admin.firestore();
+    const roomRef = db.collection('game_rooms').doc(roomId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists) {
+                throw new functions.https.HttpsError('not-found', "Room not available");
+            }
+            if (roomDoc.data()?.status !== 'waiting') {
+                throw new functions.https.HttpsError('failed-precondition', "Room not available");
+            }
+
+            const roomData = roomDoc.data();
+            if (!roomData) throw new functions.https.HttpsError('aborted', "Room data is missing.");
+            if (roomData.createdBy.uid === joinerId) {
+                throw new functions.https.HttpsError('failed-precondition', "You cannot join your own game.");
+            }
+            
+            const wager = roomData.wager || 0;
+            const creatorId = roomData.createdBy.uid;
+
+            // Get both user documents
+            const joinerRef = db.collection('users').doc(joinerId);
+            const creatorRef = db.collection('users').doc(creatorId);
+
+            const [joinerDoc, creatorDoc] = await Promise.all([
+                transaction.get(joinerRef),
+                transaction.get(creatorRef)
+            ]);
+
+            if (!joinerDoc.exists) throw new functions.https.HttpsError('not-found', "Your user profile was not found.");
+            if (!creatorDoc.exists) throw new functions.https.HttpsError('not-found', "The creator's profile was not found.");
+            
+            const joinerData = joinerDoc.data()!;
+            const creatorData = creatorDoc.data()!;
+            
+            const joinerTotalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
+            if (joinerTotalBalance < wager) {
+                throw new functions.https.HttpsError('failed-precondition', "You have insufficient funds.");
+            }
+            const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
+            if (creatorTotalBalance < wager) {
+                 throw new functions.https.HttpsError('failed-precondition', "The creator has insufficient funds.");
+            }
+            
+            // Deduct from joiner
+            const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
+            const joinerMainWagered = wager - joinerBonusWagered;
+            transaction.update(joinerRef, {
+                balance: admin.firestore.FieldValue.increment(-joinerMainWagered),
+                bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
+            });
+
+             // Deduct from creator
+            const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
+            const creatorMainWagered = wager - creatorBonusWagered;
+            transaction.update(creatorRef, {
+                balance: admin.firestore.FieldValue.increment(-creatorMainWagered),
+                bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
+            });
+
+            // Update room
+            const creatorColor = roomData.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            transaction.update(roomRef, {
+                status: 'in-progress',
+                'createdBy.wagerFromBonus': creatorBonusWagered,
+                'createdBy.wagerFromMain': creatorMainWagered,
+                player2: {
+                    uid: joinerId,
+                    name: `${joinerData.firstName} ${joinerData.lastName}`,
+                    color: joinerColor,
+                    photoURL: joinerData.photoURL || '',
+                    wagerFromBonus: joinerBonusWagered,
+                    wagerFromMain: joinerMainWagered,
+                },
+                players: admin.firestore.FieldValue.arrayUnion(joinerId),
+                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Create transaction logs for both players
+            const now = admin.firestore.FieldValue.serverTimestamp();
+            const joinerTxRef = db.collection('transactions').doc();
+            transaction.set(joinerTxRef, {
+                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: roomId, createdAt: now
+            });
+            const creatorTxRef = db.collection('transactions').doc();
+            transaction.set(creatorTxRef, {
+                userId: creatorId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: roomId, createdAt: now
+            });
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        functions.logger.error('Error joining game:', error);
+        if (error.code) {
+             throw error; // Re-throw HttpsError
+        }
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the game.');
+    }
+});
+
 export const endGame = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
@@ -163,14 +279,24 @@ export const endGame = functions.https.onCall(async (data, context) => {
 
             // Payout Logic
             if (creatorPayout > 0) {
-                transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(creatorPayout) });
+                 const profit = creatorPayout - wager;
+                 // Return wager to original wallets, profit to main balance
+                 transaction.update(creatorRef, { 
+                     balance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromMain + profit),
+                     bonusBalance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromBonus)
+                 });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
                     description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
             if (joinerPayout > 0) {
-                transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(joinerPayout) });
+                 const profit = joinerPayout - wager;
+                  // Return wager to original wallets, profit to main balance
+                 transaction.update(joinerRef, { 
+                     balance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromMain + profit),
+                     bonusBalance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromBonus)
+                 });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
                     description: `Payout for ${roomData.gameType} game vs ${roomData.createdBy.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -234,75 +360,70 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
 });
 
 export const suggestFriends = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+  if (!context.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+  }
+  const userId = context.auth.uid;
+  const db = admin.firestore();
+
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'User not found');
     }
-    const userId = context.auth.uid;
-    const db = admin.firestore();
+    const userData = userDoc.data()!;
+    const friends = userData.friends || [];
 
-    try {
-        const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) {
-            throw new HttpsError('not-found', 'User not found');
-        }
-        const userData = userDoc.data()!;
-        const friends = userData.friends || [];
+    const sentReqSnapshot = await db.collection('friend_requests').where('fromId', '==', userId).get();
+    const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
+    
+    const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
+    const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
 
-        const sentReqSnapshot = await db.collection('friend_requests').where('fromId', '==', userId).get();
-        const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
-        
-        const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
-        const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
+    const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
+    
+    const usersRef = db.collection('users');
+    const usersSnapshot = await usersRef.orderBy('wins', 'desc').limit(50).get();
 
-        const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
-        
-        const usersRef = db.collection('users');
-        // Firestore 'not-in' queries are limited to 10 items in the array. 
-        // A more scalable solution for large user bases would be more complex, 
-        // but for now, we fetch a larger batch and filter client-side.
-        // We will fetch users ordered by wins and filter.
-        const usersSnapshot = await usersRef.orderBy('wins', 'desc').limit(50).get();
+    const suggestions = usersSnapshot.docs
+        .map(doc => ({ uid: doc.id, ...doc.data() }))
+        .filter(u => u.uid && !excludeIds.includes(u.uid))
+        .slice(0, 10)
+        .map((u: any) => ({
+            uid: u.uid,
+            firstName: u.firstName || 'Unknown',
+            lastName: u.lastName || 'User',
+            photoURL: u.photoURL || '',
+            status: u.status || 'offline',
+            lastSeen: u.lastSeen || null,
+        }));
+    
+    return suggestions;
 
-        const suggestions = usersSnapshot.docs
-            .map(doc => ({ uid: doc.id, ...doc.data() }))
-            .filter(u => u.uid && !excludeIds.includes(u.uid)) // Filter out excluded users
-            .slice(0, 10) // Take the top 10 from the filtered list
-            .map((u: any) => ({
-                uid: u.uid,
-                firstName: u.firstName || 'Unknown',
-                lastName: u.lastName || 'User',
-                photoURL: u.photoURL || '',
-                status: u.status || 'offline',
-                lastSeen: u.lastSeen || null,
-            }));
-        
-        return suggestions;
-
-    } catch (error) {
-        functions.logger.error('Error suggesting friends:', error);
-        throw new HttpsError('internal', 'An error occurred while fetching friend suggestions.');
-    }
+  } catch (error) {
+    functions.logger.error('Error suggesting friends:', error);
+    throw new functions.https.HttpsError('internal', 'An error occurred while fetching friend suggestions.');
+  }
 });
 
 
 export const sendFriendRequest = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     const fromId = context.auth.uid;
-    const { toId } = data; // We only need the toId from the client
+    const { toId } = data;
     if (!toId) {
-        throw new HttpsError('invalid-argument', 'Recipient ID is required.');
+        throw new functions.https.HttpsError('invalid-argument', 'Recipient ID is required.');
     }
 
     const db = admin.firestore();
     
-    // Fetch sender and receiver data
     const fromUserDoc = await db.collection('users').doc(fromId).get();
     const toUserDoc = await db.collection('users').doc(toId).get();
 
     if (!fromUserDoc.exists() || !toUserDoc.exists()) {
-        throw new HttpsError('not-found', 'One or both users not found.');
+        throw new functions.https.HttpsError('not-found', 'One or both users not found.');
     }
     
     const fromUserData = fromUserDoc.data()!;
@@ -313,14 +434,13 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
     const toName = `${toUserData.firstName || 'User'} ${toUserData.lastName || ''}`.trim();
     const toAvatar = toUserData.photoURL || '';
     
-    // Check if a request already exists
     const sentReqQuery = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
     const receivedReqQuery = db.collection('friend_requests').where('fromId', '==', toId).where('toId', '==', fromId);
 
     const [sentSnapshot, receivedSnapshot] = await Promise.all([sentReqQuery.get(), receivedReqQuery.get()]);
 
     if (!sentSnapshot.empty || !receivedSnapshot.empty) {
-        throw new HttpsError('already-exists', 'A friend request between you and this user is already pending.');
+        throw new functions.https.HttpsError('already-exists', 'A friend request between you and this user is already pending.');
     }
 
     try {
@@ -347,6 +467,6 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
         return { success: true };
     } catch (error) {
         functions.logger.error('Error sending friend request:', error);
-        throw new HttpsError('internal', 'An unexpected error occurred.');
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred.');
     }
 });
