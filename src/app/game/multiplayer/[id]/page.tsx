@@ -162,8 +162,9 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-    
+        
         try {
+            // No need to refund here, as funds are only deducted when game starts
             await deleteDoc(roomRef);
     
             if (isAutoCancel) {
@@ -253,6 +254,13 @@ function MultiplayerGame() {
                     balance: increment(-creatorMainWagered),
                     bonusBalance: increment(-creatorBonusWagered)
                 });
+                
+                // Log creator's wager transaction
+                transaction.set(doc(collection(db, 'transactions')), {
+                    userId: roomData.createdBy.uid, type: 'wager', amount: roomData.wager, status: 'completed',
+                    description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: room.id, createdAt: serverTimestamp()
+                });
+
 
                 // Deduct from joiner
                 const joinerBonusWagered = Math.min(roomData.wager, joinerData.bonusBalance || 0);
@@ -261,6 +269,13 @@ function MultiplayerGame() {
                     balance: increment(-joinerMainWagered),
                     bonusBalance: increment(-joinerBonusWagered)
                 });
+                
+                // Log joiner's wager transaction
+                transaction.set(doc(collection(db, 'transactions')), {
+                    userId: user.uid, type: 'wager', amount: roomData.wager, status: 'completed',
+                    description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: room.id, createdAt: serverTimestamp()
+                });
+
                 
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
