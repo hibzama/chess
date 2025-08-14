@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, getDoc, updateDoc, writeBatch, increment } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, writeBatch, increment } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Gift, Copy, Share, Users, Clock, Check, X, Loader2, Gamepad2, Target, DollarSign, Info, PowerOff } from 'lucide-react';
+import { Gift, Copy, Share, Users, Clock, Check, X, Loader2, Gamepad2, Target, DollarSign, Info, PowerOff, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -18,6 +18,8 @@ import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import type { Task, SubTask } from '@/app/admin/tasks/page';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { cn } from '@/lib/utils';
 
 const subTaskIcons = {
     whatsapp_join: Gift,
@@ -30,6 +32,7 @@ const subTaskIcons = {
 type UserTaskStatus = {
     userId: string;
     userName: string;
+    phone: string;
     tasks: { [taskId: string]: { status: 'pending' | 'completed' | 'submitted'; progress?: number; value?: string } };
     claimed: boolean;
     joinedAt: any;
@@ -38,7 +41,7 @@ type UserTaskStatus = {
 
 
 const TaskCard = ({ task, onStart, isActive, isDisabled, isCompleted }: { task: Task, onStart: (taskId: string) => void, isActive: boolean, isDisabled: boolean, isCompleted: boolean }) => (
-    <Card className={`border-2 ${isActive ? 'border-primary' : 'border-border'} ${isDisabled && !isActive ? 'bg-muted/50 opacity-60' : ''}`}>
+    <Card className={cn("border-2", isActive ? 'border-primary' : 'border-border', isDisabled && !isActive && 'bg-muted/50 opacity-60')}>
         <CardHeader>
             <CardTitle>{task.title}</CardTitle>
             <CardDescription>{task.description}</CardDescription>
@@ -129,6 +132,7 @@ export default function BonusReferralPage() {
                 return {
                     userId: doc.id,
                     userName: `${data.firstName} ${data.lastName}`,
+                    phone: data.phone || 'Not available',
                     tasks: data.taskStatus || {},
                     claimed: data.taskStatus?.claimed || false,
                     joinedAt: data.createdAt,
@@ -180,7 +184,7 @@ export default function BonusReferralPage() {
         setIsClaiming(true);
 
         const userRef = doc(db, 'users', user.uid);
-        const commission = (activeTask.referrerCommission || 0) * validReferrals.length;
+        const commission = (activeTask.referrerCommission || 0) * activeTask.referrerTarget;
 
         try {
             await updateDoc(userRef, {
@@ -263,7 +267,7 @@ export default function BonusReferralPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Your Referral Target</CardTitle>
-                            <CardDescription>Get {activeTask.referrerTarget} users to complete their tasks to claim your commission reward.</CardDescription>
+                            <CardDescription>Get {activeTask.referrerTarget} users to complete their tasks to claim your commission reward of LKR {(activeTask.referrerCommission * activeTask.referrerTarget).toFixed(2)}.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
@@ -298,7 +302,7 @@ export default function BonusReferralPage() {
                                     <ReferralTable referrals={validReferrals} loading={loading} />
                                 </TabsContent>
                                 <TabsContent value="pending">
-                                    <ReferralTable referrals={pendingReferrals} loading={loading} />
+                                    <PendingReferralTable referrals={pendingReferrals} activeTask={activeTask} loading={loading} />
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
@@ -326,23 +330,88 @@ export default function BonusReferralPage() {
     );
 }
 
-const ReferralRow = ({ referral }: { referral: UserTaskStatus }) => (
-    <TableRow>
-        <TableCell>{referral.userName}</TableCell>
-        <TableCell>{referral.joinedAt ? format(referral.joinedAt.toDate(), 'PP') : 'N/A'}</TableCell>
-        <TableCell>
-            {referral.isCompleted ? <Badge variant="default">Completed</Badge> : <Badge variant="outline">In Progress</Badge>}
-        </TableCell>
-    </TableRow>
-);
-
 const ReferralTable = ({ referrals, loading }: { referrals: UserTaskStatus[], loading: boolean }) => (
     <Table>
         <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Joined</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
         <TableBody>
             {loading ? <TableRow><TableCell colSpan={3}><Skeleton className="h-10 w-full" /></TableCell></TableRow> : referrals.length > 0 ? (
-                referrals.map(ref => <ReferralRow key={ref.userId} referral={ref} />)
+                referrals.map(ref => (
+                     <TableRow key={ref.userId}>
+                        <TableCell>{ref.userName}</TableCell>
+                        <TableCell>{ref.joinedAt ? format(ref.joinedAt.toDate(), 'PP') : 'N/A'}</TableCell>
+                        <TableCell>
+                            <Badge variant="default">Completed</Badge>
+                        </TableCell>
+                    </TableRow>
+                ))
             ) : <TableRow><TableCell colSpan={3} className="text-center h-24">No referrals in this list yet.</TableCell></TableRow>}
         </TableBody>
     </Table>
 );
+
+const PendingReferralTable = ({ referrals, activeTask, loading }: { referrals: UserTaskStatus[], activeTask: Task, loading: boolean }) => {
+    
+    const getTaskStatus = (referral: UserTaskStatus, subTask: SubTask) => {
+        const taskData = referral.tasks[activeTask.id];
+        if (!taskData) return { status: 'pending', Icon: X, color: 'text-red-500' };
+
+        const subTaskData = taskData[subTask.id];
+        if (!subTaskData) return { status: 'pending', Icon: X, color: 'text-red-500' };
+
+        if (subTaskData.status === 'completed') {
+            return { status: 'Complete', Icon: Check, color: 'text-green-500' };
+        }
+        if (subTaskData.status === 'submitted') {
+             return { status: 'In Review', Icon: Clock, color: 'text-yellow-500' };
+        }
+        
+        return { status: 'Pending', Icon: X, color: 'text-red-500' };
+    }
+    
+    if (loading) {
+        return <Skeleton className="h-40 w-full mt-4" />;
+    }
+
+    if (referrals.length === 0) {
+        return <p className="text-center text-muted-foreground py-8">No pending referrals.</p>
+    }
+    
+    return (
+        <Accordion type="single" collapsible className="w-full">
+            {referrals.map(ref => (
+                 <AccordionItem key={ref.userId} value={ref.userId}>
+                    <AccordionTrigger>
+                        <div className="flex items-center justify-between w-full pr-4">
+                            <div className="text-left">
+                                <p className="font-semibold">{ref.userName}</p>
+                                <p className="text-sm text-muted-foreground">Joined: {ref.joinedAt ? format(ref.joinedAt.toDate(), 'PP') : 'N/A'}</p>
+                            </div>
+                            <Badge variant="outline">In Progress</Badge>
+                        </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <div className="p-4 bg-muted/50 rounded-md space-y-4">
+                            <div className="flex items-center gap-2 text-sm">
+                                <Phone className="w-4 h-4"/>
+                                <span>Contact: {ref.phone}</span>
+                            </div>
+                            <h4 className="font-semibold text-sm">Incomplete Tasks:</h4>
+                            <ul className="space-y-2 text-sm">
+                                {activeTask.subTasks.map(st => {
+                                    const { status, Icon, color } = getTaskStatus(ref, st);
+                                    return (
+                                        <li key={st.id} className="flex items-center gap-2">
+                                           <Icon className={cn("w-4 h-4", color)} />
+                                           <span>{st.label} - <span className={cn("font-semibold", color)}>{status}</span></span>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
+                        </div>
+                    </AccordionContent>
+                 </AccordionItem>
+            ))}
+        </Accordion>
+    )
+};
+
