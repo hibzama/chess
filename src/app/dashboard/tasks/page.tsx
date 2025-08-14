@@ -9,19 +9,30 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift } from 'lucide-react';
+import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift, Youtube, Send, MessageSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
+import { Progress } from '@/components/ui/progress';
+import type { Task, SubTask } from '@/app/admin/tasks/page';
+
+const subTaskIcons = {
+    whatsapp_join: MessageSquare,
+    telegram_channel: Send,
+    telegram_group: Users,
+    youtube_subscribe: Youtube,
+    game_play: Gamepad2,
+}
 
 export default function UserTasksPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
-    const [tasks, setTasks] = useState<any[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [taskStatus, setTaskStatus] = useState<any>({});
     const [loading, setLoading] = useState(true);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [isClaiming, setIsClaiming] = useState(false);
+    const [whatsAppNumber, setWhatsAppNumber] = useState('');
 
     useEffect(() => {
         if (!user || !userData?.taskReferredBy) {
@@ -31,13 +42,14 @@ export default function UserTasksPage() {
 
         const tasksQuery = query(collection(db, 'referral_tasks'), where('isActive', '==', true));
         const unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
-            setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task)));
             setLoading(false);
         });
 
         const userRef = doc(db, 'users', user.uid);
         const unsubUser = onSnapshot(userRef, (doc) => {
             setTaskStatus(doc.data()?.taskStatus || {});
+            setWhatsAppNumber(doc.data()?.phone || '');
         });
 
 
@@ -47,25 +59,25 @@ export default function UserTasksPage() {
         };
     }, [user, userData]);
 
-    const handleWhatsAppSubmit = async (taskId: string, whatsAppNumber: string) => {
-        if (!user || !whatsAppNumber) {
-            toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please enter your WhatsApp number.' });
-            return;
-        }
-        setIsSubmitting(true);
+    const handleLinkTaskSubmit = async (taskId: string, subTaskId: string, link: string) => {
+        if (!user) return;
+        setIsSubmitting(subTaskId);
         try {
+            // First, open the link for the user
+            window.open(link, '_blank');
+
+            // Then, mark the task as submitted for admin approval
             const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, {
-                [`taskStatus.${taskId}.status`]: 'submitted',
-                [`taskStatus.${taskId}.value`]: whatsAppNumber,
-                phone: userData?.phone || whatsAppNumber, // Update main profile phone if not set
+                [`taskStatus.${taskId}.${subTaskId}.status`]: 'submitted',
+                [`taskStatus.${taskId}.${subTaskId}.value`]: 'Clicked', // We can track that they clicked it
             });
-            toast({ title: 'Submitted!', description: 'Your submission is pending admin approval.' });
+            toast({ title: 'Submitted!', description: 'Your task is pending admin verification.' });
         } catch (error) {
-            console.error(error);
+             console.error(error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not submit your task.' });
         } finally {
-            setIsSubmitting(false);
+             setIsSubmitting(null);
         }
     };
     
@@ -74,33 +86,34 @@ export default function UserTasksPage() {
         
         setIsClaiming(true);
         try {
+            const taskPackage = tasks[0]; // Assuming one active task package for now
             // Create pending transaction for the new user
-            const newUserBonus = tasks.reduce((sum, task) => sum + (task.newUserBonus || 0), 0);
+            const newUserBonus = taskPackage.newUserBonus || 0;
             await addDoc(collection(db, 'transactions'), {
                 userId: user.uid,
                 type: 'task_bonus',
                 amount: newUserBonus,
                 status: 'pending',
-                description: `Bonus for completing referral tasks`,
+                description: `Bonus for completing: ${taskPackage.title}`,
                 fromUserId: userData.taskReferredBy,
                 createdAt: serverTimestamp()
             });
 
             // Create pending transaction for the referrer
-            const referrerCommission = tasks.reduce((sum, task) => sum + (task.referrerCommission || 0), 0);
+            const referrerCommission = taskPackage.referrerCommission || 0;
             await addDoc(collection(db, 'transactions'), {
                 userId: userData.taskReferredBy,
                 type: 'task_commission',
                 amount: referrerCommission,
                 status: 'pending',
-                description: `Commission for ${userData.firstName}'s completed tasks`,
+                description: `Commission for ${userData.firstName}'s task: ${taskPackage.title}`,
                 fromUserId: user.uid,
                 createdAt: serverTimestamp()
             });
 
             // Mark tasks as claimed for the user
             const userRef = doc(db, 'users', user.uid);
-            await updateDoc(userRef, { 'taskStatus.claimed': true });
+            await updateDoc(userRef, { [`taskStatus.${taskPackage.id}.claimed`]: true });
 
             toast({ title: 'Rewards Claimed!', description: 'Your bonus is pending admin approval.' });
         } catch (error) {
@@ -111,9 +124,10 @@ export default function UserTasksPage() {
         }
     };
 
+    const mainTask = tasks[0]; // Assuming only one task package is active at a time
+    const allSubTasksCompleted = mainTask?.subTasks?.every(sub => taskStatus[mainTask.id]?.[sub.id]?.status === 'completed');
+    const isClaimed = taskStatus[mainTask?.id]?.claimed === true;
 
-    const allTasksCompleted = tasks.length > 0 && tasks.every(task => taskStatus[task.id]?.status === 'completed');
-    const isClaimed = taskStatus.claimed === true;
 
     return (
         <div className="space-y-8">
@@ -122,57 +136,54 @@ export default function UserTasksPage() {
                 <p className="text-muted-foreground">Complete these tasks to earn a special welcome bonus!</p>
             </div>
 
-            {loading ? <Skeleton className="h-64 w-full" /> : tasks.length > 0 ? (
-                tasks.map(task => {
-                    const status = taskStatus[task.id]?.status || 'pending';
-                    const progress = taskStatus[task.id]?.progress || 0;
-                    const isCompleted = status === 'completed';
+            {loading ? <Skeleton className="h-64 w-full" /> : mainTask ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{mainTask.title}</CardTitle>
+                        <CardDescription>{mainTask.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {mainTask.subTasks.map(subTask => {
+                             const status = taskStatus[mainTask.id]?.[subTask.id]?.status || 'pending';
+                             const progress = taskStatus[mainTask.id]?.[subTask.id]?.progress || 0;
+                             const isCompleted = status === 'completed';
+                             const Icon = subTaskIcons[subTask.type];
 
-                    return (
-                        <Card key={task.id} className={isCompleted ? 'border-green-500/50 bg-green-500/10' : ''}>
-                            <CardHeader>
-                                <CardTitle className="flex items-center justify-between">
-                                    <span>{task.title}</span>
-                                    {isCompleted && <Badge variant="default" className="bg-green-600"><Check className="mr-1"/> Completed</Badge>}
-                                </CardTitle>
-                                <CardDescription>{task.description}</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {task.type === 'whatsapp_join' && (
-                                    <form onSubmit={(e) => {
-                                        e.preventDefault();
-                                        handleWhatsAppSubmit(task.id, (e.target as any).elements.whatsapp.value);
-                                    }} className="space-y-4">
-                                        <div className="flex items-center gap-2">
-                                            <Button asChild variant="secondary">
-                                                <a href={task.target} target="_blank" rel="noopener noreferrer"><Users className="mr-2"/> Join Group</a>
-                                            </Button>
-                                            <p className="text-sm text-muted-foreground">1. Join the group using the button.</p>
+                             return (
+                                <Card key={subTask.id} className={isCompleted ? 'border-green-500/50 bg-green-500/10' : 'bg-muted/50'}>
+                                     <CardContent className="p-4 flex items-center gap-4">
+                                        <Icon className="w-6 h-6 text-primary flex-shrink-0"/>
+                                        <div className="flex-1">
+                                            <p className="font-semibold">{subTask.label}</p>
+                                            {subTask.type === 'game_play' ? (
+                                                <div className="space-y-1 mt-1">
+                                                    <Progress value={isCompleted ? 100 : (progress / Number(subTask.target)) * 100} className="h-2"/>
+                                                    <p className="text-xs text-muted-foreground">{progress} / {subTask.target} games played</p>
+                                                </div>
+                                            ) : (
+                                                 <p className="text-xs text-muted-foreground break-all">{subTask.target}</p>
+                                            )}
                                         </div>
-                                         <div className="space-y-2">
-                                            <Label>2. Enter your WhatsApp number for verification:</Label>
-                                            <Input name="whatsapp" type="tel" placeholder="Your WhatsApp Number" disabled={status !== 'pending'} />
+                                        <div className="w-24 text-right">
+                                             {status === 'pending' && subTask.type !== 'game_play' && (
+                                                <Button size="sm" onClick={() => handleLinkTaskSubmit(mainTask.id, subTask.id, subTask.target)} disabled={isSubmitting === subTask.id}>
+                                                    {isSubmitting === subTask.id ? <Loader2 className="animate-spin" /> : 'Do It'}
+                                                </Button>
+                                             )}
+                                             {status === 'submitted' && <Badge variant="secondary">Pending</Badge>}
+                                             {status === 'completed' && <Badge className="bg-green-600"><Check/> Done</Badge>}
                                         </div>
-                                        {status === 'pending' && <Button type="submit" disabled={isSubmitting}>{isSubmitting ? <Loader2 className="animate-spin"/> : 'Submit for Review'}</Button>}
-                                        {status === 'submitted' && <p className="text-sm text-yellow-500">Pending admin verification...</p>}
-                                    </form>
-                                )}
-                                {task.type === 'game_play' && (
-                                    <div className="space-y-2">
-                                        <p className="text-sm">Play {task.target} multiplayer games to complete this task.</p>
-                                        <Progress value={isCompleted ? 100 : (progress / Number(task.target)) * 100} />
-                                        <p className="text-xs text-muted-foreground">{progress} / {task.target} games played</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    );
-                })
+                                     </CardContent>
+                                </Card>
+                             )
+                        })}
+                    </CardContent>
+                </Card>
             ) : (
                 <p className="text-center text-muted-foreground py-8">No tasks are currently available.</p>
             )}
 
-            {allTasksCompleted && (
+            {allSubTasksCompleted && (
                  <Card className="bg-primary/10 border-primary">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-primary"><Gift/> All Tasks Completed!</CardTitle>
