@@ -157,7 +157,7 @@ export default function UserTasksPage() {
         <div className="space-y-8">
             <div>
                 <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3"><ClipboardCheck /> Your Tasks</h1>
-                <p className="text-muted-foreground">Complete these tasks to earn a special welcome bonus!</p>
+                <p className="text-muted-foreground">Complete these tasks to earn a special welcome bonus of <span className="font-bold text-primary">LKR {mainTask?.newUserBonus.toFixed(2) || '0.00'}</span>!</p>
             </div>
 
             {loading ? <Skeleton className="h-64 w-full" /> : mainTask ? (
@@ -235,4 +235,3 @@ export default function UserTasksPage() {
         </div>
     );
 }
-

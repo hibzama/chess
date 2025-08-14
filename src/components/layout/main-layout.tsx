@@ -278,7 +278,7 @@ export default function MainLayout({
                                       </Card>
                                   </Link>
                                   
-                                  <Link href={"/dashboard/wallet"}>
+                                  {!isMarketer && <Link href={"/dashboard/wallet"}>
                                       <Card className="bg-card/50 border-accent/20 hover:bg-accent/5 transition-colors">
                                           <CardContent className="p-2 flex items-center gap-2">
                                               <Gift className="w-5 h-5 text-accent"/>
@@ -297,7 +297,7 @@ export default function MainLayout({
                                               </div>
                                           </CardContent>
                                       </Card>
-                                  </Link>
+                                  </Link>}
                                </div>
                            )}
                             <NotificationBell />
