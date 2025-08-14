@@ -24,6 +24,19 @@ const subTaskIcons = {
     game_play: Gamepad2,
 }
 
+const getInputPlaceholder = (type: SubTask['type']) => {
+    switch(type) {
+        case 'whatsapp_join': return "Enter your WhatsApp Number";
+        case 'telegram_channel':
+        case 'telegram_group':
+            return "Enter your Telegram Username";
+        case 'youtube_subscribe':
+            return "Enter your YouTube Channel Name/Handle";
+        default:
+            return "Enter required info";
+    }
+}
+
 export default function UserTasksPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
@@ -32,7 +45,7 @@ export default function UserTasksPage() {
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState<string | null>(null);
     const [isClaiming, setIsClaiming] = useState(false);
-    const [whatsAppNumber, setWhatsAppNumber] = useState('');
+    const [taskInputs, setTaskInputs] = useState<{[key: string]: string}>({});
 
     useEffect(() => {
         if (!user || !userData?.taskReferredBy) {
@@ -48,8 +61,20 @@ export default function UserTasksPage() {
 
         const userRef = doc(db, 'users', user.uid);
         const unsubUser = onSnapshot(userRef, (doc) => {
-            setTaskStatus(doc.data()?.taskStatus || {});
-            setWhatsAppNumber(doc.data()?.phone || '');
+            const data = doc.data();
+            setTaskStatus(data?.taskStatus || {});
+            // Pre-fill inputs if data already exists
+            if (data?.taskStatus) {
+                const prefilledInputs: {[key: string]: string} = {};
+                Object.values(data.taskStatus).forEach((task: any) => {
+                    Object.keys(task).forEach(subTaskId => {
+                        if (task[subTaskId]?.value) {
+                             prefilledInputs[subTaskId] = task[subTaskId].value;
+                        }
+                    })
+                })
+                setTaskInputs(prev => ({...prev, ...prefilledInputs}));
+            }
         });
 
 
@@ -59,18 +84,26 @@ export default function UserTasksPage() {
         };
     }, [user, userData]);
 
-    const handleLinkTaskSubmit = async (taskId: string, subTaskId: string, link: string) => {
-        if (!user) return;
-        setIsSubmitting(subTaskId);
+     const handleInputChange = (subTaskId: string, value: string) => {
+        setTaskInputs(prev => ({ ...prev, [subTaskId]: value }));
+    };
+
+    const handleVerificationSubmit = async (taskId: string, subTask: SubTask) => {
+        const inputValue = taskInputs[subTask.id];
+        if (!user || !inputValue || inputValue.trim() === '') {
+            toast({ variant: 'destructive', title: 'Input Required', description: 'Please provide the required information.' });
+            return;
+        }
+        setIsSubmitting(subTask.id);
         try {
-            // First, open the link for the user
-            window.open(link, '_blank');
+            // First, open the link for the user in a new tab
+            window.open(subTask.target, '_blank');
 
             // Then, mark the task as submitted for admin approval
             const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, {
-                [`taskStatus.${taskId}.${subTaskId}.status`]: 'submitted',
-                [`taskStatus.${taskId}.${subTaskId}.value`]: 'Clicked', // We can track that they clicked it
+                [`taskStatus.${taskId}.${subTask.id}.status`]: 'submitted',
+                [`taskStatus.${taskId}.${subTask.id}.value`]: inputValue,
             });
             toast({ title: 'Submitted!', description: 'Your task is pending admin verification.' });
         } catch (error) {
@@ -147,31 +180,43 @@ export default function UserTasksPage() {
                              const status = taskStatus[mainTask.id]?.[subTask.id]?.status || 'pending';
                              const progress = taskStatus[mainTask.id]?.[subTask.id]?.progress || 0;
                              const isCompleted = status === 'completed';
+                             const isSubmitted = status === 'submitted';
                              const Icon = subTaskIcons[subTask.type];
+                             const requiresInput = subTask.type !== 'game_play';
 
                              return (
                                 <Card key={subTask.id} className={isCompleted ? 'border-green-500/50 bg-green-500/10' : 'bg-muted/50'}>
-                                     <CardContent className="p-4 flex items-center gap-4">
-                                        <Icon className="w-6 h-6 text-primary flex-shrink-0"/>
-                                        <div className="flex-1">
-                                            <p className="font-semibold">{subTask.label}</p>
-                                            {subTask.type === 'game_play' ? (
-                                                <div className="space-y-1 mt-1">
-                                                    <Progress value={isCompleted ? 100 : (progress / Number(subTask.target)) * 100} className="h-2"/>
-                                                    <p className="text-xs text-muted-foreground">{progress} / {subTask.target} games played</p>
-                                                </div>
-                                            ) : (
-                                                 <p className="text-xs text-muted-foreground break-all">{subTask.target}</p>
-                                            )}
+                                     <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                        <div className="flex items-center gap-4 flex-1">
+                                            <Icon className="w-8 h-8 text-primary flex-shrink-0"/>
+                                            <div className="flex-1">
+                                                <p className="font-semibold">{subTask.label}</p>
+                                                {requiresInput ? (
+                                                     <p className="text-xs text-muted-foreground break-all">{subTask.target}</p>
+                                                ) : (
+                                                    <div className="space-y-1 mt-1">
+                                                        <Progress value={isCompleted ? 100 : (progress / Number(subTask.target)) * 100} className="h-2"/>
+                                                        <p className="text-xs text-muted-foreground">{progress} / {subTask.target} games played</p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="w-24 text-right">
-                                             {status === 'pending' && subTask.type !== 'game_play' && (
-                                                <Button size="sm" onClick={() => handleLinkTaskSubmit(mainTask.id, subTask.id, subTask.target)} disabled={isSubmitting === subTask.id}>
-                                                    {isSubmitting === subTask.id ? <Loader2 className="animate-spin" /> : 'Do It'}
-                                                </Button>
+                                        <div className="w-full sm:w-auto flex flex-col sm:items-end gap-2">
+                                             {requiresInput && !isCompleted && !isSubmitted && (
+                                                <div className="flex w-full sm:w-64 gap-2">
+                                                    <Input 
+                                                        placeholder={getInputPlaceholder(subTask.type)} 
+                                                        value={taskInputs[subTask.id] || ''}
+                                                        onChange={e => handleInputChange(subTask.id, e.target.value)}
+                                                        disabled={isSubmitting === subTask.id}
+                                                    />
+                                                    <Button size="sm" onClick={() => handleVerificationSubmit(mainTask.id, subTask)} disabled={isSubmitting === subTask.id}>
+                                                        {isSubmitting === subTask.id ? <Loader2 className="animate-spin" /> : 'Do It'}
+                                                    </Button>
+                                                </div>
                                              )}
-                                             {status === 'submitted' && <Badge variant="secondary">Pending</Badge>}
-                                             {status === 'completed' && <Badge className="bg-green-600"><Check/> Done</Badge>}
+                                             {isSubmitted && <Badge variant="secondary">Pending Review</Badge>}
+                                             {isCompleted && <Badge className="bg-green-600"><Check/> Done</Badge>}
                                         </div>
                                      </CardContent>
                                 </Card>
@@ -199,4 +244,3 @@ export default function UserTasksPage() {
         </div>
     );
 }
-
