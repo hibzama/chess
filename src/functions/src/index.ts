@@ -258,15 +258,15 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
 
         const suggestions = usersSnapshot.docs
             .map(doc => ({ uid: doc.id, ...doc.data() }))
-            .filter(u => !excludeIds.includes(u.uid))
+            .filter(u => u.uid && !excludeIds.includes(u.uid)) // Ensure uid exists before checking
             .slice(0, 10)
             .map(u => ({
                 uid: u.uid,
-                firstName: u.firstName,
-                lastName: u.lastName,
-                photoURL: u.photoURL,
-                status: u.status,
-                lastSeen: u.lastSeen,
+                firstName: u.firstName || 'Unknown',
+                lastName: u.lastName || 'User',
+                photoURL: u.photoURL || '',
+                status: u.status || 'offline',
+                lastSeen: u.lastSeen || null,
             }));
         
         return suggestions;
