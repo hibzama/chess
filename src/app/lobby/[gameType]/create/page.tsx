@@ -74,8 +74,6 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    wagerFromBonus: 0,
-                    wagerFromMain: 0
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
