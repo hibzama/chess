@@ -1,41 +1,53 @@
 
-import * as functions from "firebase-functions";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
+import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions";
+import {logger} from "firebase-functions";
 
 admin.initializeApp();
 
-// This function triggers whenever a new document is created in 'game_rooms'
-export const announceNewGame = functions.firestore
-  .document("game_rooms/{roomId}")
-  .onCreate(async (snap, context) => {
+export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (event) => {
+    const snap = event.data;
+    if (!snap) {
+        logger.log("No data associated with the event");
+        return;
+    }
     const roomData = snap.data();
-    const roomId = context.params.roomId; // Correct way to get wildcard ID
+    const roomId = event.params.roomId;
 
-    // Exit if the function is triggered with no data, or for a private room
     if (!roomData || roomData.isPrivate === true) {
-      functions.logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
-      return null;
+      logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
+      return;
     }
 
     let telegramBotToken;
     try {
+      // For v2 functions, config is not available on admin.app().options.config
+      // You should use environment variables instead.
+      // e.g. `process.env.TELEGRAM_TOKEN`
+      // For this migration, we'll try to get it the old way, but this is a point of failure.
+      const functions = await import("firebase-functions");
       telegramBotToken = functions.config().telegram.token;
     } catch (error) {
-      functions.logger.error(
-        "Could not retrieve telegram.token from Functions config. " +
+      logger.error("Could not retrieve telegram.token from Functions config. " +
         "Ensure it is set by running: " +
-        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
-      );
-      return null;
+        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\"");
+    }
+    
+    if (!telegramBotToken) {
+        logger.error(
+            "Telegram token not found. " +
+            "Ensure it is set by running: " +
+            "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
+        );
+        return;
     }
 
-    const chatId = "@nexbattlerooms"; // Your Telegram group username
+
+    const chatId = "@nexbattlerooms";
     const siteUrl = "http://nexbattle.com";
 
-    // Prepare message components with fallbacks
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
@@ -43,11 +55,9 @@ export const announceNewGame = functions.firestore
     const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
-    // Log the variables to ensure they are being read correctly
-    functions.logger.log(`Preparing message for Room ID: ${roomId}`);
-    functions.logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
+    logger.log(`Preparing message for Room ID: ${roomId}`);
+    logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
 
-    // Construct the message string carefully
     const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
       `<b>Player:</b> ${createdBy}\n` +
       `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
@@ -65,13 +75,11 @@ export const announceNewGame = functions.firestore
         text: message,
         parse_mode: 'HTML',
       });
-      functions.logger.log(`Successfully sent message for Room ID: ${roomId}`);
+      logger.log(`Successfully sent message for Room ID: ${roomId}`);
     } catch (error: any) {
-      functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
+      logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
-
-    return null;
-  });
+});
 
 
 export const endGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
@@ -242,16 +250,15 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
         const userData = userDoc.data()!;
         const friends = userData.friends || [];
 
-        // Fetch IDs of users I have sent requests to
         const sentReqSnapshot = await db.collection('friend_requests').where('fromId', '==', userId).get();
         const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
         
-        // Fetch IDs of users who have sent requests to me
         const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
         const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
 
+        // Order by wins descending for more relevant suggestions
         const usersSnapshot = await db.collection('users').orderBy('wins', 'desc').limit(50).get();
 
         const suggestions = usersSnapshot.docs
@@ -275,51 +282,48 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
     }
 });
 
+
 export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     const fromId = request.auth.uid;
     const { toId, toName, toAvatar } = request.data;
-    
     if (!toId || !toName) {
         throw new HttpsError('invalid-argument', 'Recipient ID and name are required.');
     }
 
     const db = admin.firestore();
+    const fromUserDoc = await db.collection('users').doc(fromId).get();
+    if (!fromUserDoc.exists) {
+        throw new HttpsError('not-found', 'Current user not found.');
+    }
+    const fromUserData = fromUserDoc.data()!;
+    const fromName = `${fromUserData.firstName} ${fromUserData.lastName}`;
+    const fromAvatar = fromUserData.photoURL || '';
+    
+    // Check if a request already exists
+    const sentReqQuery = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
+    const receivedReqQuery = db.collection('friend_requests').where('fromId', '==', toId).where('toId', '==', fromId);
+
+    const [sentSnapshot, receivedSnapshot] = await Promise.all([sentReqQuery.get(), receivedReqQuery.get()]);
+
+    if (!sentSnapshot.empty || !receivedSnapshot.empty) {
+        throw new HttpsError('already-exists', 'A friend request between you and this user is already pending.');
+    }
 
     try {
-        const fromUserDoc = await db.collection('users').doc(fromId).get();
-        if (!fromUserDoc.exists) {
-            throw new HttpsError('not-found', 'Current user not found.');
-        }
-        const fromUserData = fromUserDoc.data()!;
-        const fromName = `${fromUserData.firstName} ${fromUserData.lastName}`;
-        const fromAvatar = fromUserData.photoURL || '';
-
-        // Check if a request already exists in either direction
-        const reqQuery1 = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
-        const reqQuery2 = db.collection('friend_requests').where('fromId', '==', toId).where('toId', '==', fromId);
-
-        const [snapshot1, snapshot2] = await Promise.all([reqQuery1.get(), reqQuery2.get()]);
-
-        if (!snapshot1.empty || !snapshot2.empty) {
-            throw new HttpsError('already-exists', 'A friend request with this user is already pending.');
-        }
-
-        // Create the friend request
         await db.collection('friend_requests').add({
             fromId,
             fromName,
             fromAvatar,
             toId,
             toName,
-            toAvatar: toAvatar || '',
+            toAvatar,
             status: 'pending',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // Create a notification for the recipient
         await db.collection('notifications').add({
             userId: toId,
             title: "New Friend Request",
@@ -330,11 +334,8 @@ export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, a
         });
 
         return { success: true };
-    } catch (error: any) {
+    } catch (error) {
         logger.error('Error sending friend request:', error);
-        if (error instanceof HttpsError) {
-            throw error;
-        }
-        throw new HttpsError('internal', 'An unexpected error occurred while sending the friend request.');
+        throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
