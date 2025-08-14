@@ -51,7 +51,8 @@ export default function RegisterForm() {
         const country = target.country.value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
-        const aref = searchParams.get('aref'); // New task-based referral
+        const aref = searchParams.get('aref'); // Referrer for task system
+        const tid = searchParams.get('tid'); // Task ID for task system
 
         if (password !== confirmPassword) {
             toast({
@@ -125,13 +126,14 @@ export default function RegisterForm() {
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
                 emailVerified: true, // Allow login by default
-                validTaskReferrals: 0,
-                claimedTaskReferralBonus: false,
+                activeReferralTaskId: null,
+                claimedTaskReferralBonus: [],
             };
             
             // Handle new task-based referral link
-            if (aref) {
+            if (aref && tid) {
                 userData.taskReferredBy = aref;
+                userData.activeReferralTaskId = tid; // Store the task ID they joined under
             }
 
             const directReferrerId = mref || ref;
@@ -141,17 +143,13 @@ export default function RegisterForm() {
                     const referrerData = referrerDoc.data();
                     userData.referredBy = directReferrerId; // Always set the direct referrer
 
-                    // If the referrer has a chain, it means they are part of a marketer's downline.
-                    // The new user should inherit this chain and add the direct referrer to it.
                     if (referrerData.referralChain) {
                         userData.referralChain = [...referrerData.referralChain, directReferrerId];
                     } 
-                    // If the referrer is a marketer themselves (and thus the start of a chain)
                     else if (referrerData.role === 'marketer') {
                         userData.referralChain = [directReferrerId];
                     }
 
-                    // Increment the direct referrer's L1 count if they are a regular user
                     if (referrerData.role === 'user') {
                         await updateDoc(doc(db, 'users', directReferrerId), { l1Count: increment(1) });
                     }

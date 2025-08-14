@@ -4,18 +4,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, updateDoc, writeBatch } from 'firebase/firestore';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin } from 'lucide-react';
+import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin, ClipboardList, RefreshCw } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 type UserProfile = {
     uid: string;
@@ -34,6 +36,7 @@ type UserProfile = {
     city?: string;
     country?: string;
     gender?: string;
+    activeReferralTaskId?: string | null;
 };
 
 type Transaction = {
@@ -81,6 +84,7 @@ export default function UserDetailPage() {
     const params = useParams();
     const router = useRouter();
     const { userId } = params;
+    const { toast } = useToast();
 
     const [user, setUser] = useState<UserProfile | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -88,6 +92,7 @@ export default function UserDetailPage() {
     const [referrals, setReferrals] = useState<Referral[]>([]);
     const [commissions, setCommissions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
+    const [taskInfo, setTaskInfo] = useState<{ id: string; title: string } | null>(null);
 
     useEffect(() => {
         if (!userId) return;
@@ -103,6 +108,15 @@ export default function UserDetailPage() {
             }
             const userData = { ...userDoc.data(), uid: userDoc.id } as UserProfile;
             setUser(userData);
+
+            // Fetch active task info if it exists
+            if (userData.activeReferralTaskId) {
+                const taskDoc = await getDoc(doc(db, 'referral_tasks', userData.activeReferralTaskId));
+                if (taskDoc.exists()) {
+                    setTaskInfo({ id: taskDoc.id, title: taskDoc.data().title });
+                }
+            }
+
 
             // Fetch Transactions
             const transQuery = query(collection(db, 'transactions'), where('userId', '==', userId));
@@ -134,6 +148,22 @@ export default function UserDetailPage() {
 
         fetchData();
     }, [userId, router]);
+
+    const handleResetTask = async () => {
+        if (!userId) return;
+        try {
+            const userRef = doc(db, 'users', userId as string);
+            await updateDoc(userRef, {
+                activeReferralTaskId: null
+            });
+            setUser(prev => prev ? {...prev, activeReferralTaskId: null} : null);
+            setTaskInfo(null);
+            toast({ title: "Task Reset", description: "User can now choose a new referral task." });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: "Error", description: "Failed to reset user's task." });
+        }
+    };
 
     const financialStats = useMemo(() => {
         let totalDeposit = 0;
@@ -180,67 +210,100 @@ export default function UserDetailPage() {
                 </CardHeader>
             </Card>
 
-            {user.role === 'user' && (
-                 <Tabs defaultValue="overview">
-                    <TabsList className="grid w-full grid-cols-4">
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="games">Game History</TabsTrigger>
-                        <TabsTrigger value="wallet">Wallet History</TabsTrigger>
-                        <TabsTrigger value="referrals">Referrals</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="overview">
-                        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <StatCard title="Wallet Balance" value={`LKR ${user.balance.toFixed(2)}`} icon={<Wallet />} />
-                            <StatCard title="Total Deposit" value={`LKR ${financialStats.totalDeposit.toFixed(2)}`} icon={<DollarSign />} />
-                            <StatCard title="Total Withdrawal" value={`LKR ${financialStats.totalWithdrawal.toFixed(2)}`} icon={<DollarSign />} />
-                            <StatCard title="Net Earnings" value={`LKR ${financialStats.totalEarning.toFixed(2)}`} icon={<DollarSign />} />
-                            <StatCard title="Games Played" value={games.length} icon={<History />} />
-                            <StatCard title="Wins" value={user.wins || 0} icon={<Trophy />} />
-                            <StatCard title="Friends" value={user.friends?.length || 0} icon={<Users />} />
-                        </div>
-                    </TabsContent>
-                    <TabsContent value="games"><GameHistoryTable games={games} userId={user.uid} /></TabsContent>
-                    <TabsContent value="wallet"><TransactionTable transactions={transactions.filter(t => t.type === 'deposit' || t.type === 'withdrawal')} /></TabsContent>
-                    <TabsContent value="referrals">
-                        <Card>
-                            <CardHeader><CardTitle>Level 1 Referrals ({referrals.length})</CardTitle></CardHeader>
-                            <CardContent><ReferralTable referrals={referrals} /></CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
-            )}
-
-             {user.role === 'marketer' && (
-                 <Tabs defaultValue="overview">
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="referrals">Referral Network</TabsTrigger>
-                        <TabsTrigger value="commissions">Commissions</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="overview">
-                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Tabs defaultValue="overview">
+                <TabsList className="grid w-full grid-cols-5">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="games">Game History</TabsTrigger>
+                    <TabsTrigger value="wallet">Wallet History</TabsTrigger>
+                    <TabsTrigger value="referrals">Referrals</TabsTrigger>
+                    <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                </TabsList>
+                <TabsContent value="overview">
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <StatCard title="Wallet Balance" value={`LKR ${user.balance.toFixed(2)}`} icon={<Wallet />} />
+                        <StatCard title="Total Deposit" value={`LKR ${financialStats.totalDeposit.toFixed(2)}`} icon={<DollarSign />} />
+                        <StatCard title="Total Withdrawal" value={`LKR ${financialStats.totalWithdrawal.toFixed(2)}`} icon={<DollarSign />} />
+                        <StatCard title="Net Earnings" value={`LKR ${financialStats.totalEarning.toFixed(2)}`} icon={<DollarSign />} />
+                        <StatCard title="Games Played" value={games.length} icon={<History />} />
+                        <StatCard title="Wins" value={user.wins || 0} icon={<Trophy />} />
+                        <StatCard title="Friends" value={user.friends?.length || 0} icon={<Users />} />
+                        {user.role === 'marketer' && (
                             <StatCard title="Commission Balance" value={`LKR ${(user.marketingBalance || 0).toFixed(2)}`} icon={<Wallet />} />
-                            <StatCard title="Total Referrals" value={referrals.length} icon={<Users />} />
-                             <StatCard title="Total Commissions" value={`LKR ${commissions.reduce((acc, t) => acc + t.amount, 0).toFixed(2)}`} icon={<DollarSign />} />
-                        </div>
-                    </TabsContent>
-                     <TabsContent value="referrals">
-                         <Card>
-                            <CardHeader><CardTitle>Referral Network ({referrals.length})</CardTitle></CardHeader>
-                            <CardContent><ReferralTable referrals={referrals} showLevel /></CardContent>
-                        </Card>
-                     </TabsContent>
-                    <TabsContent value="commissions">
-                        <Card>
-                            <CardHeader><CardTitle>Commission History</CardTitle></CardHeader>
-                            <CardContent><TransactionTable transactions={commissions} /></CardContent>
-                        </Card>
-                    </TabsContent>
-                 </Tabs>
-            )}
+                        )}
+                    </div>
+                </TabsContent>
+                <TabsContent value="games"><GameHistoryTable games={games} userId={user.uid} /></TabsContent>
+                <TabsContent value="wallet"><TransactionTable transactions={transactions.filter(t => t.type === 'deposit' || t.type === 'withdrawal')} /></TabsContent>
+                <TabsContent value="referrals">
+                    <ReferralTab user={user} referrals={referrals} commissions={commissions} />
+                </TabsContent>
+                <TabsContent value="tasks">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Referral Task Status</CardTitle>
+                            <CardDescription>Manage this user's currently active referral task.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {taskInfo ? (
+                                <div className="space-y-2">
+                                    <p>Active Task: <span className="font-semibold">{taskInfo.title}</span></p>
+                                    <p className="text-sm text-muted-foreground">User is currently trying to complete referrals for this task package.</p>
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground">User has not started a referral task.</p>
+                            )}
+                        </CardContent>
+                        {taskInfo && (
+                            <CardFooter>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive"><RefreshCw className="mr-2"/> Reset Task</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will reset the user's active task, allowing them to choose a new one. Their progress on the current task will be lost. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleResetTask}>Confirm Reset</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </CardFooter>
+                        )}
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
+
+const ReferralTab = ({ user, referrals, commissions }: { user: UserProfile, referrals: Referral[], commissions: Transaction[] }) => {
+    if (user.role === 'marketer') {
+        return (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <Card>
+                    <CardHeader><CardTitle>Referral Network ({referrals.length})</CardTitle></CardHeader>
+                    <CardContent><ReferralTable referrals={referrals} showLevel /></CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader><CardTitle>Commission History</CardTitle></CardHeader>
+                    <CardContent><TransactionTable transactions={commissions} /></CardContent>
+                </Card>
+            </div>
+        )
+    }
+    return (
+        <Card>
+            <CardHeader><CardTitle>Level 1 Referrals ({referrals.length})</CardTitle></CardHeader>
+            <CardContent><ReferralTable referrals={referrals} /></CardContent>
+        </Card>
+    );
+};
+
 
 const GameHistoryTable = ({ games, userId }: { games: Game[], userId: string }) => {
     

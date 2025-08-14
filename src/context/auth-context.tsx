@@ -40,8 +40,8 @@ interface UserData {
     role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
     referredBy?: string;
-    taskReferredBy?: string; // For the new task system
-    taskStatus?: any; // To store progress of tasks
+    taskReferredBy?: string; 
+    taskStatus?: any;
     referralChain?: string[];
     createdAt: any;
     l1Count?: number;
@@ -50,8 +50,8 @@ interface UserData {
     status?: 'online' | 'offline';
     lastSeen?: any;
     wins?: number;
-    validTaskReferrals?: number;
-    claimedTaskReferralBonus?: boolean;
+    activeReferralTaskId?: string | null;
+    claimedTaskReferralBonus?: string[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
