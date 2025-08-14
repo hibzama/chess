@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift, Youtube, Send, MessageSquare } from 'lucide-react';
+import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift, Youtube, Send, MessageSquare, ExternalLink, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
@@ -63,7 +63,6 @@ export default function UserTasksPage() {
         const unsubUser = onSnapshot(userRef, (doc) => {
             const data = doc.data();
             setTaskStatus(data?.taskStatus || {});
-            // Pre-fill inputs if data already exists
             if (data?.taskStatus) {
                 const prefilledInputs: {[key: string]: string} = {};
                 Object.values(data.taskStatus).forEach((task: any) => {
@@ -96,10 +95,7 @@ export default function UserTasksPage() {
         }
         setIsSubmitting(subTask.id);
         try {
-            // First, open the link for the user in a new tab
             window.open(subTask.target, '_blank');
-
-            // Then, mark the task as submitted for admin approval
             const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, {
                 [`taskStatus.${taskId}.${subTask.id}.status`]: 'submitted',
@@ -122,7 +118,6 @@ export default function UserTasksPage() {
         try {
             const taskPackage = tasks[0]; 
             
-            // Create a bonus claim document for admin approval
             await addDoc(collection(db, 'bonus_claims'), {
                 newUserId: user.uid,
                 referrerId: userData.taskReferredBy,
@@ -134,7 +129,6 @@ export default function UserTasksPage() {
                 createdAt: serverTimestamp()
             });
 
-             // Mark the task package as claimed locally for the user
             await updateDoc(doc(db, 'users', user.uid), {
                 [`taskStatus.${taskPackage.id}.claimed`]: true,
             });
@@ -148,7 +142,7 @@ export default function UserTasksPage() {
         }
     };
 
-    const mainTask = tasks[0]; // Assuming only one task package is active at a time
+    const mainTask = tasks[0];
     const allSubTasksCompleted = mainTask?.subTasks?.every(sub => taskStatus[mainTask.id]?.[sub.id]?.status === 'completed');
     const isClaimed = taskStatus[mainTask?.id]?.claimed === true;
 
@@ -202,7 +196,7 @@ export default function UserTasksPage() {
                                                         disabled={isSubmitting === subTask.id}
                                                     />
                                                     <Button size="sm" onClick={() => handleVerificationSubmit(mainTask.id, subTask)} disabled={isSubmitting === subTask.id}>
-                                                        {isSubmitting === subTask.id ? <Loader2 className="animate-spin" /> : 'Do It'}
+                                                        {isSubmitting === subTask.id ? <Loader2 className="animate-spin" /> : <><ExternalLink className="mr-1 h-3 w-3" /> Do It</>}
                                                     </Button>
                                                 </div>
                                              )}
@@ -216,7 +210,13 @@ export default function UserTasksPage() {
                     </CardContent>
                 </Card>
             ) : (
-                <p className="text-center text-muted-foreground py-8">No tasks are currently available.</p>
+                 <Alert>
+                    <Gift className="h-4 w-4" />
+                    <AlertTitle>No Tasks Assigned</AlertTitle>
+                    <AlertDescription>
+                       You were not referred through a task-based link, so there are no special tasks for you to complete. Enjoy the platform!
+                    </AlertDescription>
+                </Alert>
             )}
 
             {allSubTasksCompleted && (

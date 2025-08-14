@@ -274,16 +274,20 @@ export default function BonusReferralPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Your Referral Target</CardTitle>
-                            <CardDescription>Get {activeTask.referrerTarget} users to complete their tasks to claim your commission reward of LKR {(activeTask.referrerCommission * activeTask.referrerTarget).toFixed(2)}.</CardDescription>
+                             <CardDescription>Get {activeTask.referrerTarget} users to complete their tasks to claim your commission reward.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
+                                <div className="text-center p-4 bg-primary/10 rounded-lg border border-primary/20">
+                                    <p className="text-sm text-primary">Total Potential Commission</p>
+                                    <p className="text-4xl font-bold text-primary">LKR {(activeTask.referrerCommission * activeTask.referrerTarget).toFixed(2)}</p>
+                                </div>
                                 <Progress value={(validReferrals.length / activeTask.referrerTarget) * 100} />
                                 <div className="flex justify-between items-center font-semibold">
                                     <span>{validReferrals.length} / {activeTask.referrerTarget} Referrals Completed</span>
                                     {canClaimTargetBonus && (
                                         <div className="text-right">
-                                            <p className="text-green-400">Claim LKR {(activeTask.referrerCommission * activeTask.referrerTarget).toFixed(2)}</p>
+                                            <p className="text-green-400">Claim Ready!</p>
                                             <Button size="sm" onClick={handleClaimTargetBonus} disabled={isClaiming}>
                                                 {isClaiming ? <Loader2 className="animate-spin" /> : "Submit Claim"}
                                             </Button>
@@ -421,5 +425,3 @@ const PendingReferralTable = ({ referrals, activeTask, loading }: { referrals: U
         </Accordion>
     )
 };
-
-
