@@ -165,7 +165,6 @@ function MultiplayerGame() {
         const roomRef = doc(db, 'game_rooms', roomId as string);
         
         try {
-            // No need to refund here, as funds are only deducted when game starts
             await deleteDoc(roomRef);
     
             if (isAutoCancel) {
