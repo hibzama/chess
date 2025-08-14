@@ -1,9 +1,9 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { db, functions } from '@/lib/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, onSnapshot, doc, writeBatch, arrayUnion, arrayRemove, serverTimestamp, addDoc, getDoc, limit, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,47 +38,48 @@ type UserProfile = {
   lastSeen?: any;
 };
 
-const getChatId = (uid1: string, uid2: string) => {
-    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => (
+    <Card className="flex items-center p-4 gap-4">
+        <button onClick={() => onUserClick(person.uid)} className="relative flex items-center gap-4 text-left flex-grow">
+            <Avatar>
+                <AvatarImage src={person.photoURL} />
+                <AvatarFallback>{person.firstName?.[0]}{person.lastName?.[0]}</AvatarFallback>
+            </Avatar>
+             {person.status === 'online' && <div className="absolute top-0 left-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />}
+            <div className="flex-grow">
+                <p className="font-semibold">{person.firstName} {person.lastName}</p>
+                {person.status === 'online' ? (
+                    <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">Online</Badge>
+                ) : (
+                     <p className="text-xs text-muted-foreground">
+                        {person.lastSeen ? `Last seen ${formatDistanceToNowStrict(person.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'}
+                    </p>
+                )}
+            </div>
+        </button>
+        <div className="flex gap-2">
+            {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(person.uid)}`}><MessageSquare /></Link></Button>}
+            {actionType !== 'suggestion' && 
+                <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
+                     {actionType === 'add' ? <UserPlus /> : <UserMinus />}
+                </Button>
+            }
+             {actionType === 'suggestion' && 
+                <Button variant="outline" size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
+                    <UserPlus />
+                </Button>
+            }
+        </div>
+    </Card>
+);
+
+const getChatId = (otherUserId: string) => {
+    // This is a placeholder. You'll need to pass the current user's ID
+    // or get it from context to generate the correct chat ID.
+    const currentUserId = "currentUser"; // Replace with actual current user ID
+    return [currentUserId, otherUserId].sort().join('_');
 };
 
-
-const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: any, person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
-    return (
-        <Card className="flex items-center p-4 gap-4">
-            <button onClick={() => onUserClick(person.uid)} className="relative flex items-center gap-4 text-left flex-grow">
-                <Avatar>
-                    <AvatarImage src={person.photoURL} />
-                    <AvatarFallback>{person.firstName?.[0]}{person.lastName?.[0]}</AvatarFallback>
-                </Avatar>
-                {person.status === 'online' && <div className="absolute top-0 left-0 w-3 h-3 bg-green-500 border-2 border-card rounded-full" />}
-                <div className="flex-grow">
-                    <p className="font-semibold">{person.firstName} {person.lastName}</p>
-                    {person.status === 'online' ? (
-                        <Badge variant="secondary" className="bg-green-500/10 text-green-400 border-green-500/20">Online</Badge>
-                    ) : (
-                        <p className="text-xs text-muted-foreground">
-                            {person.lastSeen ? `Last seen ${formatDistanceToNowStrict(person.lastSeen.toDate(), { addSuffix: true })}` : 'Offline'}
-                        </p>
-                    )}
-                </div>
-            </button>
-            <div className="flex gap-2">
-                {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(currentUser.uid, person.uid)}`}><MessageSquare /></Link></Button>}
-                {actionType !== 'suggestion' && 
-                    <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
-                        {actionType === 'add' ? <UserPlus /> : <UserMinus />}
-                    </Button>
-                }
-                {actionType === 'suggestion' && 
-                    <Button variant="outline" size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
-                        <UserPlus />
-                    </Button>
-                }
-            </div>
-        </Card>
-    );
-}
 
 const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string, fromName: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (
      <Card className="flex items-center p-4 gap-4">
@@ -169,14 +170,6 @@ export default function FriendsPage() {
 
             await fetchFriends();
             
-            const suggestFriendsCallable = httpsCallable(functions, 'suggestFriends');
-            try {
-                const result = await suggestFriendsCallable();
-                setSuggestions(result.data as UserProfile[]);
-            } catch (error) {
-                console.error("Error fetching suggestions:", error);
-            }
-
             // Received Requests Listener
             const reqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
             const unsubscribeReqs = onSnapshot(reqQuery, (snapshot) => {
@@ -190,13 +183,11 @@ export default function FriendsPage() {
             const unsubscribeSentReqs = onSnapshot(sentReqQuery, async (snapshot) => {
                 const sentReqsDataPromises = snapshot.docs.map(async (d) => {
                     const req = {...d.data(), id: d.id } as FriendRequest;
-                    if(req.toId) {
-                        const toUserDoc = await getDoc(doc(db, 'users', req.toId));
-                        if (toUserDoc.exists()) {
-                            const toUserData = toUserDoc.data();
-                            req.toName = `${toUserData.firstName} ${toUserData.lastName}`;
-                            req.toAvatar = toUserData.photoURL;
-                        }
+                    const toUserDoc = await getDoc(doc(db, 'users', req.toId));
+                    if (toUserDoc.exists()) {
+                        const toUserData = toUserDoc.data();
+                        req.toName = `${toUserData.firstName} ${toUserData.lastName}`;
+                        req.toAvatar = toUserData.photoURL;
                     }
                     return req;
                 });
@@ -205,6 +196,22 @@ export default function FriendsPage() {
             });
             unsubscribes.push(unsubscribeSentReqs);
             
+             // Suggestions listener
+             const usersQuery = query(collection(db, 'users'), limit(100));
+             const unsubscribeUsers = onSnapshot(usersQuery, (usersSnapshot) => {
+                 const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
+                 
+                 // We need to know who NOT to suggest
+                 const friendIds = userData?.friends || [];
+                 const sentRequestIds = sentRequests.map(req => req.toId);
+                 const receivedRequestIds = requests.map(req => req.fromId);
+                 const excludeIds = [user.uid, ...friendIds, ...sentRequestIds, ...receivedRequestIds];
+                 
+                 const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
+                 setSuggestions(sortUsers(suggestedUsers));
+             });
+             unsubscribes.push(unsubscribeUsers);
+
             setLoading(false);
         };
 
@@ -217,15 +224,46 @@ export default function FriendsPage() {
     }, [user, userData, fetchFriends]);
     
     const handleAddFriend = async (targetId: string, targetName: string) => {
-        if(!user) return;
+        if(!user || !userData) return;
         setActionLoading(targetId);
         try {
-            const sendFriendRequestCallable = httpsCallable(functions, 'sendFriendRequest');
-            await sendFriendRequestCallable({ toId: targetId });
+            if(userData.friends?.includes(targetId)) {
+                toast({ variant: 'destructive', title: 'Already Friends', description: `You are already friends with ${targetName}.` });
+                return;
+            }
+
+            const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('toId', '==', targetId), where('status', '==', 'pending'));
+            const receivedReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', targetId), where('toId', '==', user.uid), where('status', '==', 'pending'));
+            const [sentSnapshot, receivedSnapshot] = await Promise.all([getDocs(sentReqQuery), getDocs(receivedReqQuery)]);
+            
+            if(!sentSnapshot.empty || !receivedSnapshot.empty) {
+                toast({ title: 'Request Pending', description: `A friend request between you and ${targetName} is already pending.` });
+                return;
+            }
+
+            await addDoc(collection(db, 'friend_requests'), {
+                fromId: user.uid,
+                fromName: `${userData.firstName} ${userData.lastName}`,
+                fromAvatar: userData.photoURL || '',
+                toId: targetId,
+                status: 'pending',
+                createdAt: serverTimestamp(),
+            });
+
+            await addDoc(collection(db, 'notifications'), {
+                userId: targetId,
+                title: "New Friend Request",
+                description: `${userData.firstName} ${userData.lastName} wants to be your friend.`,
+                href: '/dashboard/friends',
+                createdAt: serverTimestamp(),
+                read: false,
+            });
+
+
             toast({ title: 'Request Sent!', description: `Friend request sent to ${targetName}.` });
-        } catch (error: any) {
-            console.error("Error sending friend request", error);
-            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not send friend request.' });
+        } catch (e) {
+            console.error(e);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not send friend request.' });
         } finally {
             setActionLoading(null);
         }
@@ -252,7 +290,7 @@ export default function FriendsPage() {
                 userId: fromId,
                 title: "Friend Request Accepted",
                 description: `${userData.firstName} ${userData.lastName} accepted your friend request.`,
-                href: '/dashboard/friends',
+                href: `/dashboard/chat`,
                 createdAt: serverTimestamp(),
                 read: false,
             });
@@ -348,8 +386,6 @@ export default function FriendsPage() {
     const handleUserClick = (uid: string) => {
         router.push(`/dashboard/profile/${uid}`);
     };
-    
-    if(!user) return <Loader2 className="animate-spin" />;
 
     return (
         <div className="space-y-8">
@@ -374,7 +410,7 @@ export default function FriendsPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                            {loading ? <p>Loading friends...</p> : friends.length > 0 ? friends.map(friend => (
-                               <UserCard key={friend.uid} currentUser={user} person={friend} onAction={handleRemoveFriend} actionType="remove" loading={actionLoading === friend.uid} onUserClick={handleUserClick} />
+                               <UserCard key={friend.uid} person={friend} onAction={handleRemoveFriend} actionType="remove" loading={actionLoading === friend.uid} onUserClick={handleUserClick} />
                            )) : <p className="text-muted-foreground text-center p-4">You have no friends yet. Go find some!</p>}
                         </CardContent>
                     </Card>
@@ -422,7 +458,7 @@ export default function FriendsPage() {
                             {searchResult && (
                                 <div>
                                     <h3 className="font-semibold mb-2">Search Result</h3>
-                                    <UserCard currentUser={user} person={searchResult} onAction={handleAddFriend} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
+                                    <UserCard person={searchResult} onAction={handleAddFriend} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
                                 </div>
                             )}
 
@@ -430,7 +466,7 @@ export default function FriendsPage() {
                                 <h3 className="font-semibold mb-2">Suggestions</h3>
                                 <div className="space-y-4">
                                      {loading ? <p>Loading suggestions...</p> : suggestions.length > 0 ? suggestions.map(person => (
-                                       <UserCard key={person.uid} currentUser={user} person={person} onAction={handleAddFriend} actionType="suggestion" loading={actionLoading === person.uid} onUserClick={handleUserClick} />
+                                       <UserCard key={person.uid} person={person} onAction={handleAddFriend} actionType="suggestion" loading={actionLoading === person.uid} onUserClick={handleUserClick} />
                                    )) : <p className="text-muted-foreground text-center p-4">No suggestions right now. Check back later!</p>}
                                 </div>
                             </div>

@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -46,8 +47,9 @@ export default function CreateGamePage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Minimum investment amount is LKR 10.' });
             return;
         }
-
-        if (userData.balance < wagerAmount) {
+        
+        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
+        if (totalBalance < wagerAmount) {
             toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
@@ -55,6 +57,11 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
+            // Determine how much to take from each wallet
+            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
+            const mainWagered = wagerAmount - bonusWagered;
+
+            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
@@ -70,13 +77,18 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
-                    photoURL: userData.photoURL || ''
+                    photoURL: userData.photoURL || '',
+                    wagerFromBonus: bonusWagered,
+                    wagerFromMain: mainWagered
                 },
                 players: [user.uid],
+                p1Time: parseInt(gameTimer),
+                p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
 
+            // Don't deduct funds on creation, deduct when opponent joins.
             const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });

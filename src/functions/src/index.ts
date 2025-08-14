@@ -1,3 +1,4 @@
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -96,39 +97,48 @@ export const endGame = functions.https.onCall(async (data, context) => {
     try {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
-            if (!roomDoc.exists) {
-                throw new functions.https.HttpsError('not-found', 'Game room not found.');
-            }
-
+            if (!roomDoc.exists) throw new functions.https.HttpsError('not-found', 'Game room not found.');
+            
             const roomData = roomDoc.data();
-            if (!roomData) {
-                 throw new functions.https.HttpsError('not-found', 'Game room data is missing.');
-            }
+            if (!roomData) throw new functions.https.HttpsError('not-found', 'Game room data is missing.');
             if (roomData.status === 'completed') {
                 functions.logger.log(`Game ${roomId} already completed.`);
                 return;
             }
-            if (roomData.status !== 'in-progress') {
-                throw new functions.https.HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
-            }
-
-            const wager = roomData.wager || 0;
+            if (roomData.status !== 'in-progress') throw new functions.https.HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
+            
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
-            if (!joinerId) {
-                throw new functions.https.HttpsError('failed-precondition', 'Game is missing a second player.');
-            }
-            
+            if (!joinerId) throw new functions.https.HttpsError('failed-precondition', 'Game is missing a second player.');
+
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
 
-            let creatorPayout = 0;
-            let joinerPayout = 0;
-            
             const winnerObject: any = { method };
 
+            const handlePayout = (
+                payoutAmount: number,
+                wagerFromBonus: number,
+                wagerFromMain: number,
+                isWin: boolean,
+                isDraw: boolean
+            ) => {
+                const profit = isWin ? payoutAmount - (wagerFromBonus + wagerFromMain) : 0;
+                const bonusReturn = isDraw ? wagerFromBonus * 0.9 : wagerFromBonus;
+                const mainReturn = isDraw ? wagerFromMain * 0.9 : wagerFromMain;
+
+                const bonusIncrement = bonusReturn;
+                const mainIncrement = mainReturn + profit;
+
+                return { bonusIncrement, mainIncrement };
+            };
+            
+            let creatorPayoutDetails = { bonusIncrement: 0, mainIncrement: 0 };
+            let joinerPayoutDetails = { bonusIncrement: 0, mainIncrement: 0 };
+
             if (method === 'draw') {
-                creatorPayout = joinerPayout = wager * 0.9;
+                creatorPayoutDetails = handlePayout(roomData.wager * 0.9, roomData.createdBy.wagerFromBonus, roomData.createdBy.wagerFromMain, false, true);
+                joinerPayoutDetails = handlePayout(roomData.wager * 0.9, roomData.player2.wagerFromBonus, roomData.player2.wagerFromMain, false, true);
                 winnerObject.uid = null;
             } else if (method === 'resign' && resignerDetails) {
                 const opponentPayoutRate = 1.30;
@@ -139,42 +149,34 @@ export const endGame = functions.https.onCall(async (data, context) => {
 
                 winnerObject.resignerId = resignerDetails.id;
                 winnerObject.resignerPieceCount = resignerDetails.pieceCount;
-
+                
                 if (resignerDetails.id === creatorId) { // Creator resigned
                     winnerObject.uid = joinerId;
-                    creatorPayout = wager * resignerRefundRate;
-                    joinerPayout = wager * opponentPayoutRate;
+                    creatorPayoutDetails = handlePayout(roomData.wager * resignerRefundRate, roomData.createdBy.wagerFromBonus, roomData.createdBy.wagerFromMain, false, false);
+                    joinerPayoutDetails = handlePayout(roomData.wager * opponentPayoutRate, roomData.player2.wagerFromBonus, roomData.player2.wagerFromMain, true, false);
                 } else { // Joiner resigned
                     winnerObject.uid = creatorId;
-                    creatorPayout = wager * opponentPayoutRate;
-                    joinerPayout = wager * resignerRefundRate;
+                    creatorPayoutDetails = handlePayout(roomData.wager * opponentPayoutRate, roomData.createdBy.wagerFromBonus, roomData.createdBy.wagerFromMain, true, false);
+                    joinerPayoutDetails = handlePayout(roomData.wager * resignerRefundRate, roomData.player2.wagerFromBonus, roomData.player2.wagerFromMain, false, false);
                 }
-            } else { // Standard win (checkmate, timeout, piece-capture)
+            } else { // Standard win
                 winnerObject.uid = winnerId;
                 if (winnerId === creatorId) {
-                    creatorPayout = wager * 1.8;
+                    creatorPayoutDetails = handlePayout(roomData.wager * 1.8, roomData.createdBy.wagerFromBonus, roomData.createdBy.wagerFromMain, true, false);
                 } else if (winnerId === joinerId) {
-                    joinerPayout = wager * 1.8;
+                    joinerPayoutDetails = handlePayout(roomData.wager * 1.8, roomData.player2.wagerFromBonus, roomData.player2.wagerFromMain, true, false);
                 }
                 if (winnerId) {
                     transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
                 }
             }
-
+            
             // Payout Logic
-            if (creatorPayout > 0) {
-                transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(creatorPayout) });
-                transaction.set(db.collection('transactions').doc(), {
-                    userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
+            if (creatorPayoutDetails.mainIncrement > 0 || creatorPayoutDetails.bonusIncrement > 0) {
+                transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(creatorPayoutDetails.mainIncrement), bonusBalance: admin.firestore.FieldValue.increment(creatorPayoutDetails.bonusIncrement) });
             }
-            if (joinerPayout > 0) {
-                transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(joinerPayout) });
-                transaction.set(db.collection('transactions').doc(), {
-                    userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game vs ${roomData.createdBy.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
+            if (joinerPayoutDetails.mainIncrement > 0 || joinerPayoutDetails.bonusIncrement > 0) {
+                transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(joinerPayoutDetails.mainIncrement), bonusBalance: admin.firestore.FieldValue.increment(joinerPayoutDetails.bonusIncrement) });
             }
             
             // Finalize room
@@ -183,18 +185,16 @@ export const endGame = functions.https.onCall(async (data, context) => {
         return { success: true };
     } catch (error: any) {
         functions.logger.error('Error ending game:', error);
-        if (error.code) {
-             throw error; // Re-throw HttpsError
-        }
+        if (error.code) throw error;
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred while ending the game.');
     }
 });
+
 
 export const approveBonusClaim = functions.https.onCall(async (data, context) => {
     if (!context.auth || !data.claimId) {
         throw new functions.https.HttpsError('invalid-argument', 'Authentication and claim ID are required.');
     }
-    // You could add an admin role check here for more security
     const { claimId, newStatus } = data;
     const db = admin.firestore();
     const claimRef = db.collection('bonus_claims').doc(claimId);
@@ -210,19 +210,15 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
             }
 
             if (newStatus === 'approved') {
-                // Handle referrer target bonus
                 if (claimData.claimType === 'referrer_target' && claimData.referrerId && claimData.commissionAmount > 0) {
                     const referrerRef = db.collection('users').doc(claimData.referrerId);
                     transaction.update(referrerRef, { balance: admin.firestore.FieldValue.increment(claimData.commissionAmount) });
                 }
-                
-                // Handle new user bonus
                 if (claimData.claimType === 'new_user_task' && claimData.newUserId && claimData.bonusAmount > 0) {
                     const newUserRef = db.collection('users').doc(claimData.newUserId);
                     transaction.update(newUserRef, { bonusBalance: admin.firestore.FieldValue.increment(claimData.bonusAmount) });
                 }
             }
-            // Update the claim status regardless
             transaction.update(claimRef, { status: newStatus });
         });
         return { success: true };
@@ -257,16 +253,12 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
         
         const usersRef = db.collection('users');
-        // Firestore 'not-in' queries are limited to 10 items in the array. 
-        // A more scalable solution for large user bases would be more complex, 
-        // but for now, we fetch a larger batch and filter client-side.
-        // We will fetch users ordered by wins and filter.
         const usersSnapshot = await usersRef.orderBy('wins', 'desc').limit(50).get();
 
         const suggestions = usersSnapshot.docs
             .map(doc => ({ uid: doc.id, ...doc.data() }))
-            .filter(u => u.uid && !excludeIds.includes(u.uid)) // Filter out excluded users
-            .slice(0, 10) // Take the top 10 from the filtered list
+            .filter(u => u.uid && !excludeIds.includes(u.uid))
+            .slice(0, 10)
             .map((u: any) => ({
                 uid: u.uid,
                 firstName: u.firstName || 'Unknown',
@@ -290,14 +282,16 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     const fromId = context.auth.uid;
-    const { toId } = data; // We only need the toId from the client
+    const { toId } = data;
     if (!toId) {
         throw new HttpsError('invalid-argument', 'Recipient ID is required.');
+    }
+     if (fromId === toId) {
+        throw new HttpsError('invalid-argument', "You can't send a friend request to yourself.");
     }
 
     const db = admin.firestore();
     
-    // Fetch sender and receiver data
     const fromUserDoc = await db.collection('users').doc(fromId).get();
     const toUserDoc = await db.collection('users').doc(toId).get();
 
@@ -313,7 +307,6 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
     const toName = `${toUserData.firstName || 'User'} ${toUserData.lastName || ''}`.trim();
     const toAvatar = toUserData.photoURL || '';
     
-    // Check if a request already exists
     const sentReqQuery = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
     const receivedReqQuery = db.collection('friend_requests').where('fromId', '==', toId).where('toId', '==', fromId);
 
@@ -350,5 +343,3 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
-
-    
