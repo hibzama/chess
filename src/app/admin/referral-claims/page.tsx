@@ -37,7 +37,8 @@ export default function ReferralClaimsPage() {
     const { toast } = useToast();
 
     useEffect(() => {
-        const q = query(collection(db, 'bonus_claims'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+        // Fetch all bonus_claims and filter client-side to avoid index issues.
+        const q = query(collection(db, 'bonus_claims'));
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
                 const data = claimDoc.data() as Claim;
@@ -53,8 +54,14 @@ export default function ReferralClaimsPage() {
                 }
                 return data;
             });
-            const claimsData = await Promise.all(claimsDataPromises);
-            setClaims(claimsData);
+            const allClaimsData = await Promise.all(claimsDataPromises);
+            
+            // Filter for pending claims and sort by date client-side
+            const pendingClaims = allClaimsData
+                .filter(claim => claim.status === 'pending')
+                .sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
+
+            setClaims(pendingClaims);
             setLoading(false);
         });
 
