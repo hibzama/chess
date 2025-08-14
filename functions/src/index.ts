@@ -1,51 +1,41 @@
 
-'use server';
-
-import {HttpsError, onCall} from "firebase-functions/v2/https";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import {logger} from "firebase-functions";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions";
 
 admin.initializeApp();
 
-export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (event) => {
-    const snap = event.data;
-    if (!snap) {
-        logger.log("No data associated with the event");
-        return;
-    }
+// This function triggers whenever a new document is created in 'game_rooms'
+export const announceNewGame = functions.firestore
+  .document("game_rooms/{roomId}")
+  .onCreate(async (snap, context) => {
     const roomData = snap.data();
-    const roomId = event.params.roomId;
+    const roomId = context.params.roomId; // Correct way to get wildcard ID
 
+    // Exit if the function is triggered with no data, or for a private room
     if (!roomData || roomData.isPrivate === true) {
-      logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
-      return;
+      functions.logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
+      return null;
     }
 
     let telegramBotToken;
     try {
-      const functionsConfig = admin.app().options.config;
-      if (functionsConfig && functionsConfig.telegram) {
-          telegramBotToken = functionsConfig.telegram.token;
-      }
+      telegramBotToken = functions.config().telegram.token;
     } catch (error) {
-      logger.error("Could not retrieve telegram.token from Functions config.");
-    }
-    
-    if (!telegramBotToken) {
-        logger.error(
-            "Telegram token not found. " +
-            "Ensure it is set by running: " +
-            "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
-        );
-        return;
+      functions.logger.error(
+        "Could not retrieve telegram.token from Functions config. " +
+        "Ensure it is set by running: " +
+        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
+      );
+      return null;
     }
 
-
-    const chatId = "@nexbattlerooms";
+    const chatId = "@nexbattlerooms"; // Your Telegram group username
     const siteUrl = "http://nexbattle.com";
 
+    // Prepare message components with fallbacks
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
@@ -53,9 +43,11 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
     const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
-    logger.log(`Preparing message for Room ID: ${roomId}`);
-    logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
+    // Log the variables to ensure they are being read correctly
+    functions.logger.log(`Preparing message for Room ID: ${roomId}`);
+    functions.logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
 
+    // Construct the message string carefully
     const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
       `<b>Player:</b> ${createdBy}\n` +
       `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
@@ -73,11 +65,13 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
         text: message,
         parse_mode: 'HTML',
       });
-      logger.log(`Successfully sent message for Room ID: ${roomId}`);
+      functions.logger.log(`Successfully sent message for Room ID: ${roomId}`);
     } catch (error: any) {
-      logger.error("Error sending message to Telegram:", error.response?.data || error.message);
+      functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
-});
+
+    return null;
+  });
 
 
 export const endGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
@@ -344,5 +338,3 @@ export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, a
         throw new HttpsError('internal', 'An unexpected error occurred while sending the friend request.');
     }
 });
-
-    
