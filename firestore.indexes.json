@@ -2,7 +2,7 @@
   "indexes": [
     {
       "collectionGroup": "bonus_claims",
-      "queryScope": "COLLECTION",
+      "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
           "fieldPath": "status",
