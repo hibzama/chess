@@ -243,8 +243,8 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
         if (!userDoc.exists) {
             throw new HttpsError('not-found', 'User not found');
         }
-        const userData = userDoc.data()!;
-        const friends = userData.friends || [];
+        const userData = userDoc.data();
+        const friends = userData?.friends || [];
 
         const sentReqSnapshot = await db.collection('friend_requests').where('fromId', '==', userId).get();
         const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
@@ -253,15 +253,15 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
         const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
-
-        // Order by wins descending for more relevant suggestions
-        const usersSnapshot = await db.collection('users').orderBy('wins', 'desc').limit(50).get();
+        
+        // This is a simplified suggestion logic. For larger scale, this would need optimization.
+        const usersSnapshot = await db.collection('users').limit(50).get();
 
         const suggestions = usersSnapshot.docs
             .map(doc => ({ uid: doc.id, ...doc.data() }))
             .filter(u => u.uid && !excludeIds.includes(u.uid))
             .slice(0, 10)
-            .map(u => ({
+            .map((u: any) => ({ // Use 'any' to avoid strict type checking issues with dynamic data
                 uid: u.uid,
                 firstName: u.firstName || 'Unknown',
                 lastName: u.lastName || 'User',
@@ -284,19 +284,29 @@ export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, a
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     const fromId = request.auth.uid;
-    const { toId, toName, toAvatar } = request.data;
-    if (!toId || !toName) {
-        throw new HttpsError('invalid-argument', 'Recipient ID and name are required.');
+    const { toId } = request.data;
+    if (!toId) {
+        throw new HttpsError('invalid-argument', 'Recipient ID is required.');
     }
 
     const db = admin.firestore();
+    
+    // Fetch sender and receiver data
     const fromUserDoc = await db.collection('users').doc(fromId).get();
-    if (!fromUserDoc.exists) {
-        throw new HttpsError('not-found', 'Current user not found.');
+    const toUserDoc = await db.collection('users').doc(toId).get();
+
+    if (!fromUserDoc.exists() || !toUserDoc.exists()) {
+        throw new HttpsError('not-found', 'One or both users not found.');
     }
-    const fromUserData = fromUserDoc.data()!;
-    const fromName = `${fromUserData.firstName} ${fromUserData.lastName}`;
-    const fromAvatar = fromUserData.photoURL || '';
+    
+    const fromUserData = fromUserDoc.data();
+    const toUserData = toUserDoc.data();
+
+    // Safely construct names and avatars with fallbacks
+    const fromName = `${fromUserData?.firstName || 'User'} ${fromUserData?.lastName || ''}`.trim();
+    const fromAvatar = fromUserData?.photoURL || '';
+    const toName = `${toUserData?.firstName || 'User'} ${toUserData?.lastName || ''}`.trim();
+    const toAvatar = toUserData?.photoURL || '';
     
     // Check if a request already exists
     const sentReqQuery = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
