@@ -92,7 +92,7 @@ export default function UserTasksPage() {
     const handleVerificationSubmit = async (taskId: string, subTask: SubTask) => {
         const inputValue = taskInputs[subTask.id];
         if (!user || (subTask.type !== 'game_play' && (!inputValue || inputValue.trim() === ''))) {
-            toast({ variant: 'destructive', title: 'Input Required', description: 'Please provide the required information.' });
+            toast({ variant: 'destructive', title: 'Input Required', description: 'Please provide the required information for verification.' });
             return;
         }
         setIsSubmitting(subTask.id);
@@ -187,33 +187,44 @@ export default function UserTasksPage() {
 
                              return (
                                 <Card key={subTask.id} className={cn("overflow-hidden", isCompleted ? 'border-green-500/50 bg-green-500/10' : 'bg-muted/50')}>
-                                     <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                                        <div className="flex items-center gap-4 flex-1">
-                                            <Icon className="w-8 h-8 text-primary flex-shrink-0"/>
+                                     <div className="p-4 flex flex-col gap-4">
+                                        <div className="flex items-start gap-4">
+                                            <Icon className="w-8 h-8 text-primary flex-shrink-0 mt-1"/>
                                             <div className="flex-1">
                                                 <p className="font-semibold">{subTask.label}</p>
-                                                <p className="text-xs text-muted-foreground break-all">{!requiresInput ? `Play ${subTask.target} multiplayer games.` : `Target: ${subTask.target}`}</p>
+                                                <p className="text-xs text-muted-foreground break-all">{!requiresInput ? `Play ${subTask.target} multiplayer games.` : <>Target Link: <a href={subTask.target} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">{subTask.target}</a></> }</p>
+                                            </div>
+                                             <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2">
+                                                 {requiresInput ? null : (
+                                                     <div className="w-full sm:w-24 text-right">
+                                                        <p className="text-sm font-semibold">{progress} / {subTask.target}</p>
+                                                     </div>
+                                                 )}
                                             </div>
                                         </div>
-                                         <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2">
-                                             {requiresInput ? (
-                                                <div className="flex w-full sm:w-64 gap-2">
+                                         
+                                        {requiresInput ? (
+                                            <div>
+                                                <Label htmlFor={`input-${subTask.id}`} className="text-xs text-muted-foreground">Enter info for verification:</Label>
+                                                <div className="flex w-full gap-2 mt-1">
                                                     <Input 
+                                                        id={`input-${subTask.id}`}
                                                         placeholder={getInputPlaceholder(subTask.type)} 
                                                         value={taskInputs[subTask.id] || ''}
                                                         onChange={e => handleInputChange(subTask.id, e.target.value)}
                                                         disabled={isSubmitting === subTask.id || isSubmitted || isCompleted}
                                                     />
                                                      <Button size="sm" onClick={() => handleVerificationSubmit(mainTask.id, subTask)} disabled={isSubmitting === subTask.id || isSubmitted || isCompleted}>
-                                                        {isSubmitting === subTask.id ? <Loader2 className="animate-spin h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
+                                                        {isSubmitting === subTask.id ? <Loader2 className="animate-spin h-4 w-4" /> : 'Submit'}
                                                     </Button>
                                                 </div>
-                                             ): (
-                                                 <div className="w-full sm:w-48 text-right">
-                                                    <p className="text-sm font-semibold">{progress} / {subTask.target}</p>
-                                                 </div>
-                                             )}
-                                        </div>
+                                                <p className="text-xs text-muted-foreground mt-1">Click the button to open the link & submit your info for manual verification.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="text-right">
+                                                <p className="text-xs text-muted-foreground">Your game progress is tracked automatically.</p>
+                                            </div>
+                                        )}
                                      </div>
                                       <div className="bg-background/30 px-4 py-2 flex items-center justify-end">
                                             {isCompleted ? <Badge className="bg-green-600"><Check className="mr-1"/> Completed</Badge> :
