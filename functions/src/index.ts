@@ -1,4 +1,3 @@
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -11,6 +10,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
+import { HttpsError } from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
@@ -235,15 +235,15 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
 
 export const suggestFriends = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     const userId = context.auth.uid;
     const db = admin.firestore();
 
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists()) {
-            throw new functions.https.HttpsError('not-found', 'User not found');
+        if (!userDoc.exists) {
+            throw new HttpsError('not-found', 'User not found');
         }
         const userData = userDoc.data()!;
         const friends = userData.friends || [];
@@ -280,19 +280,19 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
 
     } catch (error) {
         functions.logger.error('Error suggesting friends:', error);
-        throw new functions.https.HttpsError('internal', 'An error occurred while fetching friend suggestions.');
+        throw new HttpsError('internal', 'An error occurred while fetching friend suggestions.');
     }
 });
 
 
 export const sendFriendRequest = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     const fromId = context.auth.uid;
     const { toId } = data; // We only need the toId from the client
     if (!toId) {
-        throw new functions.https.HttpsError('invalid-argument', 'Recipient ID is required.');
+        throw new HttpsError('invalid-argument', 'Recipient ID is required.');
     }
 
     const db = admin.firestore();
@@ -302,7 +302,7 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
     const toUserDoc = await db.collection('users').doc(toId).get();
 
     if (!fromUserDoc.exists() || !toUserDoc.exists()) {
-        throw new functions.https.HttpsError('not-found', 'One or both users not found.');
+        throw new HttpsError('not-found', 'One or both users not found.');
     }
     
     const fromUserData = fromUserDoc.data()!;
@@ -320,7 +320,7 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
     const [sentSnapshot, receivedSnapshot] = await Promise.all([sentReqQuery.get(), receivedReqQuery.get()]);
 
     if (!sentSnapshot.empty || !receivedSnapshot.empty) {
-        throw new functions.https.HttpsError('already-exists', 'A friend request between you and this user is already pending.');
+        throw new HttpsError('already-exists', 'A friend request between you and this user is already pending.');
     }
 
     try {
@@ -347,6 +347,6 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
         return { success: true };
     } catch (error) {
         functions.logger.error('Error sending friend request:', error);
-        throw new functions.https.HttpsError('internal', 'An unexpected error occurred.');
+        throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
