@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -217,94 +218,22 @@ function MultiplayerGame() {
         }
     
         setIsJoining(true);
-        const roomRef = doc(db, 'game_rooms', room.id);
-
         try {
-            await runTransaction(db, async (transaction) => {
-                const currentRoomDoc = await transaction.get(roomRef);
-                if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
-                    throw new Error("Room not available");
-                }
-                const roomData = currentRoomDoc.data() as GameRoom;
-        
-                // --- PRE-READ ALL NECESSARY DATA ---
-                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
-                const joinerRef = doc(db, 'users', user.uid);
-                const [creatorDoc, joinerDoc] = await Promise.all([
-                    transaction.get(creatorRef),
-                    transaction.get(joinerRef)
-                ]);
-
-                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new Error("One of the players does not exist");
-                
-                const creatorData = creatorDoc.data();
-                const joinerData = joinerDoc.data();
-
-                const creatorTotalBalance = (creatorData?.balance || 0) + (creatorData?.bonusBalance || 0);
-                if (creatorTotalBalance < roomData.wager) {
-                    throw new Error("Creator has insufficient funds.");
-                }
-
-                // --- ALL READS ARE DONE. START WRITES. ---
-
-                // Deduct from creator
-                const creatorBonusWagered = roomData.createdBy.wagerFromBonus;
-                const creatorMainWagered = roomData.createdBy.wagerFromMain;
-                transaction.update(creatorRef, {
-                    balance: increment(-creatorMainWagered),
-                    bonusBalance: increment(-creatorBonusWagered)
-                });
-                
-                // Log creator's wager transaction
-                transaction.set(doc(collection(db, 'transactions')), {
-                    userId: roomData.createdBy.uid, type: 'wager', amount: roomData.wager, status: 'completed',
-                    description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: room.id, createdAt: serverTimestamp()
-                });
-
-
-                // Deduct from joiner
-                const joinerBonusWagered = Math.min(roomData.wager, joinerData.bonusBalance || 0);
-                const joinerMainWagered = roomData.wager - joinerBonusWagered;
-                transaction.update(joinerRef, {
-                    balance: increment(-joinerMainWagered),
-                    bonusBalance: increment(-joinerBonusWagered)
-                });
-                
-                // Log joiner's wager transaction
-                transaction.set(doc(collection(db, 'transactions')), {
-                    userId: user.uid, type: 'wager', amount: roomData.wager, status: 'completed',
-                    description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: room.id, createdAt: serverTimestamp()
-                });
-
-                
-                const creatorColor = roomData.createdBy.color;
-                const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-                
-                transaction.update(roomRef, {
-                    status: 'in-progress',
-                    player2: { 
-                        uid: user.uid, 
-                        name: `${userData.firstName} ${userData.lastName}`, 
-                        color: joinerColor, 
-                        photoURL: userData.photoURL || '',
-                        wagerFromBonus: joinerBonusWagered,
-                        wagerFromMain: joinerMainWagered,
-                    },
-                    players: [...roomData.players, user.uid],
-                    capturedByP1: [], capturedByP2: [], moveHistory: [],
-                    currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
-                });
-            });
-
-            toast({ title: "Game Joined!", description: "The match is starting now."});
+            const joinGameFunction = httpsCallable(functions, 'joinGame');
+            const result = await joinGameFunction({ roomId: room.id });
+            
+            if ((result.data as any).success) {
+                toast({ title: "Game Joined!", description: "The match is starting now."});
+            } else {
+                throw new Error((result.data as any).error || "Failed to join game.");
+            }
     
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            if (error.message === 'Room not available') {
-                 toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
-                 router.push(`/lobby/${room.gameType}`);
-            } else {
-                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. ${error.message}`});
+            toast({ variant: 'destructive', title: "Error", description: `Could not join the game. ${error.message}`});
+            // If the error indicates the room is gone, redirect
+            if (error.message.includes('Room not available') || error.message.includes('not found')) {
+                router.push(`/lobby/${room.gameType}`);
             }
         } finally {
             setIsJoining(false);
