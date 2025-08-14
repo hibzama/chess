@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift, Youtube, Send, MessageSquare, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift, Youtube, Send, MessageSquare, ExternalLink, AlertTriangle, BadgeInfo } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
 import { Progress } from '@/components/ui/progress';
 import type { Task, SubTask } from '@/app/admin/tasks/page';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 
 const subTaskIcons = {
     whatsapp_join: MessageSquare,
@@ -89,17 +91,19 @@ export default function UserTasksPage() {
 
     const handleVerificationSubmit = async (taskId: string, subTask: SubTask) => {
         const inputValue = taskInputs[subTask.id];
-        if (!user || !inputValue || inputValue.trim() === '') {
+        if (!user || (subTask.type !== 'game_play' && (!inputValue || inputValue.trim() === ''))) {
             toast({ variant: 'destructive', title: 'Input Required', description: 'Please provide the required information.' });
             return;
         }
         setIsSubmitting(subTask.id);
         try {
-            window.open(subTask.target, '_blank');
+            if(subTask.type !== 'game_play') {
+                window.open(subTask.target, '_blank');
+            }
             const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, {
                 [`taskStatus.${taskId}.${subTask.id}.status`]: 'submitted',
-                [`taskStatus.${taskId}.${subTask.id}.value`]: inputValue,
+                [`taskStatus.${taskId}.${subTask.id}.value`]: inputValue || '',
                 [`taskStatus.${taskId}.${subTask.id}.label`]: subTask.label,
             });
             toast({ title: 'Submitted!', description: 'Your task is pending admin verification.' });
@@ -151,10 +155,22 @@ export default function UserTasksPage() {
         <div className="space-y-8">
             <div>
                 <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3"><ClipboardCheck /> Your Tasks</h1>
-                <p className="text-muted-foreground">Complete these tasks to earn a special welcome bonus of <span className="font-bold text-primary">LKR {mainTask?.newUserBonus.toFixed(2) || '0.00'}</span>!</p>
+                <p className="text-muted-foreground">Complete these tasks to unlock your special welcome bonus!</p>
             </div>
-
+            
             {loading ? <Skeleton className="h-64 w-full" /> : mainTask ? (
+                <>
+                <Card className="bg-primary/10 border-primary">
+                    <CardHeader className="text-center items-center">
+                        <Gift className="w-12 h-12 text-primary" />
+                        <CardTitle className="text-2xl text-primary">Welcome Bonus</CardTitle>
+                        <CardDescription>Complete the tasks below to earn this reward.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                        <p className="text-5xl font-bold">LKR {mainTask.newUserBonus.toFixed(2)}</p>
+                    </CardContent>
+                </Card>
+
                 <Card>
                     <CardHeader>
                         <CardTitle>{mainTask.title}</CardTitle>
@@ -170,45 +186,50 @@ export default function UserTasksPage() {
                              const requiresInput = subTask.type !== 'game_play';
 
                              return (
-                                <Card key={subTask.id} className={isCompleted ? 'border-green-500/50 bg-green-500/10' : 'bg-muted/50'}>
-                                     <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <Card key={subTask.id} className={cn("overflow-hidden", isCompleted ? 'border-green-500/50 bg-green-500/10' : 'bg-muted/50')}>
+                                     <div className="p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
                                         <div className="flex items-center gap-4 flex-1">
                                             <Icon className="w-8 h-8 text-primary flex-shrink-0"/>
                                             <div className="flex-1">
                                                 <p className="font-semibold">{subTask.label}</p>
-                                                {requiresInput ? (
-                                                     <p className="text-xs text-muted-foreground break-all">{subTask.target}</p>
-                                                ) : (
-                                                    <div className="space-y-1 mt-1">
-                                                        <Progress value={isCompleted ? 100 : (progress / Number(subTask.target)) * 100} className="h-2"/>
-                                                        <p className="text-xs text-muted-foreground">{progress} / {subTask.target} games played</p>
-                                                    </div>
-                                                )}
+                                                <p className="text-xs text-muted-foreground break-all">{!requiresInput ? `Play ${subTask.target} multiplayer games.` : `Target: ${subTask.target}`}</p>
                                             </div>
                                         </div>
-                                        <div className="w-full sm:w-auto flex flex-col sm:items-end gap-2">
-                                             {requiresInput && !isCompleted && !isSubmitted && (
+                                         <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2">
+                                             {requiresInput ? (
                                                 <div className="flex w-full sm:w-64 gap-2">
                                                     <Input 
                                                         placeholder={getInputPlaceholder(subTask.type)} 
                                                         value={taskInputs[subTask.id] || ''}
                                                         onChange={e => handleInputChange(subTask.id, e.target.value)}
-                                                        disabled={isSubmitting === subTask.id}
+                                                        disabled={isSubmitting === subTask.id || isSubmitted || isCompleted}
                                                     />
-                                                    <Button size="sm" onClick={() => handleVerificationSubmit(mainTask.id, subTask)} disabled={isSubmitting === subTask.id}>
-                                                        {isSubmitting === subTask.id ? <Loader2 className="animate-spin" /> : <><ExternalLink className="mr-1 h-3 w-3" /> Do It</>}
+                                                     <Button size="sm" onClick={() => handleVerificationSubmit(mainTask.id, subTask)} disabled={isSubmitting === subTask.id || isSubmitted || isCompleted}>
+                                                        {isSubmitting === subTask.id ? <Loader2 className="animate-spin h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
                                                     </Button>
                                                 </div>
+                                             ): (
+                                                 <div className="w-full sm:w-48 text-right">
+                                                    <p className="text-sm font-semibold">{progress} / {subTask.target}</p>
+                                                 </div>
                                              )}
-                                             {isSubmitted && <Badge variant="secondary">Pending Review</Badge>}
-                                             {isCompleted && <Badge className="bg-green-600"><Check/> Done</Badge>}
                                         </div>
-                                     </CardContent>
+                                     </div>
+                                      <div className="bg-background/30 px-4 py-2 flex items-center justify-end">
+                                            {isCompleted ? <Badge className="bg-green-600"><Check className="mr-1"/> Completed</Badge> :
+                                             isSubmitted ? <Badge variant="secondary">Pending Review</Badge> :
+                                             <Badge variant="destructive">Pending</Badge>
+                                            }
+                                        </div>
+                                     {subTask.type === 'game_play' && (
+                                         <Progress value={(progress / Number(subTask.target)) * 100} className="h-1 rounded-none"/>
+                                     )}
                                 </Card>
                              )
                         })}
                     </CardContent>
                 </Card>
+                </>
             ) : (
                  <Alert>
                     <Gift className="h-4 w-4" />
