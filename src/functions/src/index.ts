@@ -230,3 +230,55 @@ export const approveBonusClaim = onCall({ region: 'us-central1', cors: true }, a
         throw new HttpsError('internal', 'An error occurred while processing the claim.');
     }
 });
+
+export const suggestFriends = onCall({ region: 'us-central1', cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    const userId = request.auth.uid;
+    const db = admin.firestore();
+
+    try {
+        // Fetch current user's data to get friends and pending requests
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            throw new HttpsError('not-found', 'User not found');
+        }
+        const userData = userDoc.data()!;
+        const friends = userData.friends || [];
+
+        // Get IDs of users the current user has sent requests to
+        const sentReqSnapshot = await db.collection('friend_requests').where('fromId', '==', userId).get();
+        const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
+
+        // Get IDs of users who have sent requests to the current user
+        const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
+        const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
+
+        const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
+
+        // Fetch a batch of recent users
+        const usersSnapshot = await db.collection('users').orderBy('createdAt', 'desc').limit(50).get();
+
+        const suggestions = usersSnapshot.docs
+            .map(doc => ({ uid: doc.id, ...doc.data() }))
+            .filter(u => !excludeIds.includes(u.uid))
+            .slice(0, 10) // Limit to 10 suggestions
+            .map(u => ({
+                uid: u.uid,
+                firstName: u.firstName,
+                lastName: u.lastName,
+                photoURL: u.photoURL,
+                status: u.status,
+                lastSeen: u.lastSeen,
+            }));
+        
+        return suggestions;
+
+    } catch (error) {
+        logger.error('Error suggesting friends:', error);
+        throw new HttpsError('internal', 'An error occurred while fetching friend suggestions.');
+    }
+});
+
+    

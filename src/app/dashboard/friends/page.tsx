@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { collection, query, where, getDocs, onSnapshot, doc, writeBatch, arrayUnion, arrayRemove, serverTimestamp, addDoc, getDoc, limit, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,6 +42,8 @@ type UserProfile = {
 const getChatId = (uid1: string, uid2: string) => {
     return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
 };
+
+const suggestFriends = httpsCallable(functions, 'suggestFriends');
 
 const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
     const { user } = useAuth();
@@ -196,21 +199,15 @@ export default function FriendsPage() {
             });
             unsubscribes.push(unsubscribeSentReqs);
             
-             // Suggestions listener
-             const usersQuery = query(collection(db, 'users'), limit(100));
-             const unsubscribeUsers = onSnapshot(usersQuery, (usersSnapshot) => {
-                 const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
-                 
-                 // We need to know who NOT to suggest
-                 const friendIds = userData?.friends || [];
-                 const sentRequestIds = sentRequests.map(req => req.toId);
-                 const receivedRequestIds = requests.map(req => req.fromId);
-                 const excludeIds = [user.uid, ...friendIds, ...sentRequestIds, ...receivedRequestIds];
-                 
-                 const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
+            // Fetch Suggestions via Cloud Function
+            try {
+                 const result = await suggestFriends();
+                 const suggestedUsers = result.data as UserProfile[];
                  setSuggestions(sortUsers(suggestedUsers));
-             });
-             unsubscribes.push(unsubscribeUsers);
+            } catch (error) {
+                console.error("Error fetching friend suggestions:", error);
+                toast({ variant: 'destructive', title: 'Could not load suggestions.'});
+            }
 
             setLoading(false);
         };
@@ -221,7 +218,7 @@ export default function FriendsPage() {
             unsubscribes.forEach(unsub => unsub());
         };
 
-    }, [user, userData, fetchFriends]);
+    }, [user, userData, fetchFriends, toast]);
     
     const handleAddFriend = async (targetId: string, targetName: string) => {
         if(!user || !userData) return;
@@ -477,3 +474,5 @@ export default function FriendsPage() {
         </div>
     )
 }
+
+    
