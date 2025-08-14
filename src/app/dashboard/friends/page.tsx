@@ -22,7 +22,7 @@ type FriendRequest = {
   id: string;
   fromId: string;
   toId: string;
-  toName?: string;
+  toName: string;
   toAvatar?: string;
   fromName: string;
   fromAvatar?: string;
@@ -44,8 +44,10 @@ const getChatId = (uid1: string, uid2: string) => {
 };
 
 const suggestFriends = httpsCallable(functions, 'suggestFriends');
+const sendFriendRequest = httpsCallable(functions, 'sendFriendRequest');
 
-const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
+
+const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (person: UserProfile) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
     const { user } = useAuth();
     
     return (
@@ -70,12 +72,12 @@ const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { pers
         <div className="flex gap-2">
             {actionType === 'remove' && user && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(user.uid, person.uid)}`}><MessageSquare /></Link></Button>}
             {actionType !== 'suggestion' && 
-                <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
+                <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person)} disabled={loading}>
                      {actionType === 'add' ? <UserPlus /> : <UserMinus />}
                 </Button>
             }
              {actionType === 'suggestion' && 
-                <Button variant="outline" size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
+                <Button variant="outline" size="icon" onClick={() => onAction(person)} disabled={loading}>
                     <UserPlus />
                 </Button>
             }
@@ -183,18 +185,8 @@ export default function FriendsPage() {
 
             // Sent Requests Listener
             const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
-            const unsubscribeSentReqs = onSnapshot(sentReqQuery, async (snapshot) => {
-                const sentReqsDataPromises = snapshot.docs.map(async (d) => {
-                    const req = {...d.data(), id: d.id } as FriendRequest;
-                    const toUserDoc = await getDoc(doc(db, 'users', req.toId));
-                    if (toUserDoc.exists()) {
-                        const toUserData = toUserDoc.data();
-                        req.toName = `${toUserData.firstName} ${toUserData.lastName}`;
-                        req.toAvatar = toUserData.photoURL;
-                    }
-                    return req;
-                });
-                const sentReqsData = await Promise.all(sentReqsDataPromises);
+            const unsubscribeSentReqs = onSnapshot(sentReqQuery, (snapshot) => {
+                const sentReqsData = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as FriendRequest));
                 setSentRequests(sentReqsData);
             });
             unsubscribes.push(unsubscribeSentReqs);
@@ -220,47 +212,25 @@ export default function FriendsPage() {
 
     }, [user, userData, fetchFriends, toast]);
     
-    const handleAddFriend = async (targetId: string, targetName: string) => {
+    const handleAddFriend = async (targetUser: UserProfile) => {
         if(!user || !userData) return;
-        setActionLoading(targetId);
+        setActionLoading(targetUser.uid);
         try {
-            if(userData.friends?.includes(targetId)) {
-                toast({ variant: 'destructive', title: 'Already Friends', description: `You are already friends with ${targetName}.` });
+            if(userData.friends?.includes(targetUser.uid)) {
+                toast({ variant: 'destructive', title: 'Already Friends', description: `You are already friends with ${targetUser.firstName}.` });
                 return;
             }
 
-            const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('toId', '==', targetId), where('status', '==', 'pending'));
-            const receivedReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', targetId), where('toId', '==', user.uid), where('status', '==', 'pending'));
-            const [sentSnapshot, receivedSnapshot] = await Promise.all([getDocs(sentReqQuery), getDocs(receivedReqQuery)]);
-            
-            if(!sentSnapshot.empty || !receivedSnapshot.empty) {
-                toast({ title: 'Request Pending', description: `A friend request between you and ${targetName} is already pending.` });
-                return;
-            }
-
-            await addDoc(collection(db, 'friend_requests'), {
-                fromId: user.uid,
-                fromName: `${userData.firstName} ${userData.lastName}`,
-                fromAvatar: userData.photoURL || '',
-                toId: targetId,
-                status: 'pending',
-                createdAt: serverTimestamp(),
+            await sendFriendRequest({
+                toId: targetUser.uid,
+                toName: `${targetUser.firstName} ${targetUser.lastName}`,
+                toAvatar: targetUser.photoURL || ''
             });
 
-            await addDoc(collection(db, 'notifications'), {
-                userId: targetId,
-                title: "New Friend Request",
-                description: `${userData.firstName} ${userData.lastName} wants to be your friend.`,
-                href: '/dashboard/friends',
-                createdAt: serverTimestamp(),
-                read: false,
-            });
-
-
-            toast({ title: 'Request Sent!', description: `Friend request sent to ${targetName}.` });
-        } catch (e) {
+            toast({ title: 'Request Sent!', description: `Friend request sent to ${targetUser.firstName}.` });
+        } catch (e: any) {
             console.error(e);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not send friend request.' });
+            toast({ variant: 'destructive', title: 'Error', description: e.message || 'Could not send friend request.' });
         } finally {
             setActionLoading(null);
         }
@@ -330,20 +300,20 @@ export default function FriendsPage() {
         }
     }
 
-    const handleRemoveFriend = async (friendId: string, friendName: string) => {
+    const handleRemoveFriend = async (friend: UserProfile) => {
         if(!user) return;
-        setActionLoading(friendId);
+        setActionLoading(friend.uid);
          const batch = writeBatch(db);
 
         const currentUserRef = doc(db, 'users', user.uid);
-        batch.update(currentUserRef, { friends: arrayRemove(friendId) });
+        batch.update(currentUserRef, { friends: arrayRemove(friend.uid) });
 
-        const otherUserRef = doc(db, 'users', friendId);
+        const otherUserRef = doc(db, 'users', friend.uid);
         batch.update(otherUserRef, { friends: arrayRemove(user.uid) });
 
         try {
              await batch.commit();
-             toast({ title: "Friend Removed", description: `You are no longer friends with ${friendName}.` });
+             toast({ title: "Friend Removed", description: `You are no longer friends with ${friend.firstName}.` });
              fetchFriends();
         } catch (e) {
             console.error(e);

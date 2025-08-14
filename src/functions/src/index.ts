@@ -281,4 +281,60 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
     }
 });
 
+export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    const fromId = request.auth.uid;
+    const { toId, toName, toAvatar } = request.data;
+    if (!toId || !toName) {
+        throw new HttpsError('invalid-argument', 'Recipient ID and name are required.');
+    }
+
+    const db = admin.firestore();
+    const fromUserDoc = await db.collection('users').doc(fromId).get();
+    if (!fromUserDoc.exists) {
+        throw new HttpsError('not-found', 'Current user not found.');
+    }
+    const fromUserData = fromUserDoc.data()!;
+    const fromName = `${fromUserData.firstName} ${fromUserData.lastName}`;
+    const fromAvatar = fromUserData.photoURL || '';
+    
+    // Check if a request already exists
+    const sentReqQuery = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
+    const receivedReqQuery = db.collection('friend_requests').where('fromId', '==', toId).where('toId', '==', fromId);
+
+    const [sentSnapshot, receivedSnapshot] = await Promise.all([sentReqQuery.get(), receivedReqQuery.get()]);
+
+    if (!sentSnapshot.empty || !receivedSnapshot.empty) {
+        throw new HttpsError('already-exists', 'A friend request between you and this user is already pending.');
+    }
+
+    try {
+        await db.collection('friend_requests').add({
+            fromId,
+            fromName,
+            fromAvatar,
+            toId,
+            toName,
+            toAvatar,
+            status: 'pending',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await db.collection('notifications').add({
+            userId: toId,
+            title: "New Friend Request",
+            description: `${fromName} wants to be your friend.`,
+            href: '/dashboard/friends',
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            read: false,
+        });
+
+        return { success: true };
+    } catch (error) {
+        logger.error('Error sending friend request:', error);
+        throw new HttpsError('internal', 'An unexpected error occurred.');
+    }
+});
     
