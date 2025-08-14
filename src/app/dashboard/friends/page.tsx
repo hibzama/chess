@@ -1,9 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { collection, query, where, getDocs, onSnapshot, doc, writeBatch, arrayUnion, arrayRemove, serverTimestamp, addDoc, getDoc, limit, orderBy, deleteDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,6 @@ import Link from 'next/link';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
-import type { User } from 'firebase/auth';
 
 type FriendRequest = {
   id: string;
@@ -39,11 +38,11 @@ type UserProfile = {
   lastSeen?: any;
 };
 
-const getChatId = (uid1: string, uid2: string) => {
-    return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+const getChatId = (currentUserId: string, otherUserId: string) => {
+    return [currentUserId, otherUserId].sort().join('_');
 };
 
-const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: User, person: UserProfile, onAction: (person: UserProfile) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => (
+const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: any, person: UserProfile, onAction: (person: UserProfile) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => (
     <Card className="flex items-center p-4 gap-4">
         <button onClick={() => onUserClick(person.uid)} className="relative flex items-center gap-4 text-left flex-grow">
             <Avatar>
@@ -77,6 +76,7 @@ const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserCl
         </div>
     </Card>
 );
+
 
 const RequestCard = ({ req, onAccept, onDecline, loading }: { req: FriendRequest, onAccept: (reqId: string, fromId: string, fromName: string) => void, onDecline: (reqId: string) => void, loading: boolean }) => (
      <Card className="flex items-center p-4 gap-4">
@@ -155,7 +155,7 @@ export default function FriendsPage() {
     }, [user]);
     
     useEffect(() => {
-        if (!user || !userData) {
+        if (!user) {
             setLoading(false);
             return;
         }
@@ -167,6 +167,15 @@ export default function FriendsPage() {
 
             await fetchFriends();
             
+            const suggestFriendsCallable = httpsCallable(functions, 'suggestFriends');
+            try {
+                const result = await suggestFriendsCallable();
+                setSuggestions(result.data as UserProfile[]);
+            } catch (error) {
+                console.error("Error fetching suggestions:", error);
+            }
+
+
             // Received Requests Listener
             const reqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
             const unsubscribeReqs = onSnapshot(reqQuery, (snapshot) => {
@@ -193,22 +202,6 @@ export default function FriendsPage() {
             });
             unsubscribes.push(unsubscribeSentReqs);
             
-             // Suggestions listener
-             const usersQuery = query(collection(db, 'users'), limit(100));
-             const unsubscribeUsers = onSnapshot(usersQuery, (usersSnapshot) => {
-                 const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
-                 
-                 // We need to know who NOT to suggest
-                 const friendIds = userData?.friends || [];
-                 const sentRequestIds = sentRequests.map(req => req.toId);
-                 const receivedRequestIds = requests.map(req => req.fromId);
-                 const excludeIds = [user.uid, ...friendIds, ...sentRequestIds, ...receivedRequestIds];
-                 
-                 const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
-                 setSuggestions(sortUsers(suggestedUsers));
-             });
-             unsubscribes.push(unsubscribeUsers);
-
             setLoading(false);
         };
 
@@ -221,48 +214,15 @@ export default function FriendsPage() {
     }, [user, userData, fetchFriends]);
     
     const handleAddFriend = async (targetUser: UserProfile) => {
-        if(!user || !userData) return;
+        if(!user) return;
         setActionLoading(targetUser.uid);
         try {
-            if(userData.friends?.includes(targetUser.uid)) {
-                toast({ variant: 'destructive', title: 'Already Friends', description: `You are already friends with ${targetUser.firstName}.` });
-                return;
-            }
-
-            const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('toId', '==', targetUser.uid), where('status', '==', 'pending'));
-            const receivedReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', targetUser.uid), where('toId', '==', user.uid), where('status', '==', 'pending'));
-            const [sentSnapshot, receivedSnapshot] = await Promise.all([getDocs(sentReqQuery), getDocs(receivedReqQuery)]);
-            
-            if(!sentSnapshot.empty || !receivedSnapshot.empty) {
-                toast({ title: 'Request Pending', description: `A friend request between you and ${targetUser.firstName} is already pending.` });
-                return;
-            }
-
-            await addDoc(collection(db, 'friend_requests'), {
-                fromId: user.uid,
-                fromName: `${userData.firstName} ${userData.lastName}`,
-                fromAvatar: userData.photoURL || '',
-                toId: targetUser.uid,
-                toName: `${targetUser.firstName} ${targetUser.lastName}`,
-                toAvatar: targetUser.photoURL || '',
-                status: 'pending',
-                createdAt: serverTimestamp(),
-            });
-
-            await addDoc(collection(db, 'notifications'), {
-                userId: targetUser.uid,
-                title: "New Friend Request",
-                description: `${userData.firstName} ${userData.lastName} wants to be your friend.`,
-                href: '/dashboard/friends',
-                createdAt: serverTimestamp(),
-                read: false,
-            });
-
-
+            const sendFriendRequestCallable = httpsCallable(functions, 'sendFriendRequest');
+            await sendFriendRequestCallable({ toId: targetUser.uid });
             toast({ title: 'Request Sent!', description: `Friend request sent to ${targetUser.firstName}.` });
-        } catch (e) {
-            console.error(e);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not send friend request.' });
+        } catch (error: any) {
+            console.error("Error sending friend request", error);
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not send friend request.' });
         } finally {
             setActionLoading(null);
         }
@@ -385,10 +345,8 @@ export default function FriendsPage() {
     const handleUserClick = (uid: string) => {
         router.push(`/dashboard/profile/${uid}`);
     };
-
-    if (!user) {
-        return <p>Loading...</p>
-    }
+    
+    if(!user) return <Loader2 className="animate-spin" />;
 
     return (
         <div className="space-y-8">
@@ -461,7 +419,7 @@ export default function FriendsPage() {
                             {searchResult && (
                                 <div>
                                     <h3 className="font-semibold mb-2">Search Result</h3>
-                                    <UserCard currentUser={user} person={searchResult} onAction={handleAddFriend} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
+                                    <UserCard currentUser={user} person={searchResult} onAction={() => handleAddFriend(searchResult)} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
                                 </div>
                             )}
 
@@ -469,7 +427,7 @@ export default function FriendsPage() {
                                 <h3 className="font-semibold mb-2">Suggestions</h3>
                                 <div className="space-y-4">
                                      {loading ? <p>Loading suggestions...</p> : suggestions.length > 0 ? suggestions.map(person => (
-                                       <UserCard key={person.uid} currentUser={user} person={person} onAction={handleAddFriend} actionType="suggestion" loading={actionLoading === person.uid} onUserClick={handleUserClick} />
+                                       <UserCard key={person.uid} currentUser={user} person={person} onAction={() => handleAddFriend(person)} actionType="suggestion" loading={actionLoading === person.uid} onUserClick={handleUserClick} />
                                    )) : <p className="text-muted-foreground text-center p-4">No suggestions right now. Check back later!</p>}
                                 </div>
                             </div>

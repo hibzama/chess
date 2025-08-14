@@ -1,3 +1,12 @@
+/**
+ * Import function triggers from their respective submodules:
+ *
+ * import {onCall} from "firebase-functions/v2/onCall";
+ * import {onDocumentWritten} from "firebase-functions/v2/firestore";
+ *
+ * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ */
+
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
@@ -242,7 +251,7 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
         const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
         
         const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
-        const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
+        const receivedRequestIds = receivedReqSnapshot.docs.map(doc => data.fromId);
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
 
@@ -252,7 +261,7 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
             .map(doc => ({ uid: doc.id, ...doc.data() }))
             .filter(u => u.uid && !excludeIds.includes(u.uid))
             .slice(0, 10)
-            .map(u => ({
+            .map((u: any) => ({
                 uid: u.uid,
                 firstName: u.firstName || 'Unknown',
                 lastName: u.lastName || 'User',
@@ -269,25 +278,33 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
     }
 });
 
-
 export const sendFriendRequest = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
         throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     const fromId = context.auth.uid;
-    const { toId, toName, toAvatar } = data;
-    if (!toId || !toName) {
-        throw new functions.https.HttpsError('invalid-argument', 'Recipient ID and name are required.');
+    const { toId } = data; // We only need the toId from the client
+    if (!toId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Recipient ID is required.');
     }
 
     const db = admin.firestore();
+    
+    // Fetch sender and receiver data
     const fromUserDoc = await db.collection('users').doc(fromId).get();
-    if (!fromUserDoc.exists) {
-        throw new functions.https.HttpsError('not-found', 'Current user not found.');
+    const toUserDoc = await db.collection('users').doc(toId).get();
+
+    if (!fromUserDoc.exists() || !toUserDoc.exists()) {
+        throw new functions.https.HttpsError('not-found', 'One or both users not found.');
     }
+    
     const fromUserData = fromUserDoc.data()!;
+    const toUserData = toUserDoc.data()!;
+
     const fromName = `${fromUserData.firstName} ${fromUserData.lastName}`;
     const fromAvatar = fromUserData.photoURL || '';
+    const toName = `${toUserData.firstName} ${toUserData.lastName}`;
+    const toAvatar = toUserData.photoURL || '';
     
     // Check if a request already exists
     const sentReqQuery = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
