@@ -1,49 +1,38 @@
-
-import {HttpsError, onCall} from "firebase-functions/v2/https";
-import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import {logger} from "firebase-functions";
 
 admin.initializeApp();
 
-export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (event) => {
-    const snap = event.data;
-    if (!snap) {
-        logger.log("No data associated with the event");
-        return;
-    }
+// This function triggers whenever a new document is created in 'game_rooms'
+export const announceNewGame = functions.firestore
+  .document("game_rooms/{roomId}")
+  .onCreate(async (snap, context) => {
     const roomData = snap.data();
-    const roomId = event.params.roomId;
+    const roomId = context.params.roomId; // Correct way to get wildcard ID
 
+    // Exit if the function is triggered with no data, or for a private room
     if (!roomData || roomData.isPrivate === true) {
-      logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
-      return;
+      functions.logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
+      return null;
     }
 
     let telegramBotToken;
     try {
-      const functionsConfig = admin.app().options.config;
-      if (functionsConfig && functionsConfig.telegram) {
-          telegramBotToken = functionsConfig.telegram.token;
-      }
+      telegramBotToken = functions.config().telegram.token;
     } catch (error) {
-      logger.error("Could not retrieve telegram.token from Functions config.");
-    }
-    
-    if (!telegramBotToken) {
-        logger.error(
-            "Telegram token not found. " +
-            "Ensure it is set by running: " +
-            "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
-        );
-        return;
+      functions.logger.error(
+        "Could not retrieve telegram.token from Functions config. " +
+        "Ensure it is set by running: " +
+        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
+      );
+      return null;
     }
 
-
-    const chatId = "@nexbattlerooms";
+    const chatId = "@nexbattlerooms"; // Your Telegram group username
     const siteUrl = "http://nexbattle.com";
 
+    // Prepare message components with fallbacks
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
@@ -51,9 +40,11 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
     const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
-    logger.log(`Preparing message for Room ID: ${roomId}`);
-    logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
+    // Log the variables to ensure they are being read correctly
+    functions.logger.log(`Preparing message for Room ID: ${roomId}`);
+    functions.logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
 
+    // Construct the message string carefully
     const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
       `<b>Player:</b> ${createdBy}\n` +
       `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
@@ -71,21 +62,22 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
         text: message,
         parse_mode: 'HTML',
       });
-      logger.log(`Successfully sent message for Room ID: ${roomId}`);
+      functions.logger.log(`Successfully sent message for Room ID: ${roomId}`);
     } catch (error: any) {
-      logger.error("Error sending message to Telegram:", error.response?.data || error.message);
-    }
-});
-
-
-export const endGame = onCall({ region: 'us-central1', cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+      functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
 
-    const { roomId, winnerId, method, resignerDetails } = request.data;
+    return null;
+  });
+
+export const endGame = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+
+    const { roomId, winnerId, method, resignerDetails } = data;
     if (!roomId || !method) {
-        throw new HttpsError('invalid-argument', 'Room ID and method are required.');
+        throw new functions.https.HttpsError('invalid-argument', 'Room ID and method are required.');
     }
 
     const db = admin.firestore();
@@ -95,26 +87,26 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
             if (!roomDoc.exists) {
-                throw new HttpsError('not-found', 'Game room not found.');
+                throw new functions.https.HttpsError('not-found', 'Game room not found.');
             }
 
             const roomData = roomDoc.data();
             if (!roomData) {
-                 throw new HttpsError('not-found', 'Game room data is missing.');
+                 throw new functions.https.HttpsError('not-found', 'Game room data is missing.');
             }
             if (roomData.status === 'completed') {
-                logger.log(`Game ${roomId} already completed.`);
+                functions.logger.log(`Game ${roomId} already completed.`);
                 return;
             }
             if (roomData.status !== 'in-progress') {
-                throw new HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
+                throw new functions.https.HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
             }
 
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
             if (!joinerId) {
-                throw new HttpsError('failed-precondition', 'Game is missing a second player.');
+                throw new functions.https.HttpsError('failed-precondition', 'Game is missing a second player.');
             }
             
             const creatorRef = db.collection('users').doc(creatorId);
@@ -180,31 +172,31 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
         });
         return { success: true };
     } catch (error: any) {
-        logger.error('Error ending game:', error);
+        functions.logger.error('Error ending game:', error);
         if (error.code) {
              throw error; // Re-throw HttpsError
         }
-        throw new HttpsError('internal', 'An unexpected error occurred while ending the game.');
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while ending the game.');
     }
 });
 
-export const approveBonusClaim = onCall({ region: 'us-central1', cors: true }, async (request) => {
-    if (!request.auth || !request.data.claimId) {
-        throw new HttpsError('invalid-argument', 'Authentication and claim ID are required.');
+export const approveBonusClaim = functions.https.onCall(async (data, context) => {
+    if (!context.auth || !data.claimId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Authentication and claim ID are required.');
     }
     // You could add an admin role check here for more security
-    const { claimId, newStatus } = request.data;
+    const { claimId, newStatus } = data;
     const db = admin.firestore();
     const claimRef = db.collection('bonus_claims').doc(claimId);
 
     try {
         await db.runTransaction(async (transaction) => {
             const claimDoc = await transaction.get(claimRef);
-            if (!claimDoc.exists) throw new HttpsError('not-found', 'Claim document not found.');
+            if (!claimDoc.exists) throw new functions.https.HttpsError('not-found', 'Claim document not found.');
             
             const claimData = claimDoc.data();
             if (!claimData || claimData.status !== 'pending') {
-                throw new HttpsError('failed-precondition', 'This claim is not in a pending state.');
+                throw new functions.https.HttpsError('failed-precondition', 'This claim is not in a pending state.');
             }
 
             if (newStatus === 'approved') {
@@ -225,23 +217,23 @@ export const approveBonusClaim = onCall({ region: 'us-central1', cors: true }, a
         });
         return { success: true };
     } catch(error: any) {
-        logger.error('Error approving bonus claim:', error);
+        functions.logger.error('Error approving bonus claim:', error);
         if (error.code) throw error;
-        throw new HttpsError('internal', 'An error occurred while processing the claim.');
+        throw new functions.https.HttpsError('internal', 'An error occurred while processing the claim.');
     }
 });
 
-export const suggestFriends = onCall({ region: 'us-central1', cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+export const suggestFriends = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    const userId = request.auth.uid;
+    const userId = context.auth.uid;
     const db = admin.firestore();
 
     try {
         const userDoc = await db.collection('users').doc(userId).get();
         if (!userDoc.exists) {
-            throw new HttpsError('not-found', 'User not found');
+            throw new functions.https.HttpsError('not-found', 'User not found');
         }
         const userData = userDoc.data()!;
         const friends = userData.friends || [];
@@ -254,7 +246,6 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
 
-        // Order by wins descending for more relevant suggestions
         const usersSnapshot = await db.collection('users').orderBy('wins', 'desc').limit(50).get();
 
         const suggestions = usersSnapshot.docs
@@ -273,26 +264,26 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
         return suggestions;
 
     } catch (error) {
-        logger.error('Error suggesting friends:', error);
-        throw new HttpsError('internal', 'An error occurred while fetching friend suggestions.');
+        functions.logger.error('Error suggesting friends:', error);
+        throw new functions.https.HttpsError('internal', 'An error occurred while fetching friend suggestions.');
     }
 });
 
 
-export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+export const sendFriendRequest = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    const fromId = request.auth.uid;
-    const { toId, toName, toAvatar } = request.data;
+    const fromId = context.auth.uid;
+    const { toId, toName, toAvatar } = data;
     if (!toId || !toName) {
-        throw new HttpsError('invalid-argument', 'Recipient ID and name are required.');
+        throw new functions.https.HttpsError('invalid-argument', 'Recipient ID and name are required.');
     }
 
     const db = admin.firestore();
     const fromUserDoc = await db.collection('users').doc(fromId).get();
     if (!fromUserDoc.exists) {
-        throw new HttpsError('not-found', 'Current user not found.');
+        throw new functions.https.HttpsError('not-found', 'Current user not found.');
     }
     const fromUserData = fromUserDoc.data()!;
     const fromName = `${fromUserData.firstName} ${fromUserData.lastName}`;
@@ -305,7 +296,7 @@ export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, a
     const [sentSnapshot, receivedSnapshot] = await Promise.all([sentReqQuery.get(), receivedReqQuery.get()]);
 
     if (!sentSnapshot.empty || !receivedSnapshot.empty) {
-        throw new HttpsError('already-exists', 'A friend request between you and this user is already pending.');
+        throw new functions.https.HttpsError('already-exists', 'A friend request between you and this user is already pending.');
     }
 
     try {
@@ -331,8 +322,7 @@ export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, a
 
         return { success: true };
     } catch (error) {
-        logger.error('Error sending friend request:', error);
-        throw new HttpsError('internal', 'An unexpected error occurred.');
+        functions.logger.error('Error sending friend request:', error);
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred.');
     }
 });
-    
