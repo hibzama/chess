@@ -47,7 +47,7 @@ export default function CreateGamePage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Minimum investment amount is LKR 10.' });
             return;
         }
-        
+
         const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
         if (totalBalance < wagerAmount) {
             toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
@@ -184,3 +184,4 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
