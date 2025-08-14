@@ -254,14 +254,14 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
         
-        // This is a simplified suggestion logic. For larger scale, this would need optimization.
-        const usersSnapshot = await db.collection('users').limit(50).get();
+        const usersRef = db.collection('users');
+        const usersSnapshot = excludeIds.length > 0 
+            ? await usersRef.where(admin.firestore.FieldPath.documentId(), 'not-in', excludeIds).limit(10).get()
+            : await usersRef.limit(10).get();
 
         const suggestions = usersSnapshot.docs
             .map(doc => ({ uid: doc.id, ...doc.data() }))
-            .filter(u => u.uid && !excludeIds.includes(u.uid))
-            .slice(0, 10)
-            .map((u: any) => ({ // Use 'any' to avoid strict type checking issues with dynamic data
+            .map((u: any) => ({
                 uid: u.uid,
                 firstName: u.firstName || 'Unknown',
                 lastName: u.lastName || 'User',
@@ -346,3 +346,4 @@ export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, a
     }
 });
     
+

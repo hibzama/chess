@@ -39,7 +39,8 @@ type UserProfile = {
   lastSeen?: any;
 };
 
-const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: any, person: UserProfile, onAction: (person: UserProfile) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
+const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: any, person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
+    
     const getChatId = (currentUserId: string, otherUserId: string) => {
         return [currentUserId, otherUserId].sort().join('_');
     };
@@ -66,12 +67,12 @@ const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserCl
             <div className="flex gap-2">
                 {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(currentUser.uid, person.uid)}`}><MessageSquare /></Link></Button>}
                 {actionType !== 'suggestion' && 
-                    <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person)} disabled={loading}>
+                    <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
                         {actionType === 'add' ? <UserPlus /> : <UserMinus />}
                     </Button>
                 }
                 {actionType === 'suggestion' && 
-                    <Button variant="outline" size="icon" onClick={() => onAction(person)} disabled={loading}>
+                    <Button variant="outline" size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
                         <UserPlus />
                     </Button>
                 }
@@ -215,13 +216,13 @@ export default function FriendsPage() {
 
     }, [user, userData, fetchFriends]);
     
-    const handleAddFriend = async (targetUser: UserProfile) => {
+    const handleAddFriend = async (targetId: string, targetName: string) => {
         if(!user) return;
-        setActionLoading(targetUser.uid);
+        setActionLoading(targetId);
         try {
             const sendFriendRequestCallable = httpsCallable(functions, 'sendFriendRequest');
-            await sendFriendRequestCallable({ toId: targetUser.uid });
-            toast({ title: 'Request Sent!', description: `Friend request sent to ${targetUser.firstName}.` });
+            await sendFriendRequestCallable({ toId: targetId });
+            toast({ title: 'Request Sent!', description: `Friend request sent to ${targetName}.` });
         } catch (error: any) {
             console.error("Error sending friend request", error);
             toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not send friend request.' });
@@ -294,20 +295,20 @@ export default function FriendsPage() {
         }
     }
 
-    const handleRemoveFriend = async (friend: UserProfile) => {
+    const handleRemoveFriend = async (friendId: string, friendName: string) => {
         if(!user) return;
-        setActionLoading(friend.uid);
+        setActionLoading(friendId);
          const batch = writeBatch(db);
 
         const currentUserRef = doc(db, 'users', user.uid);
-        batch.update(currentUserRef, { friends: arrayRemove(friend.uid) });
+        batch.update(currentUserRef, { friends: arrayRemove(friendId) });
 
-        const otherUserRef = doc(db, 'users', friend.uid);
+        const otherUserRef = doc(db, 'users', friendId);
         batch.update(otherUserRef, { friends: arrayRemove(user.uid) });
 
         try {
              await batch.commit();
-             toast({ title: "Friend Removed", description: `You are no longer friends with ${friend.firstName}.` });
+             toast({ title: "Friend Removed", description: `You are no longer friends with ${friendName}.` });
              fetchFriends();
         } catch (e) {
             console.error(e);
@@ -373,7 +374,7 @@ export default function FriendsPage() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                            {loading ? <p>Loading friends...</p> : friends.length > 0 ? friends.map(friend => (
-                               <UserCard key={friend.uid} currentUser={user} person={friend} onAction={() => handleRemoveFriend(friend)} actionType="remove" loading={actionLoading === friend.uid} onUserClick={handleUserClick} />
+                               <UserCard key={friend.uid} currentUser={user} person={friend} onAction={handleRemoveFriend} actionType="remove" loading={actionLoading === friend.uid} onUserClick={handleUserClick} />
                            )) : <p className="text-muted-foreground text-center p-4">You have no friends yet. Go find some!</p>}
                         </CardContent>
                     </Card>
@@ -421,7 +422,7 @@ export default function FriendsPage() {
                             {searchResult && (
                                 <div>
                                     <h3 className="font-semibold mb-2">Search Result</h3>
-                                    <UserCard currentUser={user} person={searchResult} onAction={() => handleAddFriend(searchResult)} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
+                                    <UserCard currentUser={user} person={searchResult} onAction={handleAddFriend} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
                                 </div>
                             )}
 
@@ -429,7 +430,7 @@ export default function FriendsPage() {
                                 <h3 className="font-semibold mb-2">Suggestions</h3>
                                 <div className="space-y-4">
                                      {loading ? <p>Loading suggestions...</p> : suggestions.length > 0 ? suggestions.map(person => (
-                                       <UserCard key={person.uid} currentUser={user} person={person} onAction={() => handleAddFriend(person)} actionType="suggestion" loading={actionLoading === person.uid} onUserClick={handleUserClick} />
+                                       <UserCard key={person.uid} currentUser={user} person={person} onAction={handleAddFriend} actionType="suggestion" loading={actionLoading === person.uid} onUserClick={handleUserClick} />
                                    )) : <p className="text-muted-foreground text-center p-4">No suggestions right now. Check back later!</p>}
                                 </div>
                             </div>
