@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -42,6 +41,7 @@ type UserProfile = {
 const getChatId = (uid1: string, uid2: string) => {
     return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
 };
+
 
 const UserCard = ({ currentUser, person, onAction, actionType, loading, onUserClick }: { currentUser: any, person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => {
     return (
@@ -252,7 +252,7 @@ export default function FriendsPage() {
                 userId: fromId,
                 title: "Friend Request Accepted",
                 description: `${userData.firstName} ${userData.lastName} accepted your friend request.`,
-                href: `/dashboard/chat`,
+                href: '/dashboard/friends',
                 createdAt: serverTimestamp(),
                 read: false,
             });
