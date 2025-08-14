@@ -1,3 +1,4 @@
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -241,7 +242,7 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
 
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) {
+        if (!userDoc.exists()) {
             throw new functions.https.HttpsError('not-found', 'User not found');
         }
         const userData = userDoc.data()!;
@@ -251,16 +252,21 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
         const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
         
         const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
-        const receivedRequestIds = receivedReqSnapshot.docs.map(doc => data.fromId);
+        const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
-
-        const usersSnapshot = await db.collection('users').orderBy('wins', 'desc').limit(50).get();
+        
+        const usersRef = db.collection('users');
+        // Firestore 'not-in' queries are limited to 10 items in the array. 
+        // A more scalable solution for large user bases would be more complex, 
+        // but for now, we fetch a larger batch and filter client-side.
+        // We will fetch users ordered by wins and filter.
+        const usersSnapshot = await usersRef.orderBy('wins', 'desc').limit(50).get();
 
         const suggestions = usersSnapshot.docs
             .map(doc => ({ uid: doc.id, ...doc.data() }))
-            .filter(u => u.uid && !excludeIds.includes(u.uid))
-            .slice(0, 10)
+            .filter(u => u.uid && !excludeIds.includes(u.uid)) // Filter out excluded users
+            .slice(0, 10) // Take the top 10 from the filtered list
             .map((u: any) => ({
                 uid: u.uid,
                 firstName: u.firstName || 'Unknown',
@@ -277,6 +283,7 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'An error occurred while fetching friend suggestions.');
     }
 });
+
 
 export const sendFriendRequest = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
@@ -301,9 +308,9 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
     const fromUserData = fromUserDoc.data()!;
     const toUserData = toUserDoc.data()!;
 
-    const fromName = `${fromUserData.firstName} ${fromUserData.lastName}`;
+    const fromName = `${fromUserData.firstName || 'User'} ${fromUserData.lastName || ''}`.trim();
     const fromAvatar = fromUserData.photoURL || '';
-    const toName = `${toUserData.firstName} ${toUserData.lastName}`;
+    const toName = `${toUserData.firstName || 'User'} ${toUserData.lastName || ''}`.trim();
     const toAvatar = toUserData.photoURL || '';
     
     // Check if a request already exists
