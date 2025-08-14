@@ -23,16 +23,12 @@ export const announceNewGame = onDocumentCreated("game_rooms/{roomId}", async (e
 
     let telegramBotToken;
     try {
-      // For v2 functions, config is not available on admin.app().options.config
-      // You should use environment variables instead.
-      // e.g. `process.env.TELEGRAM_TOKEN`
-      // For this migration, we'll try to get it the old way, but this is a point of failure.
-      const functions = await import("firebase-functions");
-      telegramBotToken = functions.config().telegram.token;
+      const functionsConfig = admin.app().options.config;
+      if (functionsConfig && functionsConfig.telegram) {
+          telegramBotToken = functionsConfig.telegram.token;
+      }
     } catch (error) {
-      logger.error("Could not retrieve telegram.token from Functions config. " +
-        "Ensure it is set by running: " +
-        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\"");
+      logger.error("Could not retrieve telegram.token from Functions config.");
     }
     
     if (!telegramBotToken) {
@@ -339,3 +335,4 @@ export const sendFriendRequest = onCall({ region: 'us-central1', cors: true }, a
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
+    
