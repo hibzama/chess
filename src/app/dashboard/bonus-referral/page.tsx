@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Gift, Copy, Share, Users, Clock, Check, X, Loader2, Gamepad2, Target, DollarSign, Info } from 'lucide-react';
+import { Gift, Copy, Share, Users, Clock, Check, X, Loader2, Gamepad2, Target, DollarSign, Info, PowerOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -162,6 +162,19 @@ export default function BonusReferralPage() {
         }
     };
 
+     const handleStopTask = async () => {
+        if (!user) return;
+        const userRef = doc(db, 'users', user.uid);
+        try {
+            await updateDoc(userRef, { activeReferralTaskId: null });
+            toast({ title: 'Task Stopped', description: 'Your active task has been reset.' });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not stop the task.' });
+        }
+    };
+
+
     const handleClaimTargetBonus = async () => {
         if(!user || !activeTask || !canClaimTargetBonus) return;
         setIsClaiming(true);
@@ -196,8 +209,27 @@ export default function BonusReferralPage() {
                  <>
                     <Card>
                         <CardHeader>
-                            <CardTitle>Your Active Task: {activeTask.title}</CardTitle>
-                            <CardDescription>Share this unique link. When a friend signs up and completes all tasks, you both get a bonus.</CardDescription>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <CardTitle>Your Active Task: {activeTask.title}</CardTitle>
+                                    <CardDescription>Share this unique link. When a friend signs up and completes all tasks, you both get a bonus.</CardDescription>
+                                </div>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="sm"><PowerOff className="mr-2"/> Stop Task</Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                            <AlertDialogDescription>Stopping this task will reset your referral progress. You can start a new task package afterwards.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleStopTask}>Confirm Stop</AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <Input readOnly value={referralLink} className="mb-4" />
@@ -205,6 +237,26 @@ export default function BonusReferralPage() {
                                 <Button onClick={copyLink} className="w-full"><Copy /> Copy</Button>
                                 <Button variant="outline" className="w-full" onClick={() => navigator.share({ url: referralLink, title: 'Join me on Nexbattle and earn a bonus!' })}><Share /> Share</Button>
                             </div>
+                        </CardContent>
+                    </Card>
+                    
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Your Referrals Must:</CardTitle>
+                            <CardDescription>To be counted as a valid referral, new users must complete the following actions.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ul className="space-y-2 text-sm">
+                                {activeTask.subTasks.map(st => {
+                                    const Icon = subTaskIcons[st.type];
+                                    return (
+                                        <li key={st.id} className="flex items-center gap-3 p-2 rounded-md bg-muted">
+                                           <Icon className="w-5 h-5 text-primary" />
+                                           <span>{st.label} {st.type === 'game_play' && `(${st.target} times)`}</span>
+                                        </li>
+                                    )
+                                })}
+                            </ul>
                         </CardContent>
                     </Card>
 
