@@ -239,7 +239,6 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
     const db = admin.firestore();
 
     try {
-        // Fetch current user's data to get friends and pending requests
         const userDoc = await db.collection('users').doc(userId).get();
         if (!userDoc.exists) {
             throw new HttpsError('not-found', 'User not found');
@@ -247,23 +246,20 @@ export const suggestFriends = onCall({ region: 'us-central1', cors: true }, asyn
         const userData = userDoc.data()!;
         const friends = userData.friends || [];
 
-        // Get IDs of users the current user has sent requests to
         const sentReqSnapshot = await db.collection('friend_requests').where('fromId', '==', userId).get();
         const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
-
-        // Get IDs of users who have sent requests to the current user
+        
         const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
         const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
 
         const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
 
-        // Fetch a batch of recent users
         const usersSnapshot = await db.collection('users').orderBy('createdAt', 'desc').limit(50).get();
 
         const suggestions = usersSnapshot.docs
             .map(doc => ({ uid: doc.id, ...doc.data() }))
             .filter(u => !excludeIds.includes(u.uid))
-            .slice(0, 10) // Limit to 10 suggestions
+            .slice(0, 10)
             .map(u => ({
                 uid: u.uid,
                 firstName: u.firstName,
