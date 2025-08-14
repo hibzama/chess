@@ -1,3 +1,4 @@
+
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {onDocumentCreated} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
@@ -184,5 +185,48 @@ export const endGame = onCall({ region: 'us-central1', cors: true }, async (requ
              throw error; // Re-throw HttpsError
         }
         throw new HttpsError('internal', 'An unexpected error occurred while ending the game.');
+    }
+});
+
+export const approveBonusClaim = onCall({ region: 'us-central1', cors: true }, async (request) => {
+    if (!request.auth || !request.data.claimId) {
+        throw new HttpsError('invalid-argument', 'Authentication and claim ID are required.');
+    }
+    // You could add an admin role check here for more security
+    const { claimId, newStatus } = request.data;
+    const db = admin.firestore();
+    const claimRef = db.collection('bonus_claims').doc(claimId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const claimDoc = await transaction.get(claimRef);
+            if (!claimDoc.exists) throw new HttpsError('not-found', 'Claim document not found.');
+            
+            const claimData = claimDoc.data();
+            if (!claimData || claimData.status !== 'pending') {
+                throw new HttpsError('failed-precondition', 'This claim is not in a pending state.');
+            }
+
+            if (newStatus === 'approved') {
+                // Handle referrer target bonus
+                if (claimData.claimType === 'referrer_target' && claimData.referrerId && claimData.commissionAmount > 0) {
+                    const referrerRef = db.collection('users').doc(claimData.referrerId);
+                    transaction.update(referrerRef, { balance: admin.firestore.FieldValue.increment(claimData.commissionAmount) });
+                }
+                
+                // Handle new user bonus
+                if (claimData.claimType === 'new_user_task' && claimData.newUserId && claimData.bonusAmount > 0) {
+                    const newUserRef = db.collection('users').doc(claimData.newUserId);
+                    transaction.update(newUserRef, { bonusBalance: admin.firestore.FieldValue.increment(claimData.bonusAmount) });
+                }
+            }
+            // Update the claim status regardless
+            transaction.update(claimRef, { status: newStatus });
+        });
+        return { success: true };
+    } catch(error: any) {
+        logger.error('Error approving bonus claim:', error);
+        if (error.code) throw error;
+        throw new HttpsError('internal', 'An error occurred while processing the claim.');
     }
 });

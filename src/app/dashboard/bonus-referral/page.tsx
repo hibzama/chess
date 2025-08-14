@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, writeBatch, increment } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, writeBatch, increment, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -178,25 +178,32 @@ export default function BonusReferralPage() {
         }
     };
 
-
     const handleClaimTargetBonus = async () => {
-        if(!user || !activeTask || !canClaimTargetBonus) return;
+        if (!user || !activeTask || !canClaimTargetBonus) return;
         setIsClaiming(true);
 
-        const userRef = doc(db, 'users', user.uid);
-        const commission = (activeTask.referrerCommission || 0) * activeTask.referrerTarget;
-
         try {
+             // Create a bonus claim document for admin approval
+            await addDoc(collection(db, 'bonus_claims'), {
+                referrerId: user.uid,
+                taskId: activeTask.id,
+                taskTitle: activeTask.title,
+                claimType: 'referrer_target',
+                commissionAmount: (activeTask.referrerCommission || 0) * activeTask.referrerTarget,
+                status: 'pending',
+                createdAt: serverTimestamp()
+            });
+            
+            // Mark this task as claimed to prevent duplicate claims
+            const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, {
-                balance: increment(commission),
                 claimedTaskReferralBonus: [...(userData?.claimedTaskReferralBonus || []), activeTask.id],
-                activeReferralTaskId: null // Reset after claiming
             });
 
-            toast({ title: "Success!", description: `LKR ${commission.toFixed(2)} has been added to your wallet.`});
+            toast({ title: "Claim Submitted!", description: `Your claim for LKR ${((activeTask.referrerCommission || 0) * activeTask.referrerTarget).toFixed(2)} is pending admin approval.` });
         } catch (error) {
             console.error(error);
-            toast({ variant: 'destructive', title: "Error", description: "Failed to claim commissions."});
+            toast({ variant: 'destructive', title: "Error", description: "Failed to submit your claim." });
         } finally {
             setIsClaiming(false);
         }
@@ -278,7 +285,7 @@ export default function BonusReferralPage() {
                                         <div className="text-right">
                                             <p className="text-green-400">Claim LKR {(activeTask.referrerCommission * activeTask.referrerTarget).toFixed(2)}</p>
                                             <Button size="sm" onClick={handleClaimTargetBonus} disabled={isClaiming}>
-                                                {isClaiming ? <Loader2 className="animate-spin" /> : "Claim Commissions"}
+                                                {isClaiming ? <Loader2 className="animate-spin" /> : "Submit Claim"}
                                             </Button>
                                         </div>
                                     )}
@@ -414,4 +421,5 @@ const PendingReferralTable = ({ referrals, activeTask, loading }: { referrals: U
         </Accordion>
     )
 };
+
 

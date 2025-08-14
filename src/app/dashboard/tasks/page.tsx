@@ -104,6 +104,7 @@ export default function UserTasksPage() {
             await updateDoc(userRef, {
                 [`taskStatus.${taskId}.${subTask.id}.status`]: 'submitted',
                 [`taskStatus.${taskId}.${subTask.id}.value`]: inputValue,
+                [`taskStatus.${taskId}.${subTask.id}.label`]: subTask.label,
             });
             toast({ title: 'Submitted!', description: 'Your task is pending admin verification.' });
         } catch (error) {
@@ -120,31 +121,28 @@ export default function UserTasksPage() {
         setIsClaiming(true);
         try {
             const taskPackage = tasks[0]; 
-            const userRef = doc(db, 'users', user.uid);
-
-            // Add new user bonus and mark as claimed
-            const newUserBonus = taskPackage.newUserBonus || 0;
-            if(newUserBonus > 0) {
-                await updateDoc(userRef, { 
-                    bonusBalance: increment(newUserBonus),
-                    [`taskStatus.${taskPackage.id}.claimed`]: true 
-                });
-            } else {
-                 await updateDoc(userRef, { 
-                    [`taskStatus.${taskPackage.id}.claimed`]: true 
-                });
-            }
             
-            // Mark the user as a valid referral for the referrer
-            const referrerRef = doc(db, 'users', userData.taskReferredBy);
-            await updateDoc(referrerRef, {
-                validTaskReferrals: increment(1)
+            // Create a bonus claim document for admin approval
+            await addDoc(collection(db, 'bonus_claims'), {
+                newUserId: user.uid,
+                referrerId: userData.taskReferredBy,
+                taskId: taskPackage.id,
+                taskTitle: taskPackage.title,
+                claimType: 'new_user_task',
+                bonusAmount: taskPackage.newUserBonus || 0,
+                status: 'pending',
+                createdAt: serverTimestamp()
             });
 
-            toast({ title: 'Reward Claimed!', description: `LKR ${newUserBonus.toFixed(2)} has been added to your bonus balance.` });
+             // Mark the task package as claimed locally for the user
+            await updateDoc(doc(db, 'users', user.uid), {
+                [`taskStatus.${taskPackage.id}.claimed`]: true,
+            });
+
+            toast({ title: 'Reward Claim Submitted!', description: `Your claim for LKR ${taskPackage.newUserBonus.toFixed(2)} is now pending admin approval.` });
         } catch (error) {
              console.error(error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not claim rewards.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not submit your claim.' });
         } finally {
             setIsClaiming(false);
         }
@@ -229,7 +227,7 @@ export default function UserTasksPage() {
                     </CardHeader>
                     <CardFooter>
                          <Button onClick={handleClaimReward} disabled={isClaiming || isClaimed}>
-                            {isClaiming ? <Loader2 className="animate-spin"/> : (isClaimed ? 'Reward Claimed!' : `Claim Bonus (LKR ${mainTask?.newUserBonus.toFixed(2)})`)}
+                            {isClaiming ? <Loader2 className="animate-spin"/> : (isClaimed ? 'Claim Submitted for Review' : `Submit Claim for LKR ${mainTask?.newUserBonus.toFixed(2)}`)}
                         </Button>
                     </CardFooter>
                 </Card>
@@ -237,3 +235,4 @@ export default function UserTasksPage() {
         </div>
     );
 }
+

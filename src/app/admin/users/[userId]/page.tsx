@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin, ClipboardList, RefreshCw } from 'lucide-react';
+import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin, ClipboardList, RefreshCw, CheckSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +37,8 @@ type UserProfile = {
     country?: string;
     gender?: string;
     activeReferralTaskId?: string | null;
+    taskReferredBy?: string;
+    taskStatus?: any;
 };
 
 type Transaction = {
@@ -92,7 +94,7 @@ export default function UserDetailPage() {
     const [referrals, setReferrals] = useState<Referral[]>([]);
     const [commissions, setCommissions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
-    const [taskInfo, setTaskInfo] = useState<{ id: string; title: string } | null>(null);
+    const [taskInfo, setTaskInfo] = useState<{ id: string; title: string, subTasks: any[] } | null>(null);
 
     useEffect(() => {
         if (!userId) return;
@@ -113,7 +115,7 @@ export default function UserDetailPage() {
             if (userData.activeReferralTaskId) {
                 const taskDoc = await getDoc(doc(db, 'referral_tasks', userData.activeReferralTaskId));
                 if (taskDoc.exists()) {
-                    setTaskInfo({ id: taskDoc.id, title: taskDoc.data().title });
+                    setTaskInfo({ id: taskDoc.id, title: taskDoc.data().title, subTasks: taskDoc.data().subTasks });
                 }
             }
 
@@ -164,6 +166,35 @@ export default function UserDetailPage() {
             toast({ variant: 'destructive', title: "Error", description: "Failed to reset user's task." });
         }
     };
+    
+    const handleSubTaskStatusChange = async (subTaskId: string, newStatus: 'completed' | 'pending') => {
+        if (!userId || !user?.activeReferralTaskId) return;
+        try {
+            const userRef = doc(db, 'users', userId as string);
+            await updateDoc(userRef, {
+                [`taskStatus.${user.activeReferralTaskId}.${subTaskId}.status`]: newStatus
+            });
+             setUser(prevUser => {
+                if (!prevUser || !prevUser.taskStatus || !prevUser.activeReferralTaskId || !prevUser.taskStatus[prevUser.activeReferralTaskId]) return prevUser;
+                const newStatus = {
+                    ...prevUser.taskStatus,
+                    [prevUser.activeReferralTaskId]: {
+                        ...prevUser.taskStatus[prevUser.activeReferralTaskId],
+                        [subTaskId]: {
+                            ...prevUser.taskStatus[prevUser.activeReferralTaskId][subTaskId],
+                            status: newStatus
+                        }
+                    }
+                };
+                return { ...prevUser, taskStatus: newStatus };
+            });
+            toast({ title: "Task Status Updated" });
+        } catch (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: 'Error', description: "Failed to update subtask status."});
+        }
+    }
+
 
     const financialStats = useMemo(() => {
         let totalDeposit = 0;
@@ -216,7 +247,7 @@ export default function UserDetailPage() {
                     <TabsTrigger value="games">Game History</TabsTrigger>
                     <TabsTrigger value="wallet">Wallet History</TabsTrigger>
                     <TabsTrigger value="referrals">Referrals</TabsTrigger>
-                    <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                    <TabsTrigger value="tasks">Bonus Tasks</TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview">
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -245,9 +276,33 @@ export default function UserDetailPage() {
                         </CardHeader>
                         <CardContent>
                             {taskInfo ? (
-                                <div className="space-y-2">
-                                    <p>Active Task: <span className="font-semibold">{taskInfo.title}</span></p>
-                                    <p className="text-sm text-muted-foreground">User is currently trying to complete referrals for this task package.</p>
+                                <div className="space-y-4">
+                                    <p>Active Task Package: <span className="font-semibold">{taskInfo.title}</span></p>
+                                    <p className="text-sm text-muted-foreground">User is currently trying to complete referrals for this task.</p>
+                                    
+                                    <h4 className="font-semibold text-sm pt-4">Task Submissions</h4>
+                                    <div className="space-y-2 p-3 border rounded-md bg-secondary/30">
+                                        {taskInfo.subTasks.map((subTask: any) => {
+                                             const subTaskStatus = user?.taskStatus?.[taskInfo.id]?.[subTask.id];
+                                             const isSubmitted = subTaskStatus?.status === 'submitted';
+                                             const isCompleted = subTaskStatus?.status === 'completed';
+                                             return(
+                                                 <div key={subTask.id} className="flex items-center justify-between">
+                                                     <div>
+                                                         <p>{subTask.label}</p>
+                                                         <p className="text-xs text-muted-foreground">Value: <span className="font-mono">{subTaskStatus?.value || 'Not submitted'}</span></p>
+                                                     </div>
+                                                     <div className="flex items-center gap-2">
+                                                        {isCompleted ? <Badge>Completed</Badge> : isSubmitted ? (
+                                                             <Button size="sm" onClick={() => handleSubTaskStatusChange(subTask.id, 'completed')}>Approve</Button>
+                                                        ) : (
+                                                            <Badge variant="destructive">Pending</Badge>
+                                                        )}
+                                                     </div>
+                                                 </div>
+                                            )
+                                        })}
+                                    </div>
                                 </div>
                             ) : (
                                 <p className="text-muted-foreground">User has not started a referral task.</p>
@@ -394,3 +449,4 @@ const ReferralTable = ({ referrals, showLevel }: { referrals: Referral[], showLe
         </TableBody>
     </Table>
 )
+
