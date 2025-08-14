@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift, Youtube, Send, MessageSquare, ExternalLink, AlertTriangle, BadgeInfo } from 'lucide-react';
+import { Check, Loader2, Gamepad2, Users, ClipboardCheck, Gift, Youtube, Send, MessageSquare, ExternalLink, AlertTriangle, BadgeInfo, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
@@ -17,6 +17,8 @@ import { Progress } from '@/components/ui/progress';
 import type { Task, SubTask } from '@/app/admin/tasks/page';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
 
 const subTaskIcons = {
     whatsapp_join: MessageSquare,
@@ -97,9 +99,6 @@ export default function UserTasksPage() {
         }
         setIsSubmitting(subTask.id);
         try {
-            if(subTask.type !== 'game_play') {
-                window.open(subTask.target, '_blank');
-            }
             const userRef = doc(db, 'users', user.uid);
             await updateDoc(userRef, {
                 [`taskStatus.${taskId}.${subTask.id}.status`]: 'submitted',
@@ -192,21 +191,29 @@ export default function UserTasksPage() {
                                             <Icon className="w-8 h-8 text-primary flex-shrink-0 mt-1"/>
                                             <div className="flex-1">
                                                 <p className="font-semibold">{subTask.label}</p>
-                                                <p className="text-xs text-muted-foreground break-all">{!requiresInput ? `Play ${subTask.target} multiplayer games.` : <>Target Link: <a href={subTask.target} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">{subTask.target}</a></> }</p>
+                                                <p className="text-xs text-muted-foreground break-all">{!requiresInput ? `Play ${subTask.target} multiplayer games.` : `Join the group or channel to complete this step.` }</p>
                                             </div>
-                                             <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-2">
-                                                 {requiresInput ? null : (
-                                                     <div className="w-full sm:w-24 text-right">
-                                                        <p className="text-sm font-semibold">{progress} / {subTask.target}</p>
-                                                     </div>
-                                                 )}
-                                            </div>
+                                             <div className="flex items-center gap-2">
+                                                 <Badge variant={isCompleted ? 'default' : isSubmitted ? 'secondary' : 'destructive'}>
+                                                    {isCompleted ? <><Check className="mr-1"/> Completed</> : isSubmitted ? "In Review" : "Pending"}
+                                                 </Badge>
+                                             </div>
                                         </div>
                                          
                                         {requiresInput ? (
-                                            <div>
-                                                <Label htmlFor={`input-${subTask.id}`} className="text-xs text-muted-foreground">Enter info for verification:</Label>
-                                                <div className="flex w-full gap-2 mt-1">
+                                            <>
+                                            <Separator/>
+                                            <div className="space-y-3">
+                                                <h4 className="font-semibold text-sm">Step 1: Join</h4>
+                                                <Button asChild>
+                                                    <a href={subTask.target} target="_blank" rel="noopener noreferrer">
+                                                        Join/Subscribe Now <ExternalLink className="ml-2 w-4 h-4"/>
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <h4 className="font-semibold text-sm">Step 2: Submit for Verification</h4>
+                                                <div className="flex w-full gap-2">
                                                     <Input 
                                                         id={`input-${subTask.id}`}
                                                         placeholder={getInputPlaceholder(subTask.type)} 
@@ -214,27 +221,24 @@ export default function UserTasksPage() {
                                                         onChange={e => handleInputChange(subTask.id, e.target.value)}
                                                         disabled={isSubmitting === subTask.id || isSubmitted || isCompleted}
                                                     />
-                                                     <Button size="sm" onClick={() => handleVerificationSubmit(mainTask.id, subTask)} disabled={isSubmitting === subTask.id || isSubmitted || isCompleted}>
+                                                     <Button onClick={() => handleVerificationSubmit(mainTask.id, subTask)} disabled={isSubmitting === subTask.id || isSubmitted || isCompleted}>
                                                         {isSubmitting === subTask.id ? <Loader2 className="animate-spin h-4 w-4" /> : 'Submit'}
                                                     </Button>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground mt-1">Click the button to open the link & submit your info for manual verification.</p>
                                             </div>
+                                            </>
                                         ) : (
-                                            <div className="text-right">
-                                                <p className="text-xs text-muted-foreground">Your game progress is tracked automatically.</p>
+                                            <>
+                                            <Separator/>
+                                            <div className="space-y-2">
+                                                <h4 className="font-semibold text-sm">Your Progress</h4>
+                                                <Progress value={(progress / Number(subTask.target)) * 100} />
+                                                <p className="text-sm text-right text-muted-foreground">{progress} / {subTask.target} games played</p>
+                                                <p className="text-xs text-muted-foreground text-center">Your game progress is tracked automatically.</p>
                                             </div>
+                                            </>
                                         )}
                                      </div>
-                                      <div className="bg-background/30 px-4 py-2 flex items-center justify-end">
-                                            {isCompleted ? <Badge className="bg-green-600"><Check className="mr-1"/> Completed</Badge> :
-                                             isSubmitted ? <Badge variant="secondary">Pending Review</Badge> :
-                                             <Badge variant="destructive">Pending</Badge>
-                                            }
-                                        </div>
-                                     {subTask.type === 'game_play' && (
-                                         <Progress value={(progress / Number(subTask.target)) * 100} className="h-1 rounded-none"/>
-                                     )}
                                 </Card>
                              )
                         })}
