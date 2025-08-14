@@ -158,7 +158,7 @@ export default function FriendsPage() {
     }, [user]);
     
     useEffect(() => {
-        if (!user) {
+        if (!user || !userData) {
             setLoading(false);
             return;
         }
@@ -170,6 +170,7 @@ export default function FriendsPage() {
 
             await fetchFriends();
             
+            // Suggestions
             const suggestFriendsCallable = httpsCallable(functions, 'suggestFriends');
             try {
                 const result = await suggestFriendsCallable();
@@ -177,7 +178,6 @@ export default function FriendsPage() {
             } catch (error) {
                 console.error("Error fetching suggestions:", error);
             }
-
 
             // Received Requests Listener
             const reqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
