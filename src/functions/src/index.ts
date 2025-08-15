@@ -119,7 +119,6 @@ export const joinGame = functions.https.onCall(async (data, context) => {
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
 
-            // Get both user documents
             const joinerRef = db.collection('users').doc(joinerId);
             const creatorRef = db.collection('users').doc(creatorId);
 
@@ -143,7 +142,6 @@ export const joinGame = functions.https.onCall(async (data, context) => {
                  throw new functions.https.HttpsError('failed-precondition', "The creator has insufficient funds.");
             }
             
-            // Deduct from joiner
             const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
             const joinerMainWagered = wager - joinerBonusWagered;
             transaction.update(joinerRef, {
@@ -151,7 +149,6 @@ export const joinGame = functions.https.onCall(async (data, context) => {
                 bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
             });
 
-             // Deduct from creator
             const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
             const creatorMainWagered = wager - creatorBonusWagered;
             transaction.update(creatorRef, {
@@ -159,7 +156,6 @@ export const joinGame = functions.https.onCall(async (data, context) => {
                 bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
             });
 
-            // Update room
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             transaction.update(roomRef, {
@@ -178,7 +174,6 @@ export const joinGame = functions.https.onCall(async (data, context) => {
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            // Create transaction logs for both players
             const now = admin.firestore.FieldValue.serverTimestamp();
             const joinerTxRef = db.collection('transactions').doc();
             transaction.set(joinerTxRef, {
@@ -196,11 +191,12 @@ export const joinGame = functions.https.onCall(async (data, context) => {
     } catch (error: any) {
         functions.logger.error('Error joining game:', error);
         if (error instanceof HttpsError) {
-             throw error; // Re-throw HttpsError
+             throw error; 
         }
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
 });
+
 
 export const endGame = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
