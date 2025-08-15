@@ -324,10 +324,14 @@ export const endGame = onCall(async (request) => {
             // Payout Logic
             if (creatorPayout > 0 && roomData.createdBy) {
                  const profit = creatorPayout - (roomData.createdBy.wagerFromMain || 0) - (roomData.createdBy.wagerFromBonus || 0);
-                 transaction.update(creatorRef, { 
-                     balance: admin.firestore.FieldValue.increment((roomData.createdBy.wagerFromMain || 0) + profit),
-                     bonusBalance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromBonus || 0)
-                 });
+                 const mainWalletReturn = (roomData.createdBy.wagerFromMain || 0) + profit;
+                 const bonusWalletReturn = (roomData.createdBy.wagerFromBonus || 0);
+                 
+                 const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
+                 if (mainWalletReturn > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainWalletReturn);
+                 if (bonusWalletReturn > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(bonusWalletReturn);
+                 if (Object.keys(updatePayload).length > 0) transaction.update(creatorRef, updatePayload);
+                
                 transaction.set(db.collection('transactions').doc(), {
                     userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
                     description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
@@ -335,10 +339,14 @@ export const endGame = onCall(async (request) => {
             }
             if (joinerPayout > 0 && roomData.player2) {
                  const profit = joinerPayout - (roomData.player2.wagerFromMain || 0) - (roomData.player2.wagerFromBonus || 0);
-                 transaction.update(joinerRef, { 
-                     balance: admin.firestore.FieldValue.increment((roomData.player2.wagerFromMain || 0) + profit),
-                     bonusBalance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromBonus || 0)
-                 });
+                 const mainWalletReturn = (roomData.player2.wagerFromMain || 0) + profit;
+                 const bonusWalletReturn = (roomData.player2.wagerFromBonus || 0);
+                 
+                 const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
+                 if (mainWalletReturn > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainWalletReturn);
+                 if (bonusWalletReturn > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(bonusWalletReturn);
+                 if (Object.keys(updatePayload).length > 0) transaction.update(joinerRef, updatePayload);
+
                 transaction.set(db.collection('transactions').doc(), {
                     userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
                     description: `Payout for ${roomData.gameType} game vs ${roomData.createdBy.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()

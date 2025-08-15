@@ -66,10 +66,15 @@ export default function CreateGamePage() {
 
             // Deduct wager from the selected wallet
             const updatePayload: { [key: string]: any } = {};
-            if (fundingWallet === 'main') {
-                updatePayload.balance = increment(-wagerAmount);
-            } else {
+            let wagerFromBonus = 0;
+            let wagerFromMain = 0;
+
+            if (fundingWallet === 'bonus') {
+                wagerFromBonus = wagerAmount;
                 updatePayload.bonusBalance = increment(-wagerAmount);
+            } else {
+                wagerFromMain = wagerAmount;
+                updatePayload.balance = increment(-wagerAmount);
             }
             batch.update(userRef, updatePayload);
 
@@ -91,8 +96,8 @@ export default function CreateGamePage() {
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
                     fundingWallet: fundingWallet,
-                    wagerFromBonus: fundingWallet === 'bonus' ? wagerAmount : 0,
-                    wagerFromMain: fundingWallet === 'main' ? wagerAmount : 0,
+                    wagerFromBonus: wagerFromBonus,
+                    wagerFromMain: wagerFromMain,
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
