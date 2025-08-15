@@ -130,27 +130,30 @@ export const joinGame = onCall(async (request) => {
             // Verify joiner has funds and deduct wager
             const joinerBalance = joinerData.balance || 0;
             const joinerBonusBalance = joinerData.bonusBalance || 0;
+            const joinerSelectedBalance = fundingWallet === 'main' ? joinerBalance : joinerBonusBalance;
             
-            let wagerFromBonus = 0;
-            let wagerFromMain = 0;
-            const joinerUpdate: { [key: string]: admin.firestore.FieldValue } = {};
+            if (joinerSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
 
-            if (fundingWallet === 'bonus') {
-                if (joinerBonusBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
-                wagerFromBonus = wager;
-                joinerUpdate.bonusBalance = admin.firestore.FieldValue.increment(-wager);
-            } else {
-                if (joinerBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
-                wagerFromMain = wager;
-                joinerUpdate.balance = admin.firestore.FieldValue.increment(-wager);
-            }
-            
+            const joinerUpdate: { [key: string]: admin.firestore.FieldValue } = {};
+            const balanceFieldToDecrement = fundingWallet === 'main' ? 'balance' : 'bonusBalance';
+            joinerUpdate[balanceFieldToDecrement] = admin.firestore.FieldValue.increment(-wager);
             transaction.update(joinerRef, joinerUpdate);
+            
+            // Record wager for joiner
+            const now = admin.firestore.FieldValue.serverTimestamp();
+            const joinerTxRef = db.collection('transactions').doc();
+            transaction.set(joinerTxRef, {
+                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`, gameRoomId: roomId, createdAt: now
+            });
             
             // Update game room to start
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
+            const bonusWageredForJoiner = fundingWallet === 'bonus' ? wager : 0;
+            const mainWageredForJoiner = fundingWallet === 'main' ? wager : 0;
+
             transaction.update(roomRef, {
                 status: 'in-progress',
                 player2: {
@@ -159,8 +162,8 @@ export const joinGame = onCall(async (request) => {
                     color: joinerColor,
                     photoURL: joinerData.photoURL || '',
                     fundingWallet: fundingWallet,
-                    wagerFromBonus: wagerFromBonus,
-                    wagerFromMain: wagerFromMain,
+                    wagerFromBonus: bonusWageredForJoiner,
+                    wagerFromMain: mainWageredForJoiner,
                 },
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
