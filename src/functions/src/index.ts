@@ -96,12 +96,6 @@ export const joinGame = onCall(async (request) => {
     const roomRef = db.collection('game_rooms').doc(roomId);
 
     try {
-        const joinerDoc = await db.collection('users').doc(joinerId).get();
-        if (!joinerDoc.exists) {
-            throw new HttpsError('not-found', "Your user profile was not found.");
-        }
-        const joinerData = joinerDoc.data()!;
-
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
             if (!roomDoc.exists) {
@@ -111,38 +105,90 @@ export const joinGame = onCall(async (request) => {
             if (!roomData || roomData.status !== 'waiting') {
                 throw new HttpsError('failed-precondition', "Room is not available for joining.");
             }
-            if (roomData.createdBy?.uid === joinerId) {
+            if (!roomData.createdBy || !roomData.createdBy.uid) {
+                throw new HttpsError('aborted', "Room data is invalid or missing creator info.");
+            }
+            if (roomData.createdBy.uid === joinerId) {
                 throw new HttpsError('failed-precondition', "You cannot join your own game.");
             }
             
+            const wager = roomData.wager || 0;
+            const creatorId = roomData.createdBy.uid;
+
+            const joinerRef = db.collection('users').doc(joinerId);
+            const creatorRef = db.collection('users').doc(creatorId);
+
+            const [joinerDoc, creatorDoc] = await Promise.all([
+                transaction.get(joinerRef),
+                transaction.get(creatorRef)
+            ]);
+
+            if (!joinerDoc.exists()) throw new HttpsError('not-found', "Your user profile was not found.");
+            if (!creatorDoc.exists()) throw new HttpsError('not-found', "The creator's profile was not found.");
+            
+            const joinerData = joinerDoc.data()!;
+            const creatorData = creatorDoc.data()!;
+            
+            const joinerTotalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
+            if (joinerTotalBalance < wager) {
+                throw new HttpsError('failed-precondition', "You have insufficient funds.");
+            }
+            const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
+            if (creatorTotalBalance < wager) {
+                 throw new HttpsError('failed-precondition', "The creator has insufficient funds.");
+            }
+            
+            const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
+            const joinerMainWagered = wager - joinerBonusWagered;
+            transaction.update(joinerRef, {
+                balance: admin.firestore.FieldValue.increment(-joinerMainWagered),
+                bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
+            });
+
+            // Creator's wager was already handled on room creation in this logic, so no need to deduct again.
+            // We just record it in the transaction for payout purposes.
+            const creatorBonusWagered = roomData.createdBy.wagerFromBonus || 0;
+            const creatorMainWagered = roomData.createdBy.wagerFromMain || 0;
+
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-
+            
             transaction.update(roomRef, {
                 status: 'in-progress',
+                'createdBy.wagerFromBonus': creatorBonusWagered,
+                'createdBy.wagerFromMain': creatorMainWagered,
                 player2: {
                     uid: joinerId,
                     name: `${joinerData.firstName} ${joinerData.lastName}`,
                     color: joinerColor,
                     photoURL: joinerData.photoURL || '',
-                    wagerFromBonus: 0, // No wager logic for now
-                    wagerFromMain: 0,
+                    wagerFromBonus: joinerBonusWagered,
+                    wagerFromMain: joinerMainWagered,
                 },
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
             });
-        });
 
+            const now = admin.firestore.FieldValue.serverTimestamp();
+            const joinerTxRef = db.collection('transactions').doc();
+            transaction.set(joinerTxRef, {
+                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: roomId, createdAt: now
+            });
+            const creatorTxRef = db.collection('transactions').doc();
+            transaction.set(creatorTxRef, {
+                userId: creatorId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: roomId, createdAt: now
+            });
+        });
         return { success: true };
 
-    } catch (error) {
-        functions.logger.error('Error in joinGame function:', error);
+    } catch (error: any) {
+        functions.logger.error('Error joining game:', error);
         if (error instanceof HttpsError) {
              throw error; 
         }
-        // Log the full error to help diagnose, but return a generic error to the client.
-        console.error("Full error object:", JSON.stringify(error));
-        throw new HttpsError('internal', 'An unexpected server error occurred while trying to join the game.');
+        throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
 });
 
@@ -187,6 +233,11 @@ export const endGame = onCall(async (request) => {
                 throw new HttpsError('failed-precondition', 'Game is missing a second player.');
             }
             
+            // This is a safety check.
+            if (!roomData.player2) {
+                throw new HttpsError('aborted', 'Player 2 data is missing from the room.');
+            }
+
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
 
@@ -422,5 +473,3 @@ export const sendFriendRequest = onCall(async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
-
-    

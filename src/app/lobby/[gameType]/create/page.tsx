@@ -75,7 +75,7 @@ export default function CreateGamePage() {
                 createdBy: {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
-                    color: finalPieceColor,
+                    color: finalPieceColor, // Ensure color is always set
                     photoURL: userData.photoURL || '',
                     wagerFromBonus: bonusWagered,
                     wagerFromMain: mainWagered,
@@ -189,5 +189,3 @@ export default function CreateGamePage() {
         </div>
     );
 }
-
-    
