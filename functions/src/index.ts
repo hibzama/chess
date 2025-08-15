@@ -12,6 +12,9 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import * as cors from 'cors';
+
+const corsHandler = cors({origin: true});
 
 admin.initializeApp();
 
@@ -166,7 +169,6 @@ export const joinGame = onCall(async (request) => {
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
-            // Update the room to start the game
             transaction.update(roomRef, {
                 status: 'in-progress',
                 'createdBy.wagerFromBonus': creatorBonusWagered,
@@ -183,7 +185,6 @@ export const joinGame = onCall(async (request) => {
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            // Create transaction logs for both players.
             const now = admin.firestore.FieldValue.serverTimestamp();
             const joinerTxRef = db.collection('transactions').doc();
             transaction.set(joinerTxRef, {
@@ -267,6 +268,17 @@ export const endGame = onCall(async (request) => {
             
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
+            
+            const [creatorDoc, joinerDoc] = await Promise.all([
+                transaction.get(creatorRef),
+                transaction.get(joinerRef)
+            ]);
+
+            if (!creatorDoc.exists()) throw new Error("CREATOR_NOT_FOUND");
+            if (!joinerDoc.exists()) throw new Error("JOINER_NOT_FOUND");
+            
+            const creatorData = creatorDoc.data()!;
+            const joinerData = joinerDoc.data()!;
 
             let creatorPayout = 0;
             let joinerPayout = 0;
@@ -317,7 +329,7 @@ export const endGame = onCall(async (request) => {
                  });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    description: `Payout for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
             if (joinerPayout > 0 && roomData.player2) {
@@ -329,7 +341,7 @@ export const endGame = onCall(async (request) => {
                  });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game vs ${roomData.createdBy.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    description: `Payout for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
             
