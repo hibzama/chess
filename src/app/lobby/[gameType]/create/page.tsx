@@ -90,25 +90,15 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    fundingWallet: fundingWallet 
+                    fundingWallet: fundingWallet,
+                    wagerFromBonus: fundingWallet === 'bonus' ? wagerAmount : 0,
+                    wagerFromMain: fundingWallet === 'main' ? wagerAmount : 0,
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
                 p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
-            });
-
-            // Log the wager transaction
-            const transactionRef = doc(collection(db, 'transactions'));
-            batch.set(transactionRef, {
-                userId: user.uid,
-                type: 'wager',
-                amount: wagerAmount,
-                status: 'completed',
-                description: `Wager for ${gameName} from ${fundingWallet} wallet`,
-                gameRoomId: roomRef.id,
-                createdAt: serverTimestamp(),
             });
 
             await batch.commit();
