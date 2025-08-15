@@ -11,6 +11,10 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
+import { HttpsError, onCall } from "firebase-functions/v2/https";
+import * as cors from 'cors';
+
+const corsHandler = cors({origin: true});
 
 admin.initializeApp();
 
@@ -79,3 +83,328 @@ export const announceNewGame = functions.firestore
 
     return null;
   });
+
+export const joinGame = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    
+    const { roomId, fundingWallet } = request.data;
+    if (!roomId || !fundingWallet) {
+        throw new HttpsError('invalid-argument', 'Room ID and funding wallet are required.');
+    }
+
+    const joinerId = request.auth.uid;
+    const db = admin.firestore();
+    const roomRef = db.collection('game_rooms').doc(roomId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+
+            if (!roomDoc.exists) throw new Error("NOT_FOUND");
+
+            const roomData = roomDoc.data();
+            if (!roomData) throw new Error("NOT_FOUND");
+            if (roomData.status !== 'waiting') throw new Error("ROOM_NOT_AVAILABLE");
+            if (!roomData.createdBy || !roomData.createdBy.uid) throw new Error("INVALID_ROOM_DATA");
+            if (roomData.createdBy.uid === joinerId) throw new Error("CANNOT_JOIN_OWN_GAME");
+            
+            const wager = roomData.wager || 0;
+            const creatorId = roomData.createdBy.uid;
+
+            const joinerRef = db.collection('users').doc(joinerId);
+            const creatorRef = db.collection('users').doc(creatorId);
+
+            const [joinerDoc, creatorDoc] = await Promise.all([
+                transaction.get(joinerRef),
+                transaction.get(creatorRef)
+            ]);
+
+            if (!joinerDoc.exists()) throw new Error("JOINER_NOT_FOUND");
+            if (!creatorDoc.exists()) throw new Error("CREATOR_NOT_FOUND");
+            
+            const joinerData = joinerDoc.data()!;
+            const creatorData = creatorDoc.data()!;
+            
+            // Verify joiner has funds
+            const joinerSelectedBalance = fundingWallet === 'main' ? (joinerData.balance || 0) : (joinerData.bonusBalance || 0);
+            if (joinerSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
+            
+            // Verify creator has funds in their chosen wallet
+            const creatorFundingWallet = roomData.createdBy.fundingWallet || 'main';
+            const creatorSelectedBalance = creatorFundingWallet === 'main' ? (creatorData.balance || 0) : (creatorData.bonusBalance || 0);
+            if (creatorSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_CREATOR");
+            
+            // Deduct wager from the joiner's selected wallet
+            const joinerUpdate: { [key: string]: admin.firestore.FieldValue } = {};
+            joinerUpdate[fundingWallet === 'main' ? 'balance' : 'bonusBalance'] = admin.firestore.FieldValue.increment(-wager);
+            transaction.update(joinerRef, joinerUpdate);
+            
+            // Deduct wager from the creator's selected wallet
+            const creatorUpdate: { [key: string]: admin.firestore.FieldValue } = {};
+            creatorUpdate[creatorFundingWallet === 'main' ? 'balance' : 'bonusBalance'] = admin.firestore.FieldValue.increment(-wager);
+            transaction.update(creatorRef, creatorUpdate);
+
+            // Record wagers for both players
+            const now = admin.firestore.FieldValue.serverTimestamp();
+            const joinerTxRef = db.collection('transactions').doc();
+            transaction.set(joinerTxRef, {
+                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`, gameRoomId: roomId, createdAt: now
+            });
+            const creatorTxRef = db.collection('transactions').doc();
+            transaction.set(creatorTxRef, {
+                userId: creatorId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} from ${creatorFundingWallet} wallet`, gameRoomId: roomId, createdAt: now
+            });
+
+            // Update game room to start
+            const creatorColor = roomData.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            
+            const bonusWageredForCreator = creatorFundingWallet === 'bonus' ? wager : 0;
+            const mainWageredForCreator = creatorFundingWallet === 'main' ? wager : 0;
+            const bonusWageredForJoiner = fundingWallet === 'bonus' ? wager : 0;
+            const mainWageredForJoiner = fundingWallet === 'main' ? wager : 0;
+
+            transaction.update(roomRef, {
+                status: 'in-progress',
+                'createdBy.wagerFromBonus': bonusWageredForCreator,
+                'createdBy.wagerFromMain': mainWageredForCreator,
+                player2: {
+                    uid: joinerId,
+                    name: `${joinerData.firstName} ${joinerData.lastName}`,
+                    color: joinerColor,
+                    photoURL: joinerData.photoURL || '',
+                    fundingWallet: fundingWallet,
+                    wagerFromBonus: bonusWageredForJoiner,
+                    wagerFromMain: mainWageredForJoiner,
+                },
+                players: admin.firestore.FieldValue.arrayUnion(joinerId),
+                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            
+            // Referral Task Progress Update
+            const playersForTaskCheck = [
+                {id: creatorId, data: creatorData}, 
+                {id: joinerId, data: joinerData}
+            ];
+
+            for(const player of playersForTaskCheck) {
+                const activeTaskId = player.data.activeReferralTaskId;
+                if (activeTaskId) {
+                    const taskRef = db.collection('referral_tasks').doc(activeTaskId);
+                    const taskDoc = await transaction.get(taskRef);
+                    if (taskDoc.exists) {
+                        const taskData = taskDoc.data();
+                        if (taskData) {
+                            const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
+                            if (gamePlaySubTask) {
+                                const userToUpdateRef = db.collection('users').doc(player.id);
+                                const currentProgress = player.data.taskStatus?.[activeTaskId]?.[gamePlaySubTask.id]?.progress || 0;
+                                const newProgress = currentProgress + 1;
+                                
+                                transaction.set(userToUpdateRef, {
+                                    taskStatus: {
+                                        [activeTaskId]: {
+                                            [gamePlaySubTask.id]: {
+                                                progress: newProgress,
+                                                status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
+                                            }
+                                        }
+                                    }
+                                }, { merge: true });
+                            }
+                        }
+                    }
+                }
+            }
+
+        });
+        return { success: true };
+
+    } catch (error: any) {
+        functions.logger.error('Error joining game:', error);
+        
+        const errorMap: { [key: string]: HttpsError } = {
+            "NOT_FOUND": new HttpsError('not-found', "Room not available."),
+            "ROOM_NOT_AVAILABLE": new HttpsError('failed-precondition', "Room is not available for joining."),
+            "INVALID_ROOM_DATA": new HttpsError('aborted', "Room data is invalid or missing creator info."),
+            "CANNOT_JOIN_OWN_GAME": new HttpsError('failed-precondition', "You cannot join your own game."),
+            "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
+            "CREATOR_NOT_FOUND": new HttpsError('not-found', "The room creator's profile was not found."),
+            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
+            "INSUFFICIENT_FUNDS_CREATOR": new HttpsError('failed-precondition', "The room creator has insufficient funds."),
+        };
+        throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
+    }
+});
+
+
+export const endGame = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+
+    const { roomId, winnerId, method, resignerDetails } = request.data;
+    if (!roomId || !method) {
+        throw new HttpsError('invalid-argument', 'Room ID and method are required.');
+    }
+
+    const db = admin.firestore();
+    const roomRef = db.collection('game_rooms').doc(roomId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists) {
+                throw new HttpsError('not-found', 'Game room not found.');
+            }
+
+            const roomData = roomDoc.data();
+            if (!roomData) {
+                 throw new HttpsError('not-found', 'Game room data is missing.');
+            }
+            if (roomData.status === 'completed') {
+                functions.logger.log(`Game ${roomId} already completed.`);
+                return;
+            }
+            if (roomData.status !== 'in-progress') {
+                throw new HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
+            }
+
+            const wager = roomData.wager || 0;
+            const creatorId = roomData.createdBy.uid;
+            const joinerId = roomData.player2?.uid;
+            
+            if (!joinerId || !roomData.player2) {
+                throw new HttpsError('failed-precondition', 'Game is missing a second player.');
+            }
+            
+            const creatorRef = db.collection('users').doc(creatorId);
+            const joinerRef = db.collection('users').doc(joinerId);
+            
+            const creatorDoc = await transaction.get(creatorRef);
+            const joinerDoc = await transaction.get(joinerRef);
+
+            if (!creatorDoc.exists() || !joinerDoc.exists()) {
+                throw new HttpsError('not-found', 'One or both players could not be found.');
+            }
+
+            let creatorPayout = 0;
+            let joinerPayout = 0;
+            
+            const winnerObject: any = { method };
+
+            if (method === 'draw') {
+                creatorPayout = joinerPayout = wager * 0.9;
+                winnerObject.uid = null;
+            } else if (method === 'resign' && resignerDetails && typeof resignerDetails.resignerPieceCount === 'number') {
+                const opponentPayoutRate = 1.30;
+                let resignerRefundRate = 0;
+                if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
+                else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
+                else resignerRefundRate = 0.25;
+
+                winnerObject.resignerId = resignerDetails.id;
+                winnerObject.resignerPieceCount = resignerDetails.resignerPieceCount;
+
+                if (resignerDetails.id === creatorId) { // Creator resigned
+                    winnerObject.uid = joinerId;
+                    creatorPayout = wager * resignerRefundRate;
+                    joinerPayout = wager * opponentPayoutRate;
+                } else { // Joiner resigned
+                    winnerObject.uid = creatorId;
+                    creatorPayout = wager * opponentPayoutRate;
+                    joinerPayout = wager * resignerRefundRate;
+                }
+            } else { // Standard win (checkmate, timeout, piece-capture)
+                winnerObject.uid = winnerId;
+                if (winnerId === creatorId) {
+                    creatorPayout = wager * 1.8;
+                } else if (winnerId === joinerId) {
+                    joinerPayout = wager * 1.8;
+                }
+                if (winnerId) {
+                    transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
+                }
+            }
+
+            // Payout Logic
+            if (creatorPayout > 0 && roomData.createdBy) {
+                 const profit = creatorPayout - wager;
+                 transaction.update(creatorRef, { 
+                     balance: admin.firestore.FieldValue.increment((roomData.createdBy.wagerFromMain || 0) + profit),
+                     bonusBalance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromBonus || 0)
+                 });
+                transaction.set(db.collection('transactions').doc(), {
+                    userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
+                    description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            if (joinerPayout > 0 && roomData.player2) {
+                 const profit = joinerPayout - wager;
+                 transaction.update(joinerRef, { 
+                     balance: admin.firestore.FieldValue.increment((roomData.player2.wagerFromMain || 0) + profit),
+                     bonusBalance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromBonus || 0)
+                 });
+                transaction.set(db.collection('transactions').doc(), {
+                    userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
+                    description: `Payout for ${roomData.gameType} game vs ${roomData.createdBy.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            // Finalize room
+            transaction.update(roomRef, { status: 'completed', winner: winnerObject, draw: method === 'draw' });
+        });
+        return { success: true };
+    } catch (error: any) {
+        functions.logger.error('Error ending game:', error);
+        if (error.code) {
+             throw error; // Re-throw HttpsError
+        }
+        throw new HttpsError('internal', 'An unexpected error occurred while ending the game.');
+    }
+});
+
+export const approveBonusClaim = onCall(async (request) => {
+    if (!request.auth || !request.data.claimId) {
+        throw new HttpsError('invalid-argument', 'Authentication and claim ID are required.');
+    }
+    // You could add an admin role check here for more security
+    const { claimId, newStatus } = request.data;
+    const db = admin.firestore();
+    const claimRef = db.collection('bonus_claims').doc(claimId);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const claimDoc = await transaction.get(claimRef);
+            if (!claimDoc.exists) throw new HttpsError('not-found', 'Claim document not found.');
+            
+            const claimData = claimDoc.data();
+            if (!claimData || claimData.status !== 'pending') {
+                throw new HttpsError('failed-precondition', 'This claim is not in a pending state.');
+            }
+
+            if (newStatus === 'approved') {
+                if (claimData.claimType === 'referrer_target' && claimData.referrerId && claimData.commissionAmount > 0) {
+                    const referrerRef = db.collection('users').doc(claimData.referrerId);
+                    transaction.update(referrerRef, { balance: admin.firestore.FieldValue.increment(claimData.commissionAmount) });
+                }
+                
+                if (claimData.claimType === 'new_user_task' && claimData.newUserId && claimData.bonusAmount > 0) {
+                    const newUserRef = db.collection('users').doc(claimData.newUserId);
+                    transaction.update(newUserRef, { bonusBalance: admin.firestore.FieldValue.increment(claimData.bonusAmount) });
+                }
+            }
+            transaction.update(claimRef, { status: newStatus });
+        });
+        return { success: true };
+    } catch(error: any) {
+        functions.logger.error('Error approving bonus claim:', error);
+        if (error.code) throw error;
+        throw new HttpsError('internal', 'An error occurred while processing the claim.');
+    }
+});
+
