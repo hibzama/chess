@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState } from 'react';
@@ -61,25 +60,12 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            const batch = writeBatch(db);
-            const userRef = doc(db, 'users', user.uid);
-            
-            // Deduct wager from the selected wallet
-            const updatePayload: any = {};
-            if (fundingWallet === 'main') {
-                updatePayload.balance = increment(-wagerAmount);
-            } else {
-                updatePayload.bonusBalance = increment(-wagerAmount);
-            }
-            batch.update(userRef, updatePayload);
-
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            const roomRef = doc(collection(db, 'game_rooms'));
-            batch.set(roomRef, {
+            const roomRef = await addDoc(collection(db, 'game_rooms'), {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -90,27 +76,12 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    fundingWallet: fundingWallet // Store the creator's funding choice
+                    fundingWallet: fundingWallet 
                 },
                 players: [user.uid],
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
             });
-
-            if(wagerAmount > 0) {
-                const transactionRef = doc(collection(db, 'transactions'));
-                batch.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'wager',
-                    amount: wagerAmount,
-                    status: 'completed',
-                    description: `Wager for ${gameName} from ${fundingWallet} wallet`,
-                    gameRoomId: roomRef.id,
-                    createdAt: serverTimestamp()
-                });
-            }
-            
-            await batch.commit();
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
             router.push(`/game/multiplayer/${roomRef.id}`);

@@ -89,9 +89,9 @@ export const joinGame = onCall(async (request) => {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     
-    const { roomId } = request.data;
-    if (!roomId) {
-        throw new HttpsError('invalid-argument', 'Room ID is required.');
+    const { roomId, fundingWallet } = request.data;
+    if (!roomId || !fundingWallet) {
+        throw new HttpsError('invalid-argument', 'Room ID and funding wallet are required.');
     }
 
     const joinerId = request.auth.uid;
@@ -102,26 +102,13 @@ export const joinGame = onCall(async (request) => {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
 
-            if (!roomDoc.exists) {
-                throw new Error("NOT_FOUND");
-            }
+            if (!roomDoc.exists) throw new Error("NOT_FOUND");
 
             const roomData = roomDoc.data();
-            if (!roomData) {
-                throw new Error("NOT_FOUND");
-            }
-
-            if (roomData.status !== 'waiting') {
-                throw new Error("ROOM_NOT_AVAILABLE");
-            }
-
-            if (!roomData.createdBy || !roomData.createdBy.uid) {
-                throw new Error("INVALID_ROOM_DATA");
-            }
-
-            if (roomData.createdBy.uid === joinerId) {
-                throw new Error("CANNOT_JOIN_OWN_GAME");
-            }
+            if (!roomData) throw new Error("NOT_FOUND");
+            if (roomData.status !== 'waiting') throw new Error("ROOM_NOT_AVAILABLE");
+            if (!roomData.createdBy || !roomData.createdBy.uid) throw new Error("INVALID_ROOM_DATA");
+            if (roomData.createdBy.uid === joinerId) throw new Error("CANNOT_JOIN_OWN_GAME");
             
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
@@ -140,62 +127,57 @@ export const joinGame = onCall(async (request) => {
             const joinerData = joinerDoc.data()!;
             const creatorData = creatorDoc.data()!;
             
-            // Verify both players have funds
-            const joinerTotalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
-            if (joinerTotalBalance < wager) {
-                throw new Error("INSUFFICIENT_FUNDS_JOINER");
-            }
+            // Verify joiner has funds
+            const joinerSelectedBalance = fundingWallet === 'main' ? (joinerData.balance || 0) : (joinerData.bonusBalance || 0);
+            if (joinerSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
             
-            const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
-            if (creatorTotalBalance < wager) {
-                 throw new Error("INSUFFICIENT_FUNDS_CREATOR");
-            }
+            // Verify creator has funds in their chosen wallet
+            const creatorFundingWallet = roomData.createdBy.fundingWallet || 'main';
+            const creatorSelectedBalance = creatorFundingWallet === 'main' ? (creatorData.balance || 0) : (creatorData.bonusBalance || 0);
+            if (creatorSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_CREATOR");
             
-            // Deduct wager from the joiner
-            const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
-            const joinerMainWagered = wager - joinerBonusWagered;
-            transaction.update(joinerRef, {
-                balance: admin.firestore.FieldValue.increment(-joinerMainWagered),
-                bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
+            // Deduct wager from the joiner's selected wallet
+            const joinerUpdate: { [key: string]: admin.firestore.FieldValue } = {};
+            joinerUpdate[fundingWallet === 'main' ? 'balance' : 'bonusBalance'] = admin.firestore.FieldValue.increment(-wager);
+            transaction.update(joinerRef, joinerUpdate);
+            
+            // Deduct wager from the creator's selected wallet
+            const creatorUpdate: { [key: string]: admin.firestore.FieldValue } = {};
+            creatorUpdate[creatorFundingWallet === 'main' ? 'balance' : 'bonusBalance'] = admin.firestore.FieldValue.increment(-wager);
+            transaction.update(creatorRef, creatorUpdate);
+
+            // Record wagers for both players
+            const now = admin.firestore.FieldValue.serverTimestamp();
+            const joinerTxRef = db.collection('transactions').doc();
+            transaction.set(joinerTxRef, {
+                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`, gameRoomId: roomId, createdAt: now
+            });
+            const creatorTxRef = db.collection('transactions').doc();
+            transaction.set(creatorTxRef, {
+                userId: creatorId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} from ${creatorFundingWallet} wallet`, gameRoomId: roomId, createdAt: now
             });
 
-            // Deduct wager from the creator
-            const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
-            const creatorMainWagered = wager - creatorBonusWagered;
-            transaction.update(creatorRef, {
-                balance: admin.firestore.FieldValue.increment(-creatorMainWagered),
-                bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
-            });
-
+            // Update game room to start
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
             transaction.update(roomRef, {
                 status: 'in-progress',
-                'createdBy.wagerFromBonus': creatorBonusWagered,
-                'createdBy.wagerFromMain': creatorMainWagered,
+                'createdBy.wagerFromBonus': creatorFundingWallet === 'bonus' ? wager : 0,
+                'createdBy.wagerFromMain': creatorFundingWallet === 'main' ? wager : 0,
                 player2: {
                     uid: joinerId,
                     name: `${joinerData.firstName} ${joinerData.lastName}`,
                     color: joinerColor,
                     photoURL: joinerData.photoURL || '',
-                    wagerFromBonus: joinerBonusWagered,
-                    wagerFromMain: joinerMainWagered,
+                    fundingWallet: fundingWallet,
+                    wagerFromBonus: fundingWallet === 'bonus' ? wager : 0,
+                    wagerFromMain: fundingWallet === 'main' ? wager : 0,
                 },
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
-            });
-
-            const now = admin.firestore.FieldValue.serverTimestamp();
-            const joinerTxRef = db.collection('transactions').doc();
-            transaction.set(joinerTxRef, {
-                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
-                description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: roomId, createdAt: now
-            });
-            const creatorTxRef = db.collection('transactions').doc();
-            transaction.set(creatorTxRef, {
-                userId: creatorId, type: 'wager', amount: wager, status: 'completed',
-                description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: roomId, createdAt: now
             });
             
             // Referral Task Progress Update
@@ -208,16 +190,13 @@ export const joinGame = onCall(async (request) => {
                 const activeTaskId = player.data.activeReferralTaskId;
                 if (activeTaskId) {
                     const taskRef = db.collection('referral_tasks').doc(activeTaskId);
-                    const taskDoc = await transaction.get(taskRef); // Use transaction.get
+                    const taskDoc = await transaction.get(taskRef);
                     if (taskDoc.exists) {
                         const taskData = taskDoc.data();
                         if (taskData) {
                             const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
                             if (gamePlaySubTask) {
                                 const userToUpdateRef = db.collection('users').doc(player.id);
-                                const progressField = `taskStatus.${activeTaskId}.${gamePlaySubTask.id}.progress`;
-                                const statusField = `taskStatus.${activeTaskId}.${gamePlaySubTask.id}.status`;
-                                
                                 const currentProgress = player.data.taskStatus?.[activeTaskId]?.[gamePlaySubTask.id]?.progress || 0;
                                 const newProgress = currentProgress + 1;
                                 
@@ -243,26 +222,17 @@ export const joinGame = onCall(async (request) => {
     } catch (error: any) {
         functions.logger.error('Error joining game:', error);
         
-        switch(error.message) {
-            case "NOT_FOUND":
-                throw new HttpsError('not-found', "Room not available.");
-            case "ROOM_NOT_AVAILABLE":
-                throw new HttpsError('failed-precondition', "Room is not available for joining.");
-            case "INVALID_ROOM_DATA":
-                throw new HttpsError('aborted', "Room data is invalid or missing creator info.");
-            case "CANNOT_JOIN_OWN_GAME":
-                throw new HttpsError('failed-precondition', "You cannot join your own game.");
-            case "JOINER_NOT_FOUND":
-                 throw new HttpsError('not-found', "Your user profile was not found.");
-            case "CREATOR_NOT_FOUND":
-                 throw new HttpsError('not-found', "The creator's profile was not found.");
-            case "INSUFFICIENT_FUNDS_JOINER":
-                 throw new HttpsError('failed-precondition', "You have insufficient funds.");
-            case "INSUFFICIENT_FUNDS_CREATOR":
-                 throw new HttpsError('failed-precondition', "The room creator has insufficient funds.");
-            default:
-                throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
-        }
+        const errorMap: { [key: string]: HttpsError } = {
+            "NOT_FOUND": new HttpsError('not-found', "Room not available."),
+            "ROOM_NOT_AVAILABLE": new HttpsError('failed-precondition', "Room is not available for joining."),
+            "INVALID_ROOM_DATA": new HttpsError('aborted', "Room data is invalid or missing creator info."),
+            "CANNOT_JOIN_OWN_GAME": new HttpsError('failed-precondition', "You cannot join your own game."),
+            "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
+            "CREATOR_NOT_FOUND": new HttpsError('not-found', "The room creator's profile was not found."),
+            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
+            "INSUFFICIENT_FUNDS_CREATOR": new HttpsError('failed-precondition', "The room creator has insufficient funds."),
+        };
+        throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
 });
 
@@ -303,7 +273,6 @@ export const endGame = onCall(async (request) => {
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
             
-            // Critical Safety Check
             if (!joinerId || !roomData.player2) {
                 throw new HttpsError('failed-precondition', 'Game is missing a second player.');
             }
@@ -316,13 +285,6 @@ export const endGame = onCall(async (request) => {
 
             if (!creatorDoc.exists() || !joinerDoc.exists()) {
                 throw new HttpsError('not-found', 'One or both players could not be found.');
-            }
-
-            const creatorData = creatorDoc.data();
-            const joinerData = joinerDoc.data();
-
-            if (!creatorData || !joinerData) {
-                 throw new HttpsError('not-found', 'One or both players data is missing.');
             }
 
             let creatorPayout = 0;
@@ -367,7 +329,6 @@ export const endGame = onCall(async (request) => {
             // Payout Logic
             if (creatorPayout > 0 && roomData.createdBy) {
                  const profit = creatorPayout - wager;
-                 // Return wager to original wallets, profit to main balance
                  transaction.update(creatorRef, { 
                      balance: admin.firestore.FieldValue.increment((roomData.createdBy.wagerFromMain || 0) + profit),
                      bonusBalance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromBonus || 0)
@@ -379,7 +340,6 @@ export const endGame = onCall(async (request) => {
             }
             if (joinerPayout > 0 && roomData.player2) {
                  const profit = joinerPayout - wager;
-                  // Return wager to original wallets, profit to main balance
                  transaction.update(joinerRef, { 
                      balance: admin.firestore.FieldValue.increment((roomData.player2.wagerFromMain || 0) + profit),
                      bonusBalance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromBonus || 0)
@@ -423,19 +383,16 @@ export const approveBonusClaim = onCall(async (request) => {
             }
 
             if (newStatus === 'approved') {
-                // Handle referrer target bonus
                 if (claimData.claimType === 'referrer_target' && claimData.referrerId && claimData.commissionAmount > 0) {
                     const referrerRef = db.collection('users').doc(claimData.referrerId);
                     transaction.update(referrerRef, { balance: admin.firestore.FieldValue.increment(claimData.commissionAmount) });
                 }
                 
-                // Handle new user bonus
                 if (claimData.claimType === 'new_user_task' && claimData.newUserId && claimData.bonusAmount > 0) {
                     const newUserRef = db.collection('users').doc(claimData.newUserId);
                     transaction.update(newUserRef, { bonusBalance: admin.firestore.FieldValue.increment(claimData.bonusAmount) });
                 }
             }
-            // Update the claim status regardless
             transaction.update(claimRef, { status: newStatus });
         });
         return { success: true };
@@ -443,117 +400,5 @@ export const approveBonusClaim = onCall(async (request) => {
         functions.logger.error('Error approving bonus claim:', error);
         if (error.code) throw error;
         throw new HttpsError('internal', 'An error occurred while processing the claim.');
-    }
-});
-
-export const suggestFriends = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-  }
-  const userId = request.auth.uid;
-  const db = admin.firestore();
-
-  try {
-    const userDoc = await db.collection('users').doc(userId).get();
-    if (!userDoc.exists) {
-      throw new HttpsError('not-found', 'User not found');
-    }
-    const userData = userDoc.data()!;
-    const friends = userData.friends || [];
-
-    const sentReqSnapshot = await db.collection('friend_requests').where('fromId', '==', userId).get();
-    const sentRequestIds = sentReqSnapshot.docs.map(doc => doc.data().toId);
-    
-    const receivedReqSnapshot = await db.collection('friend_requests').where('toId', '==', userId).get();
-    const receivedRequestIds = receivedReqSnapshot.docs.map(doc => doc.data().fromId);
-
-    const excludeIds = [userId, ...friends, ...sentRequestIds, ...receivedRequestIds];
-    
-    const usersRef = db.collection('users');
-    const usersSnapshot = await usersRef.orderBy('wins', 'desc').limit(50).get();
-
-    const suggestions = usersSnapshot.docs
-        .map(doc => ({ uid: doc.id, ...doc.data() }))
-        .filter(u => u.uid && !excludeIds.includes(u.uid))
-        .slice(0, 10)
-        .map((u: any) => ({
-            uid: u.uid,
-            firstName: u.firstName || 'Unknown',
-            lastName: u.lastName || 'User',
-            photoURL: u.photoURL || '',
-            status: u.status || 'offline',
-            lastSeen: u.lastSeen || null,
-        }));
-    
-    return suggestions;
-
-  } catch (error) {
-    functions.logger.error('Error suggesting friends:', error);
-    throw new HttpsError('internal', 'An error occurred while fetching friend suggestions.');
-  }
-});
-
-
-export const sendFriendRequest = onCall(async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-    const fromId = request.auth.uid;
-    const { toId } = request.data;
-    if (!toId) {
-        throw new HttpsError('invalid-argument', 'Recipient ID is required.');
-    }
-
-    const db = admin.firestore();
-    
-    const fromUserDoc = await db.collection('users').doc(fromId).get();
-    const toUserDoc = await db.collection('users').doc(toId).get();
-
-    if (!fromUserDoc.exists() || !toUserDoc.exists()) {
-        throw new HttpsError('not-found', 'One or both users not found.');
-    }
-    
-    const fromUserData = fromUserDoc.data()!;
-    const toUserData = toUserDoc.data()!;
-
-    const fromName = `${fromUserData.firstName || 'User'} ${fromUserData.lastName || ''}`.trim();
-    const fromAvatar = fromUserData.photoURL || '';
-    const toName = `${toUserData.firstName || 'User'} ${toUserData.lastName || ''}`.trim();
-    const toAvatar = toUserData.photoURL || '';
-    
-    const sentReqQuery = db.collection('friend_requests').where('fromId', '==', fromId).where('toId', '==', toId);
-    const receivedReqQuery = db.collection('friend_requests').where('fromId', '==', toId).where('toId', '==', fromId);
-
-    const [sentSnapshot, receivedSnapshot] = await Promise.all([sentReqQuery.get(), receivedReqQuery.get()]);
-
-    if (!sentSnapshot.empty || !receivedSnapshot.empty) {
-        throw new HttpsError('already-exists', 'A friend request between you and this user is already pending.');
-    }
-
-    try {
-        await db.collection('friend_requests').add({
-            fromId,
-            fromName,
-            fromAvatar,
-            toId,
-            toName,
-            toAvatar,
-            status: 'pending',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        await db.collection('notifications').add({
-            userId: toId,
-            title: "New Friend Request",
-            description: `${fromName} wants to be your friend.`,
-            href: '/dashboard/friends',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            read: false,
-        });
-
-        return { success: true };
-    } catch (error) {
-        functions.logger.error('Error sending friend request:', error);
-        throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
