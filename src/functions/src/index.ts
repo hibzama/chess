@@ -397,5 +397,3 @@ export const approveBonusClaim = onCall(async (request) => {
         throw new HttpsError('internal', 'An error occurred while processing the claim.');
     }
 });
-
-    
