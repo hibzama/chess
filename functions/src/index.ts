@@ -330,8 +330,8 @@ export const endGame = onCall(async (request) => {
             // Payout Logic
             if (creatorPayout > 0 && roomData.createdBy) {
                  const profit = creatorPayout - (roomData.createdBy.wagerFromMain || 0) - (roomData.createdBy.wagerFromBonus || 0);
-                 const mainWalletReturn = profit; // Profit always goes to main balance
-                 const bonusWalletReturn = (roomData.createdBy.wagerFromBonus || 0); // Refund bonus wager
+                 const mainWalletReturn = (roomData.createdBy.wagerFromMain || 0) + profit;
+                 const bonusWalletReturn = (roomData.createdBy.wagerFromBonus || 0);
                  
                  const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
                  if (mainWalletReturn > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainWalletReturn);
@@ -345,7 +345,7 @@ export const endGame = onCall(async (request) => {
             }
             if (joinerPayout > 0 && roomData.player2) {
                  const profit = joinerPayout - (roomData.player2.wagerFromMain || 0) - (roomData.player2.wagerFromBonus || 0);
-                 const mainWalletReturn = profit;
+                 const mainWalletReturn = (roomData.player2.wagerFromMain || 0) + profit;
                  const bonusWalletReturn = (roomData.player2.wagerFromBonus || 0);
                  
                  const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
