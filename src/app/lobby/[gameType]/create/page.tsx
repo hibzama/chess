@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock } from 'lucide-react';
+import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -31,38 +31,55 @@ export default function CreateGamePage() {
     const [gameTimer, setGameTimer] = useState('900');
     const [pieceColor, setPieceColor] = useState<'w' | 'b' | 'random'>('random');
     const [roomPrivacy, setRoomPrivacy] = useState<'public' | 'private'>('public');
+    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
     const [isCreating, setIsCreating] = useState(false);
 
     const USDT_RATE = 310;
-    const usdtAmount = (parseFloat(investmentAmount) / USDT_RATE || 0).toFixed(2);
+    const wagerAmount = parseInt(investmentAmount) || 0;
+    const usdtAmount = (wagerAmount / USDT_RATE || 0).toFixed(2);
     
+    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
+    const hasSufficientFunds = selectedWalletBalance >= wagerAmount;
+
+
     const handleCreateRoom = async () => {
         if (!user || !userData) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to create a room.' });
             return;
         }
 
-        const wagerAmount = parseInt(investmentAmount);
         if (isNaN(wagerAmount) || wagerAmount < 10) {
             toast({ variant: 'destructive', title: 'Error', description: 'Minimum investment amount is LKR 10.' });
             return;
         }
 
-        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if (totalBalance < wagerAmount) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
+        if (!hasSufficientFunds) {
+            toast({ variant: 'destructive', title: 'Error', description: `Insufficient funds in your ${fundingWallet} wallet.` });
             return;
         }
 
         setIsCreating(true);
 
         try {
+            const batch = writeBatch(db);
+            const userRef = doc(db, 'users', user.uid);
+            
+            // Deduct wager from the selected wallet
+            const updatePayload: any = {};
+            if (fundingWallet === 'main') {
+                updatePayload.balance = increment(-wagerAmount);
+            } else {
+                updatePayload.bonusBalance = increment(-wagerAmount);
+            }
+            batch.update(userRef, updatePayload);
+
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            const roomData = {
+            const roomRef = doc(collection(db, 'game_rooms'));
+            batch.set(roomRef, {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -72,14 +89,28 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
-                    photoURL: userData.photoURL || ''
+                    photoURL: userData.photoURL || '',
+                    fundingWallet: fundingWallet // Store the creator's funding choice
                 },
                 players: [user.uid],
                 createdAt: serverTimestamp(),
-                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
-            };
+                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
+            });
 
-            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            if(wagerAmount > 0) {
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'wager',
+                    amount: wagerAmount,
+                    status: 'completed',
+                    description: `Wager for ${gameName} from ${fundingWallet} wallet`,
+                    gameRoomId: roomRef.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+            
+            await batch.commit();
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
@@ -121,6 +152,29 @@ export default function CreateGamePage() {
                             <Label htmlFor="investment">Investment Amount (LKR)</Label>
                             <Input id="investment" type="number" value={investmentAmount} onChange={e => setInvestmentAmount(e.target.value)} min="10"/>
                             <p className="text-xs text-muted-foreground">Approximately ${usdtAmount} USDT</p>
+                        </div>
+
+                         <div className="space-y-3">
+                            <Label>Funding Wallet</Label>
+                             <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="main" id="main-wallet" />
+                                    <Label htmlFor="main-wallet">Main Wallet</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="bonus" id="bonus-wallet" />
+                                    <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
+                                </div>
+                            </RadioGroup>
+                            <Card className="p-3 bg-secondary">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">Available:</span>
+                                    <div>
+                                        <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
+                                        <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
+                                    </div>
+                                </div>
+                            </Card>
                         </div>
 
                          <div className="space-y-3">
@@ -172,7 +226,7 @@ export default function CreateGamePage() {
                             </div>
                         </div>
 
-                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
+                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating || !hasSufficientFunds}>
                             {isCreating ? 'Creating Game...' : 'Create Game & Wait for Opponent'}
                         </Button>
                     </CardContent>

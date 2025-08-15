@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentData, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import GameChat from '@/components/game/game-chat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 // Game Components
 import ChessBoard from '@/components/game/chess-board';
@@ -22,6 +24,7 @@ import CheckersBoard from '@/components/game/checkers-board';
 import GameLayout from '@/components/game/game-layout';
 import { GameProvider, useGame } from '@/context/game-context';
 import { formatTime } from '@/lib/time';
+import { cn } from '@/lib/utils';
 
 type GameRoom = {
     id: string;
@@ -34,6 +37,7 @@ type GameRoom = {
         name: string;
         color: 'w' | 'b';
         photoURL?: string;
+        fundingWallet: 'main' | 'bonus';
     };
     player2?: {
         uid: string;
@@ -145,10 +149,14 @@ function MultiplayerGame() {
     const { isGameLoading, gameOver, room } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
+    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
     
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
+
+    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
+    const hasSufficientFunds = room ? selectedWalletBalance >= room.wager : false;
 
     useEffect(() => {
         roomStatusRef.current = room?.status;
@@ -205,8 +213,8 @@ function MultiplayerGame() {
     const handleJoinGame = async () => {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
-        if(userData.balance < room.wager) {
-            toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have enough balance to join this game."});
+        if(!hasSufficientFunds) {
+            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your ${fundingWallet} wallet.`});
             return;
         }
     
@@ -223,116 +231,52 @@ function MultiplayerGame() {
         
                 const creatorRef = doc(db, 'users', roomData.createdBy.uid);
                 const joinerRef = doc(db, 'users', user.uid);
-        
-                 // --- PRE-READ ALL NECESSARY DATA ---
-                const playerRefs = [creatorRef, joinerRef];
-                const playerDocReads = playerRefs.map(ref => transaction.get(ref));
-                const playerDocs = await Promise.all(playerDocReads);
-
-                if (playerDocs.some(doc => !doc.exists())) {
-                    throw new Error("One of the players does not exist");
-                }
                 
-                const [creatorDoc, joinerDoc] = playerDocs;
-                const playersData = [
-                    { id: creatorRef.id, name: roomData.createdBy.name, data: creatorDoc.data() },
-                    { id: joinerRef.id, name: `${userData.firstName} ${userData.lastName}`, data: joinerDoc.data() }
-                ];
+                const joinerDoc = await transaction.get(joinerRef);
 
-                if ((playersData[0].data?.balance || 0) < roomData.wager) {
-                    throw new Error("Creator has insufficient funds.");
+                if (!joinerDoc.exists()) {
+                    throw new Error("Your user profile could not be found.");
                 }
 
-                const referrerReadsMap = new Map<string, Promise<DocumentData>>();
-                playersData.forEach(p => {
-                    if (p.data.referralChain && p.data.referralChain.length > 0) {
-                        p.data.referralChain.forEach((marketerId: string) => {
-                            if (!referrerReadsMap.has(marketerId)) {
-                                referrerReadsMap.set(marketerId, transaction.get(doc(db, 'users', marketerId)));
-                            }
-                        });
-                    }
-                    if (p.data.referredBy && !referrerReadsMap.has(p.data.referredBy)) {
-                         referrerReadsMap.set(p.data.referredBy, transaction.get(doc(db, 'users', p.data.referredBy)));
-                    }
-                });
-
-                const referrerResults = await Promise.all(referrerReadsMap.values());
-                const referrersDataMap = new Map();
-                let i = 0;
-                for(const key of referrerReadsMap.keys()){
-                    if(referrerResults[i].exists()){
-                        referrersDataMap.set(key, referrerResults[i].data());
-                    }
-                    i++;
+                const wagerAmount = roomData.wager || 0;
+                
+                // Deduct wager from the joiner's selected wallet
+                const updatePayload: any = {};
+                if (fundingWallet === 'main') {
+                    updatePayload.balance = increment(-wagerAmount);
+                } else {
+                    updatePayload.bonusBalance = increment(-wagerAmount);
                 }
-
-                // --- ALL READS ARE DONE. START WRITES. ---
+                transaction.update(joinerRef, updatePayload);
 
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
                 
                 transaction.update(roomRef, {
                     status: 'in-progress',
-                    player2: { uid: user.uid, name: playersData[1].name, color: joinerColor, photoURL: userData.photoURL || '' },
+                    player2: { 
+                        uid: user.uid, 
+                        name: `${userData.firstName} ${userData.lastName}`, 
+                        color: joinerColor, 
+                        photoURL: userData.photoURL || '',
+                        fundingWallet: fundingWallet // Store joiner's funding choice
+                    },
                     players: [...roomData.players, user.uid],
                     capturedByP1: [], capturedByP2: [], moveHistory: [],
                     currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
                 });
         
-                if (roomData.wager > 0) {
-                    const wagerAmount = roomData.wager;
-                    for (const player of playersData) {
-                        transaction.update(doc(db, 'users', player.id), { balance: increment(-wagerAmount) });
-                        transaction.set(doc(collection(db, 'transactions')), {
-                            userId: player.id, type: 'wager', amount: wagerAmount, status: 'completed',
-                            description: `Wager for ${roomData.gameType} game vs ${player.id === playersData[0].id ? playersData[1].name : playersData[0].name}`,
-                            gameRoomId: room.id, createdAt: serverTimestamp()
-                        });
-                        
-                        // --- Marketer Chain Commission ---
-                        if (player.data.referralChain && player.data.referralChain.length > 0) {
-                            const marketingCommissionRate = 0.03;
-                            for (let i = 0; i < player.data.referralChain.length && i < 20; i++) {
-                                const marketerId = player.data.referralChain[i];
-                                const marketerData = referrersDataMap.get(marketerId);
-                                if (marketerData && marketerData.role === 'marketer') {
-                                    const commissionAmount = wagerAmount * marketingCommissionRate;
-                                    transaction.update(doc(db, 'users', marketerId), { marketingBalance: increment(commissionAmount) });
-                                    transaction.set(doc(collection(db, 'transactions')), {
-                                        userId: marketerId, type: 'commission', amount: commissionAmount, status: 'completed',
-                                        description: `L${i + 1} Commission from ${player.name}`, fromUserId: player.id,
-                                        level: i + 1, gameRoomId: room.id, createdAt: serverTimestamp()
-                                    });
-                                }
-                            }
-                        } 
-                        
-                        // --- Regular User Commission ---
-                        if (player.data.referredBy) {
-                            const l1ReferrerId = player.data.referredBy;
-                            const l1ReferrerData = referrersDataMap.get(l1ReferrerId);
-    
-                            if (l1ReferrerData && l1ReferrerData.role === 'user') {
-                                const referralRanks = [
-                                    { rank: 1, min: 0, max: 20, l1Rate: 0.03 },
-                                    { rank: 2, min: 21, max: Infinity, l1Rate: 0.05 },
-                                ];
-                                const l1Count = l1ReferrerData.l1Count || 0; 
-                                const rank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
-                                const l1Commission = wagerAmount * rank.l1Rate;
-        
-                                if (l1Commission > 0) {
-                                    transaction.update(doc(db, 'users', l1ReferrerId), { balance: increment(l1Commission) });
-                                    transaction.set(doc(collection(db, 'transactions')), {
-                                        userId: l1ReferrerId, type: 'commission', amount: l1Commission, status: 'completed',
-                                        description: `L1 Commission from ${player.name}`, fromUserId: player.id,
-                                        level: 1, gameRoomId: room.id, createdAt: serverTimestamp()
-                                    });
-                                }
-                            }
-                        }
-                    }
+                if (wagerAmount > 0) {
+                    const transactionRef = doc(collection(db, 'transactions'));
+                    transaction.set(transactionRef, {
+                        userId: user.uid,
+                        type: 'wager',
+                        amount: wagerAmount,
+                        status: 'completed',
+                        description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`,
+                        gameRoomId: room.id,
+                        createdAt: serverTimestamp()
+                    });
                 }
             });
 
@@ -405,8 +349,6 @@ function MultiplayerGame() {
                 </div>
             )
         } else {
-            const hasEnoughBalance = userData.balance >= room.wager;
-
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                     <Card className="w-full max-w-lg p-8 bg-card/70 backdrop-blur-sm">
@@ -432,12 +374,35 @@ function MultiplayerGame() {
                                     <p className="text-xs text-muted-foreground">~{(room.wager / USDT_RATE).toFixed(2)} USDT</p>
                                 </div>
                             </div>
+
+                             <div className="space-y-3">
+                                <Label>Funding Wallet</Label>
+                                 <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="main" id="main-wallet" />
+                                        <Label htmlFor="main-wallet">Main Wallet</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="bonus" id="bonus-wallet" />
+                                        <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
+                                    </div>
+                                </RadioGroup>
+                                <Card className="p-3 bg-secondary">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Available:</span>
+                                        <div>
+                                            <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
+                                            <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
                             
-                            {!hasEnoughBalance && (
+                            {!hasSufficientFunds && (
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
-                                        You need at least LKR {room.wager.toFixed(2)} to join. Your current balance is LKR {userData.balance.toFixed(2)}.
+                                        You need at least LKR {room.wager.toFixed(2)} in your selected wallet to join.
                                     </CardDescription>
                                      <Button asChild variant="destructive">
                                         <Link href="/dashboard/wallet"><Wallet className="mr-2"/> Top Up Wallet</Link>
@@ -448,7 +413,7 @@ function MultiplayerGame() {
                             <Button 
                                 size="lg" 
                                 className="w-full"
-                                disabled={!hasEnoughBalance || isJoining}
+                                disabled={!hasSufficientFunds || isJoining}
                                 onClick={handleJoinGame}
                             >
                                 {isJoining ? <><Loader2 className="animate-spin mr-2"/> Joining...</> : <><LogIn className="mr-2"/> Join Game & Start Match</>}
@@ -524,4 +489,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-    
