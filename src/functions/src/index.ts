@@ -197,6 +197,46 @@ export const joinGame = onCall(async (request) => {
                 userId: creatorId, type: 'wager', amount: wager, status: 'completed',
                 description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: roomId, createdAt: now
             });
+            
+            // Referral Task Progress Update
+            const playersForTaskCheck = [
+                {id: creatorId, data: creatorData}, 
+                {id: joinerId, data: joinerData}
+            ];
+
+            for(const player of playersForTaskCheck) {
+                const activeTaskId = player.data.activeReferralTaskId;
+                if (activeTaskId) {
+                    const taskRef = db.collection('referral_tasks').doc(activeTaskId);
+                    const taskDoc = await transaction.get(taskRef); // Use transaction.get
+                    if (taskDoc.exists) {
+                        const taskData = taskDoc.data();
+                        if (taskData) {
+                            const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
+                            if (gamePlaySubTask) {
+                                const userToUpdateRef = db.collection('users').doc(player.id);
+                                const progressField = `taskStatus.${activeTaskId}.${gamePlaySubTask.id}.progress`;
+                                const statusField = `taskStatus.${activeTaskId}.${gamePlaySubTask.id}.status`;
+                                
+                                const currentProgress = player.data.taskStatus?.[activeTaskId]?.[gamePlaySubTask.id]?.progress || 0;
+                                const newProgress = currentProgress + 1;
+                                
+                                transaction.set(userToUpdateRef, {
+                                    taskStatus: {
+                                        [activeTaskId]: {
+                                            [gamePlaySubTask.id]: {
+                                                progress: newProgress,
+                                                status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
+                                            }
+                                        }
+                                    }
+                                }, { merge: true });
+                            }
+                        }
+                    }
+                }
+            }
+
         });
         return { success: true };
 
@@ -270,6 +310,20 @@ export const endGame = onCall(async (request) => {
             
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
+            
+            const creatorDoc = await transaction.get(creatorRef);
+            const joinerDoc = await transaction.get(joinerRef);
+
+            if (!creatorDoc.exists() || !joinerDoc.exists()) {
+                throw new HttpsError('not-found', 'One or both players could not be found.');
+            }
+
+            const creatorData = creatorDoc.data();
+            const joinerData = joinerDoc.data();
+
+            if (!creatorData || !joinerData) {
+                 throw new HttpsError('not-found', 'One or both players data is missing.');
+            }
 
             let creatorPayout = 0;
             let joinerPayout = 0;
@@ -503,5 +557,7 @@ export const sendFriendRequest = onCall(async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
+
+    
 
     
