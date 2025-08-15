@@ -1,10 +1,12 @@
 
+
 'use client'
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { doc, onSnapshot, getDoc, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentData, writeBatch } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -166,14 +168,26 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
+        const userRef = doc(db, 'users', user.uid);
     
         try {
-            await deleteDoc(roomRef);
-    
+            const batch = writeBatch(db);
+            
+            // Delete the room document
+            batch.delete(roomRef);
+
+            // Refund the wager to the correct wallet
+            if (room.wager > 0) {
+                 const refundField = room.createdBy.fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
+                 batch.update(userRef, { [refundField]: increment(room.wager) });
+            }
+
+            await batch.commit();
+
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
+                toast({ title: 'Room Expired', description: 'The room has been closed and your wager refunded.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -219,77 +233,18 @@ function MultiplayerGame() {
         }
     
         setIsJoining(true);
-        const roomRef = doc(db, 'game_rooms', room.id);
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const currentRoomDoc = await transaction.get(roomRef);
-                if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
-                    throw new Error("Room not available");
-                }
-                const roomData = currentRoomDoc.data();
-        
-                const creatorRef = doc(db, 'users', roomData.createdBy.uid);
-                const joinerRef = doc(db, 'users', user.uid);
-                
-                const joinerDoc = await transaction.get(joinerRef);
-
-                if (!joinerDoc.exists()) {
-                    throw new Error("Your user profile could not be found.");
-                }
-
-                const wagerAmount = roomData.wager || 0;
-                
-                // Deduct wager from the joiner's selected wallet
-                const updatePayload: any = {};
-                if (fundingWallet === 'main') {
-                    updatePayload.balance = increment(-wagerAmount);
-                } else {
-                    updatePayload.bonusBalance = increment(-wagerAmount);
-                }
-                transaction.update(joinerRef, updatePayload);
-
-                const creatorColor = roomData.createdBy.color;
-                const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-                
-                transaction.update(roomRef, {
-                    status: 'in-progress',
-                    player2: { 
-                        uid: user.uid, 
-                        name: `${userData.firstName} ${userData.lastName}`, 
-                        color: joinerColor, 
-                        photoURL: userData.photoURL || '',
-                        fundingWallet: fundingWallet // Store joiner's funding choice
-                    },
-                    players: [...roomData.players, user.uid],
-                    capturedByP1: [], capturedByP2: [], moveHistory: [],
-                    currentPlayer: 'w', p1Time: roomData.timeControl, p2Time: roomData.timeControl, turnStartTime: serverTimestamp(),
-                });
-        
-                if (wagerAmount > 0) {
-                    const transactionRef = doc(collection(db, 'transactions'));
-                    transaction.set(transactionRef, {
-                        userId: user.uid,
-                        type: 'wager',
-                        amount: wagerAmount,
-                        status: 'completed',
-                        description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`,
-                        gameRoomId: room.id,
-                        createdAt: serverTimestamp()
-                    });
-                }
-            });
-
+            const joinGameFunction = httpsCallable(functions, 'joinGame');
+            await joinGameFunction({ roomId: room.id, fundingWallet: fundingWallet });
             toast({ title: "Game Joined!", description: "The match is starting now."});
     
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            if (error.message === 'Room not available') {
-                 toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
+            toast({ variant: 'destructive', title: "Error Joining Game", description: error.message });
+             if (error.code === 'not-found' && error.message === 'Room not available.') {
                  router.push(`/lobby/${room.gameType}`);
-            } else {
-                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. ${error.message}`});
-            }
+             }
         } finally {
             setIsJoining(false);
         }

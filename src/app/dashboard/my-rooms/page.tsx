@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, deleteDoc, writeBatch, increment } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, deleteDoc, writeBatch, increment, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,6 +24,7 @@ type GameRoom = {
     createdBy: {
         uid: string;
         name: string;
+        fundingWallet: 'main' | 'bonus';
     };
     player2?: {
         uid: string;
@@ -32,7 +33,7 @@ type GameRoom = {
     createdAt: any;
 };
 
-const GameRoomCard = ({ room, onCancel, onRejoin }: { room: GameRoom, onCancel: (id: string, wager: number) => void, onRejoin: (id: string) => void }) => {
+const GameRoomCard = ({ room, onCancel, onRejoin }: { room: GameRoom, onCancel: (room: GameRoom) => void, onRejoin: (id: string) => void }) => {
     const { user } = useAuth();
     if (!user) return null;
     
@@ -48,7 +49,7 @@ const GameRoomCard = ({ room, onCancel, onRejoin }: { room: GameRoom, onCancel: 
                 </div>
                 <div className="flex gap-2">
                     {room.status === 'waiting' && room.createdBy.uid === user.uid && (
-                        <Button variant="destructive" size="sm" onClick={() => onCancel(room.id, room.wager)}>Cancel</Button>
+                        <Button variant="destructive" size="sm" onClick={() => onCancel(room)}>Cancel</Button>
                     )}
                      {room.status === 'in-progress' && (
                         <Button size="sm" onClick={() => onRejoin(room.id)}>Rejoin</Button>
@@ -100,17 +101,22 @@ export default function MyRoomsPage() {
         };
     }, [user]);
 
-    const handleCancelRoom = async (roomId: string, wager: number) => {
-        if (!user) return;
-        const roomRef = doc(db, 'game_rooms', roomId);
+    const handleCancelRoom = async (room: GameRoom) => {
+        if (!user || !room.createdBy.fundingWallet) return;
+        
+        const roomRef = doc(db, 'game_rooms', room.id);
         const userRef = doc(db, 'users', user.uid);
         
         try {
             const batch = writeBatch(db);
+            
+            // Delete the room document
             batch.delete(roomRef);
 
-            if (wager > 0) {
-                 batch.update(userRef, { balance: increment(wager) });
+            // Refund the wager to the correct wallet
+            if (room.wager > 0) {
+                 const refundField = room.createdBy.fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
+                 batch.update(userRef, { [refundField]: increment(room.wager) });
             }
 
             await batch.commit();
