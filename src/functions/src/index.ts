@@ -127,51 +127,34 @@ export const joinGame = onCall(async (request) => {
             const joinerData = joinerDoc.data()!;
             const creatorData = creatorDoc.data()!;
             
-            // Verify joiner has funds
-            const joinerSelectedBalance = fundingWallet === 'main' ? (joinerData.balance || 0) : (joinerData.bonusBalance || 0);
+            // Verify joiner has funds and deduct wager
+            const joinerBalance = joinerData.balance || 0;
+            const joinerBonusBalance = joinerData.bonusBalance || 0;
+            const joinerSelectedBalance = fundingWallet === 'main' ? joinerBalance : joinerBonusBalance;
+            
             if (joinerSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
-            
-            // Verify creator has funds in their chosen wallet
-            const creatorFundingWallet = roomData.createdBy.fundingWallet || 'main';
-            const creatorSelectedBalance = creatorFundingWallet === 'main' ? (creatorData.balance || 0) : (creatorData.bonusBalance || 0);
-            if (creatorSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_CREATOR");
-            
-            // Deduct wager from the joiner's selected wallet
+
             const joinerUpdate: { [key: string]: admin.firestore.FieldValue } = {};
             joinerUpdate[fundingWallet === 'main' ? 'balance' : 'bonusBalance'] = admin.firestore.FieldValue.increment(-wager);
             transaction.update(joinerRef, joinerUpdate);
             
-            // Deduct wager from the creator's selected wallet
-            const creatorUpdate: { [key: string]: admin.firestore.FieldValue } = {};
-            creatorUpdate[creatorFundingWallet === 'main' ? 'balance' : 'bonusBalance'] = admin.firestore.FieldValue.increment(-wager);
-            transaction.update(creatorRef, creatorUpdate);
-
-            // Record wagers for both players
+            // Record wager for joiner
             const now = admin.firestore.FieldValue.serverTimestamp();
             const joinerTxRef = db.collection('transactions').doc();
             transaction.set(joinerTxRef, {
                 userId: joinerId, type: 'wager', amount: wager, status: 'completed',
                 description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`, gameRoomId: roomId, createdAt: now
             });
-            const creatorTxRef = db.collection('transactions').doc();
-            transaction.set(creatorTxRef, {
-                userId: creatorId, type: 'wager', amount: wager, status: 'completed',
-                description: `Wager for ${roomData.gameType} from ${creatorFundingWallet} wallet`, gameRoomId: roomId, createdAt: now
-            });
-
+            
             // Update game room to start
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
-            const bonusWageredForCreator = creatorFundingWallet === 'bonus' ? wager : 0;
-            const mainWageredForCreator = creatorFundingWallet === 'main' ? wager : 0;
             const bonusWageredForJoiner = fundingWallet === 'bonus' ? wager : 0;
             const mainWageredForJoiner = fundingWallet === 'main' ? wager : 0;
 
             transaction.update(roomRef, {
                 status: 'in-progress',
-                'createdBy.wagerFromBonus': bonusWageredForCreator,
-                'createdBy.wagerFromMain': mainWageredForCreator,
                 player2: {
                     uid: joinerId,
                     name: `${joinerData.firstName} ${joinerData.lastName}`,
@@ -200,7 +183,7 @@ export const joinGame = onCall(async (request) => {
                         const taskData = taskDoc.data();
                         if (taskData) {
                             const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
-                            if (gamePlaySubTask) {
+                            if (gamePlaySubTask && gamePlaySubTask.target > 0) {
                                 const userToUpdateRef = db.collection('users').doc(player.id);
                                 const currentProgress = player.data.taskStatus?.[activeTaskId]?.[gamePlaySubTask.id]?.progress || 0;
                                 const newProgress = currentProgress + 1;
@@ -235,7 +218,6 @@ export const joinGame = onCall(async (request) => {
             "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
             "CREATOR_NOT_FOUND": new HttpsError('not-found', "The room creator's profile was not found."),
             "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
-            "INSUFFICIENT_FUNDS_CREATOR": new HttpsError('failed-precondition', "The room creator has insufficient funds."),
         };
         throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
@@ -301,11 +283,19 @@ export const endGame = onCall(async (request) => {
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
             } else if (method === 'resign' && resignerDetails && typeof resignerDetails.resignerPieceCount === 'number') {
-                const opponentPayoutRate = 1.30;
-                let resignerRefundRate = 0;
-                if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
-                else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
-                else resignerRefundRate = 0.25;
+                let opponentPayoutRate = 1.05;
+                if(wager >= 500) opponentPayoutRate = 1.30;
+                else if(wager >= 250) opponentPayoutRate = 1.25;
+                else if(wager >= 100) opponentPayoutRate = 1.15;
+                else opponentPayoutRate = 1.10;
+
+                let resignerRefundRate = 0.75;
+                 if(wager >= 100) {
+                    if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
+                    else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
+                    else resignerRefundRate = 0.25;
+                 }
+
 
                 winnerObject.resignerId = resignerDetails.id;
                 winnerObject.resignerPieceCount = resignerDetails.resignerPieceCount;
@@ -333,7 +323,7 @@ export const endGame = onCall(async (request) => {
 
             // Payout Logic
             if (creatorPayout > 0 && roomData.createdBy) {
-                 const profit = creatorPayout - wager;
+                 const profit = creatorPayout - (roomData.createdBy.wagerFromMain || 0) - (roomData.createdBy.wagerFromBonus || 0);
                  transaction.update(creatorRef, { 
                      balance: admin.firestore.FieldValue.increment((roomData.createdBy.wagerFromMain || 0) + profit),
                      bonusBalance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromBonus || 0)
@@ -344,7 +334,7 @@ export const endGame = onCall(async (request) => {
                 });
             }
             if (joinerPayout > 0 && roomData.player2) {
-                 const profit = joinerPayout - wager;
+                 const profit = joinerPayout - (roomData.player2.wagerFromMain || 0) - (roomData.player2.wagerFromBonus || 0);
                  transaction.update(joinerRef, { 
                      balance: admin.firestore.FieldValue.increment((roomData.player2.wagerFromMain || 0) + profit),
                      bonusBalance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromBonus || 0)
@@ -407,3 +397,5 @@ export const approveBonusClaim = onCall(async (request) => {
         throw new HttpsError('internal', 'An error occurred while processing the claim.');
     }
 });
+
+    
