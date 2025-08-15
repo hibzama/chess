@@ -151,10 +151,12 @@ export const joinGame = onCall(async (request) => {
                 bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
             });
 
-            // Creator's wager was already handled on room creation in this logic, so no need to deduct again.
-            // We just record it in the transaction for payout purposes.
-            const creatorBonusWagered = roomData.createdBy.wagerFromBonus || 0;
-            const creatorMainWagered = roomData.createdBy.wagerFromMain || 0;
+            const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
+            const creatorMainWagered = wager - creatorBonusWagered;
+            transaction.update(creatorRef, {
+                balance: admin.firestore.FieldValue.increment(-creatorMainWagered),
+                bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
+            });
 
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';

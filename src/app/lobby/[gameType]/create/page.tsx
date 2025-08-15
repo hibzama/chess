@@ -62,9 +62,6 @@ export default function CreateGamePage() {
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
-            
-            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
-            const mainWagered = wagerAmount - bonusWagered;
 
             const roomData = {
                 gameType,
@@ -75,10 +72,8 @@ export default function CreateGamePage() {
                 createdBy: {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
-                    color: finalPieceColor, // Ensure color is always set
+                    color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    wagerFromBonus: bonusWagered,
-                    wagerFromMain: mainWagered,
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
