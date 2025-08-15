@@ -114,18 +114,11 @@ export const joinGame = onCall(async (request) => {
             const creatorId = roomData.createdBy.uid;
 
             const joinerRef = db.collection('users').doc(joinerId);
-            const creatorRef = db.collection('users').doc(creatorId);
-
-            const [joinerDoc, creatorDoc] = await Promise.all([
-                transaction.get(joinerRef),
-                transaction.get(creatorRef)
-            ]);
+            const joinerDoc = await transaction.get(joinerRef);
 
             if (!joinerDoc.exists()) throw new Error("JOINER_NOT_FOUND");
-            if (!creatorDoc.exists()) throw new Error("CREATOR_NOT_FOUND");
             
             const joinerData = joinerDoc.data()!;
-            const creatorData = creatorDoc.data()!;
             
             // Verify joiner has funds and deduct wager
             const joinerBalance = joinerData.balance || 0;
@@ -168,30 +161,35 @@ export const joinGame = onCall(async (request) => {
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
             });
-            
-            // Referral Task Progress Update
+        });
+
+        // Handle referral task updates outside of the main transaction for safety
+        const creatorDoc = await db.collection('users').doc(creatorId).get();
+        const joinerDocAfterUpdate = await db.collection('users').doc(joinerId).get();
+
+        if (creatorDoc.exists() && joinerDocAfterUpdate.exists()) {
             const playersForTaskCheck = [
-                {id: creatorId, data: creatorData}, 
-                {id: joinerId, data: joinerData}
+                {id: creatorId, data: creatorDoc.data()}, 
+                {id: joinerId, data: joinerDocAfterUpdate.data()}
             ];
 
+            const batch = db.batch();
             for(const player of playersForTaskCheck) {
-                const activeTaskId = player.data.activeReferralTaskId;
-                if (activeTaskId) {
-                    const taskRef = db.collection('referral_tasks').doc(activeTaskId);
-                    const taskDoc = await transaction.get(taskRef);
+                if (player.data && player.data.activeReferralTaskId) {
+                    const taskRef = db.collection('referral_tasks').doc(player.data.activeReferralTaskId);
+                    const taskDoc = await taskRef.get();
                     if (taskDoc.exists) {
                         const taskData = taskDoc.data();
                         if (taskData) {
                             const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
                             if (gamePlaySubTask && gamePlaySubTask.target > 0) {
                                 const userToUpdateRef = db.collection('users').doc(player.id);
-                                const currentProgress = player.data.taskStatus?.[activeTaskId]?.[gamePlaySubTask.id]?.progress || 0;
+                                const currentProgress = player.data.taskStatus?.[player.data.activeReferralTaskId]?.[gamePlaySubTask.id]?.progress || 0;
                                 const newProgress = currentProgress + 1;
                                 
-                                transaction.set(userToUpdateRef, {
+                                batch.set(userToUpdateRef, {
                                     taskStatus: {
-                                        [activeTaskId]: {
+                                        [player.data.activeReferralTaskId]: {
                                             [gamePlaySubTask.id]: {
                                                 progress: newProgress,
                                                 status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
@@ -204,8 +202,9 @@ export const joinGame = onCall(async (request) => {
                     }
                 }
             }
+            await batch.commit();
+        }
 
-        });
         return { success: true };
 
     } catch (error: any) {
@@ -217,7 +216,6 @@ export const joinGame = onCall(async (request) => {
             "INVALID_ROOM_DATA": new HttpsError('aborted', "Room data is invalid or missing creator info."),
             "CANNOT_JOIN_OWN_GAME": new HttpsError('failed-precondition', "You cannot join your own game."),
             "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
-            "CREATOR_NOT_FOUND": new HttpsError('not-found', "The room creator's profile was not found."),
             "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
         };
         throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
@@ -325,8 +323,8 @@ export const endGame = onCall(async (request) => {
             // Payout Logic
             if (creatorPayout > 0 && roomData.createdBy) {
                  const profit = creatorPayout - (roomData.createdBy.wagerFromMain || 0) - (roomData.createdBy.wagerFromBonus || 0);
-                 const mainWalletReturn = (roomData.createdBy.wagerFromMain || 0) + profit;
-                 const bonusWalletReturn = (roomData.createdBy.wagerFromBonus || 0);
+                 const mainWalletReturn = (roomData.createdBy.wagerFromMain || 0) + (profit > 0 ? profit : 0);
+                 const bonusWalletReturn = (roomData.createdBy.wagerFromBonus || 0) + (profit < 0 ? profit : 0);
                  
                  const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
                  if (mainWalletReturn > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainWalletReturn);
@@ -340,8 +338,8 @@ export const endGame = onCall(async (request) => {
             }
             if (joinerPayout > 0 && roomData.player2) {
                  const profit = joinerPayout - (roomData.player2.wagerFromMain || 0) - (roomData.player2.wagerFromBonus || 0);
-                 const mainWalletReturn = (roomData.player2.wagerFromMain || 0) + profit;
-                 const bonusWalletReturn = (roomData.player2.wagerFromBonus || 0);
+                 const mainWalletReturn = (roomData.player2.wagerFromMain || 0) + (profit > 0 ? profit : 0);
+                 const bonusWalletReturn = (roomData.player2.wagerFromBonus || 0) + (profit < 0 ? profit : 0);
                  
                  const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
                  if (mainWalletReturn > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainWalletReturn);
