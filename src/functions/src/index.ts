@@ -12,6 +12,9 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import * as cors from 'cors';
+
+const corsHandler = cors({origin: true});
 
 admin.initializeApp();
 
@@ -102,7 +105,10 @@ export const joinGame = onCall(async (request) => {
                 throw new HttpsError('not-found', "Room not available");
             }
             const roomData = roomDoc.data();
-            if (!roomData || roomData.status !== 'waiting') {
+            if (!roomData) {
+                throw new HttpsError('not-found', "Room data is missing.");
+            }
+            if (roomData.status !== 'waiting') {
                 throw new HttpsError('failed-precondition', "Room is not available for joining.");
             }
             if (!roomData.createdBy || !roomData.createdBy.uid) {
@@ -229,15 +235,11 @@ export const endGame = onCall(async (request) => {
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
             
-            if (!joinerId) {
+            // Critical Safety Check
+            if (!joinerId || !roomData.player2) {
                 throw new HttpsError('failed-precondition', 'Game is missing a second player.');
             }
             
-            // This is a safety check.
-            if (!roomData.player2) {
-                throw new HttpsError('aborted', 'Player 2 data is missing from the room.');
-            }
-
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
 
@@ -249,15 +251,15 @@ export const endGame = onCall(async (request) => {
             if (method === 'draw') {
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
-            } else if (method === 'resign' && resignerDetails) {
+            } else if (method === 'resign' && resignerDetails && typeof resignerDetails.resignerPieceCount === 'number') {
                 const opponentPayoutRate = 1.30;
                 let resignerRefundRate = 0;
-                if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
-                else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
+                else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
                 else resignerRefundRate = 0.25;
 
                 winnerObject.resignerId = resignerDetails.id;
-                winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+                winnerObject.resignerPieceCount = resignerDetails.resignerPieceCount;
 
                 if (resignerDetails.id === creatorId) { // Creator resigned
                     winnerObject.uid = joinerId;

@@ -184,7 +184,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
                  if (winnerDetails.method === 'resign' && winnerDetails.resignerDetails) {
                      const isMeResigner = winnerDetails.resignerDetails.id === user.uid;
-                     if(isMeResigner) {
+                      if(isMeResigner) {
                         let refundRate = 0;
                         if (winnerDetails.resignerDetails.pieceCount >= 6) refundRate = 0.50;
                         else if (winnerDetails.resignerDetails.pieceCount >= 3) refundRate = 0.35;
@@ -462,7 +462,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 }
             }
     
-            await updateDoc(roomRef, updatePayload);
+            await runTransaction(db, async (transaction) => {
+                transaction.update(roomRef, updatePayload);
+            });
         } else {
             setGameState(prevState => {
                 if (typeof window !== 'undefined') {
@@ -485,15 +487,20 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
 
     
-    const resign = useCallback(() => { 
-        if (gameState.gameOver || gameState.isEnding || !user) return; 
-        if (isMultiplayer && room) { 
-            const winnerId = room.players.find((p)=>p !== user.uid) || null; 
-            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
-            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails); 
-        } else { 
-            setWinner('bot', gameState.boardState, 'resign'); 
-        } 
+    const resign = useCallback(() => {
+        if (gameState.gameOver || gameState.isEnding || !user) return;
+    
+        // Correctly calculate the current player's piece count
+        const currentPlayerIsCreator = room?.createdBy.uid === user.uid;
+        const pieceCount = currentPlayerIsCreator ? gameState.playerPieceCount : gameState.opponentPieceCount;
+    
+        if (isMultiplayer && room) {
+            const winnerId = room.players.find((p) => p !== user.uid) || null;
+            const resignerDetails = { id: user.uid, resignerPieceCount: pieceCount };
+            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails);
+        } else {
+            setWinner('bot', gameState.boardState, 'resign');
+        }
     }, [gameState, user, room, isMultiplayer, setWinner]);
     
     const resetGame = useCallback(() => { 
