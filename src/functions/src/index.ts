@@ -11,10 +11,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import { HttpsError } from "firebase-functions/v2/https";
-import * as cors from "cors";
-
-const corsHandler = cors({ origin: true });
 
 admin.initializeApp();
 
@@ -190,8 +186,8 @@ export const joinGame = functions.https.onCall(async (data, context) => {
         return { success: true };
     } catch (error: any) {
         functions.logger.error('Error joining game:', error);
-        if (error instanceof HttpsError) {
-             throw error; 
+        if (error.code && error.message) {
+             throw error; // Re-throw HttpsError
         }
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
@@ -229,13 +225,16 @@ export const endGame = functions.https.onCall(async (data, context) => {
             if (roomData.status !== 'in-progress') {
                 throw new functions.https.HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
             }
+             if (!roomData.createdBy || !roomData.createdBy.uid) {
+                throw new functions.https.HttpsError('aborted', "Room data is invalid or missing creator info.");
+            }
+            if (!roomData.player2 || !roomData.player2.uid) {
+                throw new functions.https.HttpsError('failed-precondition', 'Game is missing a second player.');
+            }
 
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
-            const joinerId = roomData.player2?.uid;
-            if (!joinerId) {
-                throw new functions.https.HttpsError('failed-precondition', 'Game is missing a second player.');
-            }
+            const joinerId = roomData.player2.uid;
             
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
@@ -280,7 +279,7 @@ export const endGame = functions.https.onCall(async (data, context) => {
             }
 
             // Payout Logic
-            if (creatorPayout > 0 && roomData.createdBy) {
+            if (creatorPayout > 0) {
                  const profit = creatorPayout - wager;
                  // Return wager to original wallets, profit to main balance
                  transaction.update(creatorRef, { 
@@ -292,7 +291,7 @@ export const endGame = functions.https.onCall(async (data, context) => {
                     description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
-            if (joinerPayout > 0 && roomData.player2) {
+            if (joinerPayout > 0) {
                  const profit = joinerPayout - wager;
                   // Return wager to original wallets, profit to main balance
                  transaction.update(joinerRef, { 
@@ -311,7 +310,7 @@ export const endGame = functions.https.onCall(async (data, context) => {
         return { success: true };
     } catch (error: any) {
         functions.logger.error('Error ending game:', error);
-        if (error.code) {
+        if (error.code && error.message) {
              throw error; // Re-throw HttpsError
         }
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred while ending the game.');
@@ -472,3 +471,5 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred.');
     }
 });
+
+    
