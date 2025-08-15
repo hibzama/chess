@@ -147,14 +147,6 @@ export const joinGame = onCall(async (request) => {
             
             transaction.update(joinerRef, joinerUpdate);
             
-            // Record wager for joiner
-            const now = admin.firestore.FieldValue.serverTimestamp();
-            const joinerTxRef = db.collection('transactions').doc();
-            transaction.set(joinerTxRef, {
-                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
-                description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`, gameRoomId: roomId, createdAt: now
-            });
-            
             // Update game room to start
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
