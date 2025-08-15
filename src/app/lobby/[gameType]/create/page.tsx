@@ -57,13 +57,24 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            // Handle random piece color selection
+            const batch = writeBatch(db);
+            const userRef = doc(db, 'users', user.uid);
+
+            // Deduct wager from balance immediately
+            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
+            const mainWagered = wagerAmount - bonusWagered;
+            const updatePayload: any = {};
+            if(bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
+            if(mainWagered > 0) updatePayload.balance = increment(-mainWagered);
+            batch.update(userRef, updatePayload);
+            
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
-
-            const roomData = {
+            
+            const roomRef = doc(collection(db, 'game_rooms'));
+            batch.set(roomRef, {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -74,15 +85,17 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
+                    wagerFromBonus: bonusWagered,
+                    wagerFromMain: mainWagered,
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
                 p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
-            };
-
-            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            });
+            
+            await batch.commit();
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
             router.push(`/game/multiplayer/${roomRef.id}`);

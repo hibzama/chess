@@ -102,7 +102,10 @@ export const joinGame = onCall(async (request) => {
                 throw new HttpsError('not-found', "Room not available");
             }
             const roomData = roomDoc.data();
-            if (!roomData || roomData.status !== 'waiting') {
+            if (!roomData) {
+                throw new HttpsError('not-found', "Room data is missing.");
+            }
+            if (roomData.status !== 'waiting') {
                 throw new HttpsError('failed-precondition', "Room is not available for joining.");
             }
             if (!roomData.createdBy || !roomData.createdBy.uid) {
@@ -133,11 +136,14 @@ export const joinGame = onCall(async (request) => {
             if (joinerTotalBalance < wager) {
                 throw new HttpsError('failed-precondition', "You have insufficient funds.");
             }
+            
+            // The creator wager is now only validated, not deducted again.
             const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
             if (creatorTotalBalance < wager) {
-                 throw new HttpsError('failed-precondition', "The creator has insufficient funds.");
+                 throw new HttpsError('failed-precondition', "The creator has insufficient funds to cover their wager.");
             }
             
+            // Deduct wager from the joiner ONLY.
             const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
             const joinerMainWagered = wager - joinerBonusWagered;
             transaction.update(joinerRef, {
@@ -145,19 +151,11 @@ export const joinGame = onCall(async (request) => {
                 bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
             });
 
-            const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
-            const creatorMainWagered = wager - creatorBonusWagered;
-            transaction.update(creatorRef, {
-                balance: admin.firestore.FieldValue.increment(-creatorMainWagered),
-                bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
-            });
-
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            
             transaction.update(roomRef, {
                 status: 'in-progress',
-                'createdBy.wagerFromBonus': creatorBonusWagered,
-                'createdBy.wagerFromMain': creatorMainWagered,
                 player2: {
                     uid: joinerId,
                     name: `${joinerData.firstName} ${joinerData.lastName}`,
@@ -170,6 +168,7 @@ export const joinGame = onCall(async (request) => {
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
             });
 
+            // Create transaction logs for both players.
             const now = admin.firestore.FieldValue.serverTimestamp();
             const joinerTxRef = db.collection('transactions').doc();
             transaction.set(joinerTxRef, {
@@ -192,7 +191,6 @@ export const joinGame = onCall(async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
 });
-
 
 export const endGame = onCall(async (request) => {
     if (!request.auth) {
@@ -229,7 +227,9 @@ export const endGame = onCall(async (request) => {
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
-            if (!joinerId) {
+            
+            // Critical Safety Check
+            if (!joinerId || !roomData.player2) {
                 throw new HttpsError('failed-precondition', 'Game is missing a second player.');
             }
             
@@ -244,15 +244,15 @@ export const endGame = onCall(async (request) => {
             if (method === 'draw') {
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
-            } else if (method === 'resign' && resignerDetails) {
+            } else if (method === 'resign' && resignerDetails && typeof resignerDetails.resignerPieceCount === 'number') {
                 const opponentPayoutRate = 1.30;
                 let resignerRefundRate = 0;
-                if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
-                else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
+                else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
                 else resignerRefundRate = 0.25;
 
                 winnerObject.resignerId = resignerDetails.id;
-                winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+                winnerObject.resignerPieceCount = resignerDetails.resignerPieceCount;
 
                 if (resignerDetails.id === creatorId) { // Creator resigned
                     winnerObject.uid = joinerId;
@@ -468,5 +468,3 @@ export const sendFriendRequest = onCall(async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
-
-    
