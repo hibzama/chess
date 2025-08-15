@@ -99,18 +99,22 @@ export const joinGame = onCall(async (request) => {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
             if (!roomDoc.exists) {
-                throw new HttpsError('not-found', "Room not available");
+                throw new HttpsError('not-found', "Room not available.");
             }
+
             const roomData = roomDoc.data();
             if (!roomData) {
                 throw new HttpsError('not-found', "Room data is missing.");
             }
+
             if (roomData.status !== 'waiting') {
                 throw new HttpsError('failed-precondition', "Room is not available for joining.");
             }
+
             if (!roomData.createdBy || !roomData.createdBy.uid) {
                 throw new HttpsError('aborted', "Room data is invalid or missing creator info.");
             }
+
             if (roomData.createdBy.uid === joinerId) {
                 throw new HttpsError('failed-precondition', "You cannot join your own game.");
             }
@@ -132,18 +136,18 @@ export const joinGame = onCall(async (request) => {
             const joinerData = joinerDoc.data()!;
             const creatorData = creatorDoc.data()!;
             
+            // Verify both players have funds
             const joinerTotalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
             if (joinerTotalBalance < wager) {
                 throw new HttpsError('failed-precondition', "You have insufficient funds.");
             }
             
-            // The creator wager is now only validated, not deducted again.
             const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
             if (creatorTotalBalance < wager) {
-                 throw new HttpsError('failed-precondition', "The creator has insufficient funds to cover their wager.");
+                 throw new HttpsError('failed-precondition', "The room creator has insufficient funds.");
             }
             
-            // Deduct wager from the joiner ONLY.
+            // Deduct wager from the joiner
             const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
             const joinerMainWagered = wager - joinerBonusWagered;
             transaction.update(joinerRef, {
@@ -151,11 +155,22 @@ export const joinGame = onCall(async (request) => {
                 bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
             });
 
+            // Deduct wager from the creator
+            const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
+            const creatorMainWagered = wager - creatorBonusWagered;
+            transaction.update(creatorRef, {
+                balance: admin.firestore.FieldValue.increment(-creatorMainWagered),
+                bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
+            });
+
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
+            // Update the room to start the game
             transaction.update(roomRef, {
                 status: 'in-progress',
+                'createdBy.wagerFromBonus': creatorBonusWagered,
+                'createdBy.wagerFromMain': creatorMainWagered,
                 player2: {
                     uid: joinerId,
                     name: `${joinerData.firstName} ${joinerData.lastName}`,
@@ -188,7 +203,7 @@ export const joinGame = onCall(async (request) => {
         if (error instanceof HttpsError) {
              throw error; 
         }
-        throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
+        throw new HttpsError('internal', 'An unexpected error occurred while joining the game.', error);
     }
 });
 

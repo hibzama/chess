@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -50,31 +50,21 @@ export default function CreateGamePage() {
 
         const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
         if (totalBalance < wagerAmount) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'You have insufficient funds to cover the wager for this room.' });
             return;
         }
 
         setIsCreating(true);
 
         try {
-            const batch = writeBatch(db);
-            const userRef = doc(db, 'users', user.uid);
-
-            // Deduct wager from balance immediately
-            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
-            const mainWagered = wagerAmount - bonusWagered;
-            const updatePayload: any = {};
-            if(bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
-            if(mainWagered > 0) updatePayload.balance = increment(-mainWagered);
-            batch.update(userRef, updatePayload);
-            
+            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            const roomRef = doc(collection(db, 'game_rooms'));
-            batch.set(roomRef, {
+            // Create the game room document WITHOUT deducting funds.
+            const roomRef = await addDoc(collection(db, 'game_rooms'), {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -85,8 +75,6 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    wagerFromBonus: bonusWagered,
-                    wagerFromMain: mainWagered,
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
@@ -95,9 +83,7 @@ export default function CreateGamePage() {
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             });
             
-            await batch.commit();
-            
-            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join. Your wager will be deducted when the game starts.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
