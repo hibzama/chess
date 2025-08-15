@@ -12,6 +12,9 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import { HttpsError } from "firebase-functions/v2/https";
+import * as cors from "cors";
+
+const corsHandler = cors({ origin: true });
 
 admin.initializeApp();
 
@@ -101,12 +104,12 @@ export const joinGame = functions.https.onCall(async (data, context) => {
             if (!roomDoc.exists) {
                 throw new functions.https.HttpsError('not-found', "Room not available");
             }
-            if (roomDoc.data()?.status !== 'waiting') {
-                throw new functions.https.HttpsError('failed-precondition', "Room not available");
+            const roomData = roomDoc.data();
+             if (!roomData || roomData.status !== 'waiting') {
+                throw new functions.https.HttpsError('failed-precondition', "Room is not available for joining.");
             }
 
-            const roomData = roomDoc.data();
-            if (!roomData || !roomData.createdBy || !roomData.createdBy.uid) {
+            if (!roomData.createdBy || !roomData.createdBy.uid) {
                 throw new functions.https.HttpsError('aborted', "Room data is invalid or missing creator info.");
             }
             if (roomData.createdBy.uid === joinerId) {
@@ -192,7 +195,7 @@ export const joinGame = functions.https.onCall(async (data, context) => {
         return { success: true };
     } catch (error: any) {
         functions.logger.error('Error joining game:', error);
-        if (error.code) {
+        if (error instanceof HttpsError) {
              throw error; // Re-throw HttpsError
         }
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the game.');
@@ -285,8 +288,8 @@ export const endGame = functions.https.onCall(async (data, context) => {
                  const profit = creatorPayout - wager;
                  // Return wager to original wallets, profit to main balance
                  transaction.update(creatorRef, { 
-                     balance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromMain + profit),
-                     bonusBalance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromBonus)
+                     balance: admin.firestore.FieldValue.increment((roomData.createdBy.wagerFromMain || 0) + profit),
+                     bonusBalance: admin.firestore.FieldValue.increment(roomData.createdBy.wagerFromBonus || 0)
                  });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
@@ -297,8 +300,8 @@ export const endGame = functions.https.onCall(async (data, context) => {
                  const profit = joinerPayout - wager;
                   // Return wager to original wallets, profit to main balance
                  transaction.update(joinerRef, { 
-                     balance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromMain + profit),
-                     bonusBalance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromBonus)
+                     balance: admin.firestore.FieldValue.increment((roomData.player2.wagerFromMain || 0) + profit),
+                     bonusBalance: admin.firestore.FieldValue.increment(roomData.player2.wagerFromBonus || 0)
                  });
                 transaction.set(db.collection('transactions').doc(), {
                     userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
