@@ -101,21 +101,26 @@ export const joinGame = onCall(async (request) => {
     try {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
+
             if (!roomDoc.exists) {
-                throw new HttpsError('not-found', "Room not available");
+                throw new Error("NOT_FOUND");
             }
+
             const roomData = roomDoc.data();
             if (!roomData) {
-                throw new HttpsError('not-found', "Room data is missing.");
+                throw new Error("NOT_FOUND");
             }
+
             if (roomData.status !== 'waiting') {
-                throw new HttpsError('failed-precondition', "Room is not available for joining.");
+                throw new Error("ROOM_NOT_AVAILABLE");
             }
+
             if (!roomData.createdBy || !roomData.createdBy.uid) {
-                throw new HttpsError('aborted', "Room data is invalid or missing creator info.");
+                throw new Error("INVALID_ROOM_DATA");
             }
+
             if (roomData.createdBy.uid === joinerId) {
-                throw new HttpsError('failed-precondition', "You cannot join your own game.");
+                throw new Error("CANNOT_JOIN_OWN_GAME");
             }
             
             const wager = roomData.wager || 0;
@@ -129,21 +134,24 @@ export const joinGame = onCall(async (request) => {
                 transaction.get(creatorRef)
             ]);
 
-            if (!joinerDoc.exists()) throw new HttpsError('not-found', "Your user profile was not found.");
-            if (!creatorDoc.exists()) throw new HttpsError('not-found', "The creator's profile was not found.");
+            if (!joinerDoc.exists()) throw new Error("JOINER_NOT_FOUND");
+            if (!creatorDoc.exists()) throw new Error("CREATOR_NOT_FOUND");
             
             const joinerData = joinerDoc.data()!;
             const creatorData = creatorDoc.data()!;
             
+            // Verify both players have funds
             const joinerTotalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
             if (joinerTotalBalance < wager) {
-                throw new HttpsError('failed-precondition', "You have insufficient funds.");
-            }
-            const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
-            if (creatorTotalBalance < wager) {
-                 throw new HttpsError('failed-precondition', "The creator has insufficient funds.");
+                throw new Error("INSUFFICIENT_FUNDS_JOINER");
             }
             
+            const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
+            if (creatorTotalBalance < wager) {
+                 throw new Error("INSUFFICIENT_FUNDS_CREATOR");
+            }
+            
+            // Deduct wager from the joiner
             const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
             const joinerMainWagered = wager - joinerBonusWagered;
             transaction.update(joinerRef, {
@@ -151,6 +159,7 @@ export const joinGame = onCall(async (request) => {
                 bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
             });
 
+            // Deduct wager from the creator
             const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
             const creatorMainWagered = wager - creatorBonusWagered;
             transaction.update(creatorRef, {
@@ -193,10 +202,27 @@ export const joinGame = onCall(async (request) => {
 
     } catch (error: any) {
         functions.logger.error('Error joining game:', error);
-        if (error instanceof HttpsError) {
-             throw error; 
+        
+        switch(error.message) {
+            case "NOT_FOUND":
+                throw new HttpsError('not-found', "Room not available.");
+            case "ROOM_NOT_AVAILABLE":
+                throw new HttpsError('failed-precondition', "Room is not available for joining.");
+            case "INVALID_ROOM_DATA":
+                throw new HttpsError('aborted', "Room data is invalid or missing creator info.");
+            case "CANNOT_JOIN_OWN_GAME":
+                throw new HttpsError('failed-precondition', "You cannot join your own game.");
+            case "JOINER_NOT_FOUND":
+                 throw new HttpsError('not-found', "Your user profile was not found.");
+            case "CREATOR_NOT_FOUND":
+                 throw new HttpsError('not-found', "The creator's profile was not found.");
+            case "INSUFFICIENT_FUNDS_JOINER":
+                 throw new HttpsError('failed-precondition', "You have insufficient funds.");
+            case "INSUFFICIENT_FUNDS_CREATOR":
+                 throw new HttpsError('failed-precondition', "The room creator has insufficient funds.");
+            default:
+                throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
         }
-        throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
 });
 
@@ -477,3 +503,5 @@ export const sendFriendRequest = onCall(async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
+
+    

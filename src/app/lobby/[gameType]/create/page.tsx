@@ -63,7 +63,6 @@ export default function CreateGamePage() {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            // Create the game room document WITHOUT deducting funds.
             const roomRef = await addDoc(collection(db, 'game_rooms'), {
                 gameType,
                 wager: wagerAmount,
@@ -183,3 +182,5 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
+    
