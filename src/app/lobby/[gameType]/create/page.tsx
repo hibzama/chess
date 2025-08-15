@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,16 +48,14 @@ export default function CreateGamePage() {
             return;
         }
 
-        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if (totalBalance < wagerAmount) {
-            toast({ variant: 'destructive', title: 'Error', description: 'You have insufficient funds to create this room.' });
+        if (userData.balance < wagerAmount) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
 
         setIsCreating(true);
 
         try {
-            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
@@ -73,18 +71,16 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
-                    photoURL: userData.photoURL || '',
+                    photoURL: userData.photoURL || ''
                 },
                 players: [user.uid],
-                p1Time: parseInt(gameTimer),
-                p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
             };
 
             const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
             
-            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join. Your wager will be deducted when the game starts.' });
+            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
