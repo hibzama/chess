@@ -512,5 +512,3 @@ export const sendFriendRequest = onCall(async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
-
-    
