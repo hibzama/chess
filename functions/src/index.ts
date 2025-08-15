@@ -11,10 +11,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import { HttpsError } from "firebase-functions/v2/https";
-import * as cors from "cors";
-
-const corsHandler = cors({ origin: true });
+import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
@@ -84,109 +81,107 @@ export const announceNewGame = functions.firestore
     return null;
   });
 
-export const joinGame = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
+export const joinGame = onCall(async (request) => {
+    if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     
-    const { roomId } = data;
+    const { roomId } = request.data;
     if (!roomId) {
         throw new HttpsError('invalid-argument', 'Room ID is required.');
     }
 
-    const joinerId = context.auth.uid;
+    const joinerId = request.auth.uid;
     const db = admin.firestore();
     const roomRef = db.collection('game_rooms').doc(roomId);
 
     try {
-        const roomDoc = await roomRef.get();
-        if (!roomDoc.exists) {
-            throw new HttpsError('not-found', "Room not available");
-        }
-        const roomData = roomDoc.data();
-        if (!roomData || roomData.status !== 'waiting') {
-            throw new HttpsError('failed-precondition', "Room is not available for joining.");
-        }
-        if (!roomData.createdBy || !roomData.createdBy.uid) {
-            throw new HttpsError('aborted', "Room data is invalid or missing creator info.");
-        }
-        if (roomData.createdBy.uid === joinerId) {
-            throw new HttpsError('failed-precondition', "You cannot join your own game.");
-        }
-        
-        const wager = roomData.wager || 0;
-        const creatorId = roomData.createdBy.uid;
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists) {
+                throw new HttpsError('not-found', "Room not available");
+            }
+            const roomData = roomDoc.data();
+            if (!roomData || roomData.status !== 'waiting') {
+                throw new HttpsError('failed-precondition', "Room is not available for joining.");
+            }
+            if (!roomData.createdBy || !roomData.createdBy.uid) {
+                throw new HttpsError('aborted', "Room data is invalid or missing creator info.");
+            }
+            if (roomData.createdBy.uid === joinerId) {
+                throw new HttpsError('failed-precondition', "You cannot join your own game.");
+            }
+            
+            const wager = roomData.wager || 0;
+            const creatorId = roomData.createdBy.uid;
 
-        const joinerRef = db.collection('users').doc(joinerId);
-        const creatorRef = db.collection('users').doc(creatorId);
+            const joinerRef = db.collection('users').doc(joinerId);
+            const creatorRef = db.collection('users').doc(creatorId);
 
-        const [joinerDoc, creatorDoc] = await Promise.all([
-            joinerRef.get(),
-            creatorRef.get()
-        ]);
+            const [joinerDoc, creatorDoc] = await Promise.all([
+                transaction.get(joinerRef),
+                transaction.get(creatorRef)
+            ]);
 
-        if (!joinerDoc.exists()) throw new HttpsError('not-found', "Your user profile was not found.");
-        if (!creatorDoc.exists()) throw new HttpsError('not-found', "The creator's profile was not found.");
-        
-        const joinerData = joinerDoc.data()!;
-        const creatorData = creatorDoc.data()!;
-        
-        const joinerTotalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
-        if (joinerTotalBalance < wager) {
-            throw new HttpsError('failed-precondition', "You have insufficient funds.");
-        }
-        const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
-        if (creatorTotalBalance < wager) {
-             throw new HttpsError('failed-precondition', "The creator has insufficient funds.");
-        }
-        
-        const batch = db.batch();
+            if (!joinerDoc.exists()) throw new HttpsError('not-found', "Your user profile was not found.");
+            if (!creatorDoc.exists()) throw new HttpsError('not-found', "The creator's profile was not found.");
+            
+            const joinerData = joinerDoc.data()!;
+            const creatorData = creatorDoc.data()!;
+            
+            const joinerTotalBalance = (joinerData.balance || 0) + (joinerData.bonusBalance || 0);
+            if (joinerTotalBalance < wager) {
+                throw new HttpsError('failed-precondition', "You have insufficient funds.");
+            }
+            const creatorTotalBalance = (creatorData.balance || 0) + (creatorData.bonusBalance || 0);
+            if (creatorTotalBalance < wager) {
+                 throw new HttpsError('failed-precondition', "The creator has insufficient funds.");
+            }
+            
+            const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
+            const joinerMainWagered = wager - joinerBonusWagered;
+            transaction.update(joinerRef, {
+                balance: admin.firestore.FieldValue.increment(-joinerMainWagered),
+                bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
+            });
 
-        const joinerBonusWagered = Math.min(wager, joinerData.bonusBalance || 0);
-        const joinerMainWagered = wager - joinerBonusWagered;
-        batch.update(joinerRef, {
-            balance: admin.firestore.FieldValue.increment(-joinerMainWagered),
-            bonusBalance: admin.firestore.FieldValue.increment(-joinerBonusWagered)
+            const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
+            const creatorMainWagered = wager - creatorBonusWagered;
+            transaction.update(creatorRef, {
+                balance: admin.firestore.FieldValue.increment(-creatorMainWagered),
+                bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
+            });
+
+            const creatorColor = roomData.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            transaction.update(roomRef, {
+                status: 'in-progress',
+                'createdBy.wagerFromBonus': creatorBonusWagered,
+                'createdBy.wagerFromMain': creatorMainWagered,
+                player2: {
+                    uid: joinerId,
+                    name: `${joinerData.firstName} ${joinerData.lastName}`,
+                    color: joinerColor,
+                    photoURL: joinerData.photoURL || '',
+                    wagerFromBonus: joinerBonusWagered,
+                    wagerFromMain: joinerMainWagered,
+                },
+                players: admin.firestore.FieldValue.arrayUnion(joinerId),
+                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            const now = admin.firestore.FieldValue.serverTimestamp();
+            const joinerTxRef = db.collection('transactions').doc();
+            transaction.set(joinerTxRef, {
+                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: roomId, createdAt: now
+            });
+            const creatorTxRef = db.collection('transactions').doc();
+            transaction.set(creatorTxRef, {
+                userId: creatorId, type: 'wager', amount: wager, status: 'completed',
+                description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: roomId, createdAt: now
+            });
         });
-
-        const creatorBonusWagered = Math.min(wager, creatorData.bonusBalance || 0);
-        const creatorMainWagered = wager - creatorBonusWagered;
-        batch.update(creatorRef, {
-            balance: admin.firestore.FieldValue.increment(-creatorMainWagered),
-            bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered)
-        });
-
-        const creatorColor = roomData.createdBy.color;
-        const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-        batch.update(roomRef, {
-            status: 'in-progress',
-            'createdBy.wagerFromBonus': creatorBonusWagered,
-            'createdBy.wagerFromMain': creatorMainWagered,
-            player2: {
-                uid: joinerId,
-                name: `${joinerData.firstName} ${joinerData.lastName}`,
-                color: joinerColor,
-                photoURL: joinerData.photoURL || '',
-                wagerFromBonus: joinerBonusWagered,
-                wagerFromMain: joinerMainWagered,
-            },
-            players: admin.firestore.FieldValue.arrayUnion(joinerId),
-            turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        const now = admin.firestore.FieldValue.serverTimestamp();
-        const joinerTxRef = db.collection('transactions').doc();
-        batch.set(joinerTxRef, {
-            userId: joinerId, type: 'wager', amount: wager, status: 'completed',
-            description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`, gameRoomId: roomId, createdAt: now
-        });
-        const creatorTxRef = db.collection('transactions').doc();
-        batch.set(creatorTxRef, {
-            userId: creatorId, type: 'wager', amount: wager, status: 'completed',
-            description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`, gameRoomId: roomId, createdAt: now
-        });
-
-        await batch.commit();
         return { success: true };
 
     } catch (error: any) {
@@ -199,12 +194,12 @@ export const joinGame = functions.https.onCall(async (data, context) => {
 });
 
 
-export const endGame = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
+export const endGame = onCall(async (request) => {
+    if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
-    const { roomId, winnerId, method, resignerDetails } = data;
+    const { roomId, winnerId, method, resignerDetails } = request.data;
     if (!roomId || !method) {
         throw new HttpsError('invalid-argument', 'Room ID and method are required.');
     }
@@ -319,12 +314,12 @@ export const endGame = functions.https.onCall(async (data, context) => {
     }
 });
 
-export const approveBonusClaim = functions.https.onCall(async (data, context) => {
-    if (!context.auth || !data.claimId) {
+export const approveBonusClaim = onCall(async (request) => {
+    if (!request.auth || !request.data.claimId) {
         throw new HttpsError('invalid-argument', 'Authentication and claim ID are required.');
     }
     // You could add an admin role check here for more security
-    const { claimId, newStatus } = data;
+    const { claimId, newStatus } = request.data;
     const db = admin.firestore();
     const claimRef = db.collection('bonus_claims').doc(claimId);
 
@@ -362,11 +357,11 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
     }
 });
 
-export const suggestFriends = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
+export const suggestFriends = onCall(async (request) => {
+  if (!request.auth) {
     throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
   }
-  const userId = context.auth.uid;
+  const userId = request.auth.uid;
   const db = admin.firestore();
 
   try {
@@ -410,12 +405,12 @@ export const suggestFriends = functions.https.onCall(async (data, context) => {
 });
 
 
-export const sendFriendRequest = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
+export const sendFriendRequest = onCall(async (request) => {
+    if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-    const fromId = context.auth.uid;
-    const { toId } = data;
+    const fromId = request.auth.uid;
+    const { toId } = request.data;
     if (!toId) {
         throw new HttpsError('invalid-argument', 'Recipient ID is required.');
     }
@@ -473,3 +468,5 @@ export const sendFriendRequest = functions.https.onCall(async (data, context) =>
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
+
+    
