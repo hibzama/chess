@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, Timestamp, setDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -52,7 +53,10 @@ export default function CreateGamePage() {
             return;
         }
 
-        // We no longer check for funds here, as it will be checked when the 2nd player joins.
+        if(!hasSufficientFunds) {
+            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your primary wallet (${fundingWallet}) to create this game.`});
+            return;
+        }
         
         setIsCreating(true);
 
@@ -75,9 +79,11 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    fundingWallet: fundingWallet, // Store the intended funding wallet
+                    fundingWallet: fundingWallet,
                 },
                 players: [user.uid],
+                p1Time: parseInt(gameTimer),
+                p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
             };
