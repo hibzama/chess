@@ -29,6 +29,37 @@ interface BonusClaim {
     answer?: string; // The user's submitted answer for verification
 }
 
+async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
+    const claimsDataPromises = snapshot.docs.map(async (claimDoc: any) => {
+        const data = claimDoc.data() as BonusClaim;
+        const userDoc = await getDoc(doc(db, 'users', data.userId));
+        
+        let answer = '';
+        if(data.type === 'referee' && data.refereeId && data.campaignId) {
+            const campaignInfoDoc = await getDoc(doc(db, `users/${data.refereeId}/active_campaigns`, 'current'));
+            if(campaignInfoDoc.exists()) {
+                 const campaignInfo = campaignInfoDoc.data();
+                 const campaignDetails = await getDoc(doc(db, 'referral_campaigns', data.campaignId));
+                 if(campaignDetails.exists()){
+                     const tasks = campaignDetails.data().tasks;
+                     const relatedTask = tasks.find((t: any) => t.description.substring(0,30) === data.campaignTitle.split(':')[1]?.trim().substring(0,30));
+                     if(relatedTask && campaignInfo.answers) {
+                         answer = campaignInfo.answers[relatedTask.id] || 'Not found';
+                     }
+                 }
+            }
+        }
+
+        return { 
+            ...data, 
+            id: claimDoc.id, 
+            userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User',
+            answer: answer
+        };
+    });
+    return Promise.all(claimsDataPromises);
+}
+
 export default function ReferralClaimsPage() {
     const [pendingClaims, setPendingClaims] = useState<BonusClaim[]>([]);
     const [historyClaims, setHistoryClaims] = useState<BonusClaim[]>([]);
@@ -36,55 +67,34 @@ export default function ReferralClaimsPage() {
     const { toast } = useToast();
 
     useEffect(() => {
-        // A robust query that doesn't need a complex index.
-        // We will fetch recent claims and filter them client-side.
-        const q = query(collectionGroup(db, 'bonus_claims'), orderBy('createdAt', 'desc'), limit(100));
+        setLoading(true);
 
-        const unsubscribe = onSnapshot(q, async (snapshot) => {
-            setLoading(true);
-            const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
-                const data = claimDoc.data() as BonusClaim;
-                const userDoc = await getDoc(doc(db, 'users', data.userId));
-                
-                let answer = '';
-                if(data.type === 'referee' && data.refereeId && data.campaignId) {
-                    const campaignInfoDoc = await getDoc(doc(db, `users/${data.refereeId}/active_campaigns`, 'current'));
-                    if(campaignInfoDoc.exists()) {
-                         const campaignInfo = campaignInfoDoc.data();
-                         const campaignDetails = await getDoc(doc(db, 'referral_campaigns', data.campaignId));
-                         if(campaignDetails.exists()){
-                             const tasks = campaignDetails.data().tasks;
-                             const relatedTask = tasks.find((t: any) => t.description.substring(0,30) === data.campaignTitle.split(':')[1]?.trim().substring(0,30));
-                             if(relatedTask && campaignInfo.answers) {
-                                 answer = campaignInfo.answers[relatedTask.id] || 'Not found';
-                             }
-                         }
-                    }
-                }
+        const handleError = (error: any) => {
+             console.error("Error fetching claims:", error);
+             setLoading(false);
+             toast({ variant: 'destructive', title: 'Error', description: 'Failed to fetch claims data.' });
+        }
 
-                return { 
-                    ...data, 
-                    id: claimDoc.id, 
-                    userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User',
-                    answer: answer
-                };
-            });
-            const allClaims = await Promise.all(claimsDataPromises);
-
-            // Filter claims into pending and history lists
-            const pending = allClaims.filter(claim => claim.status === 'pending');
-            const history = allClaims.filter(claim => claim.status === 'approved' || claim.status === 'rejected');
-            
-            setPendingClaims(pending);
-            setHistoryClaims(history);
+        // Listener for pending claims
+        const pendingQuery = query(collectionGroup(db, 'bonus_claims'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+        const unsubscribePending = onSnapshot(pendingQuery, async (snapshot) => {
+            const claims = await enrichClaims(snapshot);
+            setPendingClaims(claims);
             setLoading(false);
-        }, (error) => {
-            console.error("Error fetching claims:", error);
-            setLoading(false);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to fetch claims data.' });
-        });
+        }, handleError);
 
-        return () => unsubscribe();
+        // Listener for history claims
+        const historyQuery = query(collectionGroup(db, 'bonus_claims'), where('status', 'in', ['approved', 'rejected']), orderBy('createdAt', 'desc'), limit(50));
+        const unsubscribeHistory = onSnapshot(historyQuery, async (snapshot) => {
+             const claims = await enrichClaims(snapshot);
+            setHistoryClaims(claims);
+        }, handleError);
+
+
+        return () => {
+            unsubscribePending();
+            unsubscribeHistory();
+        };
     }, [toast]);
 
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
