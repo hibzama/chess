@@ -99,14 +99,15 @@ export default function UserCampaignsPage() {
          // Fetch claim history
         const claimQuery = query(
             collection(db, 'transactions'), 
-            where('userId', '==', user.uid),
-            where('type', '==', 'bonus'),
-            orderBy('createdAt', 'desc')
+            where('userId', '==', user.uid)
         );
         const unsubHistory = onSnapshot(claimQuery, (snapshot) => {
-            const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as ClaimHistory));
-            const filteredHistory = history.filter(h => h.description !== 'Deposit Bonus');
-            setClaimHistory(filteredHistory);
+            const allTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}));
+            const bonusHistory = allTransactions
+                .filter(tx => tx.type === 'bonus' && tx.description !== 'Deposit Bonus')
+                .sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+
+            setClaimHistory(bonusHistory as ClaimHistory[]);
         });
 
         return () => {
@@ -251,7 +252,7 @@ export default function UserCampaignsPage() {
                                         <TableRow key={claim.id}>
                                             <TableCell>{claim.description}</TableCell>
                                             <TableCell className="text-green-400 font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
-                                            <TableCell>{format(claim.createdAt.toDate(), 'PPp')}</TableCell>
+                                            <TableCell>{claim.createdAt ? format(claim.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                                         </TableRow>
                                     )) : <TableRow><TableCell colSpan={3} className="text-center h-24">No history found.</TableCell></TableRow>}
                                 </TableBody>
