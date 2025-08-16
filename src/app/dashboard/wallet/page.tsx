@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db, storage } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp, orderBy, limit, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp, orderBy, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -92,16 +92,15 @@ export default function WalletPage() {
     
     const q = query(
         collection(db, 'transactions'), 
-        where('userId', '==', user.uid), 
-        orderBy('createdAt', 'desc'), 
-        limit(50)
+        where('userId', '==', user.uid)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const userTransactions = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Transaction))
-        .filter(tx => tx.type !== 'commission'); 
-      setTransactions(userTransactions);
+        .filter(tx => tx.type !== 'commission')
+        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      setTransactions(userTransactions.slice(0, 50));
       setLoading(false);
     }, (error) => {
       console.error("Error fetching transactions:", error);
@@ -556,5 +555,3 @@ export default function WalletPage() {
     </>
   );
 }
-
-    
