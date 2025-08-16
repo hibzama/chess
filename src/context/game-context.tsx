@@ -1,9 +1,8 @@
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db, functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc, onSnapshot, Timestamp, runTransaction, DocumentData } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, Timestamp, runTransaction, DocumentData, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -27,8 +26,8 @@ interface GameRoom {
     p2Time: number; // Stored as seconds remaining at last turn
     turnStartTime: Timestamp;
     timeControl: number;
-    createdBy: { uid: string; color: PlayerColor; name: string; photoURL?: string; wagerFromBonus: number; wagerFromMain: number; };
-    player2?: { uid: string; color: PlayerColor, name: string; photoURL?: string; wagerFromBonus: number; wagerFromMain: number; };
+    createdBy: { uid: string; color: PlayerColor; name: string; photoURL?: string; fundingWallet: 'main' | 'bonus' };
+    player2?: { uid: string; color: PlayerColor, name: string; photoURL?: string; fundingWallet: 'main' | 'bonus' };
     players: string[];
     status: 'waiting' | 'in-progress' | 'completed';
     winner?: {
@@ -72,6 +71,7 @@ interface GameContextType extends GameState {
     isGameLoading: boolean;
     isMultiplayer: boolean;
     resign: () => void;
+    cancelWaitingRoom: () => Promise<void>;
     roomWager: number;
     roomOpponentId: string | null;
     room: GameRoom | null;
@@ -490,13 +490,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     const resign = useCallback(() => {
         if (gameState.gameOver || gameState.isEnding || !user) return;
     
-        // Correctly calculate the current player's piece count
         const currentPlayerIsCreator = room?.createdBy.uid === user.uid;
         const pieceCount = currentPlayerIsCreator ? gameState.playerPieceCount : gameState.opponentPieceCount;
     
         if (isMultiplayer && room) {
             const winnerId = room.players.find((p) => p !== user.uid) || null;
-            const resignerDetails = { id: user.uid, resignerPieceCount: pieceCount };
+            const resignerDetails = { id: user.uid, pieceCount: pieceCount };
             setWinner(winnerId, gameState.boardState, 'resign', resignerDetails);
         } else {
             setWinner('bot', gameState.boardState, 'resign');
@@ -513,9 +512,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         setRoom(null); 
     }, [isMultiplayer, storageKey, getInitialState]);
     
+    const cancelWaitingRoom = useCallback(async () => {
+        if (isMultiplayer && room && room.status === 'waiting') {
+            const roomRef = doc(db, 'game_rooms', room.id);
+            await deleteDoc(roomRef);
+        }
+    }, [isMultiplayer, room]);
+
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, isMounted, setupGame, switchTurn, updateAndSaveState, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isGameLoading };
+    const contextValue = { ...gameState, isMounted, setupGame, switchTurn, updateAndSaveState, setWinner, resign, cancelWaitingRoom, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isGameLoading };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 };

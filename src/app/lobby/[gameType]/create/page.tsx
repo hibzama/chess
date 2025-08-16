@@ -1,4 +1,3 @@
-
 'use client'
 
 import { useState } from 'react';
@@ -53,38 +52,19 @@ export default function CreateGamePage() {
             return;
         }
 
-        if (!hasSufficientFunds) {
-            toast({ variant: 'destructive', title: 'Error', description: `Insufficient funds in your primary wallet (${fundingWallet}). Please top up or change your primary wallet.` });
-            return;
-        }
-
+        // We no longer check for funds here, as it will be checked when the 2nd player joins.
+        
         setIsCreating(true);
 
         try {
-            const batch = writeBatch(db);
-            const userRef = doc(db, 'users', user.uid);
-
-            // Deduct wager from the selected wallet
-            const updatePayload: { [key: string]: any } = {};
-            let wagerFromBonus = 0;
-            let wagerFromMain = 0;
-
-            if (fundingWallet === 'bonus') {
-                wagerFromBonus = wagerAmount;
-                updatePayload.bonusBalance = increment(-wagerAmount);
-            } else {
-                wagerFromMain = wagerAmount;
-                updatePayload.balance = increment(-wagerAmount);
-            }
-            batch.update(userRef, updatePayload);
-
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
             const roomRef = doc(collection(db, 'game_rooms'));
-            batch.set(roomRef, {
+            
+            const roomData = {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -95,25 +75,21 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    fundingWallet: fundingWallet,
-                    wagerFromBonus: wagerFromBonus,
-                    wagerFromMain: wagerFromMain,
+                    fundingWallet: fundingWallet, // Store the intended funding wallet
                 },
                 players: [user.uid],
-                p1Time: parseInt(gameTimer),
-                p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
-            });
+            };
 
-            await batch.commit();
+            await setDoc(roomRef, roomData);
             
-            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join. Your funds will be deducted when the game starts.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your balance has not been changed.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room.' });
         } finally {
             setIsCreating(false);
         }
@@ -151,6 +127,10 @@ export default function CreateGamePage() {
                                 <Button variant="link" asChild size="sm" className="p-0 h-auto">
                                     <Link href="/dashboard/wallet?tab=primary-wallet">Change</Link>
                                 </Button>
+                            </div>
+                             <div className="flex justify-between items-center mt-2 pt-2 border-t text-sm">
+                                <span className="text-muted-foreground">Available Balance:</span>
+                                <span className="font-semibold">LKR {selectedWalletBalance.toFixed(2)}</span>
                             </div>
                         </Card>
 
@@ -209,7 +189,7 @@ export default function CreateGamePage() {
                             </div>
                         </div>
 
-                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating || !hasSufficientFunds}>
+                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
                             {isCreating ? 'Creating Game...' : 'Create Game & Wait for Opponent'}
                         </Button>
                     </CardContent>
