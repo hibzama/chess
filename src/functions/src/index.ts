@@ -85,6 +85,7 @@ export const announceNewGame = functions.firestore
   });
 
 export const joinGame = onCall(async (request) => {
+  return corsHandler(request, {} as any, async () => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
@@ -130,19 +131,30 @@ export const joinGame = onCall(async (request) => {
             const creatorFundingWallet = creatorData.primaryWallet || 'main';
             const joinerFundingWallet = fundingWallet;
 
-            const creatorBalance = creatorFundingWallet === 'main' ? creatorData.balance : creatorData.bonusBalance;
-            const joinerBalance = joinerFundingWallet === 'main' ? joinerData.balance : joinerData.bonusBalance;
+            const creatorBalance = creatorFundingWallet === 'main' ? (creatorData.balance || 0) : (creatorData.bonusBalance || 0);
+            const joinerBalance = joinerFundingWallet === 'main' ? (joinerData.balance || 0) : (joinerData.bonusBalance || 0);
 
-            if ((creatorBalance || 0) < wager) throw new Error("INSUFFICIENT_FUNDS_CREATOR");
-            if ((joinerBalance || 0) < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
+            if (creatorBalance < wager) throw new Error("INSUFFICIENT_FUNDS_CREATOR");
+            if (joinerBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
+
+            const creatorWagerFromBonus = creatorFundingWallet === 'bonus' ? wager : 0;
+            const creatorWagerFromMain = creatorFundingWallet === 'main' ? wager : 0;
+            const joinerWagerFromBonus = joinerFundingWallet === 'bonus' ? wager : 0;
+            const joinerWagerFromMain = joinerFundingWallet === 'main' ? wager : 0;
 
             // Deduct from creator
-            const creatorBalanceField = creatorFundingWallet === 'main' ? 'balance' : 'bonusBalance';
-            transaction.update(creatorRef, { [creatorBalanceField]: admin.firestore.FieldValue.increment(-wager) });
+            if (creatorWagerFromBonus > 0) {
+                 transaction.update(creatorRef, { bonusBalance: admin.firestore.FieldValue.increment(-creatorWagerFromBonus) });
+            } else if (creatorWagerFromMain > 0) {
+                 transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(-creatorWagerFromMain) });
+            }
             
             // Deduct from joiner
-            const joinerBalanceField = joinerFundingWallet === 'main' ? 'balance' : 'bonusBalance';
-            transaction.update(joinerRef, { [joinerBalanceField]: admin.firestore.FieldValue.increment(-wager) });
+            if (joinerWagerFromBonus > 0) {
+                 transaction.update(joinerRef, { bonusBalance: admin.firestore.FieldValue.increment(-joinerWagerFromBonus) });
+            } else if (joinerWagerFromMain > 0) {
+                 transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(-joinerWagerFromMain) });
+            }
             
             // Update game room to start
             const creatorColor = roomData.createdBy.color;
@@ -151,8 +163,8 @@ export const joinGame = onCall(async (request) => {
             const updatedCreatorData = {
                 ...roomData.createdBy,
                 fundingWallet: creatorFundingWallet,
-                wagerFromMain: creatorFundingWallet === 'main' ? wager : 0,
-                wagerFromBonus: creatorFundingWallet === 'bonus' ? wager : 0,
+                wagerFromMain: creatorWagerFromMain,
+                wagerFromBonus: creatorWagerFromBonus,
             };
 
             transaction.update(roomRef, {
@@ -164,8 +176,8 @@ export const joinGame = onCall(async (request) => {
                     color: joinerColor,
                     photoURL: joinerData.photoURL || '',
                     fundingWallet: joinerFundingWallet,
-                    wagerFromMain: joinerFundingWallet === 'main' ? wager : 0,
-                    wagerFromBonus: joinerFundingWallet === 'bonus' ? wager : 0,
+                    wagerFromMain: joinerWagerFromMain,
+                    wagerFromBonus: joinerWagerFromBonus,
                 },
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
@@ -231,10 +243,12 @@ export const joinGame = onCall(async (request) => {
         };
         throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
+  });
 });
 
 
 export const endGame = onCall(async (request) => {
+  return corsHandler(request, {} as any, async () => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
@@ -360,9 +374,11 @@ export const endGame = onCall(async (request) => {
         }
         throw new HttpsError('internal', 'An unexpected error occurred while ending the game.');
     }
+  });
 });
 
 export const approveBonusClaim = onCall(async (request) => {
+  return corsHandler(request, {} as any, async () => {
     if (!request.auth || !request.data.claimId) {
         throw new HttpsError('invalid-argument', 'Authentication and claim ID are required.');
     }
@@ -400,4 +416,5 @@ export const approveBonusClaim = onCall(async (request) => {
         if (error.code) throw error;
         throw new HttpsError('internal', 'An error occurred while processing the claim.');
     }
+  });
 });
