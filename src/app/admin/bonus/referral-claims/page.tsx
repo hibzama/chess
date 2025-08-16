@@ -34,27 +34,11 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
         const data = claimDoc.data() as BonusClaim;
         const userDoc = await getDoc(doc(db, 'users', data.userId));
         
-        let answer = '';
-        if(data.type === 'referee' && data.refereeId && data.campaignId) {
-            const campaignInfoDoc = await getDoc(doc(db, `users/${data.refereeId}/active_campaigns`, 'current'));
-            if(campaignInfoDoc.exists()) {
-                 const campaignInfo = campaignInfoDoc.data();
-                 const campaignDetails = await getDoc(doc(db, 'referral_campaigns', data.campaignId));
-                 if(campaignDetails.exists()){
-                     const tasks = campaignDetails.data().tasks;
-                     const relatedTask = tasks.find((t: any) => t.description.substring(0,30) === data.campaignTitle.split(':')[1]?.trim().substring(0,30));
-                     if(relatedTask && campaignInfo.answers) {
-                         answer = campaignInfo.answers[relatedTask.id] || 'Not found';
-                     }
-                 }
-            }
-        }
-
+        // This logic is simplified as the answer is now stored directly on the claim.
         return { 
             ...data, 
             id: claimDoc.id, 
             userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User',
-            answer: answer
         };
     });
     return Promise.all(claimsDataPromises);
