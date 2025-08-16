@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -9,16 +9,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, Loader2, Check, X, Globe, MessageSquare, Send } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Loader2, Check, X, Globe, MessageSquare, Send, Link as LinkIcon, Facebook } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+const TikTokIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-2.43.03-4.83-.65-6.49-2.31-1.31-1.31-2.12-3.1-2.12-4.99 0-1.89.81-3.69 2.12-4.99 1.66-1.66 4.06-2.34 6.49-2.31.02 1.55.02 3.1-.01 4.65-.54-.03-1.08-.02-1.62-.02-1.09 0-2.19-.17-3.23-.48-.6-.19-1.18-.44-1.73-.78-.26-.16-.52-.33-.78-.51 0-1.02.01-2.03.01-3.04.27.19.52.38.77.57 1.03.78 2.24 1.18 3.54 1.18.57 0 1.14-.03 1.71-.09.08-1.57.03-3.14.03-4.71z" />
+    </svg>
+);
+
+
 export interface CampaignTask {
     id: string;
     description: string;
-    type: 'generic' | 'whatsapp' | 'telegram';
+    type: 'generic' | 'link' | 'whatsapp' | 'telegram' | 'facebook' | 'tiktok';
     link?: string;
     verificationQuestion: string;
     refereeBonus: number;
@@ -103,13 +110,15 @@ export default function ReferralCampaignsPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+        
+        const isLinkRequired = (type: CampaignTask['type']) => !['generic'].includes(type);
 
         const campaignData = {
             title: formState.title,
             tasks: formState.tasks.map(task => ({
                 ...task, 
                 refereeBonus: Number(task.refereeBonus),
-                link: task.type === 'generic' ? '' : task.link
+                link: isLinkRequired(task.type) ? task.link : ''
             })),
             referralGoal: Number(formState.referralGoal),
             referrerBonus: Number(formState.referrerBonus),
@@ -166,6 +175,7 @@ export default function ReferralCampaignsPage() {
     }
     
     const totalRefereeBonus = formState.tasks.reduce((acc, task) => acc + Number(task.refereeBonus || 0), 0);
+    const isLinkRequired = (type: CampaignTask['type']) => !['generic'].includes(type);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -185,16 +195,19 @@ export default function ReferralCampaignsPage() {
                             {formState.tasks.map((task, index) => (
                                 <div key={task.id} className="p-3 border rounded-lg space-y-3 relative bg-background/50">
                                     <Label>Task {index + 1}</Label>
-                                    <Select value={task.type} onValueChange={(v) => handleTaskChange(index, 'type', v)}>
+                                    <Select value={task.type} onValueChange={(v) => handleTaskChange(index, 'type', v as any)}>
                                         <SelectTrigger><SelectValue/></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="generic"><Globe className="w-4 h-4 inline-block mr-2"/> Generic Task</SelectItem>
+                                            <SelectItem value="link"><LinkIcon className="w-4 h-4 inline-block mr-2"/> Custom Link</SelectItem>
                                             <SelectItem value="whatsapp"><MessageSquare className="w-4 h-4 inline-block mr-2"/> Join WhatsApp</SelectItem>
                                             <SelectItem value="telegram"><Send className="w-4 h-4 inline-block mr-2"/> Join Telegram</SelectItem>
+                                            <SelectItem value="facebook"><Facebook className="w-4 h-4 inline-block mr-2"/> Follow on Facebook</SelectItem>
+                                            <SelectItem value="tiktok"><TikTokIcon className="w-4 h-4 inline-block mr-2"/> Follow on TikTok</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <Textarea value={task.description} onChange={e => handleTaskChange(index, 'description', e.target.value)} placeholder={`e.g., Join our official group.`} required/>
-                                    {task.type !== 'generic' && (
+                                    {isLinkRequired(task.type) && (
                                         <Input value={task.link} onChange={e => handleTaskChange(index, 'link', e.target.value)} placeholder={`e.g., https://chat.whatsapp.com/...`} required/>
                                     )}
                                     <Input value={task.verificationQuestion} onChange={e => handleTaskChange(index, 'verificationQuestion', e.target.value)} placeholder={`e.g., What is your WhatsApp number?`} required/>

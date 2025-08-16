@@ -5,7 +5,7 @@ import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { doc, getDoc, updateDoc, increment, setDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment, setDoc, collection, serverTimestamp, writeBatch, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -55,31 +55,35 @@ function CampaignTaskCompletion() {
         setIsSubmitting(true);
         
         try {
+            const batch = writeBatch(db);
             const userRef = doc(db, 'users', user.uid);
             const newCompletedTasks = [...(userData.campaignInfo.completedTasks || []), currentTask.id];
             
-            await updateDoc(userRef, {
+            batch.update(userRef, {
                 'campaignInfo.completedTasks': newCompletedTasks,
                 'campaignInfo.answers': {
                     ...userData.campaignInfo.answers,
                     [currentTask.id]: answer
                 },
-                balance: increment(currentTask.refereeBonus || 0)
             });
             
-            if (currentTask.refereeBonus > 0) {
-                 const transactionRef = doc(collection(db, 'transactions'));
-                 await setDoc(transactionRef, {
-                     userId: user.uid,
-                     type: 'bonus',
-                     amount: currentTask.refereeBonus,
-                     status: 'completed',
-                     description: `Referral Task Bonus: ${currentTask.description.substring(0, 30)}...`,
-                     createdAt: serverTimestamp(),
+            // Create a bonus claim for the admin to approve
+            if(currentTask.refereeBonus > 0) {
+                 const claimRef = doc(collection(db, 'bonus_claims'));
+                 batch.set(claimRef, {
+                    userId: user.uid,
+                    amount: currentTask.refereeBonus,
+                    campaignTitle: `Task: ${currentTask.description.substring(0, 30)}...`,
+                    type: 'referee',
+                    status: 'pending',
+                    createdAt: serverTimestamp(),
+                    refereeId: user.uid // The new user is the referee
                  });
             }
 
-            toast({ title: "Task Completed!", description: `LKR ${currentTask.refereeBonus.toFixed(2)} has been added to your balance!`});
+            await batch.commit();
+
+            toast({ title: "Task Submitted!", description: `Your task completion has been submitted for review.`});
             
             // This will trigger the useEffect to find the next task
             setUserData(prev => prev ? ({
@@ -97,6 +101,8 @@ function CampaignTaskCompletion() {
             setIsSubmitting(false);
         }
     }
+    
+    const isLinkTask = currentTask && ['whatsapp', 'telegram', 'facebook', 'tiktok', 'link'].includes(currentTask.type);
 
     if (loading || !currentTask) {
         return null;
@@ -108,6 +114,13 @@ function CampaignTaskCompletion() {
             <AlertTitle className="font-bold text-primary">Complete Your Referral Task!</AlertTitle>
             <AlertDescription>
                 {currentTask.description}
+                 {isLinkTask && currentTask.link && (
+                    <Button asChild size="sm" className="my-2">
+                        <a href={currentTask.link} target="_blank" rel="noopener noreferrer">
+                            Open Link
+                        </a>
+                    </Button>
+                )}
                 <div className="mt-2 space-y-2">
                     <p className="text-sm font-semibold">{currentTask.verificationQuestion}</p>
                     <div className="flex gap-2">
@@ -162,4 +175,3 @@ export default function DashboardLayout({
         </MainLayout>
     )
   }
-
