@@ -98,6 +98,8 @@ export const joinGame = onCall(async (request) => {
     const db = admin.firestore();
     const roomRef = db.collection('game_rooms').doc(roomId);
 
+    let creatorId: string;
+
     try {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
@@ -111,21 +113,14 @@ export const joinGame = onCall(async (request) => {
             if (roomData.createdBy.uid === joinerId) throw new Error("CANNOT_JOIN_OWN_GAME");
             
             const wager = roomData.wager || 0;
-            const creatorId = roomData.createdBy.uid;
+            creatorId = roomData.createdBy.uid;
 
             const joinerRef = db.collection('users').doc(joinerId);
-            const creatorRef = db.collection('users').doc(creatorId);
-
-            const [joinerDoc, creatorDoc] = await Promise.all([
-                transaction.get(joinerRef),
-                transaction.get(creatorRef)
-            ]);
+            const joinerDoc = await transaction.get(joinerRef);
 
             if (!joinerDoc.exists()) throw new Error("JOINER_NOT_FOUND");
-            if (!creatorDoc.exists()) throw new Error("CREATOR_NOT_FOUND");
             
             const joinerData = joinerDoc.data()!;
-            const creatorData = creatorDoc.data()!;
             
             // Verify joiner has funds and deduct wager
             const joinerBalance = joinerData.balance || 0;
@@ -135,7 +130,8 @@ export const joinGame = onCall(async (request) => {
             if (joinerSelectedBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
 
             const joinerUpdate: { [key: string]: admin.firestore.FieldValue } = {};
-            joinerUpdate[fundingWallet === 'main' ? 'balance' : 'bonusBalance'] = admin.firestore.FieldValue.increment(-wager);
+            const balanceFieldToDecrement = fundingWallet === 'main' ? 'balance' : 'bonusBalance';
+            joinerUpdate[balanceFieldToDecrement] = admin.firestore.FieldValue.increment(-wager);
             transaction.update(joinerRef, joinerUpdate);
             
             // Record wager for joiner
@@ -167,30 +163,35 @@ export const joinGame = onCall(async (request) => {
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
             });
-            
-            // Referral Task Progress Update
+        });
+
+        // Handle referral task updates outside of the main transaction for safety
+        const creatorDoc = await db.collection('users').doc(creatorId!).get();
+        const joinerDocAfterUpdate = await db.collection('users').doc(joinerId).get();
+
+        if (creatorDoc.exists() && joinerDocAfterUpdate.exists()) {
             const playersForTaskCheck = [
-                {id: creatorId, data: creatorData}, 
-                {id: joinerId, data: joinerData}
+                {id: creatorId!, data: creatorDoc.data()}, 
+                {id: joinerId, data: joinerDocAfterUpdate.data()}
             ];
 
+            const batch = db.batch();
             for(const player of playersForTaskCheck) {
-                const activeTaskId = player.data.activeReferralTaskId;
-                if (activeTaskId) {
-                    const taskRef = db.collection('referral_tasks').doc(activeTaskId);
-                    const taskDoc = await transaction.get(taskRef);
+                if (player.data && player.data.activeReferralTaskId) {
+                    const taskRef = db.collection('referral_tasks').doc(player.data.activeReferralTaskId);
+                    const taskDoc = await taskRef.get();
                     if (taskDoc.exists) {
                         const taskData = taskDoc.data();
                         if (taskData) {
                             const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
                             if (gamePlaySubTask && gamePlaySubTask.target > 0) {
                                 const userToUpdateRef = db.collection('users').doc(player.id);
-                                const currentProgress = player.data.taskStatus?.[activeTaskId]?.[gamePlaySubTask.id]?.progress || 0;
+                                const currentProgress = player.data.taskStatus?.[player.data.activeReferralTaskId]?.[gamePlaySubTask.id]?.progress || 0;
                                 const newProgress = currentProgress + 1;
                                 
-                                transaction.set(userToUpdateRef, {
+                                batch.set(userToUpdateRef, {
                                     taskStatus: {
-                                        [activeTaskId]: {
+                                        [player.data.activeReferralTaskId]: {
                                             [gamePlaySubTask.id]: {
                                                 progress: newProgress,
                                                 status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
@@ -203,8 +204,9 @@ export const joinGame = onCall(async (request) => {
                     }
                 }
             }
+            await batch.commit();
+        }
 
-        });
         return { success: true };
 
     } catch (error: any) {
@@ -216,7 +218,6 @@ export const joinGame = onCall(async (request) => {
             "INVALID_ROOM_DATA": new HttpsError('aborted', "Room data is invalid or missing creator info."),
             "CANNOT_JOIN_OWN_GAME": new HttpsError('failed-precondition', "You cannot join your own game."),
             "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
-            "CREATOR_NOT_FOUND": new HttpsError('not-found', "The room creator's profile was not found."),
             "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
         };
         throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
@@ -320,37 +321,33 @@ export const endGame = onCall(async (request) => {
                     transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
                 }
             }
+            
+            const playersPayoutData = [
+                { ref: creatorRef, payout: creatorPayout, wagerInfo: roomData.createdBy },
+                { ref: joinerRef, payout: joinerPayout, wagerInfo: roomData.player2 }
+            ];
+            
+            for(const p of playersPayoutData) {
+                if (p.payout > 0) {
+                    const profit = p.payout - (p.wagerInfo.wagerFromMain || 0) - (p.wagerInfo.wagerFromBonus || 0);
+                    const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
 
-            // Payout Logic
-            if (creatorPayout > 0 && roomData.createdBy) {
-                 const profit = creatorPayout - (roomData.createdBy.wagerFromMain || 0) - (roomData.createdBy.wagerFromBonus || 0);
-                 const mainWalletReturn = (roomData.createdBy.wagerFromMain || 0) + profit;
-                 const bonusWalletReturn = (roomData.createdBy.wagerFromBonus || 0);
-                 
-                 const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
-                 if (mainWalletReturn > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainWalletReturn);
-                 if (bonusWalletReturn > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(bonusWalletReturn);
-                 if (Object.keys(updatePayload).length > 0) transaction.update(creatorRef, updatePayload);
-                
-                transaction.set(db.collection('transactions').doc(), {
-                    userId: creatorId, type: 'payout', amount: creatorPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game vs ${roomData.player2.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-            }
-            if (joinerPayout > 0 && roomData.player2) {
-                 const profit = joinerPayout - (roomData.player2.wagerFromMain || 0) - (roomData.player2.wagerFromBonus || 0);
-                 const mainWalletReturn = (roomData.player2.wagerFromMain || 0) + profit;
-                 const bonusWalletReturn = (roomData.player2.wagerFromBonus || 0);
-                 
-                 const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
-                 if (mainWalletReturn > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainWalletReturn);
-                 if (bonusWalletReturn > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(bonusWalletReturn);
-                 if (Object.keys(updatePayload).length > 0) transaction.update(joinerRef, updatePayload);
+                    if (profit > 0) {
+                         updatePayload.balance = admin.firestore.FieldValue.increment(profit);
+                    }
+                    if ((p.wagerInfo.wagerFromBonus || 0) > 0) {
+                        updatePayload.bonusBalance = admin.firestore.FieldValue.increment(p.wagerInfo.wagerFromBonus);
+                    }
 
-                transaction.set(db.collection('transactions').doc(), {
-                    userId: joinerId, type: 'payout', amount: joinerPayout, status: 'completed',
-                    description: `Payout for ${roomData.gameType} game vs ${roomData.createdBy.name}`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
+                    if (Object.keys(updatePayload).length > 0) {
+                        transaction.update(p.ref, updatePayload);
+                    }
+                    
+                    transaction.set(db.collection('transactions').doc(), {
+                        userId: p.wagerInfo.uid, type: 'payout', amount: p.payout, status: 'completed',
+                        description: `Payout for ${roomData.gameType} game`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                }
             }
             
             // Finalize room
