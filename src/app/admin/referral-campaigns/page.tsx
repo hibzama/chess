@@ -2,18 +2,21 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, Loader2, Check, X, Globe, MessageSquare, Send, Link as LinkIcon, Facebook } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Loader2, Check, X, Globe, MessageSquare, Send, Link as LinkIcon, Facebook, Eye } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const TikTokIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -42,12 +45,131 @@ export interface Campaign {
     createdAt: any;
 }
 
+interface Participant {
+    id: string;
+    firstName: string;
+    lastName: string;
+    referrals: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        completedTasks: string[];
+    }[];
+}
+
+const CampaignDetailsDialog = ({ campaign, open, onOpenChange }: { campaign: Campaign | null, open: boolean, onOpenChange: (open: boolean) => void}) => {
+    const [participants, setParticipants] = useState<Participant[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!campaign) return;
+
+        const fetchParticipants = async () => {
+            setLoading(true);
+            // 1. Find all users who have started this campaign (referrers)
+            const activeCampaignsQuery = query(collection(db, `users`), where('campaignInfo.campaignId', '==', null)); // Placeholder, Firestore doesn't support not-equals on subfields well. We must fetch all users with `campaignInfo`
+            const usersSnapshot = await getDocs(query(collection(db, 'users')));
+            
+            const potentialReferrers = usersSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter((user: any) => user.active_campaigns?.current?.campaignId === campaign.id);
+            
+            const participantPromises = usersSnapshot.docs.map(async (userDoc) => {
+                const userData = userDoc.data();
+                const activeCampaignsRef = collection(db, `users/${userDoc.id}/active_campaigns`);
+                const activeCampaignsSnapshot = await getDocs(query(activeCampaignsRef, where("campaignId", "==", campaign.id)));
+                
+                if (activeCampaignsSnapshot.empty) return null;
+
+                // 2. For each referrer, find their referees for this campaign
+                const refereesQuery = query(collection(db, 'users'), where('campaignInfo.referrerId', '==', userDoc.id), where('campaignInfo.campaignId', '==', campaign.id));
+                const refereesSnapshot = await getDocs(refereesQuery);
+                const referrals = refereesSnapshot.docs.map(refDoc => {
+                    const refData = refDoc.data();
+                    return {
+                        id: refDoc.id,
+                        firstName: refData.firstName,
+                        lastName: refData.lastName,
+                        completedTasks: refData.campaignInfo.completedTasks || []
+                    }
+                });
+                
+                return {
+                    id: userDoc.id,
+                    firstName: userData.firstName,
+                    lastName: userData.lastName,
+                    referrals,
+                };
+            });
+
+            const allParticipants = (await Promise.all(participantPromises)).filter(p => p !== null) as Participant[];
+            setParticipants(allParticipants);
+            setLoading(false);
+        }
+        fetchParticipants();
+    }, [campaign]);
+
+    if (!campaign) return null;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Campaign Details: {campaign.title}</DialogTitle>
+                    <DialogDescription>
+                        Tracking participants and their referral progress.
+                    </DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="h-[60vh] mt-4">
+                    {loading ? <Skeleton className="h-48 w-full"/> : 
+                     participants.length > 0 ? (
+                        <Accordion type="single" collapsible className="w-full">
+                            {participants.map(p => (
+                                <AccordionItem key={p.id} value={p.id}>
+                                    <AccordionTrigger>
+                                        <div>
+                                            <p>{p.firstName} {p.lastName}</p>
+                                            <p className="text-sm text-muted-foreground">{p.referrals.length} / {campaign.referralGoal} referrals</p>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                        {p.referrals.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {p.referrals.map(ref => {
+                                                    const pendingTasks = campaign.tasks.filter(t => !ref.completedTasks.includes(t.id));
+                                                    return (
+                                                        <Card key={ref.id} className="p-3 bg-muted/50">
+                                                            <p className="font-semibold">{ref.firstName} {ref.lastName}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {pendingTasks.length > 0 
+                                                                    ? `Pending: ${pendingTasks.map(t => t.description).join(', ')}`
+                                                                    : 'All tasks complete!'
+                                                                }
+                                                            </p>
+                                                        </Card>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : <p className="text-muted-foreground text-sm p-4 text-center">No referrals for this user yet.</p>}
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                     ) : <p className="text-muted-foreground text-center p-8">No one has started this campaign yet.</p>
+                    }
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 export default function ReferralCampaignsPage() {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
     const { toast } = useToast();
 
     const [formState, setFormState] = useState({
@@ -176,6 +298,11 @@ export default function ReferralCampaignsPage() {
         }
     }
     
+    const viewDetails = (campaign: Campaign) => {
+        setSelectedCampaign(campaign);
+        setDetailsOpen(true);
+    }
+    
     const totalRefereeBonus = formState.tasks.reduce((acc, task) => acc + Number(task.refereeBonus || 0), 0);
     const isLinkRequired = (type: CampaignTask['type']) => !['generic'].includes(type);
 
@@ -274,6 +401,7 @@ export default function ReferralCampaignsPage() {
                                         </div>
                                         <div className="flex flex-col items-end gap-2">
                                             <div className="flex items-center gap-2">
+                                                 <Button size="icon" variant="secondary" onClick={() => viewDetails(c)}><Eye className="w-4 h-4"/></Button>
                                                 <Button size="icon" variant="outline" onClick={() => handleEdit(c)}><Edit className="w-4 h-4"/></Button>
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild><Button size="icon" variant="destructive"><Trash2 className="w-4 h-4"/></Button></AlertDialogTrigger>
@@ -300,6 +428,8 @@ export default function ReferralCampaignsPage() {
                     </CardContent>
                 </Card>
             </div>
+            <CampaignDetailsDialog campaign={selectedCampaign} open={detailsOpen} onOpenChange={setDetailsOpen} />
         </div>
     );
 }
+
