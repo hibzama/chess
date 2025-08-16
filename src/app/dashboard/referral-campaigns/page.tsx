@@ -45,6 +45,7 @@ interface ClaimHistory {
     description: string;
     createdAt: any;
     status: string;
+    type: 'referrer' | 'referee';
 }
 
 export default function UserCampaignsPage() {
@@ -100,13 +101,14 @@ export default function UserCampaignsPage() {
          // Fetch claim history
         const claimQuery = query(
             collection(db, 'bonus_claims'), 
-            where('userId', '==', user.uid),
-            where('type', '==', 'referrer'),
-            orderBy('createdAt', 'desc')
+            where('userId', '==', user.uid)
         );
         const unsubHistory = onSnapshot(claimQuery, (snapshot) => {
-            const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}) as ClaimHistory);
-            setClaimHistory(history);
+            const allClaims = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}) as ClaimHistory);
+            const referrerClaims = allClaims
+                .filter(claim => claim.type === 'referrer')
+                .sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+            setClaimHistory(referrerClaims);
         });
 
         return () => {
@@ -369,3 +371,5 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
         </Table>
     </ScrollArea>
 );
+
+    
