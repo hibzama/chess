@@ -189,6 +189,9 @@ export default function MainLayout({
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={isMounted && pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
+                                <SidebarMenuItem>
+                                    <Link href="/dashboard/bonus-center"><SidebarMenuButton tooltip="Bonus Center" isActive={isMounted && pathname.startsWith('/dashboard/bonus-center')}><Gift /><span>Bonus Center</span></SidebarMenuButton></Link>
+                                </SidebarMenuItem>
                                  <SidebarMenuItem>
                                     <Link href="/dashboard/friends"><SidebarMenuButton tooltip="Friends &amp; Community" isActive={isMounted && pathname.startsWith('/dashboard/friends')}><Users /><span>Friends &amp; Community</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>

@@ -87,6 +87,19 @@ export default function PendingDepositsPage() {
                 batch.update(userRef, { balance: increment(totalAmount) });
                 batch.update(transactionRef, { status: newStatus });
                 
+                // If there's a bonus, create a separate transaction log for it
+                if (transaction.eligibleBonus && transaction.eligibleBonus > 0) {
+                    const bonusTransactionRef = doc(collection(db, 'transactions'));
+                    batch.set(bonusTransactionRef, {
+                        userId: transaction.userId,
+                        type: 'bonus',
+                        amount: transaction.eligibleBonus,
+                        status: 'completed',
+                        description: 'Deposit Bonus',
+                        createdAt: serverTimestamp()
+                    });
+                }
+                
                 toast({
                     title: 'Success!',
                     description: `Deposit of LKR ${transaction.amount.toFixed(2)} approved. ${transaction.eligibleBonus ? `Bonus of LKR ${transaction.eligibleBonus.toFixed(2)} added.` : ''}`,

@@ -3,7 +3,7 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle, CalendarClock } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -124,10 +124,16 @@ export default function AdminLayout({
                              <Link href="/admin/proxy-detection"><SidebarMenuButton tooltip="Proxy/VPN Users" isActive={isActive('/admin/proxy-detection')}><ShieldAlert /><span>Proxy/VPN Users</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Signup Bonus" isActive={isActive('/admin/bonus')}><Gift /><span>Signup Bonus</span></SidebarMenuButton></Link>
+                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Signup Bonus" isActive={isActive('/admin/bonus') && !pathname.includes('deposit') && !pathname.includes('daily') && !pathname.includes('referral')}><Gift /><span>Signup Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                              <Link href="/admin/bonus/deposit-bonus"><SidebarMenuButton tooltip="Deposit Bonus" isActive={isActive('/admin/bonus/deposit-bonus')}><PercentCircle /><span>Deposit Bonus</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                         <SidebarMenuItem>
+                             <Link href="/admin/bonus/daily-bonus"><SidebarMenuButton tooltip="Daily Bonus" isActive={isActive('/admin/bonus/daily-bonus')}><CalendarClock /><span>Daily Bonus</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                         <SidebarMenuItem>
+                             <Link href="/admin/bonus/referral-bonus"><SidebarMenuButton tooltip="Referral Bonus" isActive={isActive('/admin/bonus/referral-bonus')}><Users /><span>Referral Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/mailer"><SidebarMenuButton tooltip="Mailer" isActive={pathname === '/admin/mailer'}><Mail /><span>Mailer</span></SidebarMenuButton></Link>
