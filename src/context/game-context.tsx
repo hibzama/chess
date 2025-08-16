@@ -1,8 +1,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { db, functions } from '@/lib/firebase';
-import { httpsCallable } from 'firebase/functions';
-import { doc, getDoc, onSnapshot, Timestamp, runTransaction, DocumentData, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -26,8 +25,8 @@ interface GameRoom {
     p2Time: number; // Stored as seconds remaining at last turn
     turnStartTime: Timestamp;
     timeControl: number;
-    createdBy: { uid: string; color: PlayerColor; name: string; photoURL?: string; fundingWallet: 'main' | 'bonus' };
-    player2?: { uid: string; color: PlayerColor, name: string; photoURL?: string; fundingWallet: 'main' | 'bonus' };
+    createdBy: { uid: string; color: PlayerColor; name: string; photoURL?: string; };
+    player2?: { uid: string; color: PlayerColor, name: string; photoURL?: string; };
     players: string[];
     status: 'waiting' | 'in-progress' | 'completed';
     winner?: {
@@ -71,7 +70,6 @@ interface GameContextType extends GameState {
     isGameLoading: boolean;
     isMultiplayer: boolean;
     resign: () => void;
-    cancelWaitingRoom: () => Promise<void>;
     roomWager: number;
     roomOpponentId: string | null;
     room: GameRoom | null;
@@ -169,39 +167,109 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         if (!roomId || !user) return { myPayout: 0 };
     
         try {
-             const endGameFunction = httpsCallable(functions, 'endGame');
-             await endGameFunction({
-                roomId: roomId,
-                winnerId: winnerDetails.winnerId,
-                method: winnerDetails.method,
-                resignerDetails: winnerDetails.resignerDetails,
+            const payoutResult = await runTransaction(db, async (transaction) => {
+                const roomRef = doc(db, 'game_rooms', roomId as string);
+                const roomDoc = await transaction.get(roomRef);
+    
+                if (!roomDoc.exists() || !roomDoc.data()?.player2) throw "Room not found or not ready";
+                if (roomDoc.data().payoutTransactionId) throw "Payout already processed";
+    
+                const roomData = roomDoc.data() as GameRoom;
+                const wager = roomData.wager;
+                let creatorPayout = 0, joinerPayout = 0;
+                let creatorDesc = '', joinerDesc = '';
+                
+                const { winnerId, method, resignerDetails } = winnerDetails;
+                const winnerObject: GameRoom['winner'] = { uid: null, method };
+    
+                if (resignerDetails) { // Resignation logic
+                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
+                    const opponentPayoutRate = 1.30;
+    
+                    let resignerRefundRate = 0;
+                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
+                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                    else resignerRefundRate = 0.25;
+
+                    if (isCreatorResigner) {
+                        creatorPayout = wager * resignerRefundRate;
+                        joinerPayout = wager * opponentPayoutRate;
+                    } else {
+                        creatorPayout = wager * opponentPayoutRate;
+                        joinerPayout = wager * resignerRefundRate;
+                    }
+                    
+                    creatorDesc = isCreatorResigner ? `Resignation Refund vs ${roomData.player2.name}` : `Forfeit Win vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorResigner ? `Resignation Refund vs ${roomData.createdBy.name}` : `Forfeit Win vs ${roomData.createdBy.name}`;
+                    
+                    winnerObject.uid = roomData.players.find(p => p !== resignerDetails.id) || null;
+                    winnerObject.resignerId = resignerDetails.id;
+                    winnerObject.resignerPieceCount = resignerDetails.pieceCount;
+
+                } else if (winnerId === 'draw') { // Draw logic
+                    creatorPayout = joinerPayout = wager * 0.9;
+                    creatorDesc = `Draw refund vs ${roomData.player2.name}`;
+                    joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
+                } else if (winnerId) { // Win/loss logic
+                    const isCreatorWinner = winnerId === roomData.createdBy.uid;
+                    creatorPayout = isCreatorWinner ? wager * 1.8 : 0;
+                    joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
+                    const reason = method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture');
+                    creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
+                    joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
+                    transaction.update(doc(db, 'users', winnerId), { wins: increment(1) });
+                    winnerObject.uid = winnerId;
+                }
+    
+                const now = serverTimestamp();
+                const payoutTxId = doc(collection(db, 'transactions')).id;
+    
+                if (creatorPayout > 0) {
+                    transaction.update(doc(db, 'users', roomData.createdBy.uid), { balance: increment(creatorPayout) });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.createdBy.uid, type: 'payout', amount: creatorPayout, status: 'completed', description: creatorDesc, gameRoomId: roomId, createdAt: now, payoutTxId });
+                }
+                if (joinerPayout > 0) {
+                    transaction.update(doc(db, 'users', roomData.player2.uid), { balance: increment(joinerPayout) });
+                    transaction.set(doc(collection(db, 'transactions')), { userId: roomData.player2.uid, type: 'payout', amount: joinerPayout, status: 'completed', description: joinerDesc, gameRoomId: roomId, createdAt: now, payoutTxId });
+                }
+    
+                transaction.update(roomRef, { 
+                    status: 'completed',
+                    winner: winnerObject,
+                    draw: winnerId === 'draw',
+                    payoutTransactionId: payoutTxId 
+                });
+    
+                return { myPayout: roomData.createdBy.uid === user.uid ? creatorPayout : joinerPayout };
             });
-            // Payout calculation is now entirely on the backend. We just need to find out what our return was.
-             const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
-             if (roomDoc.exists()) {
-                 const roomData = roomDoc.data() as GameRoom;
-                 const wager = roomData.wager || 0;
-
-                 if (winnerDetails.method === 'resign' && winnerDetails.resignerDetails) {
-                     const isMeResigner = winnerDetails.resignerDetails.id === user.uid;
-                      if(isMeResigner) {
-                        let refundRate = 0;
-                        if (winnerDetails.resignerDetails.pieceCount >= 6) refundRate = 0.50;
-                        else if (winnerDetails.resignerDetails.pieceCount >= 3) refundRate = 0.35;
-                        else refundRate = 0.25;
-                        return { myPayout: wager * refundRate };
-                     } else {
-                        return { myPayout: wager * 1.30 };
-                     }
-                 }
-                 if (winnerDetails.winnerId === 'draw') return { myPayout: wager * 0.9 };
-                 if (winnerDetails.winnerId === user.uid) return { myPayout: wager * 1.8 };
-             }
-
+            return payoutResult;
         } catch (error) {
-             console.error("Payout Transaction failed:", error);
+            if (String(error).includes('Payout already processed')) {
+                 const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
+                 if (roomDoc.exists()) {
+                    const roomData = roomDoc.data() as GameRoom;
+                    const wager = roomData.wager || 0;
+                    const winnerData = roomData.winner;
+                    const resignerDetails = winnerData?.resignerId ? {id: winnerData.resignerId, pieceCount: winnerData.resignerPieceCount || 0} : null;
+
+                    if (resignerDetails) { // Resignation
+                        let refundRate = 0;
+                        if (resignerDetails.pieceCount >= 6) refundRate = 0.50;
+                        else if (resignerDetails.pieceCount >= 3) refundRate = 0.35;
+                        else refundRate = 0.25;
+
+                        return { myPayout: resignerDetails.id === user.uid ? wager * refundRate : wager * 1.30 };
+                    } else if (roomData.draw) { // Draw
+                        return { myPayout: wager * 0.9 };
+                    } else if (winnerData?.uid === user.uid) { // I won
+                        return { myPayout: wager * 1.8 };
+                    }
+                 }
+            } else {
+                 console.error("Payout Transaction failed:", error);
+            }
+            return { myPayout: 0 };
         }
-        return { myPayout: 0 };
     }, [user, roomId, gameType]);
 
     const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerDetails: {id: string, pieceCount: number} | null = null) => {
@@ -462,9 +530,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 }
             }
     
-            await runTransaction(db, async (transaction) => {
-                transaction.update(roomRef, updatePayload);
-            });
+            await updateDoc(roomRef, updatePayload);
         } else {
             setGameState(prevState => {
                 if (typeof window !== 'undefined') {
@@ -487,19 +553,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     }, [isMultiplayer, storageKey, getInitialState, updateAndSaveState]);
 
     
-    const resign = useCallback(() => {
-        if (gameState.gameOver || gameState.isEnding || !user) return;
-    
-        const currentPlayerIsCreator = room?.createdBy.uid === user.uid;
-        const pieceCount = currentPlayerIsCreator ? gameState.playerPieceCount : gameState.opponentPieceCount;
-    
-        if (isMultiplayer && room) {
-            const winnerId = room.players.find((p) => p !== user.uid) || null;
-            const resignerDetails = { id: user.uid, pieceCount: pieceCount };
-            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails);
-        } else {
-            setWinner('bot', gameState.boardState, 'resign');
-        }
+    const resign = useCallback(() => { 
+        if (gameState.gameOver || gameState.isEnding || !user) return; 
+        if (isMultiplayer && room) { 
+            const winnerId = room.players.find((p)=>p !== user.uid) || null; 
+            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
+            setWinner(winnerId, gameState.boardState, 'resign', resignerDetails); 
+        } else { 
+            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
+            setWinner('bot', gameState.boardState, 'resign', resignerDetails); 
+        } 
     }, [gameState, user, room, isMultiplayer, setWinner]);
     
     const resetGame = useCallback(() => { 
@@ -512,16 +575,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         setRoom(null); 
     }, [isMultiplayer, storageKey, getInitialState]);
     
-    const cancelWaitingRoom = useCallback(async () => {
-        if (isMultiplayer && room && room.status === 'waiting') {
-            const roomRef = doc(db, 'game_rooms', room.id);
-            await deleteDoc(roomRef);
-        }
-    }, [isMultiplayer, room]);
-
     const getOpponentId = () => { if (!user || !room || !room.players || !room.player2) return null; return room.players.find(p => p !== user.uid) || null; };
 
-    const contextValue = { ...gameState, isMounted, setupGame, switchTurn, updateAndSaveState, setWinner, resign, cancelWaitingRoom, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isGameLoading };
+    const contextValue = { ...gameState, isMounted, setupGame, switchTurn, updateAndSaveState, setWinner, resign, resetGame, loadGameState, isMultiplayer, roomWager: room?.wager || 0, roomOpponentId: getOpponentId(), room, isGameLoading };
 
     return ( <GameContext.Provider value={contextValue}> {children} </GameContext.Provider> );
 };
