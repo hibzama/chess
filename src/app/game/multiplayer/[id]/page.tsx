@@ -149,12 +149,12 @@ function MultiplayerGame() {
     const { isGameLoading, gameOver, room } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
-    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
     
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
+    const fundingWallet = userData?.primaryWallet || 'main';
     const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
     const hasSufficientFunds = room ? selectedWalletBalance >= room.wager : false;
 
@@ -214,7 +214,7 @@ function MultiplayerGame() {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
         if(!hasSufficientFunds) {
-            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your ${fundingWallet} wallet.`});
+            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your primary wallet (${fundingWallet}).`});
             return;
         }
     
@@ -316,34 +316,30 @@ function MultiplayerGame() {
                                 </div>
                             </div>
 
-                             <div className="space-y-3">
-                                <Label>Funding Wallet</Label>
-                                 <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="main" id="main-wallet" />
-                                        <Label htmlFor="main-wallet">Main Wallet</Label>
+                             <Card className="p-3 bg-secondary">
+                                <div className="flex justify-between items-center">
+                                    <div className="text-left">
+                                        <Label>Funding from your Primary Wallet</Label>
+                                        <p className="text-sm font-bold capitalize">{fundingWallet} Wallet</p>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="bonus" id="bonus-wallet" />
-                                        <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
+                                    <Button variant="link" size="sm" asChild className="p-0 h-auto">
+                                        <Link href="/dashboard/wallet?tab=primary-wallet">Change</Link>
+                                    </Button>
+                                </div>
+                                <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                                    <span className="text-sm text-muted-foreground">Available:</span>
+                                    <div>
+                                        <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
+                                        <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
                                     </div>
-                                </RadioGroup>
-                                <Card className="p-3 bg-secondary">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">Available:</span>
-                                        <div>
-                                            <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
-                                            <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
+                                </div>
+                            </Card>
                             
                             {!hasSufficientFunds && (
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
-                                        You need at least LKR {room.wager.toFixed(2)} in your selected wallet to join.
+                                        You need at least LKR {room.wager.toFixed(2)} in your primary wallet to join.
                                     </CardDescription>
                                      <Button asChild variant="destructive">
                                         <Link href="/dashboard/wallet"><Wallet className="mr-2"/> Top Up Wallet</Link>

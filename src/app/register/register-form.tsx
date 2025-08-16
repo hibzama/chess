@@ -126,6 +126,7 @@ export default function RegisterForm() {
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
                 emailVerified: true, // Allow login by default
+                primaryWallet: 'main',
                 activeReferralTaskId: null,
                 claimedTaskReferralBonus: [],
             };

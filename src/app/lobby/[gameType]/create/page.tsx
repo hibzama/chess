@@ -31,13 +31,13 @@ export default function CreateGamePage() {
     const [gameTimer, setGameTimer] = useState('900');
     const [pieceColor, setPieceColor] = useState<'w' | 'b' | 'random'>('random');
     const [roomPrivacy, setRoomPrivacy] = useState<'public' | 'private'>('public');
-    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
     const [isCreating, setIsCreating] = useState(false);
 
     const USDT_RATE = 310;
     const wagerAmount = parseInt(investmentAmount) || 0;
     const usdtAmount = (wagerAmount / USDT_RATE || 0).toFixed(2);
     
+    const fundingWallet = userData?.primaryWallet || 'main';
     const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
     const hasSufficientFunds = selectedWalletBalance >= wagerAmount;
 
@@ -54,7 +54,7 @@ export default function CreateGamePage() {
         }
 
         if (!hasSufficientFunds) {
-            toast({ variant: 'destructive', title: 'Error', description: `Insufficient funds in your ${fundingWallet} wallet.` });
+            toast({ variant: 'destructive', title: 'Error', description: `Insufficient funds in your primary wallet (${fundingWallet}). Please top up or change your primary wallet.` });
             return;
         }
 
@@ -143,34 +143,21 @@ export default function CreateGamePage() {
                                 Playing against another player on the same device is strictly prohibited.
                             </AlertDescription>
                         </Alert>
+                        
+                        <Card className="p-4 bg-secondary">
+                            <Label>Funding From</Label>
+                            <div className="flex justify-between items-center mt-1">
+                                <p className="text-lg font-bold capitalize">{fundingWallet} Wallet</p>
+                                <Button variant="link" asChild size="sm" className="p-0 h-auto">
+                                    <Link href="/dashboard/wallet?tab=primary-wallet">Change</Link>
+                                </Button>
+                            </div>
+                        </Card>
 
                         <div className="space-y-2">
                             <Label htmlFor="investment">Investment Amount (LKR)</Label>
                             <Input id="investment" type="number" value={investmentAmount} onChange={e => setInvestmentAmount(e.target.value)} min="10"/>
                             <p className="text-xs text-muted-foreground">Approximately ${usdtAmount} USDT</p>
-                        </div>
-
-                         <div className="space-y-3">
-                            <Label>Funding Wallet</Label>
-                             <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="main" id="main-wallet" />
-                                    <Label htmlFor="main-wallet">Main Wallet</Label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="bonus" id="bonus-wallet" />
-                                    <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
-                                </div>
-                            </RadioGroup>
-                            <Card className="p-3 bg-secondary">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Available:</span>
-                                    <div>
-                                        <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
-                                        <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
-                                    </div>
-                                </div>
-                            </Card>
                         </div>
 
                          <div className="space-y-3">

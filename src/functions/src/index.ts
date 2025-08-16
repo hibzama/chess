@@ -134,14 +134,6 @@ export const joinGame = onCall(async (request) => {
             joinerUpdate[balanceFieldToDecrement] = admin.firestore.FieldValue.increment(-wager);
             transaction.update(joinerRef, joinerUpdate);
             
-            // Record wager for joiner
-            const now = admin.firestore.FieldValue.serverTimestamp();
-            const joinerTxRef = db.collection('transactions').doc();
-            transaction.set(joinerTxRef, {
-                userId: joinerId, type: 'wager', amount: wager, status: 'completed',
-                description: `Wager for ${roomData.gameType} from ${fundingWallet} wallet`, gameRoomId: roomId, createdAt: now
-            });
-            
             // Update game room to start
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
@@ -165,48 +157,6 @@ export const joinGame = onCall(async (request) => {
             });
         });
 
-        // Handle referral task updates outside of the main transaction for safety
-        const creatorDoc = await db.collection('users').doc(creatorId!).get();
-        const joinerDocAfterUpdate = await db.collection('users').doc(joinerId).get();
-
-        if (creatorDoc.exists() && joinerDocAfterUpdate.exists()) {
-            const playersForTaskCheck = [
-                {id: creatorId!, data: creatorDoc.data()}, 
-                {id: joinerId, data: joinerDocAfterUpdate.data()}
-            ];
-
-            const batch = db.batch();
-            for(const player of playersForTaskCheck) {
-                if (player.data && player.data.activeReferralTaskId) {
-                    const taskRef = db.collection('referral_tasks').doc(player.data.activeReferralTaskId);
-                    const taskDoc = await taskRef.get();
-                    if (taskDoc.exists) {
-                        const taskData = taskDoc.data();
-                        if (taskData) {
-                            const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
-                            if (gamePlaySubTask && gamePlaySubTask.target > 0) {
-                                const userToUpdateRef = db.collection('users').doc(player.id);
-                                const currentProgress = player.data.taskStatus?.[player.data.activeReferralTaskId]?.[gamePlaySubTask.id]?.progress || 0;
-                                const newProgress = currentProgress + 1;
-                                
-                                batch.set(userToUpdateRef, {
-                                    taskStatus: {
-                                        [player.data.activeReferralTaskId]: {
-                                            [gamePlaySubTask.id]: {
-                                                progress: newProgress,
-                                                status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
-                                            }
-                                        }
-                                    }
-                                }, { merge: true });
-                            }
-                        }
-                    }
-                }
-            }
-            await batch.commit();
-        }
-
         return { success: true };
 
     } catch (error: any) {
@@ -218,7 +168,7 @@ export const joinGame = onCall(async (request) => {
             "INVALID_ROOM_DATA": new HttpsError('aborted', "Room data is invalid or missing creator info."),
             "CANNOT_JOIN_OWN_GAME": new HttpsError('failed-precondition', "You cannot join your own game."),
             "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
-            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
+            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in your selected wallet."),
         };
         throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
@@ -265,9 +215,6 @@ export const endGame = onCall(async (request) => {
                 throw new HttpsError('failed-precondition', 'Game is missing a second player.');
             }
             
-            const creatorRef = db.collection('users').doc(creatorId);
-            const joinerRef = db.collection('users').doc(joinerId);
-            
             let creatorPayout = 0;
             let joinerPayout = 0;
             
@@ -309,30 +256,39 @@ export const endGame = onCall(async (request) => {
             }
             
             const playersPayoutData = [
-                { ref: creatorRef, payout: creatorPayout, wagerInfo: roomData.createdBy },
-                { ref: joinerRef, payout: joinerPayout, wagerInfo: roomData.player2 }
+                { ref: db.collection('users').doc(creatorId), payout: creatorPayout, wagerInfo: roomData.createdBy },
+                { ref: db.collection('users').doc(joinerId), payout: joinerPayout, wagerInfo: roomData.player2 }
             ];
             
             for(const p of playersPayoutData) {
                 if (p.payout > 0) {
-                    const profit = p.payout - (p.wagerInfo.wagerFromMain || 0) - (p.wagerInfo.wagerFromBonus || 0);
+                    const wageredFromMain = p.wagerInfo.wagerFromMain || 0;
+                    const wageredFromBonus = p.wagerInfo.wagerFromBonus || 0;
+                    
+                    const profit = p.payout - wageredFromMain - wageredFromBonus;
                     const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
 
                     if (profit > 0) {
-                         updatePayload.balance = admin.firestore.FieldValue.increment(profit);
-                    }
-                    if ((p.wagerInfo.wagerFromBonus || 0) > 0) {
-                        updatePayload.bonusBalance = admin.firestore.FieldValue.increment(p.wagerInfo.wagerFromBonus);
+                         // Add profit to the main balance
+                         updatePayload.balance = admin.firestore.FieldValue.increment(wageredFromMain + profit);
+                         // Return only the wagered bonus amount to the bonus balance
+                         if (wageredFromBonus > 0) {
+                            updatePayload.bonusBalance = admin.firestore.FieldValue.increment(wageredFromBonus);
+                         }
+                    } else { // Handle losses or refunds (draw, resign)
+                        // This logic refunds the proportional amount back to each wallet
+                        const totalWagered = wageredFromMain + wageredFromBonus;
+                        if(totalWagered > 0) {
+                            const mainRefund = (wageredFromMain / totalWagered) * p.payout;
+                            const bonusRefund = (wageredFromBonus / totalWagered) * p.payout;
+                             if(mainRefund > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainRefund);
+                             if(bonusRefund > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(bonusRefund);
+                        }
                     }
 
                     if (Object.keys(updatePayload).length > 0) {
                         transaction.update(p.ref, updatePayload);
                     }
-                    
-                    transaction.set(db.collection('transactions').doc(), {
-                        userId: p.wagerInfo.uid, type: 'payout', amount: p.payout, status: 'completed',
-                        description: `Payout for ${roomData.gameType} game`, gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
-                    });
                 }
             }
             

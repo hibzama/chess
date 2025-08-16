@@ -26,6 +26,7 @@ import { boyAvatars, girlAvatars } from '@/components/icons/avatars';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 type Game = {
@@ -82,6 +83,15 @@ export default function ProfilePage() {
     const [selectedAvatar, setSelectedAvatar] = useState<React.FC | null>(null);
     const [worldRank, setWorldRank] = useState<number | null>(null);
     const [avatarTab, setAvatarTab] = useState<'boy' | 'girl'>('boy');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
+
+    useEffect(() => {
+        if (userData) {
+            setFirstName(userData.firstName);
+            setLastName(userData.lastName);
+        }
+    }, [userData]);
 
     const USDT_RATE = 310;
 
@@ -169,30 +179,35 @@ export default function ProfilePage() {
         return { rank, nextRank, winsToNextLevel: winsToNext, progress: progressValue };
     }, [totalWins]);
 
-    const handleAvatarSave = async () => {
-        if (!selectedAvatar || !user || !userData) return;
-
+    const handleProfileUpdate = async () => {
+        if (!user || !userData) return;
         setIsSaving(true);
         try {
             const userDocRef = doc(db, 'users', user.uid);
-            const svgString = renderToString(React.createElement(selectedAvatar));
-            const dataUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
-            
-            await updateDoc(userDocRef, { photoURL: dataUri });
+            const updates: any = {
+                firstName: firstName,
+                lastName: lastName
+            };
+            if(selectedAvatar) {
+                const svgString = renderToString(React.createElement(selectedAvatar));
+                updates.photoURL = `data:image/svg+xml;base64,${btoa(svgString)}`;
+            }
+
+            await updateDoc(userDocRef, updates);
             
             // Manually update local state to reflect change immediately
-            setUserData({ ...userData, photoURL: dataUri });
+            setUserData({ ...userData, ...updates });
 
-            toast({ title: "Success", description: "Avatar updated successfully." });
+            toast({ title: "Success", description: "Profile updated successfully." });
             setIsAvatarDialogOpen(false);
             setSelectedAvatar(null);
         } catch (error) {
-            console.error("Avatar update failed:", error);
-            toast({ variant: 'destructive', title: "Update Failed", description: "Could not update your avatar." });
+            console.error("Profile update failed:", error);
+            toast({ variant: 'destructive', title: "Update Failed", description: "Could not update your profile." });
         } finally {
             setIsSaving(false);
         }
-    };
+    }
     
     const handlePasswordReset = async () => {
         if (!user?.email) {
@@ -219,7 +234,7 @@ export default function ProfilePage() {
              if(game.winner.resignerId === user?.uid) { // I resigned
                 return { text: 'Loss', color: 'text-red-400', net: -(game.wager * 0.25) };
              } else { // Opponent resigned
-                return { text: 'Win', color: 'text-green-400', net: game.wager * 0.05 };
+                return { text: 'Win', color: 'text-green-400', net: game.wager * 1.05 };
              }
         }
         if (game.winner?.uid === user?.uid) {
@@ -256,46 +271,12 @@ export default function ProfilePage() {
                     <Card>
                         <CardContent className="p-6 space-y-6">
                             <div className="flex flex-col md:flex-row items-center gap-6">
-                                <AlertDialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
-                                    <AlertDialogTrigger asChild>
-                                        <div className="relative cursor-pointer">
-                                            <Avatar className="w-24 h-24 border-2 border-primary">
-                                                <AvatarImage src={userData?.photoURL} />
-                                                <AvatarFallback>{getInitials()}</AvatarFallback>
-                                            </Avatar>
-                                            <div className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-secondary flex items-center justify-center">
-                                                <Camera className="w-4 h-4"/>
-                                            </div>
-                                        </div>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Choose your Avatar</AlertDialogTitle>
-                                            <AlertDialogDescription>Select an icon to represent you on the platform.</AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <div className="grid grid-cols-2 gap-2 mb-4">
-                                            <Button variant={avatarTab === 'boy' ? 'default' : 'outline'} onClick={() => setAvatarTab('boy')}>Boy Avatars</Button>
-                                            <Button variant={avatarTab === 'girl' ? 'default' : 'outline'} onClick={() => setAvatarTab('girl')}>Girl Avatars</Button>
-                                        </div>
-                                        <ScrollArea className="h-72">
-                                            <div className="grid grid-cols-4 gap-4 p-1">
-                                                {(avatarTab === 'boy' ? boyAvatars : girlAvatars).map((AvatarComponent, i) => (
-                                                    <button key={`${avatarTab}-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
-                                                        <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
-                                                            <AvatarComponent/>
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </ScrollArea>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={handleAvatarSave} disabled={isSaving || !selectedAvatar}>
-                                                {isSaving ? "Saving..." : "Save Avatar"}
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
+                                <div className="relative">
+                                    <Avatar className="w-24 h-24 border-2 border-primary">
+                                        <AvatarImage src={userData?.photoURL} />
+                                        <AvatarFallback>{getInitials()}</AvatarFallback>
+                                    </Avatar>
+                                </div>
                                 <div className="flex-1 space-y-2 text-center md:text-left">
                                     <h1 className="text-3xl font-bold">{userData?.firstName} {userData?.lastName}</h1>
                                     <p className="text-muted-foreground">{userData?.email}</p>
@@ -310,6 +291,53 @@ export default function ProfilePage() {
                                         <Badge variant="secondary" className="text-base py-1 px-3 flex items-center gap-1.5"><Users className="w-4 h-4" /> Friends: {userData?.friends?.length || 0}</Badge>
                                     </div>
                                 </div>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="outline">Edit Profile</Button>
+                                    </AlertDialogTrigger>
+                                     <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Edit Your Profile</AlertDialogTitle>
+                                            <AlertDialogDescription>Update your name or choose a new avatar.</AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="edit-first-name">First Name</Label>
+                                                    <Input id="edit-first-name" value={firstName} onChange={e => setFirstName(e.target.value)} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="edit-last-name">Last Name</Label>
+                                                    <Input id="edit-last-name" value={lastName} onChange={e => setLastName(e.target.value)} />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <Label>Choose Avatar</Label>
+                                                <div className="grid grid-cols-2 gap-2 my-2">
+                                                    <Button variant={avatarTab === 'boy' ? 'default' : 'outline'} onClick={() => setAvatarTab('boy')}>Boy Avatars</Button>
+                                                    <Button variant={avatarTab === 'girl' ? 'default' : 'outline'} onClick={() => setAvatarTab('girl')}>Girl Avatars</Button>
+                                                </div>
+                                                <ScrollArea className="h-48 border rounded-md">
+                                                    <div className="grid grid-cols-5 gap-2 p-2">
+                                                        {(avatarTab === 'boy' ? boyAvatars : girlAvatars).map((AvatarComponent, i) => (
+                                                            <button key={`${avatarTab}-${i}`} onClick={() => setSelectedAvatar(() => AvatarComponent)} className={cn('rounded-full border-2 p-1 aspect-square', selectedAvatar === AvatarComponent ? 'border-primary ring-2 ring-primary' : 'border-transparent')}>
+                                                                <div className="w-full h-full rounded-full bg-muted flex items-center justify-center">
+                                                                    <AvatarComponent/>
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </ScrollArea>
+                                            </div>
+                                        </div>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction onClick={handleProfileUpdate} disabled={isSaving}>
+                                                {isSaving ? "Saving..." : "Save Changes"}
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </div>
                              <div className="mt-4">
                                 <Progress value={progress} className="h-2" />

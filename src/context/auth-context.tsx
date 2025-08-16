@@ -39,6 +39,7 @@ interface UserData {
     marketingBalance?: number;
     role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
+    primaryWallet?: 'main' | 'bonus';
     referredBy?: string;
     taskReferredBy?: string; 
     taskStatus?: any;
