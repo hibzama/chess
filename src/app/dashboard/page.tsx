@@ -182,9 +182,17 @@ export default function DashboardPage() {
         daily: false,
         task: false,
     });
+    const [checkingBonuses, setCheckingBonuses] = useState(true);
 
     const handleBonusAvailability = (type: keyof typeof availableBonuses, available: boolean) => {
-        setAvailableBonuses(prev => ({...prev, [type]: available}));
+        setAvailableBonuses(prev => {
+            const newState = {...prev, [type]: available};
+            // Check if all bonus checks are complete
+            if (Object.values(newState).every(v => v === false || v === true)) {
+                setCheckingBonuses(false);
+            }
+            return newState;
+        });
     }
 
     const activeBonusCount = Object.values(availableBonuses).filter(Boolean).length;
@@ -214,8 +222,18 @@ export default function DashboardPage() {
             setStatsLoading(false);
         });
 
-        return () => unsubscribe();
-    }, [user]);
+        // Set a timeout in case bonus checks take too long
+        const bonusCheckTimeout = setTimeout(() => {
+            if (checkingBonuses) {
+                setCheckingBonuses(false);
+            }
+        }, 5000);
+
+        return () => {
+            unsubscribe();
+            clearTimeout(bonusCheckTimeout);
+        };
+    }, [user, checkingBonuses]);
 
     const financialStats = useMemo(() => {
         let totalDeposit = 0;
@@ -276,15 +294,23 @@ export default function DashboardPage() {
       </div>
 
        {/* Bonus Hub Section */}
-      <div className="space-y-4">
-        {activeBonusCount > 0 && (
-             <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
-                <DepositBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('deposit', isAvailable)} />
-                <DailyBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('daily', isAvailable)} />
-                <ReferralTaskAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('task', isAvailable)} />
-            </div>
-        )}
-      </div>
+        <div className="space-y-4">
+            {checkingBonuses ? (
+                <Skeleton className="h-44 w-full" />
+            ) : activeBonusCount > 0 ? (
+                <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
+                    <DepositBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('deposit', isAvailable)} />
+                    <DailyBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('daily', isAvailable)} />
+                    <ReferralTaskAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('task', isAvailable)} />
+                </div>
+            ) : (
+                <Card className="bg-card/50 border-dashed">
+                    <CardContent className="p-6 text-center text-muted-foreground">
+                        No special bonuses available for you right now. Check back soon!
+                    </CardContent>
+                </Card>
+            )}
+        </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
