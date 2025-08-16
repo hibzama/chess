@@ -2,57 +2,57 @@
 'use client'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gift, Gamepad2, ArrowDown, ArrowUp, Trophy, Megaphone, Calendar, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, Calendar, Banknote } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState, useMemo } from 'react';
-import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Award, Loader2 } from "lucide-react";
-import { CampaignTask } from "@/app/admin/referral-campaigns/page";
+import { DailyBonusCampaign } from '@/app/admin/bonus/daily-bonus/page';
 
-
+// #region Bonus Components
 function CampaignTaskAlert() {
     const { userData } = useAuth();
-    const [campaign, setCampaign] = useState<{id: string, tasks: CampaignTask[]} | null>(null);
-    const [currentTask, setCurrentTask] = useState<CampaignTask | null>(null);
+    const [hasIncompleteTask, setHasIncompleteTask] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!userData?.campaignInfo) {
+        if (!userData) {
             setLoading(false);
             return;
         }
-
-        const fetchCampaign = async () => {
-            const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
-            if (campaignDoc.exists()) {
-                const campaignData = campaignDoc.data() as { tasks: CampaignTask[], id: string };
-                setCampaign({ ...campaignData, id: campaignDoc.id });
-                
-                const completedTasks = userData.campaignInfo.completedTasks || [];
-                const nextTask = campaignData.tasks.find(task => !completedTasks.includes(task.id));
-                setCurrentTask(nextTask || null);
+        
+        const checkCampaign = async () => {
+             if (userData.campaignInfo) {
+                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
+                if (campaignDoc.exists()) {
+                    const campaignData = campaignDoc.data();
+                    const completedTasks = userData.campaignInfo.completedTasks || [];
+                    if(completedTasks.length < campaignData.tasks.length) {
+                        setHasIncompleteTask(true);
+                    }
+                }
             }
             setLoading(false);
-        }
-        fetchCampaign();
+        };
+        checkCampaign();
     }, [userData]);
 
-    if (loading || !currentTask) {
+
+    if (loading || !hasIncompleteTask) {
         return null;
     }
 
     return (
-        <Alert className="mb-6 border-primary bg-primary/5">
+        <Alert className="border-primary bg-primary/5">
              <Award className="h-4 w-4 text-primary" />
-            <AlertTitle className="font-bold text-primary">Complete Your Referral Task!</AlertTitle>
+            <AlertTitle className="font-bold text-primary">Complete Your Task!</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
-                <p>{currentTask.description}</p>
+                <p>You have a pending referral task to complete.</p>
                 <Button asChild size="sm">
                     <Link href="/dashboard/layout">Go to Task <ArrowRight className="w-4 h-4 ml-2"/></Link>
                 </Button>
@@ -61,7 +61,87 @@ function CampaignTaskAlert() {
     );
 }
 
-const StatCard = ({ title, value, description, isLoading, isNegative = false }: { title: string, value: string | number, description?: string, isLoading: boolean, isNegative?: boolean}) => (
+function DepositBonusAlert() {
+    const [bonus, setBonus] = useState<{enabled: boolean, percentage: number} | null>(null);
+    useEffect(() => {
+        const fetchBonus = async () => {
+            const settingsSnap = await getDoc(doc(db, 'settings', 'depositBonusConfig'));
+            if(settingsSnap.exists() && settingsSnap.data().depositBonusEnabled) {
+                setBonus({
+                    enabled: true,
+                    percentage: settingsSnap.data().depositBonusPercentage
+                })
+            }
+        }
+        fetchBonus();
+    }, [])
+
+    if (!bonus) return null;
+
+    return (
+        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-400/30">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Banknote className="text-green-400"/> Deposit Bonus</CardTitle>
+                <CardDescription>Get {bonus.percentage}% bonus on your next deposit!</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button variant="outline" asChild className="w-full">
+                    <Link href="/dashboard/wallet">Make a Deposit</Link>
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
+function DailyBonusAlert() {
+    const { user, userData } = useAuth();
+    const [bonus, setBonus] = useState<DailyBonusCampaign | null>(null);
+    
+    useEffect(() => {
+         if (!user || !userData) return;
+         const fetchBonus = async () => {
+            const now = Timestamp.now();
+            const dailyQuery = query(
+                collection(db, 'daily_bonus_campaigns'),
+                where('isActive', '==', true),
+                where('startDate', '<=', now),
+                limit(1)
+            );
+            const dailySnapshot = await getDocs(dailyQuery);
+            if (!dailySnapshot.empty) {
+                const campaign = dailySnapshot.docs[0].data() as DailyBonusCampaign;
+                if(campaign.endDate.toDate() > now.toDate()) {
+                    // Check if user has claimed it
+                    const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, dailySnapshot.docs[0].id));
+                    if(!claimSnap.exists()) {
+                         setBonus(campaign)
+                    }
+                }
+            }
+         }
+         fetchBonus();
+    }, [user, userData]);
+
+    if(!bonus) return null;
+
+    return (
+         <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-400/30">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Calendar className="text-blue-400"/> Daily Bonus</CardTitle>
+                <CardDescription>A special bonus is available for you today!</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button variant="outline" asChild className="w-full">
+                    <Link href="/dashboard/bonus-center">Claim Now</Link>
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+// #endregion
+
+
+const StatCard = ({ title, value, description, isLoading, colorClass }: { title: string, value: string | number, description?: string, isLoading: boolean, colorClass?: string}) => (
     <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
@@ -70,7 +150,7 @@ const StatCard = ({ title, value, description, isLoading, isNegative = false }: 
             {isLoading ? (
                 <Skeleton className="h-8 w-1/2" />
             ) : (
-                <p className={cn("text-3xl font-bold", isNegative ? 'text-destructive' : 'text-primary')}>{value}</p>
+                <p className={cn("text-3xl font-bold", colorClass || 'text-primary')}>{value}</p>
             )}
             {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
         </CardContent>
@@ -158,7 +238,14 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <CampaignTaskAlert />
+       {/* Bonus Hub Section */}
+      <div className="space-y-4">
+        <CampaignTaskAlert />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <DepositBonusAlert />
+            <DailyBonusAlert />
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
@@ -166,25 +253,28 @@ export default function DashboardPage() {
             value={`LKR ${(userData?.balance ?? 0).toFixed(2)}`}
             description={`~${((userData?.balance ?? 0) / USDT_RATE).toFixed(2)} USDT`}
             isLoading={loading}
+            colorClass="text-primary"
         />
          <StatCard 
             title="Total Deposit"
             value={`LKR ${financialStats.totalDeposit.toFixed(2)}`}
-            description={`~${(financialStats.totalDeposit / USDT_RATE).toFixed(2)} USDT`}
+            description="All funds you've added."
             isLoading={statsLoading}
+            colorClass="text-green-400"
         />
          <StatCard 
             title="Total Withdrawals"
             value={`LKR ${financialStats.totalWithdrawal.toFixed(2)}`}
-            description={`~${(financialStats.totalWithdrawal / USDT_RATE).toFixed(2)} USDT`}
+            description="All funds you've taken out."
             isLoading={statsLoading}
+            colorClass="text-red-400"
         />
          <StatCard 
             title="Total Earnings"
             value={`LKR ${financialStats.totalEarning.toFixed(2)}`}
-            description={`~${(financialStats.totalEarning / USDT_RATE).toFixed(2)} USDT`}
+            description="Your net profit from games."
             isLoading={statsLoading}
-            isNegative={financialStats.totalEarning < 0}
+            colorClass={financialStats.totalEarning < 0 ? "text-yellow-400" : "text-green-400"}
         />
       </div>
 
@@ -219,3 +309,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
