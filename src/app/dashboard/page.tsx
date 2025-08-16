@@ -13,11 +13,12 @@ import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyBonusCampaign } from '@/app/admin/bonus/daily-bonus/page';
+import { CampaignTask } from '@/app/admin/referral-campaigns/page';
 
 // #region Bonus Components
 function CampaignTaskAlert() {
     const { userData } = useAuth();
-    const [hasIncompleteTask, setHasIncompleteTask] = useState(false);
+    const [nextTask, setNextTask] = useState<CampaignTask | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -32,8 +33,9 @@ function CampaignTaskAlert() {
                 if (campaignDoc.exists()) {
                     const campaignData = campaignDoc.data();
                     const completedTasks = userData.campaignInfo.completedTasks || [];
-                    if(completedTasks.length < campaignData.tasks.length) {
-                        setHasIncompleteTask(true);
+                    const firstIncompleteTask = campaignData.tasks.find((task: CampaignTask) => !completedTasks.includes(task.id));
+                    if (firstIncompleteTask) {
+                        setNextTask(firstIncompleteTask);
                     }
                 }
             }
@@ -43,14 +45,14 @@ function CampaignTaskAlert() {
     }, [userData]);
 
 
-    if (loading || !hasIncompleteTask) {
+    if (loading || !nextTask) {
         return null;
     }
 
     return (
         <Alert className="mb-4 border-primary bg-primary/5">
              <Award className="h-4 w-4 text-primary" />
-            <AlertTitle className="font-bold text-primary">Complete Your Task!</AlertTitle>
+            <AlertTitle className="font-bold text-primary">Complete Your Task & Earn a LKR {nextTask.refereeBonus} Bonus!</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
                 <p>You have a pending referral task to complete.</p>
                 <Button asChild size="sm">
