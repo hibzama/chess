@@ -61,7 +61,7 @@ function CampaignTaskAlert() {
     );
 }
 
-const StatCard = ({ title, value, description, icon, isLoading, isNegative = false }: { title: string, value: string | number, description?: string, icon?: React.ReactNode, isLoading: boolean, isNegative?: boolean}) => (
+const StatCard = ({ title, value, description, isLoading, isNegative = false }: { title: string, value: string | number, description?: string, isLoading: boolean, isNegative?: boolean}) => (
     <Card className="bg-card/50">
         <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
@@ -219,3 +219,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
