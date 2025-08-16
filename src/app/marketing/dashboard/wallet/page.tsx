@@ -226,7 +226,7 @@ export default function MarketingWalletPage() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="font-medium">LKR {tx.amount.toFixed(2)}</div>
-                                        <div className="text-xs text-muted-foreground">~{(tx.amount / USDT_RATE).toFixed(2)} USDT</p>
+                                        <div className="text-xs text-muted-foreground">~{(tx.amount / USDT_RATE).toFixed(2)} USDT</div>
                                     </TableCell>
                                     <TableCell>{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                                     <TableCell>
