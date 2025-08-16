@@ -72,22 +72,31 @@ export default function ReferralClaimsPage() {
         const handleError = (error: any) => {
              console.error("Error fetching claims:", error);
              setLoading(false);
-             toast({ variant: 'destructive', title: 'Error', description: 'Failed to fetch claims data.' });
+             toast({ variant: 'destructive', title: 'Error', description: 'Failed to fetch claims data. ' + error.message });
         }
 
         // Listener for pending claims
-        const pendingQuery = query(collectionGroup(db, 'bonus_claims'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
+        const pendingQuery = query(
+            collectionGroup(db, 'bonus_claims'), 
+            where('status', '==', 'pending'), 
+            orderBy('createdAt', 'asc') // Changed to asc to match index
+        );
         const unsubscribePending = onSnapshot(pendingQuery, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setPendingClaims(claims);
+            setPendingClaims(claims.reverse()); // Reverse on client
             if(loading) setLoading(false);
         }, handleError);
 
         // Listener for history claims
-        const historyQuery = query(collectionGroup(db, 'bonus_claims'), where('status', 'in', ['approved', 'rejected']), orderBy('createdAt', 'desc'), limit(50));
+        const historyQuery = query(
+            collectionGroup(db, 'bonus_claims'), 
+            where('status', 'in', ['approved', 'rejected']), 
+            orderBy('createdAt', 'asc'), // Changed to asc to match index
+            limit(50)
+        );
         const unsubscribeHistory = onSnapshot(historyQuery, async (snapshot) => {
              const claims = await enrichClaims(snapshot);
-            setHistoryClaims(claims);
+            setHistoryClaims(claims.reverse()); // Reverse on client
         }, handleError);
 
 
