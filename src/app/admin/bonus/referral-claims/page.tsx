@@ -74,13 +74,14 @@ export default function ReferralClaimsPage() {
         
         const q = query(
             collectionGroup(db, 'bonus_claims'),
-            orderBy('createdAt', 'desc'),
             limit(100) 
         );
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setAllClaims(claims);
+            // Sort claims client-side to avoid index requirement
+            const sortedClaims = claims.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+            setAllClaims(sortedClaims);
             setLoading(false);
         }, (err) => handleError(err, 'all'));
         
