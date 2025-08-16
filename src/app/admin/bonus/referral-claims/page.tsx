@@ -61,8 +61,7 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
 }
 
 export default function ReferralClaimsPage() {
-    const [pendingClaims, setPendingClaims] = useState<BonusClaim[]>([]);
-    const [historyClaims, setHistoryClaims] = useState<BonusClaim[]>([]);
+    const [allClaims, setAllClaims] = useState<BonusClaim[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
@@ -72,39 +71,30 @@ export default function ReferralClaimsPage() {
         const handleError = (error: any) => {
              console.error("Error fetching claims:", error);
              setLoading(false);
-             toast({ variant: 'destructive', title: 'Error', description: 'Failed to fetch claims data. ' + error.message });
+             toast({ variant: 'destructive', title: 'Error fetching claims data.', description: `The query requires an index. You can create it here: ${error.message.substring(error.message.indexOf('https'))}` });
         }
-
-        // Listener for pending claims
-        const pendingQuery = query(
-            collectionGroup(db, 'bonus_claims'), 
-            where('status', '==', 'pending'), 
-            orderBy('createdAt', 'asc') // Changed to asc to match index
+        
+        // Fetch all bonus claims sorted by date. We will filter client-side.
+        // This is a more robust query that is less likely to fail due to complex indexes.
+        const claimsQuery = query(
+            collectionGroup(db, 'bonus_claims'),
+            orderBy('createdAt', 'desc'),
+            limit(100) // Limit to the last 100 claims for performance
         );
-        const unsubscribePending = onSnapshot(pendingQuery, async (snapshot) => {
+        
+        const unsubscribe = onSnapshot(claimsQuery, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setPendingClaims(claims.reverse()); // Reverse on client
-            if(loading) setLoading(false);
-        }, handleError);
-
-        // Listener for history claims
-        const historyQuery = query(
-            collectionGroup(db, 'bonus_claims'), 
-            where('status', 'in', ['approved', 'rejected']), 
-            orderBy('createdAt', 'asc'), // Changed to asc to match index
-            limit(50)
-        );
-        const unsubscribeHistory = onSnapshot(historyQuery, async (snapshot) => {
-             const claims = await enrichClaims(snapshot);
-            setHistoryClaims(claims.reverse()); // Reverse on client
+            setAllClaims(claims);
+            setLoading(false);
         }, handleError);
 
 
-        return () => {
-            unsubscribePending();
-            unsubscribeHistory();
-        };
-    }, [toast, loading]);
+        return () => unsubscribe();
+    }, [toast]);
+    
+    const pendingClaims = allClaims.filter(claim => claim.status === 'pending');
+    const historyClaims = allClaims.filter(claim => claim.status !== 'pending');
+
 
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
         const claimRef = doc(db, 'bonus_claims', claim.id);
