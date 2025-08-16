@@ -1,4 +1,3 @@
-
 'use client'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -17,7 +16,6 @@ import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
 import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
 
 // #region Bonus Components
-
 const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string}) => (
     <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 flex flex-col">
         <CardHeader className="flex-grow">
@@ -33,126 +31,61 @@ const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {t
     </Card>
 )
 
-function DepositBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
-    const [bonus, setBonus] = useState<DepositBonusCampaign | null>(null);
-    useEffect(() => {
-        const fetchBonus = async () => {
-            const now = Timestamp.now();
-            const q = query(
-                collection(db, 'deposit_bonus_campaigns'), 
-                where('isActive', '==', true), 
-                where('expiresAt', '>', now),
-                limit(1)
-            );
-            const snapshot = await getDocs(q);
-            if(!snapshot.empty) {
-                const campaign = snapshot.docs[0].data() as DepositBonusCampaign;
-                setBonus(campaign);
-                onAvailabilityChange(true);
-            } else {
-                onAvailabilityChange(false);
-            }
-        }
-        fetchBonus();
-    }, [onAvailabilityChange])
-
-    if (!bonus) return null;
-
-    return (
-        <BonusCardShell 
-            title={bonus.title || "Deposit Bonus"}
-            description={`Get a ${bonus.percentage}% bonus on deposits from LKR ${bonus.minDeposit} to LKR ${bonus.maxDeposit}!`}
-            icon={<Banknote className="text-green-400"/>}
-            href="/dashboard/wallet"
-            linkText="Make a Deposit"
-        />
-    )
-}
-
-function DailyBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
-    const { user, userData } = useAuth();
-    const [bonus, setBonus] = useState<DailyBonusCampaign | null>(null);
+const BonusHub = ({ depositBonus, dailyBonus, referralTask }: { depositBonus: DepositBonusCampaign | null, dailyBonus: DailyBonusCampaign | null, referralTask: {task: CampaignTask, campaign: Campaign} | null }) => {
+    const activeBonuses = [depositBonus, dailyBonus, referralTask].filter(Boolean);
     
-    useEffect(() => {
-         if (!user || !userData) return;
-         const fetchBonus = async () => {
-            const now = Timestamp.now();
-            const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true), where('endDate', '>', now), limit(1));
-            const dailySnapshot = await getDocs(dailyQuery);
-            if (!dailySnapshot.empty) {
-                const campaign = dailySnapshot.docs[0].data() as DailyBonusCampaign;
-                if(campaign.startDate.toDate() < now.toDate()) { // Check if it has started
-                    const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, dailySnapshot.docs[0].id));
-                    if(!claimSnap.exists()) {
-                         setBonus(campaign);
-                         onAvailabilityChange(true);
-                    } else {
-                        onAvailabilityChange(false);
-                    }
-                } else {
-                     onAvailabilityChange(false);
-                }
-            } else {
-                 onAvailabilityChange(false);
-            }
-         }
-         fetchBonus();
-    }, [user, userData, onAvailabilityChange]);
-
-    if(!bonus) return null;
-
-    return (
-        <BonusCardShell 
-            title={bonus.title || "Daily Bonus"}
-            description="A special bonus is available for you to claim today!"
-            icon={<Calendar className="text-blue-400"/>}
-            href="/dashboard/bonus-center"
-            linkText="Claim Now"
-        />
-    )
-}
-
-function ReferralTaskAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
-    const { userData } = useAuth();
-    const [task, setTask] = useState<{task: CampaignTask, campaign: Campaign} | null>(null);
-
-    useEffect(() => {
-        if (!userData?.campaignInfo) {
-            onAvailabilityChange(false);
-            return;
-        };
-        const fetchTask = async () => {
-            const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo!.campaignId));
-            if (campaignDoc.exists()) {
-                const campaignData = campaignDoc.data() as Campaign;
-                const completedTaskIds = new Set(userData.campaignInfo!.completedTasks || []);
-                const nextTask = campaignData.tasks.find(t => !completedTaskIds.has(t.id));
-                if (nextTask) {
-                    setTask({ task: nextTask, campaign: campaignData });
-                    onAvailabilityChange(true);
-                } else {
-                    onAvailabilityChange(false);
-                }
-            } else {
-                onAvailabilityChange(false);
-            }
+    if (activeBonuses.length === 0) {
+        return (
+             <Card className="bg-card/50 border-dashed">
+                <CardContent className="p-6 text-center text-muted-foreground">
+                    No special bonuses available for you right now. Check back soon!
+                </CardContent>
+            </Card>
+        );
+    }
+    
+    const gridColsClass = useMemo(() => {
+        switch (activeBonuses.length) {
+            case 1: return "md:grid-cols-1";
+            case 2: return "md:grid-cols-2";
+            case 3: return "md:grid-cols-3";
+            default: return "";
         }
-        fetchTask();
-    }, [userData, onAvailabilityChange]);
-
-    if (!task) return null;
+    }, [activeBonuses.length]);
 
     return (
-        <BonusCardShell 
-            title="Your Next Task" 
-            description={task.task.description}
-            icon={<ClipboardCheck className="text-yellow-400"/>}
-            href="/dashboard/your-task"
-            linkText="Complete Task"
-            reward={`Reward: LKR ${task.task.refereeBonus.toFixed(2)}`}
-        />
-    )
-}
+        <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
+            {depositBonus && (
+                <BonusCardShell 
+                    title={depositBonus.title || "Deposit Bonus"}
+                    description={`Get a ${depositBonus.percentage}% bonus on deposits from LKR ${depositBonus.minDeposit} to LKR ${depositBonus.maxDeposit}!`}
+                    icon={<Banknote className="text-green-400"/>}
+                    href="/dashboard/wallet"
+                    linkText="Make a Deposit"
+                />
+            )}
+            {dailyBonus && (
+                <BonusCardShell 
+                    title={dailyBonus.title || "Daily Bonus"}
+                    description="A special bonus is available for you to claim today!"
+                    icon={<Calendar className="text-blue-400"/>}
+                    href="/dashboard/bonus-center"
+                    linkText="Claim Now"
+                />
+            )}
+            {referralTask && (
+                 <BonusCardShell 
+                    title="Your Next Task" 
+                    description={referralTask.task.description}
+                    icon={<ClipboardCheck className="text-yellow-400"/>}
+                    href="/dashboard/your-task"
+                    linkText="Complete Task"
+                    reward={`Reward: LKR ${referralTask.task.refereeBonus.toFixed(2)}`}
+                />
+            )}
+        </div>
+    );
+};
 // #endregion
 
 
@@ -177,63 +110,75 @@ export default function DashboardPage() {
     const [transactions, setTransactions] = useState<any[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
     
-    const [availableBonuses, setAvailableBonuses] = useState({
-        deposit: false,
-        daily: false,
-        task: false,
-    });
+    // State for all available bonuses
+    const [depositBonus, setDepositBonus] = useState<DepositBonusCampaign | null>(null);
+    const [dailyBonus, setDailyBonus] = useState<DailyBonusCampaign | null>(null);
+    const [referralTask, setReferralTask] = useState<{task: CampaignTask, campaign: Campaign} | null>(null);
     const [checkingBonuses, setCheckingBonuses] = useState(true);
-
-    const handleBonusAvailability = (type: keyof typeof availableBonuses, available: boolean) => {
-        setAvailableBonuses(prev => {
-            const newState = {...prev, [type]: available};
-            // Check if all bonus checks are complete
-            if (Object.values(newState).every(v => v === false || v === true)) {
-                setCheckingBonuses(false);
-            }
-            return newState;
-        });
-    }
-
-    const activeBonusCount = Object.values(availableBonuses).filter(Boolean).length;
-    
-    const gridColsClass = useMemo(() => {
-        switch (activeBonusCount) {
-            case 1: return "md:grid-cols-1";
-            case 2: return "md:grid-cols-2";
-            case 3: return "md:grid-cols-3";
-            default: return "";
-        }
-    }, [activeBonusCount]);
-
 
     const USDT_RATE = 310;
     
     useEffect(() => {
-        if (!user) {
+        if (!user || !userData) {
             setStatsLoading(false);
+            setCheckingBonuses(false);
             return;
         }
 
-        const q = query(collection(db, 'transactions'), where('userId', '==', user.uid));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        // Fetch Transactions
+        const transQuery = query(collection(db, 'transactions'), where('userId', '==', user.uid));
+        const unsubscribeTrans = onSnapshot(transQuery, (snapshot) => {
             const userTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setTransactions(userTransactions);
             setStatsLoading(false);
         });
 
-        // Set a timeout in case bonus checks take too long
-        const bonusCheckTimeout = setTimeout(() => {
-            if (checkingBonuses) {
-                setCheckingBonuses(false);
+        // --- Fetch all bonuses ---
+        const fetchBonuses = async () => {
+            const now = Timestamp.now();
+            
+            // 1. Deposit Bonus
+            const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true), where('expiresAt', '>', now), limit(1));
+            const depositSnapshot = await getDocs(depositQuery);
+            if (!depositSnapshot.empty) {
+                setDepositBonus(depositSnapshot.docs[0].data() as DepositBonusCampaign);
             }
-        }, 5000);
+
+            // 2. Daily Bonus
+            const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true), where('endDate', '>', now), limit(1));
+            const dailySnapshot = await getDocs(dailyQuery);
+            if (!dailySnapshot.empty) {
+                const campaign = dailySnapshot.docs[0].data() as DailyBonusCampaign;
+                if (campaign.startDate.toDate() < now.toDate()) {
+                    const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, dailySnapshot.docs[0].id));
+                    if (!claimSnap.exists()) {
+                        setDailyBonus(campaign);
+                    }
+                }
+            }
+            
+            // 3. Referral Task
+            if (userData.campaignInfo) {
+                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
+                if (campaignDoc.exists()) {
+                    const campaignData = campaignDoc.data() as Campaign;
+                    const completedTaskIds = new Set(userData.campaignInfo.completedTasks || []);
+                    const nextTask = campaignData.tasks.find(t => !completedTaskIds.has(t.id));
+                    if (nextTask) {
+                        setReferralTask({ task: nextTask, campaign: campaignData });
+                    }
+                }
+            }
+            
+            setCheckingBonuses(false);
+        };
+        
+        fetchBonuses();
 
         return () => {
-            unsubscribe();
-            clearTimeout(bonusCheckTimeout);
+            unsubscribeTrans();
         };
-    }, [user, checkingBonuses]);
+    }, [user, userData]);
 
     const financialStats = useMemo(() => {
         let totalDeposit = 0;
@@ -297,18 +242,8 @@ export default function DashboardPage() {
         <div className="space-y-4">
             {checkingBonuses ? (
                 <Skeleton className="h-44 w-full" />
-            ) : activeBonusCount > 0 ? (
-                <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
-                    <DepositBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('deposit', isAvailable)} />
-                    <DailyBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('daily', isAvailable)} />
-                    <ReferralTaskAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('task', isAvailable)} />
-                </div>
             ) : (
-                <Card className="bg-card/50 border-dashed">
-                    <CardContent className="p-6 text-center text-muted-foreground">
-                        No special bonuses available for you right now. Check back soon!
-                    </CardContent>
-                </Card>
+                <BonusHub depositBonus={depositBonus} dailyBonus={dailyBonus} referralTask={referralTask} />
             )}
         </div>
       
