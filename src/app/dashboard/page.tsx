@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, Calendar, Banknote, Megaphone } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, Calendar, Banknote, Megaphone, ClipboardCheck } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,17 +13,19 @@ import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyBonusCampaign } from '@/app/admin/bonus/daily-bonus/page';
-import { CampaignTask } from '@/app/admin/referral-campaigns/page';
+import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
+import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
 
 // #region Bonus Components
 
-const BonusCardShell = ({ title, description, icon, href, linkText }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string}) => (
+const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string}) => (
     <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 flex flex-col">
         <CardHeader className="flex-grow">
             <CardTitle className="flex items-center gap-2 text-lg">{icon} {title}</CardTitle>
             <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
+            {reward && <div className="mb-4 text-center p-2 bg-yellow-400/10 border border-yellow-400/20 rounded-md text-yellow-300 font-bold text-sm">{reward}</div>}
             <Button variant="outline" asChild className="w-full">
                 <Link href={href}>{linkText}</Link>
             </Button>
@@ -32,13 +34,20 @@ const BonusCardShell = ({ title, description, icon, href, linkText }: {title: st
 )
 
 function DepositBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
-    const [bonus, setBonus] = useState<{enabled: boolean, percentage: number} | null>(null);
+    const [bonus, setBonus] = useState<DepositBonusCampaign | null>(null);
     useEffect(() => {
         const fetchBonus = async () => {
-            const settingsSnap = await getDoc(doc(db, 'settings', 'depositBonusConfig'));
-            if(settingsSnap.exists() && settingsSnap.data().depositBonusEnabled) {
-                const data = settingsSnap.data();
-                setBonus({ enabled: true, percentage: data.depositBonusPercentage });
+            const now = Timestamp.now();
+            const q = query(
+                collection(db, 'deposit_bonus_campaigns'), 
+                where('isActive', '==', true), 
+                where('expiresAt', '>', now),
+                limit(1)
+            );
+            const snapshot = await getDocs(q);
+            if(!snapshot.empty) {
+                const campaign = snapshot.docs[0].data() as DepositBonusCampaign;
+                setBonus(campaign);
                 onAvailabilityChange(true);
             } else {
                 onAvailabilityChange(false);
@@ -51,8 +60,8 @@ function DepositBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (av
 
     return (
         <BonusCardShell 
-            title="Deposit Bonus" 
-            description={`Get ${bonus.percentage}% bonus on your next deposit!`}
+            title={bonus.title || "Deposit Bonus"}
+            description={`Get a ${bonus.percentage}% bonus on deposits from LKR ${bonus.minDeposit} to LKR ${bonus.maxDeposit}!`}
             icon={<Banknote className="text-green-400"/>}
             href="/dashboard/wallet"
             linkText="Make a Deposit"
@@ -68,11 +77,11 @@ function DailyBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (avai
          if (!user || !userData) return;
          const fetchBonus = async () => {
             const now = Timestamp.now();
-            const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true), limit(1));
+            const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true), where('endDate', '>', now), limit(1));
             const dailySnapshot = await getDocs(dailyQuery);
             if (!dailySnapshot.empty) {
                 const campaign = dailySnapshot.docs[0].data() as DailyBonusCampaign;
-                if(campaign.endDate.toDate() > now.toDate()) {
+                if(campaign.startDate.toDate() < now.toDate()) { // Check if it has started
                     const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, dailySnapshot.docs[0].id));
                     if(!claimSnap.exists()) {
                          setBonus(campaign);
@@ -81,7 +90,7 @@ function DailyBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (avai
                         onAvailabilityChange(false);
                     }
                 } else {
-                    onAvailabilityChange(false);
+                     onAvailabilityChange(false);
                 }
             } else {
                  onAvailabilityChange(false);
@@ -94,8 +103,8 @@ function DailyBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (avai
 
     return (
         <BonusCardShell 
-            title="Daily Bonus" 
-            description="A special bonus is available for you today!"
+            title={bonus.title || "Daily Bonus"}
+            description="A special bonus is available for you to claim today!"
             icon={<Calendar className="text-blue-400"/>}
             href="/dashboard/bonus-center"
             linkText="Claim Now"
@@ -103,41 +112,44 @@ function DailyBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (avai
     )
 }
 
-function ReferralCampaignAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
-    const { user } = useAuth();
-    const [campaignAvailable, setCampaignAvailable] = useState(false);
+function ReferralTaskAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
+    const { userData } = useAuth();
+    const [task, setTask] = useState<{task: CampaignTask, campaign: Campaign} | null>(null);
 
     useEffect(() => {
-        if (!user) return;
-        const checkCampaigns = async () => {
-            const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
-            const userCampaignDoc = await getDoc(userCampaignRef);
-
-            if (userCampaignDoc.exists()) {
-                setCampaignAvailable(false); // User is already in a campaign
-                onAvailabilityChange(false);
-                return;
-            }
-
-            const campaignsQuery = query(collection(db, 'referral_campaigns'), where('isActive', '==', true), limit(1));
-            const campaignsSnapshot = await getDocs(campaignsQuery);
-
-            const isAvailable = !campaignsSnapshot.empty;
-            setCampaignAvailable(isAvailable);
-            onAvailabilityChange(isAvailable);
+        if (!userData?.campaignInfo) {
+            onAvailabilityChange(false);
+            return;
         };
-        checkCampaigns();
-    }, [user, onAvailabilityChange]);
+        const fetchTask = async () => {
+            const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo!.campaignId));
+            if (campaignDoc.exists()) {
+                const campaignData = campaignDoc.data() as Campaign;
+                const completedTaskIds = new Set(userData.campaignInfo!.completedTasks || []);
+                const nextTask = campaignData.tasks.find(t => !completedTaskIds.has(t.id));
+                if (nextTask) {
+                    setTask({ task: nextTask, campaign: campaignData });
+                    onAvailabilityChange(true);
+                } else {
+                    onAvailabilityChange(false);
+                }
+            } else {
+                onAvailabilityChange(false);
+            }
+        }
+        fetchTask();
+    }, [userData, onAvailabilityChange]);
 
-    if (!campaignAvailable) return null;
+    if (!task) return null;
 
     return (
         <BonusCardShell 
-            title="Referral Campaign" 
-            description="Start a campaign to earn bigger rewards by inviting friends."
-            icon={<Award className="text-yellow-400"/>}
-            href="/dashboard/referral-campaigns"
-            linkText="View Campaigns"
+            title="Your Next Task" 
+            description={task.task.description}
+            icon={<ClipboardCheck className="text-yellow-400"/>}
+            href="/dashboard/your-task"
+            linkText="Complete Task"
+            reward={`Reward: LKR ${task.task.refereeBonus.toFixed(2)}`}
         />
     )
 }
@@ -168,7 +180,7 @@ export default function DashboardPage() {
     const [availableBonuses, setAvailableBonuses] = useState({
         deposit: false,
         daily: false,
-        referral: false,
+        task: false,
     });
 
     const handleBonusAvailability = (type: keyof typeof availableBonuses, available: boolean) => {
@@ -269,7 +281,7 @@ export default function DashboardPage() {
              <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
                 <DepositBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('deposit', isAvailable)} />
                 <DailyBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('daily', isAvailable)} />
-                <ReferralCampaignAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('referral', isAvailable)} />
+                <ReferralTaskAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('task', isAvailable)} />
             </div>
         )}
       </div>
