@@ -8,13 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, Loader2, Calendar, Check, X, Users, Eye } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Loader2, Calendar, Check, X, Users, Eye, Clock } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, setHours, setMinutes, setSeconds } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -52,11 +52,21 @@ export default function DailyBonusCampaignsPage() {
     const [editingCampaign, setEditingCampaign] = useState<DailyBonusCampaign | null>(null);
     const { toast } = useToast();
 
-    const [formState, setFormState] = useState({
-        title: '', isActive: true, eligibility: 'all', balanceThreshold: 10,
-        bonusType: 'fixed', bonusValue: 5, startDate: new Date(),
-        endDate: new Date(new Date().setDate(new Date().getDate() + 7)), userLimit: 100,
-    });
+    const getInitialFormState = () => {
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(now.getDate() + 1);
+
+        return {
+            title: '', isActive: true, eligibility: 'all' as 'all' | 'below' | 'above', balanceThreshold: 10,
+            bonusType: 'fixed' as 'fixed' | 'percentage', bonusValue: 5, 
+            startDate: now, startHour: now.getHours(), startMinute: now.getMinutes(),
+            endDate: tomorrow, endHour: tomorrow.getHours(), endMinute: tomorrow.getMinutes(),
+            userLimit: 100,
+        };
+    };
+
+    const [formState, setFormState] = useState(getInitialFormState());
     
     const [isClaimsDialogOpen, setIsClaimsDialogOpen] = useState(false);
     const [claims, setClaims] = useState<Claim[]>([]);
@@ -87,25 +97,27 @@ export default function DailyBonusCampaignsPage() {
     };
 
     const resetForm = () => {
-        setFormState({
-            title: '', isActive: true, eligibility: 'all', balanceThreshold: 10,
-            bonusType: 'fixed', bonusValue: 5, startDate: new Date(),
-            endDate: new Date(new Date().setDate(new Date().getDate() + 7)), userLimit: 100
-        });
+        setFormState(getInitialFormState());
         setEditingCampaign(null);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSubmitting(true);
+
+        let startDate = setSeconds(setMinutes(setHours(formState.startDate, formState.startHour), formState.startMinute), 0);
+        let endDate = setSeconds(setMinutes(setHours(formState.endDate, formState.endHour), formState.endMinute), 0);
         
         const campaignData = {
-            ...formState,
+            title: formState.title,
+            isActive: formState.isActive,
+            eligibility: formState.eligibility,
             balanceThreshold: Number(formState.balanceThreshold),
+            bonusType: formState.bonusType,
             bonusValue: Number(formState.bonusValue),
             userLimit: Number(formState.userLimit),
-            startDate: Timestamp.fromDate(formState.startDate),
-            endDate: Timestamp.fromDate(formState.endDate),
+            startDate: Timestamp.fromDate(startDate),
+            endDate: Timestamp.fromDate(endDate),
         };
 
         try {
@@ -128,6 +140,9 @@ export default function DailyBonusCampaignsPage() {
 
     const handleEdit = (campaign: DailyBonusCampaign) => {
         setEditingCampaign(campaign);
+        const startDate = campaign.startDate.toDate();
+        const endDate = campaign.endDate.toDate();
+
         setFormState({
             title: campaign.title,
             isActive: campaign.isActive,
@@ -135,8 +150,12 @@ export default function DailyBonusCampaignsPage() {
             balanceThreshold: campaign.balanceThreshold,
             bonusType: campaign.bonusType,
             bonusValue: campaign.bonusValue,
-            startDate: campaign.startDate.toDate(),
-            endDate: campaign.endDate.toDate(),
+            startDate: startDate,
+            startHour: startDate.getHours(),
+            startMinute: startDate.getMinutes(),
+            endDate: endDate,
+            endHour: endDate.getHours(),
+            endMinute: endDate.getMinutes(),
             userLimit: campaign.userLimit,
         });
     };
@@ -200,14 +219,24 @@ export default function DailyBonusCampaignsPage() {
                             <Input name="bonusValue" type="number" value={formState.bonusValue} onChange={handleInputChange} placeholder={formState.bonusType === 'fixed' ? "e.g. 5" : "e.g. 10"}/>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2"><Label>Start Date</Label>
+                        <div className="space-y-2">
+                            <Label>Start Date & Time</Label>
+                            <div className="flex gap-2">
                                 <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.startDate && "text-muted-foreground")}><Calendar className="mr-2 h-4 w-4" />{formState.startDate ? format(formState.startDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent><Calendar mode="single" selected={formState.startDate} onSelect={(d) => d && setFormState(s=>({...s, startDate:d}))} initialFocus/></PopoverContent></Popover>
-                            </div>
-                            <div className="space-y-2"><Label>End Date</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.endDate && "text-muted-foreground")}><Calendar className="mr-2 h-4 w-4" />{formState.endDate ? format(formState.endDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent><Calendar mode="single" selected={formState.endDate} onSelect={(d) => d && setFormState(s=>({...s, endDate:d}))} initialFocus/></PopoverContent></Popover>
+                                <Input type="number" min="0" max="23" placeholder="HH" value={formState.startHour} onChange={e => setFormState(s=>({...s, startHour: Number(e.target.value)}))} className="w-20" />
+                                <Input type="number" min="0" max="59" placeholder="MM" value={formState.startMinute} onChange={e => setFormState(s=>({...s, startMinute: Number(e.target.value)}))} className="w-20" />
                             </div>
                         </div>
+
+                        <div className="space-y-2">
+                            <Label>End Date & Time</Label>
+                             <div className="flex gap-2">
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.endDate && "text-muted-foreground")}><Calendar className="mr-2 h-4 w-4" />{formState.endDate ? format(formState.endDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent><Calendar mode="single" selected={formState.endDate} onSelect={(d) => d && setFormState(s=>({...s, endDate:d}))} initialFocus/></PopoverContent></Popover>
+                                <Input type="number" min="0" max="23" placeholder="HH" value={formState.endHour} onChange={e => setFormState(s=>({...s, endHour: Number(e.target.value)}))} className="w-20" />
+                                <Input type="number" min="0" max="59" placeholder="MM" value={formState.endMinute} onChange={e => setFormState(s=>({...s, endMinute: Number(e.target.value)}))} className="w-20" />
+                            </div>
+                        </div>
+
 
                         <div className="space-y-2"><Label>User Limit</Label><Input name="userLimit" type="number" value={formState.userLimit} onChange={handleInputChange}/></div>
                         <div className="flex items-center space-x-2"><Switch id="isActive" name="isActive" checked={formState.isActive} onCheckedChange={(checked) => setFormState(s => ({...s, isActive: checked}))} /><Label htmlFor="isActive">Campaign is Active</Label></div>
@@ -266,3 +295,4 @@ export default function DailyBonusCampaignsPage() {
         </div>
     );
 }
+
