@@ -338,22 +338,21 @@ export const endGame = onCall(async (request) => {
                     const wageredFromMain = p.wagerInfo.wagerFromMain || 0;
                     const wageredFromBonus = p.wagerInfo.wagerFromBonus || 0;
                     
-                    const profit = p.payout - wageredFromMain - wageredFromBonus;
+                    const profit = p.payout - (wageredFromMain + wageredFromBonus);
                     const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
 
-                    if (profit > 0) {
-                         // Refund original wagers and add profit to the main balance
-                         updatePayload.balance = admin.firestore.FieldValue.increment(wageredFromMain + profit);
-                         if (wageredFromBonus > 0) {
+                    if (wageredFromMain > 0) {
+                         // Player used main wallet, so all winnings go to main wallet
+                         updatePayload.balance = admin.firestore.FieldValue.increment(p.payout);
+                    } else if (wageredFromBonus > 0) {
+                        // Player used bonus wallet
+                        if (profit > 0) {
+                            // Return original stake to bonus wallet, profit to main wallet
                             updatePayload.bonusBalance = admin.firestore.FieldValue.increment(wageredFromBonus);
-                         }
-                    } else { // Handle losses or refunds (draw, resign)
-                        const totalWagered = wageredFromMain + wageredFromBonus;
-                        if(totalWagered > 0) {
-                            const mainRefund = (wageredFromMain / totalWagered) * p.payout;
-                            const bonusRefund = (wageredFromBonus / totalWagered) * p.payout;
-                             if(mainRefund > 0) updatePayload.balance = admin.firestore.FieldValue.increment(mainRefund);
-                             if(bonusRefund > 0) updatePayload.bonusBalance = admin.firestore.FieldValue.increment(bonusRefund);
+                            updatePayload.balance = admin.firestore.FieldValue.increment(profit);
+                        } else {
+                            // It's a refund (draw/resign), so return the payout to bonus wallet
+                            updatePayload.bonusBalance = admin.firestore.FieldValue.increment(p.payout);
                         }
                     }
 
