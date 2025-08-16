@@ -90,12 +90,14 @@ export default function WalletPage() {
         return;
     }
     
-    const q = query(collection(db, 'transactions'), where('userId', '==', user.uid));
+    // Simplified query to avoid complex indexing
+    const q = query(collection(db, 'transactions'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(50));
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const userTransactions = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Transaction))
         .filter(tx => tx.type !== 'commission'); // Filter out commission transactions from main wallet
-      setTransactions(userTransactions.sort((a, b) => (b.createdAt?.seconds ?? Infinity) - (a.createdAt?.seconds ?? Infinity)));
+      setTransactions(userTransactions); // Already sorted by Firestore
       setLoading(false);
     }, (error) => {
       console.error("Error fetching transactions:", error);
@@ -550,3 +552,5 @@ export default function WalletPage() {
     </>
   );
 }
+
+    
