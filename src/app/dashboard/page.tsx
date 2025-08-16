@@ -61,39 +61,50 @@ function CampaignTaskAlert() {
     );
 }
 
-function DepositBonusAlert() {
+const BonusCardShell = ({ title, description, icon, href, linkText }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string}) => (
+    <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 flex flex-col">
+        <CardHeader className="flex-grow">
+            <CardTitle className="flex items-center gap-2 text-lg">{icon} {title}</CardTitle>
+            <CardDescription>{description}</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <Button variant="outline" asChild className="w-full">
+                <Link href={href}>{linkText}</Link>
+            </Button>
+        </CardContent>
+    </Card>
+)
+
+function DepositBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
     const [bonus, setBonus] = useState<{enabled: boolean, percentage: number} | null>(null);
     useEffect(() => {
         const fetchBonus = async () => {
             const settingsSnap = await getDoc(doc(db, 'settings', 'depositBonusConfig'));
             if(settingsSnap.exists() && settingsSnap.data().depositBonusEnabled) {
-                setBonus({
-                    enabled: true,
-                    percentage: settingsSnap.data().depositBonusPercentage
-                })
+                const data = settingsSnap.data();
+                setBonus({ enabled: true, percentage: data.depositBonusPercentage });
+                onAvailabilityChange(true);
+            } else {
+                onAvailabilityChange(false);
             }
         }
         fetchBonus();
-    }, [])
+    }, [onAvailabilityChange])
 
     if (!bonus) return null;
 
     return (
-        <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-400/30">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="text-green-400"/> Deposit Bonus</CardTitle>
-                <CardDescription>Get {bonus.percentage}% bonus on your next deposit!</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button variant="outline" asChild className="w-full">
-                    <Link href="/dashboard/wallet">Make a Deposit</Link>
-                </Button>
-            </CardContent>
-        </Card>
+        <BonusCardShell 
+            title="Deposit Bonus" 
+            description={`Get ${bonus.percentage}% bonus on your next deposit!`}
+            icon={<Banknote className="text-green-400"/>}
+            href="/dashboard/wallet"
+            linkText="Make a Deposit"
+        />
     )
 }
 
-function DailyBonusAlert() {
+function DailyBonusAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
     const { user, userData } = useAuth();
     const [bonus, setBonus] = useState<DailyBonusCampaign | null>(null);
     
@@ -101,40 +112,77 @@ function DailyBonusAlert() {
          if (!user || !userData) return;
          const fetchBonus = async () => {
             const now = Timestamp.now();
-            const dailyQuery = query(
-                collection(db, 'daily_bonus_campaigns'),
-                where('isActive', '==', true),
-                limit(1)
-            );
+            const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true), limit(1));
             const dailySnapshot = await getDocs(dailyQuery);
             if (!dailySnapshot.empty) {
                 const campaign = dailySnapshot.docs[0].data() as DailyBonusCampaign;
                 if(campaign.endDate.toDate() > now.toDate()) {
-                    // Check if user has claimed it
                     const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, dailySnapshot.docs[0].id));
                     if(!claimSnap.exists()) {
-                         setBonus(campaign)
+                         setBonus(campaign);
+                         onAvailabilityChange(true);
+                    } else {
+                        onAvailabilityChange(false);
                     }
+                } else {
+                    onAvailabilityChange(false);
                 }
+            } else {
+                 onAvailabilityChange(false);
             }
          }
          fetchBonus();
-    }, [user, userData]);
+    }, [user, userData, onAvailabilityChange]);
 
     if(!bonus) return null;
 
     return (
-         <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-400/30">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg"><Calendar className="text-blue-400"/> Daily Bonus</CardTitle>
-                <CardDescription>A special bonus is available for you today!</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Button variant="outline" asChild className="w-full">
-                    <Link href="/dashboard/bonus-center">Claim Now</Link>
-                </Button>
-            </CardContent>
-        </Card>
+        <BonusCardShell 
+            title="Daily Bonus" 
+            description="A special bonus is available for you today!"
+            icon={<Calendar className="text-blue-400"/>}
+            href="/dashboard/bonus-center"
+            linkText="Claim Now"
+        />
+    )
+}
+
+function ReferralCampaignAlert({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
+    const { user } = useAuth();
+    const [campaignAvailable, setCampaignAvailable] = useState(false);
+
+    useEffect(() => {
+        if (!user) return;
+        const checkCampaigns = async () => {
+            const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
+            const userCampaignDoc = await getDoc(userCampaignRef);
+
+            if (userCampaignDoc.exists()) {
+                setCampaignAvailable(false); // User is already in a campaign
+                onAvailabilityChange(false);
+                return;
+            }
+
+            const campaignsQuery = query(collection(db, 'referral_campaigns'), where('isActive', '==', true), limit(1));
+            const campaignsSnapshot = await getDocs(campaignsQuery);
+
+            const isAvailable = !campaignsSnapshot.empty;
+            setCampaignAvailable(isAvailable);
+            onAvailabilityChange(isAvailable);
+        };
+        checkCampaigns();
+    }, [user, onAvailabilityChange]);
+
+    if (!campaignAvailable) return null;
+
+    return (
+        <BonusCardShell 
+            title="Referral Campaign" 
+            description="Start a campaign to earn bigger rewards by inviting friends."
+            icon={<Award className="text-yellow-400"/>}
+            href="/dashboard/referral-campaigns"
+            linkText="View Campaigns"
+        />
     )
 }
 // #endregion
@@ -160,6 +208,28 @@ export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
     const [transactions, setTransactions] = useState<any[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
+    
+    const [availableBonuses, setAvailableBonuses] = useState({
+        deposit: false,
+        daily: false,
+        referral: false,
+    });
+
+    const handleBonusAvailability = (type: keyof typeof availableBonuses, available: boolean) => {
+        setAvailableBonuses(prev => ({...prev, [type]: available}));
+    }
+
+    const activeBonusCount = Object.values(availableBonuses).filter(Boolean).length;
+    
+    const gridColsClass = useMemo(() => {
+        switch (activeBonusCount) {
+            case 1: return "md:grid-cols-1";
+            case 2: return "md:grid-cols-2";
+            case 3: return "md:grid-cols-3";
+            default: return "";
+        }
+    }, [activeBonusCount]);
+
 
     const USDT_RATE = 310;
     
@@ -240,10 +310,13 @@ export default function DashboardPage() {
        {/* Bonus Hub Section */}
       <div className="space-y-4">
         <CampaignTaskAlert />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DepositBonusAlert />
-            <DailyBonusAlert />
-        </div>
+        {activeBonusCount > 0 && (
+             <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
+                <DepositBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('deposit', isAvailable)} />
+                <DailyBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('daily', isAvailable)} />
+                <ReferralCampaignAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('referral', isAvailable)} />
+            </div>
+        )}
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
