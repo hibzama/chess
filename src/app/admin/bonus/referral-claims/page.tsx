@@ -85,7 +85,7 @@ export default function ReferralClaimsPage() {
                          });
                     }
                 }
-            }); // This was the missing closing parenthesis and brace
+            });
 
             toast({ title: "Success!", description: `Claim has been ${newStatus}.` });
 
