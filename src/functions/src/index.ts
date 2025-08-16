@@ -89,9 +89,9 @@ export const joinGame = onCall(async (request) => {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     
-    const { roomId } = request.data;
-    if (!roomId) {
-        throw new HttpsError('invalid-argument', 'Room ID is required.');
+    const { roomId, fundingWallet } = request.data;
+    if (!roomId || !fundingWallet) {
+        throw new HttpsError('invalid-argument', 'Room ID and funding wallet are required.');
     }
 
     const joinerId = request.auth.uid;
@@ -127,8 +127,8 @@ export const joinGame = onCall(async (request) => {
             const creatorData = creatorDoc.data()!;
             const joinerData = joinerDoc.data()!;
 
-            const creatorFundingWallet = roomData.createdBy.fundingWallet || 'main';
-            const joinerFundingWallet = joinerData.primaryWallet || 'main';
+            const creatorFundingWallet = creatorData.primaryWallet || 'main';
+            const joinerFundingWallet = fundingWallet;
 
             const creatorBalance = creatorFundingWallet === 'main' ? creatorData.balance : creatorData.bonusBalance;
             const joinerBalance = joinerFundingWallet === 'main' ? joinerData.balance : joinerData.bonusBalance;
@@ -150,6 +150,7 @@ export const joinGame = onCall(async (request) => {
             
             const updatedCreatorData = {
                 ...roomData.createdBy,
+                fundingWallet: creatorFundingWallet,
                 wagerFromMain: creatorFundingWallet === 'main' ? wager : 0,
                 wagerFromBonus: creatorFundingWallet === 'bonus' ? wager : 0,
             };
@@ -171,6 +172,48 @@ export const joinGame = onCall(async (request) => {
             });
         });
 
+        // Handle referral task updates outside of the main transaction for safety
+        const creatorDoc = await db.collection('users').doc(creatorId).get();
+        const joinerDocAfterUpdate = await db.collection('users').doc(joinerId).get();
+
+        if (creatorDoc.exists() && joinerDocAfterUpdate.exists()) {
+            const playersForTaskCheck = [
+                {id: creatorId, data: creatorDoc.data()}, 
+                {id: joinerId, data: joinerDocAfterUpdate.data()}
+            ];
+
+            const batch = db.batch();
+            for(const player of playersForTaskCheck) {
+                if (player.data && player.data.activeReferralTaskId) {
+                    const taskRef = db.collection('referral_tasks').doc(player.data.activeReferralTaskId);
+                    const taskDoc = await taskRef.get();
+                    if (taskDoc.exists) {
+                        const taskData = taskDoc.data();
+                        if (taskData) {
+                            const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
+                            if (gamePlaySubTask && gamePlaySubTask.target > 0) {
+                                const userToUpdateRef = db.collection('users').doc(player.id);
+                                const currentProgress = player.data.taskStatus?.[player.data.activeReferralTaskId]?.[gamePlaySubTask.id]?.progress || 0;
+                                const newProgress = currentProgress + 1;
+                                
+                                batch.set(userToUpdateRef, {
+                                    taskStatus: {
+                                        [player.data.activeReferralTaskId]: {
+                                            [gamePlaySubTask.id]: {
+                                                progress: newProgress,
+                                                status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
+                                            }
+                                        }
+                                    }
+                                }, { merge: true });
+                            }
+                        }
+                    }
+                }
+            }
+            await batch.commit();
+        }
+
         return { success: true };
 
     } catch (error: any) {
@@ -183,7 +226,7 @@ export const joinGame = onCall(async (request) => {
             "CANNOT_JOIN_OWN_GAME": new HttpsError('failed-precondition', "You cannot join your own game."),
             "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
             "CREATOR_NOT_FOUND": new HttpsError('aborted', "The room creator's profile could not be found."),
-            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in your primary wallet."),
+            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
             "INSUFFICIENT_FUNDS_CREATOR": new HttpsError('aborted', "The room creator has insufficient funds."),
         };
         throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
