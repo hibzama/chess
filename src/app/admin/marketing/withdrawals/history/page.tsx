@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -33,8 +33,7 @@ export default function MarketingWithdrawalHistoryPage() {
             collection(db, 'transactions'), 
             where('type', '==', 'marketing_withdrawal'), 
             where('status', 'in', ['approved', 'rejected']),
-            orderBy('createdAt', 'desc'),
-            limit(100)
+            orderBy('createdAt', 'desc')
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -68,7 +67,7 @@ export default function MarketingWithdrawalHistoryPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Marketing Withdrawal History</CardTitle>
-                <CardDescription>A log of the last 100 approved and rejected marketing withdrawals.</CardDescription>
+                <CardDescription>A log of all approved and rejected marketing withdrawals.</CardDescription>
             </CardHeader>
             <CardContent>
                 {loading ? (
