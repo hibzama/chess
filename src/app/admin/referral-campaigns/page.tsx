@@ -9,14 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, Loader2, Check, X } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Loader2, Check, X, Globe, MessageSquare } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface CampaignTask {
     id: string;
     description: string;
+    type: 'generic' | 'whatsapp' | 'telegram';
+    link?: string;
     verificationQuestion: string;
     refereeBonus: number;
 }
@@ -44,7 +47,7 @@ export default function ReferralCampaignsPage() {
         referralGoal: '10',
         referrerBonus: '100',
         isActive: true,
-        tasks: [{ id: `task_${Date.now()}`, description: '', verificationQuestion: '', refereeBonus: 10 }] as CampaignTask[]
+        tasks: [{ id: `task_${Date.now()}`, description: '', type: 'generic', link: '', verificationQuestion: '', refereeBonus: 10 }] as CampaignTask[]
     });
 
     const fetchCampaigns = async () => {
@@ -73,7 +76,7 @@ export default function ReferralCampaignsPage() {
     const addTask = () => {
         setFormState(prev => ({
             ...prev,
-            tasks: [...prev.tasks, { id: `task_${Date.now()}`, description: '', verificationQuestion: '', refereeBonus: 10 }]
+            tasks: [...prev.tasks, { id: `task_${Date.now()}`, description: '', type: 'generic', link: '', verificationQuestion: '', refereeBonus: 10 }]
         }));
     }
 
@@ -92,7 +95,7 @@ export default function ReferralCampaignsPage() {
             referralGoal: '10',
             referrerBonus: '100',
             isActive: true,
-            tasks: [{ id: `task_${Date.now()}`, description: '', verificationQuestion: '', refereeBonus: 10 }]
+            tasks: [{ id: `task_${Date.now()}`, description: '', type: 'generic', link: '', verificationQuestion: '', refereeBonus: 10 }]
         });
         setEditingCampaign(null);
     };
@@ -103,7 +106,11 @@ export default function ReferralCampaignsPage() {
 
         const campaignData = {
             title: formState.title,
-            tasks: formState.tasks.map(task => ({...task, refereeBonus: Number(task.refereeBonus)})),
+            tasks: formState.tasks.map(task => ({
+                ...task, 
+                refereeBonus: Number(task.refereeBonus),
+                link: task.type === 'generic' ? '' : task.link
+            })),
             referralGoal: Number(formState.referralGoal),
             referrerBonus: Number(formState.referrerBonus),
             isActive: formState.isActive,
@@ -131,7 +138,7 @@ export default function ReferralCampaignsPage() {
         setEditingCampaign(campaign);
         setFormState({
             title: campaign.title,
-            tasks: campaign.tasks,
+            tasks: campaign.tasks.map(t => ({...t, link: t.link || ''})), // ensure link is not undefined
             referralGoal: String(campaign.referralGoal),
             referrerBonus: String(campaign.referrerBonus),
             isActive: campaign.isActive,
@@ -178,7 +185,18 @@ export default function ReferralCampaignsPage() {
                             {formState.tasks.map((task, index) => (
                                 <div key={task.id} className="p-3 border rounded-lg space-y-3 relative bg-background/50">
                                     <Label>Task {index + 1}</Label>
-                                    <Textarea value={task.description} onChange={e => handleTaskChange(index, 'description', e.target.value)} placeholder={`e.g., Join our official WhatsApp group.`} required/>
+                                    <Select value={task.type} onValueChange={(v) => handleTaskChange(index, 'type', v)}>
+                                        <SelectTrigger><SelectValue/></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="generic"><Globe className="w-4 h-4 inline-block mr-2"/> Generic Task</SelectItem>
+                                            <SelectItem value="whatsapp"><MessageSquare className="w-4 h-4 inline-block mr-2"/> Join WhatsApp</SelectItem>
+                                            <SelectItem value="telegram"><Send className="w-4 h-4 inline-block mr-2"/> Join Telegram</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Textarea value={task.description} onChange={e => handleTaskChange(index, 'description', e.target.value)} placeholder={`e.g., Join our official group.`} required/>
+                                    {task.type !== 'generic' && (
+                                        <Input value={task.link} onChange={e => handleTaskChange(index, 'link', e.target.value)} placeholder={`e.g., https://chat.whatsapp.com/...`} required/>
+                                    )}
                                     <Input value={task.verificationQuestion} onChange={e => handleTaskChange(index, 'verificationQuestion', e.target.value)} placeholder={`e.g., What is your WhatsApp number?`} required/>
                                     <div className="space-y-1">
                                         <Label className="text-xs">Bonus for this task (LKR)</Label>
