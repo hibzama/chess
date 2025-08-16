@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, writeBatch, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, serverTimestamp, increment } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -86,24 +86,25 @@ export default function YourTaskPage() {
                 },
             });
             
-            if(task.refereeBonus > 0) {
-                 const claimRef = doc(collection(db, 'bonus_claims'));
-                 batch.set(claimRef, {
+            if (task.refereeBonus > 0) {
+                // Directly update the user's balance
+                batch.update(userRef, { balance: increment(task.refereeBonus) });
+
+                // Create a transaction log for the bonus
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
                     userId: user.uid,
+                    type: 'bonus',
                     amount: task.refereeBonus,
-                    campaignTitle: `Task: ${task.description.substring(0, 30)}...`,
-                    type: 'referee',
-                    status: 'pending',
+                    status: 'completed',
+                    description: `Referral Task Bonus: ${task.description.substring(0, 30)}...`,
                     createdAt: serverTimestamp(),
-                    refereeId: user.uid,
-                    campaignId: campaign.id,
-                    referrerId: userData.campaignInfo.referrerId
-                 });
+                });
             }
 
             await batch.commit();
 
-            toast({ title: "Task Submitted!", description: `Your task completion has been submitted for review.`});
+            toast({ title: "Task Submitted!", description: `Your bonus of LKR ${task.refereeBonus.toFixed(2)} has been added to your wallet.`});
             
             setUserData(prev => prev ? ({
                 ...prev,
@@ -136,13 +137,13 @@ export default function YourTaskPage() {
          return (
              <div className="text-center space-y-6 max-w-2xl mx-auto">
                 <Award className="w-16 h-16 text-green-500 mx-auto" />
-                <h1 className="text-3xl font-bold">All Tasks Submitted!</h1>
-                <p className="text-muted-foreground">Thank you! Your submissions are under review. Bonuses will be added to your account upon approval.</p>
+                <h1 className="text-3xl font-bold">All Tasks Completed!</h1>
+                <p className="text-muted-foreground">Thank you! Your referred friend will now see you as a valid referral. Your bonuses have been added to your wallet.</p>
                 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Pending Approval</CardTitle>
-                        <CardDescription>Total bonus of <span className="font-bold text-primary">LKR {totalPendingBonus.toFixed(2)}</span> is awaiting admin approval.</CardDescription>
+                        <CardTitle>Bonuses Received</CardTitle>
+                        <CardDescription>Total bonus of <span className="font-bold text-primary">LKR {totalPendingBonus.toFixed(2)}</span> has been added to your account.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -159,7 +160,7 @@ export default function YourTaskPage() {
                                     <TableCell>{task.description}</TableCell>
                                     <TableCell>LKR {task.refereeBonus.toFixed(2)}</TableCell>
                                     <TableCell>
-                                        <Badge variant="secondary" className="gap-1.5"><Clock className="w-3 h-3"/> Pending</Badge>
+                                        <Badge variant="secondary" className="gap-1.5 bg-green-500/10 text-green-400 border-green-500/20"><CheckCircle className="w-3 h-3"/> Claimed</Badge>
                                     </TableCell>
                                 </TableRow>
                                 ))}
@@ -207,7 +208,7 @@ export default function YourTaskPage() {
                     </CardContent>
                     <CardFooter>
                         <Button onClick={() => handleSubmit(task)} disabled={isSubmitting || !answers[task.id]?.trim()}>
-                            {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit for Review"}
+                            {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit & Claim Bonus"}
                         </Button>
                     </CardFooter>
                 </Card>

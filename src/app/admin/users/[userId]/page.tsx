@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin } from 'lucide-react';
+import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin, Award } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +36,12 @@ type UserProfile = {
     city?: string;
     country?: string;
     gender?: string;
+    campaignInfo?: {
+        campaignId: string;
+        referrerId: string;
+        completedTasks: string[];
+        answers: Record<string, string>;
+    }
 };
 
 type Transaction = {
@@ -183,11 +189,12 @@ export default function UserDetailPage() {
             </Card>
 
             <Tabs defaultValue="overview">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="games">Game History</TabsTrigger>
                     <TabsTrigger value="wallet">Wallet History</TabsTrigger>
                     <TabsTrigger value="referrals">Referrals</TabsTrigger>
+                    {user.campaignInfo && <TabsTrigger value="campaign">Campaign</TabsTrigger>}
                 </TabsList>
                 <TabsContent value="overview">
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -208,6 +215,11 @@ export default function UserDetailPage() {
                 <TabsContent value="referrals">
                     <ReferralTab user={user} referrals={referrals} commissions={commissions} />
                 </TabsContent>
+                {user.campaignInfo && (
+                    <TabsContent value="campaign">
+                        <CampaignInfoTab campaignInfo={user.campaignInfo} />
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     );
@@ -236,6 +248,79 @@ const ReferralTab = ({ user, referrals, commissions }: { user: UserProfile, refe
     );
 };
 
+const CampaignInfoTab = ({ campaignInfo }: { campaignInfo: UserProfile['campaignInfo'] }) => {
+    const [campaignDetails, setCampaignDetails] = useState<any | null>(null);
+    const [referrer, setReferrer] = useState<{firstName: string, lastName: string} | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchDetails = async () => {
+            if (!campaignInfo) return;
+            const campaignDoc = await getDoc(doc(db, 'referral_campaigns', campaignInfo.campaignId));
+            if (campaignDoc.exists()) {
+                setCampaignDetails(campaignDoc.data());
+            }
+            const referrerDoc = await getDoc(doc(db, 'users', campaignInfo.referrerId));
+            if(referrerDoc.exists()) {
+                setReferrer(referrerDoc.data() as any);
+            }
+            setLoading(false);
+        }
+        fetchDetails();
+    }, [campaignInfo]);
+
+    if (loading) {
+        return <Skeleton className="h-64 w-full" />
+    }
+
+    if (!campaignInfo || !campaignDetails) {
+        return <p>No active campaign found for this user.</p>
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Award /> Referral Campaign Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div>
+                    <p className="text-sm text-muted-foreground">Campaign Name</p>
+                    <p className="font-semibold">{campaignDetails.title}</p>
+                </div>
+                 <div>
+                    <p className="text-sm text-muted-foreground">Referred By</p>
+                    <p className="font-semibold text-primary">{referrer ? `${referrer.firstName} ${referrer.lastName}` : 'Unknown'}</p>
+                </div>
+                <div>
+                    <h4 className="font-semibold mb-2">Task Progress</h4>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Task</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Submitted Answer</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {campaignDetails.tasks.map((task: any) => (
+                                <TableRow key={task.id}>
+                                    <TableCell>{task.description}</TableCell>
+                                    <TableCell>
+                                        {campaignInfo.completedTasks.includes(task.id) 
+                                            ? <Badge className="bg-green-500/20 text-green-400">Completed</Badge>
+                                            : <Badge variant="secondary">Pending</Badge>
+                                        }
+                                    </TableCell>
+                                    <TableCell>{campaignInfo.answers?.[task.id] || 'N/A'}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
 
 const GameHistoryTable = ({ games, userId }: { games: Game[], userId: string }) => {
     

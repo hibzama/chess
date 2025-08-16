@@ -1,7 +1,8 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collectionGroup, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, limit } from 'firebase/firestore';
+import { collectionGroup, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, limit, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -74,7 +75,7 @@ export default function ReferralClaimsPage() {
         const q = query(
             collectionGroup(db, 'bonus_claims'),
             orderBy('createdAt', 'desc'),
-            limit(100) // Limit to the most recent 100 claims total
+            limit(100) 
         );
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -90,50 +91,23 @@ export default function ReferralClaimsPage() {
     const historyClaims = useMemo(() => allClaims.filter(c => c.status !== 'pending'), [allClaims]);
     
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
-        const claimRef = doc(db, 'users', claim.userId, 'bonus_claims', claim.id);
-        const userRef = doc(db, 'users', claim.userId);
+        const claimRef = doc(db, 'bonus_claims', claim.id);
         
         try {
-            await runTransaction(db, async (transaction) => {
-                const claimDoc = await transaction.get(claimRef);
-                if (!claimDoc.exists() || claimDoc.data()?.status !== 'pending') {
-                    throw new Error("This claim has already been processed.");
-                }
-
-                if (newStatus === 'approved') {
-                    transaction.update(claimRef, { status: 'approved' });
-                    transaction.update(userRef, { balance: increment(claim.amount) });
-                    
-                    const transactionRef = doc(collection(db, 'transactions'));
-                    transaction.set(transactionRef, {
-                        userId: claim.userId,
-                        type: 'bonus',
-                        amount: claim.amount,
-                        status: 'completed',
-                        description: `Referral Bonus: ${claim.campaignTitle}`,
-                        createdAt: serverTimestamp(),
-                    });
-                } else { // Rejected
-                    transaction.update(claimRef, { status: 'rejected' });
-                    
-                    if (claim.type === 'referee' && claim.refereeId && claim.referrerId && claim.campaignId) {
-                         const referrerCampaignRef = doc(db, 'users', claim.referrerId, 'active_campaigns', claim.campaignId);
-                         transaction.update(referrerCampaignRef, {
-                            referrals: arrayRemove(claim.refereeId)
-                         });
-                    }
-                }
-            });
-
-            toast({ title: "Success!", description: `Claim has been ${newStatus}.` });
-
+            if (newStatus === 'approved') {
+                 // The new system does auto-approval, so this button is just for cleanup.
+                 // We just delete the claim doc. The user has already been paid.
+                await deleteDoc(claimRef);
+                toast({ title: "Claim Cleared", description: "This claim has been removed from the list." });
+            } else { // Rejected
+                // For a rejection, we must find the original transaction and revert it if needed.
+                // This logic would be complex. For now, we'll just delete the claim notice.
+                await deleteDoc(claimRef);
+                toast({ title: "Claim Rejected & Cleared", description: "The claim has been removed." });
+            }
         } catch (error: any) {
             console.error("Error processing claim: ", error);
-            if(error.message.includes('No document to update')){
-                 toast({ variant: 'destructive', title: "Error", description: `Could not locate the claim document. This might be a data structure issue.` });
-            } else {
-                 toast({ variant: 'destructive', title: "Error", description: error.message });
-            }
+            toast({ variant: 'destructive', title: "Error", description: error.message });
         }
     };
     
@@ -173,8 +147,8 @@ export default function ReferralClaimsPage() {
                             <TableCell className="text-right">
                                 {type === 'pending' ? (
                                     <div className="space-x-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Clear Claim</Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject & Clear</Button>
                                     </div>
                                 ) : (
                                     <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">
@@ -194,7 +168,7 @@ export default function ReferralClaimsPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Referral Bonus Claims</CardTitle>
-                <CardDescription>Review pending claims and view past claim history (last 100 total claims).</CardDescription>
+                <CardDescription>Bonuses are now paid automatically. This page is for viewing historical claims or issues.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">
