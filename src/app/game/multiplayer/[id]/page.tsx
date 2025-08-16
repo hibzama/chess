@@ -220,7 +220,7 @@ function MultiplayerGame() {
 
         try {
             const joinGameFunction = httpsCallable(functions, 'joinGame');
-            await joinGameFunction({ roomId: room.id });
+            await joinGameFunction({ roomId: room.id, fundingWallet: 'main' });
             toast({ title: "Game Joined!", description: "The match is starting now."});
     
         } catch (error: any) {

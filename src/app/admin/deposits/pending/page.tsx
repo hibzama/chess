@@ -1,5 +1,4 @@
 
-
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -27,12 +26,26 @@ interface Transaction {
 export default function PendingDepositsPage() {
     const [deposits, setDeposits] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
+    const [bonusSettings, setBonusSettings] = useState({
+        depositBonusEnabled: false,
+        depositBonusPercentage: 10,
+        depositBonusMaxAmount: 500,
+    });
 
     const { toast } = useToast();
     const router = useRouter();
 
 
     useEffect(() => {
+        const fetchBonusSettings = async () => {
+            const settingsRef = doc(db, 'settings', 'depositBonusConfig');
+            const settingsSnap = await getDoc(settingsRef);
+            if (settingsSnap.exists()) {
+                setBonusSettings(settingsSnap.data() as typeof bonusSettings);
+            }
+        }
+        fetchBonusSettings();
+
         const q = query(collection(db, 'transactions'), where('type', '==', 'deposit'), where('status', '==', 'pending'));
         
         const unsubscribeDeposits = onSnapshot(q, async (snapshot) => {
@@ -41,10 +54,16 @@ export default function PendingDepositsPage() {
                 const depositData = transactionDoc.data() as Transaction;
                 const userDoc = await getDoc(doc(db, 'users', depositData.userId));
                 if (userDoc.exists()) {
+                    let eligibleBonus = 0;
+                    if(bonusSettings.depositBonusEnabled) {
+                        const bonus = depositData.amount * (bonusSettings.depositBonusPercentage / 100);
+                        eligibleBonus = Math.min(bonus, bonusSettings.depositBonusMaxAmount);
+                    }
                     pendingDeposits.push({ 
                         ...depositData, 
                         id: transactionDoc.id, 
-                        user: userDoc.data() as Transaction['user'] 
+                        user: userDoc.data() as Transaction['user'],
+                        eligibleBonus,
                     });
                 }
             }
@@ -55,7 +74,7 @@ export default function PendingDepositsPage() {
         return () => {
             unsubscribeDeposits();
         };
-    }, []);
+    }, [bonusSettings.depositBonusEnabled, bonusSettings.depositBonusMaxAmount, bonusSettings.depositBonusPercentage]);
 
     const handleTransaction = async (transaction: Transaction, newStatus: 'approved' | 'rejected') => {
         const batch = writeBatch(db);
@@ -64,12 +83,13 @@ export default function PendingDepositsPage() {
 
         try {
             if (newStatus === 'approved') {
-                batch.update(userRef, { balance: increment(transaction.amount) });
+                const totalAmount = transaction.amount + (transaction.eligibleBonus || 0);
+                batch.update(userRef, { balance: increment(totalAmount) });
                 batch.update(transactionRef, { status: newStatus });
                 
                 toast({
                     title: 'Success!',
-                    description: `Deposit of LKR ${transaction.amount.toFixed(2)} approved.`,
+                    description: `Deposit of LKR ${transaction.amount.toFixed(2)} approved. ${transaction.eligibleBonus ? `Bonus of LKR ${transaction.eligibleBonus.toFixed(2)} added.` : ''}`,
                 });
 
             } else { // 'rejected'
@@ -125,7 +145,12 @@ export default function PendingDepositsPage() {
                                     <div className="text-sm text-muted-foreground">{deposit.user?.email}</div>
                                     <div className="text-sm text-muted-foreground">{deposit.user?.phone}</div>
                                 </TableCell>
-                                <TableCell>{deposit.amount.toFixed(2)}</TableCell>
+                                <TableCell>
+                                    <div>{deposit.amount.toFixed(2)}</div>
+                                    {deposit.eligibleBonus && deposit.eligibleBonus > 0 && (
+                                        <Badge variant="secondary" className="mt-1">Bonus: {deposit.eligibleBonus.toFixed(2)}</Badge>
+                                    )}
+                                </TableCell>
                                 <TableCell>
                                     <Badge variant="secondary" className="capitalize">{deposit.depositMethod}</Badge>
                                 </TableCell>

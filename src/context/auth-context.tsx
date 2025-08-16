@@ -34,7 +34,6 @@ interface UserData {
     phone: string;
     binancePayId?: string;
     balance: number;
-    marketingBalance?: number;
     role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
     referredBy?: string;
@@ -47,6 +46,7 @@ interface UserData {
     lastSeen?: any;
     wins?: number;
     emailVerified?: boolean;
+    marketingBalance?: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

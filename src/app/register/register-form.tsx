@@ -89,13 +89,17 @@ export default function RegisterForm() {
             // Send verification email
             await sendEmailVerification(user);
 
+            // Fetch bonus settings
+            const bonusConfigSnap = await getDoc(doc(db, 'settings', 'bonusConfig'));
+            const bonusConfig = bonusConfigSnap.data();
+
             const usersCollection = collection(db, "users");
             const snapshot = await getCountFromServer(usersCollection);
             const userCount = snapshot.data().count;
             
             let initialBalance = 0;
-            if (userCount < 250) {
-                initialBalance = 100;
+            if (bonusConfig?.signupBonusEnabled && userCount < (bonusConfig.signupBonusLimit || 250)) {
+                initialBalance = bonusConfig.signupBonusAmount || 100;
             }
 
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
@@ -115,7 +119,6 @@ export default function RegisterForm() {
                 gender,
                 binancePayId: '',
                 balance: initialBalance,
-                marketingBalance: 0,
                 role: 'user',
                 createdAt: serverTimestamp(),
                 l1Count: 0,

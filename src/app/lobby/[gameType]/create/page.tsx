@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock, Wallet, Gift } from 'lucide-react';
+import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -74,6 +74,7 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
+                    fundingWallet: 'main', // Hardcode to main
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),

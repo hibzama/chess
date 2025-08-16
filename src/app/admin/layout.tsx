@@ -3,7 +3,7 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -122,6 +122,12 @@ export default function AdminLayout({
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/proxy-detection"><SidebarMenuButton tooltip="Proxy/VPN Users" isActive={isActive('/admin/proxy-detection')}><ShieldAlert /><span>Proxy/VPN Users</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Signup Bonus" isActive={isActive('/admin/bonus')}><Gift /><span>Signup Bonus</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                             <Link href="/admin/bonus/deposit-bonus"><SidebarMenuButton tooltip="Deposit Bonus" isActive={isActive('/admin/bonus/deposit-bonus')}><PercentCircle /><span>Deposit Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/mailer"><SidebarMenuButton tooltip="Mailer" isActive={pathname === '/admin/mailer'}><Mail /><span>Mailer</span></SidebarMenuButton></Link>
