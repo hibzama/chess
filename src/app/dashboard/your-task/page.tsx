@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
+import { Badge } from '@/components/ui/badge';
 
 export default function YourTaskPage() {
     const { user, userData, setUserData } = useAuth();
@@ -173,4 +174,3 @@ export default function YourTaskPage() {
         </div>
     );
 }
-
