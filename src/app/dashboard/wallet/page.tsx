@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -61,9 +62,6 @@ export default function WalletPage() {
   const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: 'Bank of Ceylon (Boc)', branch: '', accountNumber: '', accountName: '' });
   const [binancePayId, setBinancePayId] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
-
-  const [primaryWallet, setPrimaryWallet] = useState<'main' | 'bonus'>('main');
-  const [savingPrimaryWallet, setSavingPrimaryWallet] = useState(false);
   
   const usdtAmount = (parseFloat(depositAmount) / USDT_RATE || 0).toFixed(2);
   
@@ -91,10 +89,6 @@ export default function WalletPage() {
         setLoading(false);
         return;
     }
-
-    if (userData?.primaryWallet) {
-        setPrimaryWallet(userData.primaryWallet);
-    }
     
     const q = query(collection(db, 'transactions'), where('userId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -110,7 +104,7 @@ export default function WalletPage() {
     });
 
     return () => unsubscribe();
-  }, [user, toast, userData]);
+  }, [user, toast]);
   
 
   const handleDepositSubmit = async () => {
@@ -231,21 +225,6 @@ export default function WalletPage() {
     }
   };
 
-  const handleSavePrimaryWallet = async () => {
-    if (!user) return;
-    setSavingPrimaryWallet(true);
-    try {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, { primaryWallet: primaryWallet });
-        toast({ title: 'Success!', description: 'Primary wallet preference saved.'});
-    } catch(e) {
-        console.error('Error saving primary wallet:', e);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not save your preference.'});
-    } finally {
-        setSavingPrimaryWallet(false);
-    }
-  }
-
   const getStatusIcon = (status: Transaction['status']) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
@@ -278,52 +257,30 @@ export default function WalletPage() {
         <p className="text-muted-foreground text-center">Manage your funds for the games ahead.</p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-            <CardHeader>
-            <CardTitle className="flex items-center gap-2"><DollarSign /> Main Balance</CardTitle>
-            <CardDescription>Withdraw anytime.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {authLoading || !userData || typeof userData.balance === 'undefined' ? (
-                    <div className="space-y-2">
-                        <Skeleton className="h-10 w-48" />
-                        <Skeleton className="h-4 w-32" />
-                    </div>
-                ) : (
-                    <div>
-                        <p className="text-4xl font-bold">LKR {userData.balance.toFixed(2)}</p>
-                        <p className="text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-        <Card className="bg-primary/10 border-primary/20">
-            <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-primary"><Gift /> Bonus Balance</CardTitle>
-            <CardDescription>Use for gameplay. Profits are moved to main balance.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                {authLoading || !userData || typeof userData.bonusBalance === 'undefined' ? (
-                    <div className="space-y-2">
-                        <Skeleton className="h-10 w-48" />
-                        <Skeleton className="h-4 w-32" />
-                    </div>
-                ) : (
-                    <div>
-                        <p className="text-4xl font-bold text-primary">LKR {(userData.bonusBalance || 0).toFixed(2)}</p>
-                        <p className="text-muted-foreground">~{((userData.bonusBalance || 0) / USDT_RATE).toFixed(2)} USDT</p>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+        <CardTitle className="flex items-center gap-2"><DollarSign /> Main Balance</CardTitle>
+        <CardDescription>All your funds in one place. Deposit, withdraw, and play.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            {authLoading || !userData || typeof userData.balance === 'undefined' ? (
+                <div className="space-y-2">
+                    <Skeleton className="h-10 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                </div>
+            ) : (
+                <div>
+                    <p className="text-4xl font-bold">LKR {userData.balance.toFixed(2)}</p>
+                    <p className="text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                </div>
+            )}
+        </CardContent>
+    </Card>
       
       <Tabs defaultValue="deposit" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="deposit"><ArrowUpCircle /> Deposit</TabsTrigger>
           <TabsTrigger value="withdraw"><ArrowDownCircle /> Withdraw</TabsTrigger>
-           <TabsTrigger value="primary-wallet"><Info /> Primary Wallet</TabsTrigger>
           <TabsTrigger value="history"><History /> History</TabsTrigger>
         </TabsList>
         <TabsContent value="deposit">
@@ -483,37 +440,6 @@ export default function WalletPage() {
                     <Button type="submit" disabled={submittingWithdrawal}>{submittingWithdrawal ? "Requesting..." : "Request Withdrawal"}</Button>
                     </CardFooter>
                 </form>
-            </Card>
-        </TabsContent>
-         <TabsContent value="primary-wallet">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Primary Wallet for Gameplay</CardTitle>
-                    <CardDescription>Choose which wallet to use by default for all game wagers. This setting will be used automatically when you create or join a game.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <RadioGroup value={primaryWallet} onValueChange={(v) => setPrimaryWallet(v as 'main' | 'bonus')} className="space-y-2">
-                        <Label htmlFor="main-wallet" className="flex items-center justify-between p-4 border rounded-lg cursor-pointer [&:has([data-state=checked])]:border-primary">
-                            <div>
-                                <p className="font-semibold">Main Wallet</p>
-                                <p className="text-sm text-muted-foreground">Balance: LKR {userData?.balance?.toFixed(2) ?? '0.00'}</p>
-                            </div>
-                            <RadioGroupItem value="main" id="main-wallet" />
-                        </Label>
-                         <Label htmlFor="bonus-wallet" className="flex items-center justify-between p-4 border rounded-lg cursor-pointer [&:has([data-state=checked])]:border-primary">
-                            <div>
-                                <p className="font-semibold">Bonus Wallet</p>
-                                <p className="text-sm text-muted-foreground">Balance: LKR {userData?.bonusBalance?.toFixed(2) ?? '0.00'}</p>
-                            </div>
-                            <RadioGroupItem value="bonus" id="bonus-wallet" />
-                        </Label>
-                    </RadioGroup>
-                </CardContent>
-                <CardFooter>
-                    <Button onClick={handleSavePrimaryWallet} disabled={savingPrimaryWallet}>
-                        {savingPrimaryWallet ? 'Saving...' : 'Save Preference'}
-                    </Button>
-                </CardFooter>
             </Card>
         </TabsContent>
         <TabsContent value="history">

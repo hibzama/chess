@@ -31,15 +31,13 @@ export default function CreateGamePage() {
     const [gameTimer, setGameTimer] = useState('900');
     const [pieceColor, setPieceColor] = useState<'w' | 'b' | 'random'>('random');
     const [roomPrivacy, setRoomPrivacy] = useState<'public' | 'private'>('public');
-    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
     const [isCreating, setIsCreating] = useState(false);
 
     const USDT_RATE = 310;
     const wagerAmount = parseInt(investmentAmount) || 0;
     const usdtAmount = (wagerAmount / USDT_RATE || 0).toFixed(2);
     
-    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
-    const hasSufficientFunds = selectedWalletBalance >= wagerAmount;
+    const hasSufficientFunds = (userData?.balance ?? 0) >= wagerAmount;
 
     const handleCreateRoom = async () => {
         if (!user || !userData) {
@@ -53,7 +51,7 @@ export default function CreateGamePage() {
         }
 
         if (!hasSufficientFunds) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds in the selected wallet.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds.' });
             return;
         }
 
@@ -76,9 +74,10 @@ export default function CreateGamePage() {
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
                     photoURL: userData.photoURL || '',
-                    fundingWallet: fundingWallet, // Save the chosen wallet
                 },
                 players: [user.uid],
+                p1Time: parseInt(gameTimer),
+                p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
             };
@@ -121,28 +120,15 @@ export default function CreateGamePage() {
                             </AlertDescription>
                         </Alert>
                         
-                         <div className="space-y-3">
-                            <Label>Funding Wallet</Label>
-                             <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="main" id="main-wallet" />
-                                    <Label htmlFor="main-wallet">Main Wallet</Label>
+                        <Card className="p-3 bg-secondary">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-muted-foreground">Available Balance:</span>
+                                <div>
+                                    <p className="font-bold">LKR {(userData?.balance ?? 0).toFixed(2)}</p>
+                                    <p className="text-xs text-muted-foreground text-right">~{((userData?.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
                                 </div>
-                                <div className="flex items-center space-x-2">
-                                    <RadioGroupItem value="bonus" id="bonus-wallet" />
-                                    <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
-                                </div>
-                            </RadioGroup>
-                             <Card className="p-3 bg-secondary">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-muted-foreground">Available Balance:</span>
-                                    <div>
-                                        <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
-                                        <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
+                            </div>
+                        </Card>
 
 
                         <div className="space-y-2">

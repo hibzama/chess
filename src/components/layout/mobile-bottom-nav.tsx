@@ -2,7 +2,7 @@
 'use client'
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Users, DollarSign, MessageSquare, List, Gift } from 'lucide-react';
+import { Home, Users, DollarSign, MessageSquare, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
 
@@ -15,9 +15,7 @@ export default function MobileBottomNav() {
         { href: '/dashboard/friends', icon: Users, label: 'Friends' },
         { href: '/lobby', icon: DollarSign, label: 'Earn' },
         { href: '/dashboard/chat', icon: MessageSquare, label: 'Messages' },
-        ...(userData?.taskReferredBy ? 
-            [{ href: '/dashboard/tasks', icon: Gift, label: 'Tasks' }] :
-            [{ href: '/dashboard/my-rooms', icon: List, label: 'My Rooms' }]),
+        { href: '/dashboard/my-rooms', icon: List, label: 'My Rooms' },
     ];
 
     return (

@@ -13,33 +13,6 @@ import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import BonusDisplay, { type DepositBonus } from './bonus-display';
-import DailyBonusDisplay from './daily-bonus-display';
-import type { Task } from '@/app/admin/tasks/page';
-
-
-const ReferralTaskDisplay = ({ task, onStart }: { task: Task, onStart: () => void }) => (
-    <Card className="h-full border-green-400 bg-green-400/10 flex flex-col items-center text-center">
-        <CardHeader>
-             <div className="mx-auto p-3 bg-green-400/10 rounded-full w-fit mb-2">
-                <Gift className="w-8 h-8 text-green-400" />
-            </div>
-            <CardTitle className="text-lg text-green-400">Complete Tasks, Earn a Bonus!</CardTitle>
-             <CardDescription className="text-green-400/80">
-                You were invited to complete a task. Finish it to get your reward!
-            </CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 flex flex-col justify-center items-center">
-            <p className="text-sm text-muted-foreground">Reward Upon Completion</p>
-            <p className="text-4xl font-bold text-green-400">LKR {task.newUserBonus.toFixed(2)}</p>
-        </CardContent>
-        <CardFooter className="w-full">
-            <Button asChild className="w-full bg-green-500 hover:bg-green-400">
-                <Link href="/dashboard/tasks">View Your Tasks <ArrowRight className="ml-2"/></Link>
-            </Button>
-        </CardFooter>
-    </Card>
-);
 
 export default function DashboardPage() {
     const { user, userData, loading } = useAuth();
@@ -49,11 +22,6 @@ export default function DashboardPage() {
         totalEarning: 0,
     });
     const [statsLoading, setStatsLoading] = useState(true);
-
-    const [depositBonus, setDepositBonus] = useState<DepositBonus | null>(null);
-    const [hasDailyBonus, setHasDailyBonus] = useState(false);
-    const [activeReferralTask, setActiveReferralTask] = useState<Task | null>(null);
-    const [promotionsLoading, setPromotionsLoading] = useState(true);
 
     const USDT_RATE = 310;
 
@@ -78,74 +46,6 @@ export default function DashboardPage() {
             fetchStats();
         }
     }, [user]);
-
-    useEffect(() => {
-        if (!user || !userData) {
-            setPromotionsLoading(false);
-            return;
-        }
-
-        let bonusLoaded = false, dailyBonusLoaded = false, refTaskLoaded = false;
-        
-        const checkLoading = () => {
-            if (bonusLoaded && dailyBonusLoaded && refTaskLoaded) {
-                setPromotionsLoading(false);
-            }
-        };
-
-        const bonusRef = doc(db, 'settings', 'depositBonus');
-        const bonusUnsub = onSnapshot(bonusRef, (docSnap) => {
-            if (docSnap.exists() && docSnap.data().isActive) {
-                setDepositBonus(docSnap.data() as DepositBonus);
-            } else {
-                setDepositBonus(null);
-            }
-            bonusLoaded = true;
-            checkLoading();
-        });
-
-        const dailyBonusQuery = query(collection(db, 'bonuses'), where('isActive', '==', true), limit(1));
-        const dailyBonusUnsub = onSnapshot(dailyBonusQuery, (snapshot) => {
-            setHasDailyBonus(!snapshot.empty);
-            dailyBonusLoaded = true;
-            checkLoading();
-        });
-        
-        if (userData?.taskReferredBy && userData.activeReferralTaskId) {
-            const taskRef = doc(db, 'referral_tasks', userData.activeReferralTaskId);
-            const taskUnsub = onSnapshot(taskRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    setActiveReferralTask({ ...docSnap.data(), id: docSnap.id } as Task);
-                }
-                refTaskLoaded = true;
-                checkLoading();
-            });
-            return () => taskUnsub();
-        } else {
-            refTaskLoaded = true;
-            checkLoading();
-        }
-
-        return () => {
-            bonusUnsub();
-            dailyBonusUnsub();
-        };
-    }, [user, userData]);
-
-    const promotionItems = useMemo(() => {
-        const items = [];
-        if (activeReferralTask) {
-             items.push({ type: 'referralTask', data: activeReferralTask, id: 'referral-task' });
-        }
-        if (depositBonus) {
-            items.push({ type: 'bonus', data: depositBonus, id: 'deposit-bonus' });
-        }
-        if (hasDailyBonus) {
-            items.push({ type: 'dailyBonus', data: {}, id: 'daily-bonus' });
-        }
-        return items;
-    }, [depositBonus, hasDailyBonus, activeReferralTask]);
-
 
     if (loading) {
         return (
@@ -172,7 +72,6 @@ export default function DashboardPage() {
     
     const summaryCards = {
         balance: { title: "Wallet Balance", value: userData?.balance, description: "Your current available funds.", colorClass: "text-primary" },
-        bonus: { title: "Bonus Balance", value: userData?.bonusBalance, description: "Funds for gameplay.", colorClass: "text-accent" },
         earnings: { title: "Total Earnings", value: stats.totalEarning, description: "Your net profit from games.", colorClass: "text-yellow-500" },
         deposit: { title: "Total Deposit", value: stats.totalDeposit, description: "All funds you've added.", colorClass: "text-green-500" },
         withdrawals: { title: "Total Withdrawals", value: stats.totalWithdrawal, description: "All funds you've taken out.", colorClass: "text-red-500" },
@@ -213,31 +112,11 @@ export default function DashboardPage() {
         </p>
       </div>
       
-       {promotionsLoading ? (
-           <Skeleton className="h-48 w-full" />
-       ) : promotionItems.length > 0 && (
-           <div className={cn(
-               "grid grid-cols-1 gap-6",
-               promotionItems.length === 2 && "md:grid-cols-2",
-               promotionItems.length >= 3 && "md:grid-cols-2 lg:grid-cols-3",
-           )}>
-               {promotionItems.map(item => {
-                   if (item.type === 'referralTask') return <ReferralTaskDisplay key={item.id} task={item.data as Task} onStart={() => {}} />;
-                   if (item.type === 'bonus') return <BonusDisplay key={item.id}/>;
-                   if (item.type === 'dailyBonus') return <DailyBonusDisplay key={item.id}/>;
-                   return null;
-               })}
-           </div>
-       )}
-
-      <div className="grid gap-6">
-        <div className="grid grid-cols-2 gap-6">
+       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard card={summaryCards.balance} />
-            <StatCard card={summaryCards.bonus} />
-        </div>
-        <div className="grid grid-cols-2 gap-6">
             <StatCard card={summaryCards.earnings} />
             <StatCard card={summaryCards.deposit} />
+            <StatCard card={summaryCards.withdrawals} />
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -256,6 +135,5 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
-    </div>
   );
 }

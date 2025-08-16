@@ -34,15 +34,10 @@ interface UserData {
     phone: string;
     binancePayId?: string;
     balance: number;
-    bonusBalance?: number;
-    commissionBalance?: number;
     marketingBalance?: number;
     role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
-    primaryWallet?: 'main' | 'bonus';
     referredBy?: string;
-    taskReferredBy?: string; 
-    taskStatus?: any;
     referralChain?: string[];
     createdAt: any;
     l1Count?: number;
@@ -51,8 +46,6 @@ interface UserData {
     status?: 'online' | 'offline';
     lastSeen?: any;
     wins?: number;
-    activeReferralTaskId?: string | null;
-    claimedTaskReferralBonus?: string[];
     emailVerified?: boolean;
 }
 

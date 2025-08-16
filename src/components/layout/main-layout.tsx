@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Calendar, ClipboardCheck } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -126,10 +126,8 @@ const NotificationBell = () => {
 
 export default function MainLayout({
     children,
-    showTaskNavItem = false,
   }: {
     children: React.ReactNode,
-    showTaskNavItem?: boolean,
   }) {
     const { logout, userData, loading } = useAuth();
     const router = useRouter();
@@ -182,16 +180,8 @@ export default function MainLayout({
                                 <SidebarMenuItem>
                                     <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
-                                 {showTaskNavItem && (
-                                     <SidebarMenuItem>
-                                        <Link href="/dashboard/tasks"><SidebarMenuButton tooltip="Your Tasks" isActive={isMounted && pathname === '/dashboard/tasks'}><ClipboardCheck /><span>Your Tasks</span></SidebarMenuButton></Link>
-                                    </SidebarMenuItem>
-                                 )}
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/profile"><SidebarMenuButton tooltip="My Profile" isActive={isMounted && pathname === '/dashboard/profile'}><User /><span>My Profile</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/bonus"><SidebarMenuButton tooltip="Daily Bonus" isActive={isMounted && pathname === '/dashboard/bonus'}><Gift /><span>Daily Bonus</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><List /><span>My Rooms</span></SidebarMenuButton></Link>
@@ -210,9 +200,6 @@ export default function MainLayout({
                                 </SidebarMenuItem>
                                 <SidebarMenuItem>
                                     <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer &amp; Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer &amp; Earn</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/bonus-referral"><SidebarMenuButton tooltip="Ref &amp; Earn Bonus" isActive={isMounted && pathname === '/dashboard/bonus-referral'}><Gift /><span>Ref &amp; Earn Bonus</span></SidebarMenuButton></Link>
                                 </SidebarMenuItem>
                                  <SidebarMenuItem>
                                     <Link href="/dashboard/chat"><SidebarMenuButton tooltip="Direct Messages" isActive={isMounted && pathname.startsWith('/dashboard/chat')}><MessageSquare /><span>Direct Messages</span></SidebarMenuButton></Link>
@@ -277,27 +264,6 @@ export default function MainLayout({
                                           </CardContent>
                                       </Card>
                                   </Link>
-                                  
-                                  {!isMarketer && <Link href={"/dashboard/wallet"}>
-                                      <Card className="bg-card/50 border-accent/20 hover:bg-accent/5 transition-colors">
-                                          <CardContent className="p-2 flex items-center gap-2">
-                                              <Gift className="w-5 h-5 text-accent"/>
-                                              <div>
-                                              {loading || !userData ? (
-                                                  <div className="space-y-1">
-                                                    <Skeleton className="h-4 w-16"/>
-                                                    <Skeleton className="h-3 w-12"/>
-                                                  </div>
-                                                  ) : (
-                                                  <>
-                                                      <p className="text-sm font-bold text-accent">LKR {(userData.bonusBalance ?? 0).toFixed(2)}</p>
-                                                      <p className="text-xs text-muted-foreground">~{((userData.bonusBalance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
-                                                  </>
-                                              )}
-                                              </div>
-                                          </CardContent>
-                                      </Card>
-                                  </Link>}
                                </div>
                            )}
                             <NotificationBell />

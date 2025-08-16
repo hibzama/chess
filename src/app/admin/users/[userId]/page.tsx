@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin, ClipboardList, RefreshCw, CheckSquare } from 'lucide-react';
+import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -36,9 +36,6 @@ type UserProfile = {
     city?: string;
     country?: string;
     gender?: string;
-    activeReferralTaskId?: string | null;
-    taskReferredBy?: string;
-    taskStatus?: any;
 };
 
 type Transaction = {
@@ -94,7 +91,6 @@ export default function UserDetailPage() {
     const [referrals, setReferrals] = useState<Referral[]>([]);
     const [commissions, setCommissions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
-    const [taskInfo, setTaskInfo] = useState<{ id: string; title: string, subTasks: any[] } | null>(null);
 
     useEffect(() => {
         if (!userId) return;
@@ -108,17 +104,7 @@ export default function UserDetailPage() {
                 router.push('/admin/users');
                 return;
             }
-            const userData = { ...userDoc.data(), uid: userDoc.id } as UserProfile;
-            setUser(userData);
-
-            // Fetch active task info if it exists
-            if (userData.activeReferralTaskId) {
-                const taskDoc = await getDoc(doc(db, 'referral_tasks', userData.activeReferralTaskId));
-                if (taskDoc.exists()) {
-                    setTaskInfo({ id: taskDoc.id, title: taskDoc.data().title, subTasks: taskDoc.data().subTasks });
-                }
-            }
-
+            setUser({ ...userDoc.data(), uid: userDoc.id } as UserProfile);
 
             // Fetch Transactions
             const transQuery = query(collection(db, 'transactions'), where('userId', '==', userId));
@@ -134,13 +120,13 @@ export default function UserDetailPage() {
             setGames(gamesData.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
 
             // Fetch Referrals
-            const refQuery = userData.role === 'marketer'
+            const refQuery = user?.role === 'marketer'
                 ? query(collection(db, 'users'), where('referralChain', 'array-contains', userId))
                 : query(collection(db, 'users'), where('referredBy', '==', userId));
             const refSnap = await getDocs(refQuery);
             const refData = refSnap.docs.map(d => {
                 const data = d.data();
-                const level = userData.role === 'marketer' ? (data.referralChain?.indexOf(userId) + 1 || 0) : 1;
+                const level = user?.role === 'marketer' ? (data.referralChain?.indexOf(userId) + 1 || 0) : 1;
                 return { ...data, uid: d.id, level } as Referral
             });
             setReferrals(refData.sort((a,b) => (a.level || 0) - (b.level || 0)));
@@ -149,52 +135,7 @@ export default function UserDetailPage() {
         };
 
         fetchData();
-    }, [userId, router]);
-
-    const handleResetTask = async () => {
-        if (!userId) return;
-        try {
-            const userRef = doc(db, 'users', userId as string);
-            await updateDoc(userRef, {
-                activeReferralTaskId: null
-            });
-            setUser(prev => prev ? {...prev, activeReferralTaskId: null} : null);
-            setTaskInfo(null);
-            toast({ title: "Task Reset", description: "User can now choose a new referral task." });
-        } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: "Error", description: "Failed to reset user's task." });
-        }
-    };
-    
-    const handleSubTaskStatusChange = async (subTaskId: string, newStatus: 'completed' | 'pending') => {
-        if (!userId || !user?.activeReferralTaskId) return;
-        try {
-            const userRef = doc(db, 'users', userId as string);
-            await updateDoc(userRef, {
-                [`taskStatus.${user.activeReferralTaskId}.${subTaskId}.status`]: newStatus
-            });
-             setUser(prevUser => {
-                if (!prevUser || !prevUser.taskStatus || !prevUser.activeReferralTaskId || !prevUser.taskStatus[prevUser.activeReferralTaskId]) return prevUser;
-                const newStatus = {
-                    ...prevUser.taskStatus,
-                    [prevUser.activeReferralTaskId]: {
-                        ...prevUser.taskStatus[prevUser.activeReferralTaskId],
-                        [subTaskId]: {
-                            ...prevUser.taskStatus[prevUser.activeReferralTaskId][subTaskId],
-                            status: newStatus
-                        }
-                    }
-                };
-                return { ...prevUser, taskStatus: newStatus };
-            });
-            toast({ title: "Task Status Updated" });
-        } catch (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'Error', description: "Failed to update subtask status."});
-        }
-    }
-
+    }, [userId, router, user?.role]);
 
     const financialStats = useMemo(() => {
         let totalDeposit = 0;
@@ -242,12 +183,11 @@ export default function UserDetailPage() {
             </Card>
 
             <Tabs defaultValue="overview">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="games">Game History</TabsTrigger>
                     <TabsTrigger value="wallet">Wallet History</TabsTrigger>
                     <TabsTrigger value="referrals">Referrals</TabsTrigger>
-                    <TabsTrigger value="tasks">Bonus Tasks</TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview">
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -267,69 +207,6 @@ export default function UserDetailPage() {
                 <TabsContent value="wallet"><TransactionTable transactions={transactions.filter(t => t.type === 'deposit' || t.type === 'withdrawal')} /></TabsContent>
                 <TabsContent value="referrals">
                     <ReferralTab user={user} referrals={referrals} commissions={commissions} />
-                </TabsContent>
-                <TabsContent value="tasks">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Referral Task Status</CardTitle>
-                            <CardDescription>Manage this user's currently active referral task.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {taskInfo ? (
-                                <div className="space-y-4">
-                                    <p>Active Task Package: <span className="font-semibold">{taskInfo.title}</span></p>
-                                    <p className="text-sm text-muted-foreground">User is currently trying to complete referrals for this task.</p>
-                                    
-                                    <h4 className="font-semibold text-sm pt-4">Task Submissions</h4>
-                                    <div className="space-y-2 p-3 border rounded-md bg-secondary/30">
-                                        {taskInfo.subTasks.map((subTask: any) => {
-                                             const subTaskStatus = user?.taskStatus?.[taskInfo.id]?.[subTask.id];
-                                             const isSubmitted = subTaskStatus?.status === 'submitted';
-                                             const isCompleted = subTaskStatus?.status === 'completed';
-                                             return(
-                                                 <div key={subTask.id} className="flex items-center justify-between">
-                                                     <div>
-                                                         <p>{subTask.label}</p>
-                                                         <p className="text-xs text-muted-foreground">Value: <span className="font-mono">{subTaskStatus?.value || 'Not submitted'}</span></p>
-                                                     </div>
-                                                     <div className="flex items-center gap-2">
-                                                        {isCompleted ? <Badge>Completed</Badge> : isSubmitted ? (
-                                                             <Button size="sm" onClick={() => handleSubTaskStatusChange(subTask.id, 'completed')}>Approve</Button>
-                                                        ) : (
-                                                            <Badge variant="destructive">Pending</Badge>
-                                                        )}
-                                                     </div>
-                                                 </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-muted-foreground">User has not started a referral task.</p>
-                            )}
-                        </CardContent>
-                        {taskInfo && (
-                            <CardFooter>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button variant="destructive"><RefreshCw className="mr-2"/> Reset Task</Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                This will reset the user's active task, allowing them to choose a new one. Their progress on the current task will be lost. This action cannot be undone.
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction onClick={handleResetTask}>Confirm Reset</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </CardFooter>
-                        )}
-                    </Card>
                 </TabsContent>
             </Tabs>
         </div>
@@ -449,4 +326,3 @@ const ReferralTable = ({ referrals, showLevel }: { referrals: Referral[], showLe
         </TableBody>
     </Table>
 )
-

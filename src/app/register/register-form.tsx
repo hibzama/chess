@@ -51,9 +51,7 @@ export default function RegisterForm() {
         const country = target.country.value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
-        const aref = searchParams.get('aref'); // Referrer for task system
-        const tid = searchParams.get('tid'); // Task ID for task system
-
+        
         if (password !== confirmPassword) {
             toast({
                 variant: "destructive",
@@ -95,9 +93,9 @@ export default function RegisterForm() {
             const snapshot = await getCountFromServer(usersCollection);
             const userCount = snapshot.data().count;
             
-            let initialBonusBalance = 0;
+            let initialBalance = 0;
             if (userCount < 250) {
-                initialBonusBalance = 100;
+                initialBalance = 100;
             }
 
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
@@ -116,9 +114,7 @@ export default function RegisterForm() {
                 country,
                 gender,
                 binancePayId: '',
-                balance: 0,
-                bonusBalance: initialBonusBalance,
-                commissionBalance: 0,
+                balance: initialBalance,
                 marketingBalance: 0,
                 role: 'user',
                 createdAt: serverTimestamp(),
@@ -126,17 +122,8 @@ export default function RegisterForm() {
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
                 emailVerified: true, // Allow login by default
-                primaryWallet: 'main',
-                activeReferralTaskId: null,
-                claimedTaskReferralBonus: [],
             };
             
-            // Handle new task-based referral link
-            if (aref && tid) {
-                userData.taskReferredBy = aref;
-                userData.activeReferralTaskId = tid; // Store the task ID they joined under
-            }
-
             const directReferrerId = mref || ref;
             if (directReferrerId) {
                 const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));

@@ -1,20 +1,8 @@
 
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/onCall";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import * as cors from 'cors';
-
-const corsHandler = cors({origin: true});
 
 admin.initializeApp();
 
@@ -23,9 +11,8 @@ export const announceNewGame = functions.firestore
   .document("game_rooms/{roomId}")
   .onCreate(async (snap, context) => {
     const roomData = snap.data();
-    const roomId = context.params.roomId; // Correct way to get wildcard ID
+    const roomId = context.params.roomId;
 
-    // Exit if the function is triggered with no data, or for a private room
     if (!roomData || roomData.isPrivate === true) {
       functions.logger.log(`Function exiting: Room ${roomId} is private or has no data.`);
       return null;
@@ -35,18 +22,12 @@ export const announceNewGame = functions.firestore
     try {
       telegramBotToken = functions.config().telegram.token;
     } catch (error) {
-      functions.logger.error(
-        "Could not retrieve telegram.token from Functions config. " +
-        "Ensure it is set by running: " +
-        "firebase functions:config:set telegram.token=\"YOUR_BOT_TOKEN\""
-      );
+      functions.logger.error("Could not retrieve telegram.token from Functions config.");
       return null;
     }
 
-    const chatId = "@nexbattlerooms"; // Your Telegram group username
+    const chatId = "@nexbattlerooms";
     const siteUrl = "http://nexbattle.com";
-
-    // Prepare message components with fallbacks
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
@@ -54,11 +35,6 @@ export const announceNewGame = functions.firestore
     const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
-    // Log the variables to ensure they are being read correctly
-    functions.logger.log(`Preparing message for Room ID: ${roomId}`);
-    functions.logger.log(`Game Type: ${gameType}, Wager: ${wager}, Created By: ${createdBy}, Time: ${timeControl}`);
-
-    // Construct the message string carefully
     const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
       `<b>Player:</b> ${createdBy}\n` +
       `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
@@ -67,8 +43,7 @@ export const announceNewGame = functions.firestore
       `<a href="${gameLink}">Click Here to Join Game</a>\n\n` +
       `<i>This room will expire in 3 minutes if no one joins.</i>`;
 
-    const telegramApiUrl =
-      `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
+    const telegramApiUrl = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
 
     try {
       await axios.post(telegramApiUrl, {
@@ -80,19 +55,17 @@ export const announceNewGame = functions.firestore
     } catch (error: any) {
       functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
-
     return null;
   });
 
-export const joinGame = onCall(async (request) => {
-  return corsHandler(request, {} as any, async () => {
+export const joinGame = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
     
-    const { roomId, fundingWallet } = request.data;
-    if (!roomId || !fundingWallet) {
-        throw new HttpsError('invalid-argument', 'Room ID and funding wallet are required.');
+    const { roomId } = request.data;
+    if (!roomId) {
+        throw new HttpsError('invalid-argument', 'Room ID is required.');
     }
 
     const joinerId = request.auth.uid;
@@ -102,13 +75,10 @@ export const joinGame = onCall(async (request) => {
     try {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
-
             if (!roomDoc.exists) throw new Error("NOT_FOUND");
-
             const roomData = roomDoc.data();
             if (!roomData) throw new Error("NOT_FOUND");
             if (roomData.status !== 'waiting') throw new Error("ROOM_NOT_AVAILABLE");
-            if (!roomData.createdBy || !roomData.createdBy.uid) throw new Error("INVALID_ROOM_DATA");
             if (roomData.createdBy.uid === joinerId) throw new Error("CANNOT_JOIN_OWN_GAME");
             
             const wager = roomData.wager || 0;
@@ -124,124 +94,53 @@ export const joinGame = onCall(async (request) => {
             
             if (!creatorDoc.exists()) throw new Error("CREATOR_NOT_FOUND");
             if (!joinerDoc.exists()) throw new Error("JOINER_NOT_FOUND");
-
+            
             const creatorData = creatorDoc.data()!;
             const joinerData = joinerDoc.data()!;
 
-            const creatorFundingWallet = roomData.createdBy.fundingWallet || 'main';
-            const joinerFundingWallet = fundingWallet;
-
-            const creatorBalance = creatorFundingWallet === 'main' ? (creatorData.balance || 0) : (creatorData.bonusBalance || 0);
-            const joinerBalance = joinerFundingWallet === 'main' ? (joinerData.balance || 0) : (joinerData.bonusBalance || 0);
-
-            if (creatorBalance < wager) throw new Error("INSUFFICIENT_FUNDS_CREATOR");
-            if (joinerBalance < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
-
-            const creatorWagerFromBonus = creatorFundingWallet === 'bonus' ? wager : 0;
-            const creatorWagerFromMain = creatorFundingWallet === 'main' ? wager : 0;
-            const joinerWagerFromBonus = joinerFundingWallet === 'bonus' ? wager : 0;
-            const joinerWagerFromMain = joinerFundingWallet === 'main' ? wager : 0;
-
-            // Deduct from creator
-            if (creatorWagerFromBonus > 0) {
-                 transaction.update(creatorRef, { bonusBalance: admin.firestore.FieldValue.increment(-creatorWagerFromBonus) });
-            } else if (creatorWagerFromMain > 0) {
-                 transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(-creatorWagerFromMain) });
-            }
+            if ((creatorData.balance || 0) < wager) throw new Error("INSUFFICIENT_FUNDS_CREATOR");
+            if ((joinerData.balance || 0) < wager) throw new Error("INSUFFICIENT_FUNDS_JOINER");
             
-            // Deduct from joiner
-            if (joinerWagerFromBonus > 0) {
-                 transaction.update(joinerRef, { bonusBalance: admin.firestore.FieldValue.increment(-joinerWagerFromBonus) });
-            } else if (joinerWagerFromMain > 0) {
-                 transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(-joinerWagerFromMain) });
-            }
+            // Deduct from both players
+            transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(-wager) });
+            transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(-wager) });
             
-            // Update game room to start
+            // Update game room
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
             transaction.update(roomRef, {
                 status: 'in-progress',
-                player2: {
-                    uid: joinerId,
-                    name: `${joinerData.firstName} ${joinerData.lastName}`,
-                    color: joinerColor,
-                    photoURL: joinerData.photoURL || '',
-                    fundingWallet: joinerFundingWallet,
-                },
+                player2: { uid: joinerId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
             });
         });
 
-        // Handle referral task updates outside of the main transaction for safety
-        const creatorId = (await db.collection('game_rooms').doc(roomId).get()).data()!.createdBy.uid;
-        const playersForTaskCheck = [
-            {id: creatorId, data: (await db.collection('users').doc(creatorId).get()).data()}, 
-            {id: joinerId, data: (await db.collection('users').doc(joinerId).get()).data()}
-        ];
-
-        const batch = db.batch();
-        for(const player of playersForTaskCheck) {
-            if (player.data && player.data.activeReferralTaskId) {
-                const taskRef = db.collection('referral_tasks').doc(player.data.activeReferralTaskId);
-                const taskDoc = await taskRef.get();
-                if (taskDoc.exists) {
-                    const taskData = taskDoc.data();
-                    if (taskData) {
-                        const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
-                        if (gamePlaySubTask && gamePlaySubTask.target > 0) {
-                            const userToUpdateRef = db.collection('users').doc(player.id);
-                            const currentProgress = player.data.taskStatus?.[player.data.activeReferralTaskId]?.[gamePlaySubTask.id]?.progress || 0;
-                            const newProgress = currentProgress + 1;
-                            
-                            batch.set(userToUpdateRef, {
-                                taskStatus: {
-                                    [player.data.activeReferralTaskId]: {
-                                        [gamePlaySubTask.id]: {
-                                            progress: newProgress,
-                                            status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
-                                        }
-                                    }
-                                }
-                            }, { merge: true });
-                        }
-                    }
-                }
-            }
-        }
-        await batch.commit();
-
         return { success: true };
 
     } catch (error: any) {
         functions.logger.error('Error joining game:', error);
-        
-        const errorMap: { [key: string]: HttpsError } = {
+        const errorMap: { [key: string]: functions.https.HttpsError } = {
             "NOT_FOUND": new HttpsError('not-found', "Room not available."),
             "ROOM_NOT_AVAILABLE": new HttpsError('failed-precondition', "Room is not available for joining."),
-            "INVALID_ROOM_DATA": new HttpsError('aborted', "Room data is invalid or missing creator info."),
             "CANNOT_JOIN_OWN_GAME": new HttpsError('failed-precondition', "You cannot join your own game."),
-            "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
             "CREATOR_NOT_FOUND": new HttpsError('aborted', "The room creator's profile could not be found."),
-            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds in the selected wallet."),
+            "JOINER_NOT_FOUND": new HttpsError('not-found', "Your user profile was not found."),
             "INSUFFICIENT_FUNDS_CREATOR": new HttpsError('aborted', "The room creator has insufficient funds."),
+            "INSUFFICIENT_FUNDS_JOINER": new HttpsError('failed-precondition', "You have insufficient funds."),
         };
         throw errorMap[error.message] || new HttpsError('internal', 'An unexpected error occurred while joining the game.');
     }
-  });
 });
 
-
-export const endGame = onCall(async (request) => {
-  return corsHandler(request, {} as any, async () => {
+export const endGame = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
-
     const { roomId, winnerId, method, resignerDetails } = request.data;
     if (!roomId || !method) {
-        throw new HttpsError('invalid-argument', 'Room ID and method are required.');
+        throw new HttpsError('invalid-argument', 'Room ID and end method are required.');
     }
 
     const db = admin.firestore();
@@ -250,41 +149,25 @@ export const endGame = onCall(async (request) => {
     try {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
-            if (!roomDoc.exists) {
-                throw new HttpsError('not-found', 'Game room not found.');
-            }
+            if (!roomDoc.exists) throw new HttpsError('not-found', 'Game room not found.');
 
             const roomData = roomDoc.data();
-            if (!roomData) {
-                 throw new HttpsError('not-found', 'Game room data is missing.');
-            }
-            if (roomData.status === 'completed') {
-                functions.logger.log(`Game ${roomId} already completed.`);
-                return;
-            }
-            if (roomData.status !== 'in-progress') {
-                throw new HttpsError('failed-precondition', `Game ${roomId} is not in progress.`);
-            }
+            if (!roomData || roomData.status === 'completed') return;
 
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
             const joinerId = roomData.player2?.uid;
             
-            if (!joinerId || !roomData.player2) {
-                throw new HttpsError('failed-precondition', 'Game is missing a second player.');
-            }
-            
-            let creatorPayout = 0;
-            let joinerPayout = 0;
-            
+            if (!joinerId) throw new HttpsError('failed-precondition', 'Game is missing a second player.');
+
+            let creatorPayout = 0, joinerPayout = 0;
             const winnerObject: any = { method };
 
             if (method === 'draw') {
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
-            } else if (method === 'resign' && resignerDetails && typeof resignerDetails.resignerPieceCount === 'number') {
+            } else if (method === 'resign' && resignerDetails) {
                 let opponentPayoutRate = 1.30;
-                
                 let resignerRefundRate = 0;
                 if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
                 else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
@@ -293,109 +176,63 @@ export const endGame = onCall(async (request) => {
                 winnerObject.resignerId = resignerDetails.id;
                 winnerObject.resignerPieceCount = resignerDetails.resignerPieceCount;
 
-                if (resignerDetails.id === creatorId) { // Creator resigned
+                if (resignerDetails.id === creatorId) {
                     winnerObject.uid = joinerId;
                     creatorPayout = wager * resignerRefundRate;
                     joinerPayout = wager * opponentPayoutRate;
-                } else { // Joiner resigned
+                } else {
                     winnerObject.uid = creatorId;
                     creatorPayout = wager * opponentPayoutRate;
                     joinerPayout = wager * resignerRefundRate;
                 }
-            } else { // Standard win (checkmate, timeout, piece-capture)
+            } else {
                 winnerObject.uid = winnerId;
-                if (winnerId === creatorId) {
-                    creatorPayout = wager * 1.8;
-                } else if (winnerId === joinerId) {
-                    joinerPayout = wager * 1.8;
-                }
-                if (winnerId) {
-                    transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
-                }
+                if (winnerId === creatorId) creatorPayout = wager * 1.8;
+                else if (winnerId === joinerId) joinerPayout = wager * 1.8;
+                if (winnerId) transaction.update(db.collection('users').doc(winnerId), { wins: admin.firestore.FieldValue.increment(1) });
             }
             
-            const playersPayoutData = [
-                { ref: db.collection('users').doc(creatorId), payout: creatorPayout, wagerInfo: roomData.createdBy },
-                { ref: db.collection('users').doc(joinerId), payout: joinerPayout, wagerInfo: roomData.player2 }
-            ];
+            if (creatorPayout > 0) transaction.update(db.collection('users').doc(creatorId), { balance: admin.firestore.FieldValue.increment(creatorPayout) });
+            if (joinerPayout > 0) transaction.update(db.collection('users').doc(joinerId), { balance: admin.firestore.FieldValue.increment(joinerPayout) });
             
-            for(const p of playersPayoutData) {
-                if (p.payout > 0) {
-                    const fundingWallet = p.wagerInfo.fundingWallet || 'main';
-                    const profit = p.payout - wager;
-                    const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
-
-                    if (fundingWallet === 'main') {
-                         updatePayload.balance = admin.firestore.FieldValue.increment(p.payout);
-                    } else if (fundingWallet === 'bonus') {
-                        if (profit > 0) {
-                            // Return original stake to bonus wallet, profit to main wallet
-                            updatePayload.bonusBalance = admin.firestore.FieldValue.increment(wager);
-                            updatePayload.balance = admin.firestore.FieldValue.increment(profit);
-                        } else {
-                            // It's a refund (draw/resign), so return the payout to bonus wallet
-                            updatePayload.bonusBalance = admin.firestore.FieldValue.increment(p.payout);
-                        }
-                    }
-
-                    if (Object.keys(updatePayload).length > 0) {
-                        transaction.update(p.ref, updatePayload);
-                    }
-                }
-            }
-            
-            // Finalize room
             transaction.update(roomRef, { status: 'completed', winner: winnerObject, draw: method === 'draw' });
         });
         return { success: true };
     } catch (error: any) {
         functions.logger.error('Error ending game:', error);
-        if (error.code) {
-             throw error; // Re-throw HttpsError
-        }
-        throw new HttpsError('internal', 'An unexpected error occurred while ending the game.');
+        throw new HttpsError('internal', 'An unexpected error occurred.');
     }
-  });
 });
 
-export const approveBonusClaim = onCall(async (request) => {
-  return corsHandler(request, {} as any, async () => {
-    if (!request.auth || !request.data.claimId) {
-        throw new HttpsError('invalid-argument', 'Authentication and claim ID are required.');
+export const consolidateWallets = onCall({ cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be authenticated to run this function.');
     }
-    // You could add an admin role check here for more security
-    const { claimId, newStatus } = request.data;
+    // Optional: Add admin role check for extra security
+    
     const db = admin.firestore();
-    const claimRef = db.collection('bonus_claims').doc(claimId);
+    const usersRef = db.collection('users');
+    const snapshot = await usersRef.where('bonusBalance', '>', 0).get();
 
-    try {
-        await db.runTransaction(async (transaction) => {
-            const claimDoc = await transaction.get(claimRef);
-            if (!claimDoc.exists) throw new HttpsError('not-found', 'Claim document not found.');
-            
-            const claimData = claimDoc.data();
-            if (!claimData || claimData.status !== 'pending') {
-                throw new HttpsError('failed-precondition', 'This claim is not in a pending state.');
-            }
-
-            if (newStatus === 'approved') {
-                if (claimData.claimType === 'referrer_target' && claimData.referrerId && claimData.commissionAmount > 0) {
-                    const referrerRef = db.collection('users').doc(claimData.referrerId);
-                    transaction.update(referrerRef, { balance: admin.firestore.FieldValue.increment(claimData.commissionAmount) });
-                }
-                
-                if (claimData.claimType === 'new_user_task' && claimData.newUserId && claimData.bonusAmount > 0) {
-                    const newUserRef = db.collection('users').doc(claimData.newUserId);
-                    transaction.update(newUserRef, { bonusBalance: admin.firestore.FieldValue.increment(claimData.bonusAmount) });
-                }
-            }
-            transaction.update(claimRef, { status: newStatus });
-        });
-        return { success: true };
-    } catch(error: any) {
-        functions.logger.error('Error approving bonus claim:', error);
-        if (error.code) throw error;
-        throw new HttpsError('internal', 'An error occurred while processing the claim.');
+    if (snapshot.empty) {
+        return { message: "No users with bonus balances to consolidate." };
     }
-  });
+
+    const batch = db.batch();
+    let consolidatedCount = 0;
+
+    snapshot.forEach(doc => {
+        const userData = doc.data();
+        const bonusBalance = userData.bonusBalance || 0;
+        
+        batch.update(doc.ref, {
+            balance: admin.firestore.FieldValue.increment(bonusBalance),
+            bonusBalance: admin.firestore.FieldValue.delete()
+        });
+        consolidatedCount++;
+    });
+
+    await batch.commit();
+
+    return { message: `Successfully consolidated bonus balances for ${consolidatedCount} users.` };
 });
