@@ -51,7 +51,8 @@ export default function RegisterForm() {
         const country = target.country.value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
-        const aref = searchParams.get('aref'); // New referral for bonus
+        const aref = searchParams.get('aref');
+        const rcid = searchParams.get('rcid'); // Referral Campaign ID
         
         if (password !== confirmPassword) {
             toast({
@@ -130,11 +131,20 @@ export default function RegisterForm() {
             };
             
             if (aref) {
-                userData.bonusReferredBy = aref;
+                const referrerRef = doc(db, 'users', aref);
+                await updateDoc(referrerRef, { bonusReferralCount: increment(1) });
+            }
+
+            if (rcid && ref) { // It's a campaign referral
+                userData.campaignInfo = {
+                    campaignId: rcid,
+                    referrerId: ref,
+                    taskCompleted: false,
+                };
             }
             
             const directReferrerId = mref || ref;
-            if (directReferrerId) {
+            if (directReferrerId && !rcid) { // Ensure it's not a campaign referral
                 const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();

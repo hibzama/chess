@@ -26,6 +26,13 @@ interface EquipmentSettings {
     }
 }
 
+interface CampaignInfo {
+    campaignId: string;
+    referrerId: string;
+    taskCompleted: boolean;
+    taskAnswer?: string;
+}
+
 interface UserData {
     uid: string;
     firstName: string;
@@ -37,7 +44,6 @@ interface UserData {
     role: 'user' | 'admin' | 'marketer';
     equipment?: EquipmentSettings;
     referredBy?: string;
-    bonusReferredBy?: string;
     bonusReferralCount?: number;
     referralChain?: string[];
     createdAt: any;
@@ -49,6 +55,7 @@ interface UserData {
     wins?: number;
     emailVerified?: boolean;
     marketingBalance?: number;
+    campaignInfo?: CampaignInfo;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
