@@ -77,7 +77,9 @@ function CampaignTaskCompletion() {
                     type: 'referee',
                     status: 'pending',
                     createdAt: serverTimestamp(),
-                    refereeId: user.uid // The new user is the referee
+                    refereeId: user.uid, // The new user is the referee
+                    campaignId: campaign.id,
+                    referrerId: userData.campaignInfo.referrerId
                  });
             }
 
@@ -170,7 +172,6 @@ export default function DashboardLayout({
 
     return (
         <MainLayout>
-            <CampaignTaskCompletion />
             {children}
         </MainLayout>
     )
