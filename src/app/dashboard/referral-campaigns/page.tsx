@@ -101,12 +101,12 @@ export default function UserCampaignsPage() {
             collection(db, 'transactions'), 
             where('userId', '==', user.uid),
             where('type', '==', 'bonus'),
-            where('description', '!=', 'Deposit Bonus'), // Exclude other bonus types
             orderBy('createdAt', 'desc')
         );
         const unsubHistory = onSnapshot(claimQuery, (snapshot) => {
             const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()} as ClaimHistory));
-            setClaimHistory(history);
+            const filteredHistory = history.filter(h => h.description !== 'Deposit Bonus');
+            setClaimHistory(filteredHistory);
         });
 
         return () => {
@@ -377,5 +377,3 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
         </Table>
     </ScrollArea>
 );
-
-    
