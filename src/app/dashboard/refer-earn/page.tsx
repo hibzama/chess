@@ -53,13 +53,6 @@ export default function ReferAndEarnPage() {
         return '';
     }, [user]);
 
-    const bonusReferralLink = useMemo(() => {
-        if (typeof window !== 'undefined' && user) {
-            return `${window.location.origin}/register?aref=${user.uid}`;
-        }
-        return '';
-    }, [user]);
-
     const { rank, l1Rate } = useMemo(() => {
         const l1Count = level1.length;
         const currentRank = referralRanks.find(r => l1Count >= r.min && l1Count <= r.max) || referralRanks[0];
@@ -121,8 +114,8 @@ export default function ReferAndEarnPage() {
          return () => unsubscribe();
     }, [user]);
     
-    const copyLink = (link: string) => {
-        navigator.clipboard.writeText(link);
+    const copyLink = () => {
+        navigator.clipboard.writeText(referralLink);
         toast({ title: "Copied!", description: "Referral link copied to clipboard." });
     };
 
@@ -192,20 +185,13 @@ export default function ReferAndEarnPage() {
             </div>
 
              <div className="grid md:grid-cols-1 lg:grid-cols-5 gap-6">
-                 <Card className="lg:col-span-2 space-y-4">
-                    <CardHeader><CardTitle>Your Referral Links</CardTitle><CardDescription>Share these links to invite new players.</CardDescription></CardHeader>
+                 <Card className="lg:col-span-2">
+                    <CardHeader><CardTitle>Your Referral Link</CardTitle><CardDescription>Share this link to invite new players and earn commissions.</CardDescription></CardHeader>
                     <CardContent>
-                        <Label>Standard Referral Link (For Commissions)</Label>
-                        <div className="flex gap-2">
-                            <Input readOnly value={referralLink}/>
-                            <Button variant="ghost" size="icon" onClick={() => copyLink(referralLink)}><Copy/></Button>
-                        </div>
-                    </CardContent>
-                    <CardContent>
-                        <Label>Bonus Referral Link (For Bonus Tiers)</Label>
-                         <div className="flex gap-2">
-                            <Input readOnly value={bonusReferralLink} />
-                            <Button variant="ghost" size="icon" onClick={() => copyLink(bonusReferralLink)}><Copy/></Button>
+                        <Input readOnly value={referralLink} className="mb-4"/>
+                        <div className="flex gap-4">
+                            <Button onClick={copyLink} className="w-full"><Copy/> Copy</Button>
+                            <Button variant="outline" className="w-full" onClick={() => navigator.share({ url: referralLink, title: 'Join me on Nexbattle!'})}><Share/> Share</Button>
                         </div>
                     </CardContent>
                 </Card>
