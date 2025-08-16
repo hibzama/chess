@@ -25,18 +25,16 @@
         { "fieldPath": "isActive", "order": "ASCENDING" },
         { "fieldPath": "expiresAt", "order": "ASCENDING" }
       ]
-    }
-  ],
-  "fieldOverrides": [
+    },
     {
       "collectionGroup": "bonus_claims",
-      "fieldPath": "createdAt",
-      "indexes": [
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
-        }
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     }
-  ]
+  ],
+  "fieldOverrides": []
 }
