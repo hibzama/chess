@@ -178,7 +178,7 @@ export default function UserCampaignsPage() {
                 transaction.update(userRef, { balance: increment(campaignDetails.referrerBonus) });
                 transaction.set(transactionRef, {
                     userId: user.uid, type: 'bonus', amount: campaignDetails.referrerBonus,
-                    status: 'completed', description: `Referral Campaign Bonus: ${campaignDetails.title}`,
+                    status: 'completed', description: `Referral Campaign: ${campaignDetails.title}`,
                     createdAt: serverTimestamp()
                 });
                 transaction.update(userCampaignRef, { claimed: true });
@@ -229,7 +229,7 @@ export default function UserCampaignsPage() {
                                                     <DialogDescription>A new user must complete all these tasks for you to get referral credit.</DialogDescription>
                                                 </DialogHeader>
                                                 <ul className="list-disc space-y-2 pl-5 mt-4 text-sm">
-                                                    {c.tasks.map(task => <li key={task.id}>{task.description}</li>)}
+                                                    {c.tasks.map(task => <li key={task.id}>{task.description} (Reward: LKR {task.refereeBonus})</li>)}
                                                 </ul>
                                             </DialogContent>
                                         </Dialog>
@@ -318,10 +318,10 @@ export default function UserCampaignsPage() {
                             <TabsTrigger value="valid">Valid ({validReferrals.length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="pending">
-                            <ReferralList referrals={referrals.filter(r => !campaignDetails || r.campaignInfo.completedTasks.length < campaignDetails.tasks.length)} />
+                            <ReferralList referrals={referrals.filter(r => !campaignDetails || r.campaignInfo.completedTasks.length < campaignDetails.tasks.length)} campaign={campaignDetails} />
                         </TabsContent>
                         <TabsContent value="valid">
-                            <ReferralList referrals={validReferrals} showAnswer campaign={campaignDetails} />
+                            <ReferralList referrals={validReferrals} campaign={campaignDetails} />
                         </TabsContent>
                     </Tabs>
                 </CardContent>
@@ -330,15 +330,14 @@ export default function UserCampaignsPage() {
     )
 }
 
-const ReferralList = ({ referrals, showAnswer = false, campaign }: { referrals: CampaignReferral[], showAnswer?: boolean, campaign?: Campaign | null }) => (
+const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], campaign: Campaign | null }) => (
     <ScrollArea className="h-72">
         <Table>
             <TableHeader>
                 <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Contact</TableHead>
-                    {showAnswer && <TableHead>Task Answers</TableHead>}
-                    <TableHead>Status</TableHead>
+                    <TableHead>Task Progress</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -346,25 +345,17 @@ const ReferralList = ({ referrals, showAnswer = false, campaign }: { referrals: 
                     <TableRow key={ref.id}>
                         <TableCell>{ref.firstName} {ref.lastName}</TableCell>
                         <TableCell><a href={`tel:${ref.phone}`} className="flex items-center gap-1 hover:underline"><Phone className="w-3 h-3"/> {ref.phone}</a></TableCell>
-                        {showAnswer && <TableCell>
-                           <ul className="text-xs">
-                               {campaign?.tasks.map(task => (
-                                   <li key={task.id}><strong>{task.verificationQuestion}:</strong> {ref.campaignInfo.answers[task.id] || 'N/A'}</li>
-                               ))}
-                           </ul>
-                        </TableCell>}
                         <TableCell>
-                             <Badge variant={showAnswer ? 'default' : 'secondary'}>
-                                {showAnswer ? 'Completed' : 'Pending Tasks'}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                 <Progress value={campaign ? (ref.campaignInfo.completedTasks.length / campaign.tasks.length) * 100 : 0} className="w-24 h-2" />
+                                 <span className="text-xs text-muted-foreground">{ref.campaignInfo.completedTasks.length} / {campaign?.tasks.length || 0}</span>
+                            </div>
                         </TableCell>
                     </TableRow>
                 )) : (
-                    <TableRow><TableCell colSpan={showAnswer ? 4 : 3} className="h-24 text-center">No referrals in this list.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={3} className="h-24 text-center">No referrals in this list.</TableCell></TableRow>
                 )}
             </TableBody>
         </Table>
     </ScrollArea>
 );
-
-    

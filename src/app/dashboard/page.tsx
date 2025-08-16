@@ -16,52 +16,6 @@ import { DailyBonusCampaign } from '@/app/admin/bonus/daily-bonus/page';
 import { CampaignTask } from '@/app/admin/referral-campaigns/page';
 
 // #region Bonus Components
-function CampaignTaskAlert() {
-    const { userData } = useAuth();
-    const [nextTask, setNextTask] = useState<CampaignTask | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (!userData) {
-            setLoading(false);
-            return;
-        }
-        
-        const checkCampaign = async () => {
-             if (userData.campaignInfo) {
-                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
-                if (campaignDoc.exists()) {
-                    const campaignData = campaignDoc.data();
-                    const completedTasks = userData.campaignInfo.completedTasks || [];
-                    const firstIncompleteTask = campaignData.tasks.find((task: CampaignTask) => !completedTasks.includes(task.id));
-                    if (firstIncompleteTask) {
-                        setNextTask(firstIncompleteTask);
-                    }
-                }
-            }
-            setLoading(false);
-        };
-        checkCampaign();
-    }, [userData]);
-
-
-    if (loading || !nextTask) {
-        return null;
-    }
-
-    return (
-        <Alert className="mb-4 border-primary bg-primary/5">
-             <Award className="h-4 w-4 text-primary" />
-            <AlertTitle className="font-bold text-primary">Complete Your Task & Earn a LKR {nextTask.refereeBonus} Bonus!</AlertTitle>
-            <AlertDescription className="flex items-center justify-between">
-                <p>You have a pending referral task to complete.</p>
-                <Button asChild size="sm">
-                    <Link href="/dashboard/referral-campaigns">Go to Task <ArrowRight className="w-4 h-4 ml-2"/></Link>
-                </Button>
-            </AlertDescription>
-        </Alert>
-    );
-}
 
 const BonusCardShell = ({ title, description, icon, href, linkText }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string}) => (
     <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 flex flex-col">
@@ -311,7 +265,6 @@ export default function DashboardPage() {
 
        {/* Bonus Hub Section */}
       <div className="space-y-4">
-        <CampaignTaskAlert />
         {activeBonusCount > 0 && (
              <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
                 <DepositBonusAlert onAvailabilityChange={(isAvailable) => handleBonusAvailability('deposit', isAvailable)} />

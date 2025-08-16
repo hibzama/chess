@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Award } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Award, ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -152,6 +152,26 @@ export default function MainLayout({
 
     const USDT_RATE = 310;
     const isMarketer = userData?.role === 'marketer';
+    const hasPendingTasks = userData?.campaignInfo && userData.campaignInfo.completedTasks.length < (userData.campaignInfo as any).totalTasks;
+
+    const sidebarItems = isMarketer ? [
+        { href: '/marketing/dashboard', icon: LayoutGrid, label: 'Dashboard' },
+        { href: '/marketing/dashboard/wallet', icon: Wallet, label: 'Commission Wallet' },
+    ] : [
+        { href: '/dashboard', icon: LayoutGrid, label: 'Dashboard' },
+        { href: '/dashboard/profile', icon: User, label: 'My Profile' },
+        { href: '/dashboard/my-rooms', icon: List, label: 'My Rooms' },
+        { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
+        { href: '/dashboard/bonus-center', icon: Gift, label: 'Bonus Center' },
+        { href: '/dashboard/your-task', icon: ClipboardCheck, label: 'Your Tasks', condition: !!userData?.campaignInfo },
+        { href: '/dashboard/friends', icon: Users, label: 'Friends & Community' },
+        { href: '/dashboard/rankings', icon: Trophy, label: 'Rankings' },
+        { href: '/dashboard/equipment', icon: Gamepad2, label: 'My Equipment' },
+        { href: '/dashboard/refer-earn', icon: Megaphone, label: 'Refer & Earn' },
+        { href: '/dashboard/referral-campaigns', icon: Award, label: 'Referral Campaigns' },
+        { href: '/dashboard/chat', icon: MessageSquare, label: 'Direct Messages' },
+        { href: '/about', icon: Info, label: 'About Us' },
+    ];
 
 
     return (
@@ -166,55 +186,16 @@ export default function MainLayout({
                 </SidebarHeader>
                 <SidebarContent>
                     <SidebarMenu>
-                        {isMarketer ? (
-                            <>
-                                <SidebarMenuItem>
-                                    <Link href="/marketing/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname.startsWith('/marketing/dashboard')}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/marketing/dashboard/wallet"><SidebarMenuButton tooltip="Commission Wallet" isActive={isMounted && pathname.startsWith('/marketing/dashboard/wallet')}><Wallet /><span>Commission Wallet</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                            </>
-                        ) : (
-                            <>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard"><SidebarMenuButton tooltip="Dashboard" isActive={isMounted && pathname === '/dashboard'}><LayoutGrid /><span>Dashboard</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/profile"><SidebarMenuButton tooltip="My Profile" isActive={isMounted && pathname === '/dashboard/profile'}><User /><span>My Profile</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/my-rooms"><SidebarMenuButton tooltip="My Rooms" isActive={isMounted && pathname === '/dashboard/my-rooms'}><List /><span>My Rooms</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/wallet"><SidebarMenuButton tooltip="Wallet" isActive={isMounted && pathname === '/dashboard/wallet'}><Wallet /><span>Wallet</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/bonus-center"><SidebarMenuButton tooltip="Bonus Center" isActive={isMounted && pathname.startsWith('/dashboard/bonus-center')}><Gift /><span>Bonus Center</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/friends"><SidebarMenuButton tooltip="Friends &amp; Community" isActive={isMounted && pathname.startsWith('/dashboard/friends')}><Users /><span>Friends &amp; Community</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/rankings"><SidebarMenuButton tooltip="Rankings" isActive={isMounted && pathname.startsWith('/dashboard/rankings')}><Trophy /><span>Rankings</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/equipment"><SidebarMenuButton tooltip="My Equipment" isActive={isMounted && pathname === '/dashboard/equipment'}><Gamepad2 /><span>My Equipment</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/refer-earn"><SidebarMenuButton tooltip="Refer &amp; Earn" isActive={isMounted && pathname === '/dashboard/refer-earn'}><Megaphone /><span>Refer &amp; Earn</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/dashboard/referral-campaigns"><SidebarMenuButton tooltip="Referral Campaigns" isActive={isMounted && pathname === '/dashboard/referral-campaigns'}><Award /><span>Referral Campaigns</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                 <SidebarMenuItem>
-                                    <Link href="/dashboard/chat"><SidebarMenuButton tooltip="Direct Messages" isActive={isMounted && pathname.startsWith('/dashboard/chat')}><MessageSquare /><span>Direct Messages</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                                <SidebarMenuItem>
-                                    <Link href="/about"><SidebarMenuButton tooltip="About Us" isActive={isMounted && pathname === '/about'}><Info /><span>About Us</span></SidebarMenuButton></Link>
-                                </SidebarMenuItem>
-                            </>
-                        )}
+                        {sidebarItems.filter(item => item.condition !== false).map(item => (
+                             <SidebarMenuItem key={item.href}>
+                                <Link href={item.href}>
+                                    <SidebarMenuButton tooltip={item.label} isActive={isMounted && pathname.startsWith(item.href)}>
+                                        <item.icon />
+                                        <span>{item.label}</span>
+                                    </SidebarMenuButton>
+                                </Link>
+                            </SidebarMenuItem>
+                        ))}
                     </SidebarMenu>
                 </SidebarContent>
                 <SidebarFooter>
