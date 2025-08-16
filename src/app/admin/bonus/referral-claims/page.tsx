@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, collectionGroup } from 'firebase/firestore';
+import { collectionGroup, query, where, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -76,24 +76,24 @@ export default function ReferralClaimsPage() {
         const pendingQuery = query(
             collectionGroup(db, 'bonus_claims'),
             where('status', '==', 'pending'),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'asc')
         );
 
         const historyQuery = query(
             collectionGroup(db, 'bonus_claims'),
             where('status', 'in', ['approved', 'rejected']),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'asc')
         );
         
         const unsubPending = onSnapshot(pendingQuery, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setPendingClaims(claims);
+            setPendingClaims(claims.reverse());
             setLoading(false);
         }, (err) => handleError(err, 'pending'));
 
         const unsubHistory = onSnapshot(historyQuery, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setHistoryClaims(claims);
+            setHistoryClaims(claims.reverse());
         }, (err) => handleError(err, 'history'));
 
         return () => {
