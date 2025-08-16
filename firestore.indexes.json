@@ -58,11 +58,11 @@
       "fieldPath": "createdAt",
       "indexes": [
         {
-          "order": "ASCENDING",
+          "order": "DESCENDING",
           "queryScope": "COLLECTION_GROUP"
         },
         {
-          "order": "DESCENDING",
+          "order": "ASCENDING",
           "queryScope": "COLLECTION_GROUP"
         }
       ]
