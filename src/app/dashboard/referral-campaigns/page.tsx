@@ -287,8 +287,13 @@ export default function UserCampaignsPage() {
                              <p>Get <span className="font-bold">{campaignDetails.referralGoal}</span> people to sign up and complete all their tasks.</p>
                         </div>
                          <div className="p-4 bg-background/50 rounded-lg space-y-2">
-                             <h4 className="font-semibold text-primary flex items-center gap-2"><Users/> Referrals' Goal</h4>
-                             <p>Each new user must complete <span className="font-bold">{campaignDetails.tasks.length}</span> task(s) to become a valid referral.</p>
+                            <h4 className="font-semibold text-primary flex items-center gap-2"><Users/> Referrals' Goal</h4>
+                            <p className="text-muted-foreground">Each new user must complete the following tasks:</p>
+                            <ul className="list-disc pl-5 space-y-1">
+                                {campaignDetails.tasks.map(task => (
+                                    <li key={task.id}>{task.description}</li>
+                                ))}
+                            </ul>
                         </div>
                     </div>
                     <div className="space-y-2">
@@ -372,3 +377,5 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
         </Table>
     </ScrollArea>
 );
+
+    
