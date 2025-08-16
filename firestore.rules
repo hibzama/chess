@@ -1,66 +1,98 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Users can manage their own document and subcollections
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId || isAdmin();
+      allow read, update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow delete: if isAdmin(); // Only admins can delete user accounts
 
       match /{subcollection}/{docId} {
-        allow read, write: if request.auth.uid == userId || isAdmin();
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
     
+    // Public collections that any signed-in user can read
     match /game_rooms/{roomId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /transactions/{transactionId} {
-        allow read: if request.auth.uid == resource.data.userId || isAdmin();
-        allow create: if request.auth != null;
-        allow update: if isAdmin();
-    }
-    
-    match /marketing_applications/{appId} {
-        allow create: if true;
-        allow read, write: if isAdmin();
-    }
-    
-    match /notifications/{notificationId} {
-        allow read, write: if request.auth.uid == resource.data.userId || isAdmin();
-        allow create: if request.auth != null;
-    }
-
-    match /settings/{settingId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
+        allow read: if isSignedIn();
+        allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
+        allow update: if isSignedIn() && request.auth.uid in resource.data.players;
+        allow delete: if isSignedIn() && (isOwner(resource.data.createdBy.uid) || isAdmin());
+        
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+        }
     }
     
     match /referral_campaigns/{campaignId} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
     }
     
-    match /bonus_claims/{claimId} {
-        allow read: if request.auth.uid == resource.data.userId || isAdmin();
-        allow create: if request.auth != null;
-        allow update: if isAdmin();
+    match /daily_bonus_campaigns/{campaignId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+         match /claims/{claimId} {
+            allow read, write: if isAdmin() || isOwner(claimId);
+        }
+    }
+    
+    match /settings/{docId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
     }
 
-    match /daily_bonus_campaigns/{campaignId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-      
-      match /claims/{claimDoc} {
-        allow read, write: if request.auth != null || isAdmin();
-      }
+    // Collections with specific access rules
+    match /marketing_applications/{appId} {
+        allow create: if isSignedIn();
+        allow read, update: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isOwner(resource.data.userId) || isAdmin();
+      allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+      allow update: if isAdmin(); // Only admins can approve/reject
+    }
+
+    match /chats/{chatId} {
+        allow read, update, create: if isSignedIn() && request.auth.uid in resource.data.userIds;
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        }
+    }
+
+    match /friend_requests/{reqId} {
+        allow read, create, delete: if isSignedIn() && (isOwner(request.resource.data.fromId) || isOwner(request.resource.data.toId));
+    }
+    
+    match /notifications/{notifId} {
+        allow read, update: if isOwner(resource.data.userId);
+        allow create: if isSignedIn();
+    }
+
+    // Collection group for bonus claims, requires specific index
+    match /{path=**}/bonus_claims/{claimId} {
+      allow read, write: if isOwner(get(path).data.userId) || isAdmin();
     }
   }
 }
