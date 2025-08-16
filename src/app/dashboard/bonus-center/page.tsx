@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, writeBatch, collection } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -39,14 +39,17 @@ export default function BonusCenterPage() {
     const [referralBonusSettings, setReferralBonusSettings] = useState<ReferralBonusSettings | null>(null);
     const [claimedReferralTiers, setClaimedReferralTiers] = useState<number[]>([]);
     const [claimingReferral, setClaimingReferral] = useState<number | null>(null);
+    const [bonusReferralCount, setBonusReferralCount] = useState(0);
 
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!user) {
+        if (!user || !userData) {
             setLoading(false);
             return;
         }
+
+        setBonusReferralCount(userData.bonusReferralCount || 0);
 
         const fetchAllSettings = async () => {
             setLoading(true);
@@ -80,7 +83,7 @@ export default function BonusCenterPage() {
         };
         
         fetchAllSettings();
-    }, [user]);
+    }, [user, userData]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -134,7 +137,7 @@ export default function BonusCenterPage() {
     };
     
     const handleClaimReferralBonus = async (tier: {referrals: number, amount: number}) => {
-        if (!user || !userData || (userData.l1Count || 0) < tier.referrals || claimedReferralTiers.includes(tier.referrals)) return;
+        if (!user || !userData || (bonusReferralCount || 0) < tier.referrals || claimedReferralTiers.includes(tier.referrals)) return;
         setClaimingReferral(tier.referrals);
         
         const userRef = doc(db, 'users', user.uid);
@@ -174,8 +177,6 @@ export default function BonusCenterPage() {
         )
     }
 
-    const l1Count = userData?.l1Count || 0;
-
     return (
         <div className="space-y-8">
             <div className="text-center">
@@ -212,22 +213,22 @@ export default function BonusCenterPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Users/> Referral Bonus</CardTitle>
-                        <CardDescription>Earn one-time rewards for growing your Level 1 referral network.</CardDescription>
+                        <CardDescription>Earn one-time rewards for inviting new players via your bonus referral link.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {referralBonusSettings.tiers.map((tier) => {
                             const isClaimed = claimedReferralTiers.includes(tier.referrals);
-                            const canClaim = l1Count >= tier.referrals && !isClaimed;
-                            const progress = Math.min((l1Count / tier.referrals) * 100, 100);
+                            const canClaim = bonusReferralCount >= tier.referrals && !isClaimed;
+                            const progress = Math.min((bonusReferralCount / tier.referrals) * 100, 100);
 
                             return (
                                 <Card key={tier.referrals} className="p-4 bg-card/50">
                                     <div className="flex flex-col md:flex-row md:items-center gap-4">
                                         <div className="flex-1 space-y-2">
                                             <div className="font-bold">Reward: LKR {tier.amount.toFixed(2)}</div>
-                                            <p className="text-sm text-muted-foreground">Requirement: {tier.referrals} Level 1 Referrals</p>
+                                            <p className="text-sm text-muted-foreground">Requirement: {tier.referrals} Bonus Referrals</p>
                                             <Progress value={progress} />
-                                            <p className="text-xs text-muted-foreground text-right">{l1Count} / {tier.referrals}</p>
+                                            <p className="text-xs text-muted-foreground text-right">{bonusReferralCount} / {tier.referrals}</p>
                                         </div>
                                         <Button
                                             disabled={!canClaim || claimingReferral === tier.referrals}
