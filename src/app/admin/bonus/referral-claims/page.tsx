@@ -1,8 +1,7 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collectionGroup, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy } from 'firebase/firestore';
+import { collectionGroup, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -74,7 +73,8 @@ export default function ReferralClaimsPage() {
         
         const q = query(
             collectionGroup(db, 'bonus_claims'),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'desc'),
+            limit(100) // Limit to the most recent 100 claims total
         );
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -194,7 +194,7 @@ export default function ReferralClaimsPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Referral Bonus Claims</CardTitle>
-                <CardDescription>Review pending claims and view past claim history.</CardDescription>
+                <CardDescription>Review pending claims and view past claim history (last 100 total claims).</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,13 @@ export default function DepositHistoryPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const q = query(collection(db, 'transactions'), where('type', '==', 'deposit'), where('status', 'in', ['approved', 'rejected']));
+        const q = query(
+            collection(db, 'transactions'), 
+            where('type', '==', 'deposit'), 
+            where('status', 'in', ['approved', 'rejected']),
+            orderBy('createdAt', 'desc'),
+            limit(100)
+        );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const history: Transaction[] = [];
@@ -38,7 +44,7 @@ export default function DepositHistoryPage() {
                     });
                 }
             }
-            setDeposits(history.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
+            setDeposits(history); // Already sorted by query
             setLoading(false);
         });
 
@@ -56,7 +62,7 @@ export default function DepositHistoryPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Deposit History</CardTitle>
-                <CardDescription>A log of all approved and rejected deposits.</CardDescription>
+                <CardDescription>A log of the last 100 approved and rejected deposits.</CardDescription>
             </CardHeader>
             <CardContent>
                 {loading ? (

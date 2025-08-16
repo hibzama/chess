@@ -1,8 +1,7 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -25,12 +24,15 @@ export default function GameHistoryPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const q = query(collection(db, 'game_rooms'), where('status', '==', 'completed'));
+        const q = query(
+            collection(db, 'game_rooms'), 
+            where('status', '==', 'completed'),
+            orderBy('createdAt', 'desc'),
+            limit(100)
+        );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Game));
-            // Sort client-side to avoid needing a composite index
-            history.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
             setGames(history);
             setLoading(false);
         });
@@ -74,7 +76,7 @@ export default function GameHistoryPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Game History</CardTitle>
-                <CardDescription>A log of all completed games on the platform.</CardDescription>
+                <CardDescription>A log of the last 100 completed games on the platform.</CardDescription>
             </CardHeader>
             <CardContent>
                 {loading ? (
