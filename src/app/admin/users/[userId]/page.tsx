@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin, Award } from 'lucide-react';
+import { ArrowLeft, User, History, DollarSign, Users, Wallet, Layers, Trophy, Ban, Handshake, Home, MapPin, Award, CheckSquare } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -73,6 +73,14 @@ type Referral = {
     level?: number;
 };
 
+type ClaimedCampaign = {
+    id: string;
+    amount: number;
+    claimedAt: any;
+    title?: string;
+    description?: string;
+}
+
 const StatCard = ({ title, value, icon }: { title: string; value: string | number; icon: React.ReactNode }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -96,6 +104,7 @@ export default function UserDetailPage() {
     const [games, setGames] = useState<Game[]>([]);
     const [referrals, setReferrals] = useState<Referral[]>([]);
     const [commissions, setCommissions] = useState<Transaction[]>([]);
+    const [claimedCampaigns, setClaimedCampaigns] = useState<ClaimedCampaign[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -104,7 +113,6 @@ export default function UserDetailPage() {
         const fetchData = async () => {
             setLoading(true);
 
-            // Fetch User
             const userDoc = await getDoc(doc(db, 'users', userId as string));
             if (!userDoc.exists()) {
                 router.push('/admin/users');
@@ -112,20 +120,18 @@ export default function UserDetailPage() {
             }
             setUser({ ...userDoc.data(), uid: userDoc.id } as UserProfile);
 
-            // Fetch Transactions
             const transQuery = query(collection(db, 'transactions'), where('userId', '==', userId));
             const transSnap = await getDocs(transQuery);
             const transData = transSnap.docs.map(d => ({ ...d.data(), id: d.id } as Transaction));
             setTransactions(transData);
             setCommissions(transData.filter(t => t.type === 'commission').sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
+            setClaimedCampaigns(transData.filter(t => t.type === 'bonus' && t.description?.includes('Referral Campaign')).sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
 
-            // Fetch Games
             const gamesQuery = query(collection(db, 'game_rooms'), where('players', 'array-contains', userId), where('status', '==', 'completed'));
             const gamesSnap = await getDocs(gamesQuery);
             const gamesData = gamesSnap.docs.map(d => ({ ...d.data(), id: d.id } as Game));
             setGames(gamesData.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
 
-            // Fetch Referrals
             const refQuery = user?.role === 'marketer'
                 ? query(collection(db, 'users'), where('referralChain', 'array-contains', userId))
                 : query(collection(db, 'users'), where('referredBy', '==', userId));
@@ -189,12 +195,13 @@ export default function UserDetailPage() {
             </Card>
 
             <Tabs defaultValue="overview">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-6">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="games">Game History</TabsTrigger>
                     <TabsTrigger value="wallet">Wallet History</TabsTrigger>
                     <TabsTrigger value="referrals">Referrals</TabsTrigger>
-                    {user.campaignInfo && <TabsTrigger value="campaign">Campaign</TabsTrigger>}
+                    <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+                    {user.campaignInfo && <TabsTrigger value="campaign">Active Task</TabsTrigger>}
                 </TabsList>
                 <TabsContent value="overview">
                     <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -214,6 +221,12 @@ export default function UserDetailPage() {
                 <TabsContent value="wallet"><TransactionTable transactions={transactions.filter(t => t.type === 'deposit' || t.type === 'withdrawal')} /></TabsContent>
                 <TabsContent value="referrals">
                     <ReferralTab user={user} referrals={referrals} commissions={commissions} />
+                </TabsContent>
+                <TabsContent value="campaigns">
+                    <Card>
+                        <CardHeader><CardTitle>Claimed Campaign Bonuses</CardTitle></CardHeader>
+                        <CardContent><ClaimedCampaignsTable campaigns={claimedCampaigns} /></CardContent>
+                    </Card>
                 </TabsContent>
                 {user.campaignInfo && (
                     <TabsContent value="campaign">
@@ -411,3 +424,28 @@ const ReferralTable = ({ referrals, showLevel }: { referrals: Referral[], showLe
         </TableBody>
     </Table>
 )
+
+const ClaimedCampaignsTable = ({ campaigns }: { campaigns: ClaimedCampaign[] }) => (
+    <Table>
+        <TableHeader>
+            <TableRow>
+                <TableHead>Campaign</TableHead>
+                <TableHead>Bonus</TableHead>
+                <TableHead>Date Claimed</TableHead>
+            </TableRow>
+        </TableHeader>
+        <TableBody>
+            {campaigns.length > 0 ? campaigns.map(c => (
+                <TableRow key={c.id}>
+                    <TableCell>{c.description || "Referral Campaign"}</TableCell>
+                    <TableCell className="text-green-400 font-semibold">LKR {c.amount.toFixed(2)}</TableCell>
+                    <TableCell>{c.createdAt ? format(c.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
+                </TableRow>
+            )) : (
+                <TableRow>
+                    <TableCell colSpan={3} className="text-center h-24">No campaign bonuses claimed.</TableCell>
+                </TableRow>
+            )}
+        </TableBody>
+    </Table>
+);

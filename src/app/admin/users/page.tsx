@@ -1,15 +1,16 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { ShieldCheck, User, CheckCircle, Wallet, ShieldAlert } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { Input } from '@/components/ui/input';
 
 interface UserData {
     uid: string;
@@ -24,6 +25,7 @@ interface UserData {
 export default function UsersPage() {
     const [users, setUsers] = useState<UserData[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
     const { toast } = useToast();
     const router = useRouter();
 
@@ -36,6 +38,13 @@ export default function UsersPage() {
 
         return () => unsubscribe();
     }, []);
+
+    const filteredUsers = useMemo(() => {
+        if (!searchTerm) return users;
+        return users.filter(user => 
+            user.firstName.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [users, searchTerm]);
 
     const handleRoleChange = async (e: React.MouseEvent, uid: string, newRole: 'admin' | 'user') => {
         e.stopPropagation(); 
@@ -79,8 +88,16 @@ export default function UsersPage() {
         <Card>
             <CardHeader>
                 <CardTitle>User Management</CardTitle>
+                <CardDescription>View, search, and manage all users on the platform.</CardDescription>
             </CardHeader>
             <CardContent>
+                <div className="mb-4">
+                    <Input 
+                        placeholder="Search by first name..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
                 {loading ? (
                      <p>Loading users...</p>
                 ) : (
@@ -96,7 +113,7 @@ export default function UsersPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {users.map((user) => (
+                        {filteredUsers.map((user) => (
                             <TableRow key={user.uid} onClick={() => router.push(`/admin/users/${user.uid}`)} className="cursor-pointer">
                                 <TableCell>{user.firstName} {user.lastName}</TableCell>
                                 <TableCell>{user.email}</TableCell>
