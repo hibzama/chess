@@ -32,14 +32,16 @@ interface BonusClaim {
 export default function ReferralClaimsPage() {
     const [pendingClaims, setPendingClaims] = useState<BonusClaim[]>([]);
     const [historyClaims, setHistoryClaims] = useState<BonusClaim[]>([]);
-    const [loadingPending, setLoadingPending] = useState(true);
-    const [loadingHistory, setLoadingHistory] = useState(true);
+    const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
     useEffect(() => {
-        // Listener for pending claims
-        const qPending = query(collectionGroup(db, 'bonus_claims'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
-        const unsubscribePending = onSnapshot(qPending, async (snapshot) => {
+        // A robust query that doesn't need a complex index.
+        // We will fetch recent claims and filter them client-side.
+        const q = query(collectionGroup(db, 'bonus_claims'), orderBy('createdAt', 'desc'), limit(100));
+
+        const unsubscribe = onSnapshot(q, async (snapshot) => {
+            setLoading(true);
             const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
                 const data = claimDoc.data() as BonusClaim;
                 const userDoc = await getDoc(doc(db, 'users', data.userId));
@@ -67,34 +69,23 @@ export default function ReferralClaimsPage() {
                     answer: answer
                 };
             });
-            const claimsData = await Promise.all(claimsDataPromises);
-            setPendingClaims(claimsData.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
-            setLoadingPending(false);
-        });
-        
-        // Listener for history claims
-        const qHistory = query(collectionGroup(db, 'bonus_claims'), where('status', 'in', ['approved', 'rejected']), orderBy('createdAt', 'desc'), limit(50));
-        const unsubscribeHistory = onSnapshot(qHistory, async (snapshot) => {
-            const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
-                const data = claimDoc.data() as BonusClaim;
-                const userDoc = await getDoc(doc(db, 'users', data.userId));
-                return { 
-                    ...data, 
-                    id: claimDoc.id, 
-                    userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User',
-                };
-            });
-            const claimsData = await Promise.all(claimsDataPromises);
-            setHistoryClaims(claimsData);
-            setLoadingHistory(false);
+            const allClaims = await Promise.all(claimsDataPromises);
+
+            // Filter claims into pending and history lists
+            const pending = allClaims.filter(claim => claim.status === 'pending');
+            const history = allClaims.filter(claim => claim.status === 'approved' || claim.status === 'rejected');
+            
+            setPendingClaims(pending);
+            setHistoryClaims(history);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching claims:", error);
+            setLoading(false);
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to fetch claims data.' });
         });
 
-
-        return () => {
-            unsubscribePending();
-            unsubscribeHistory();
-        };
-    }, []);
+        return () => unsubscribe();
+    }, [toast]);
 
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
         const claimRef = doc(db, 'bonus_claims', claim.id);
@@ -153,7 +144,7 @@ export default function ReferralClaimsPage() {
                         <TabsTrigger value="history">History</TabsTrigger>
                     </TabsList>
                     <TabsContent value="pending">
-                        {loadingPending ? <p>Loading claims...</p> : pendingClaims.length === 0 ? <p className="text-center py-8">No pending claims found.</p> : (
+                        {loading ? <p>Loading claims...</p> : pendingClaims.length === 0 ? <p className="text-center py-8">No pending claims found.</p> : (
                         <Table>
                             <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Campaign/Task</TableHead><TableHead>Type</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                             <TableBody>
@@ -180,7 +171,7 @@ export default function ReferralClaimsPage() {
                         )}
                     </TabsContent>
                     <TabsContent value="history">
-                         {loadingHistory ? <p>Loading history...</p> : historyClaims.length === 0 ? <p className="text-center py-8">No claim history found.</p> : (
+                         {loading ? <p>Loading history...</p> : historyClaims.length === 0 ? <p className="text-center py-8">No claim history found.</p> : (
                         <Table>
                             <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Campaign</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
