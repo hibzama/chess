@@ -1,6 +1,6 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, writeBatch, collection, serverTimestamp } from 'firebase/firestore';
@@ -8,12 +8,13 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Award, Loader2, Check } from 'lucide-react';
+import { Award, Loader2, Check, CheckCircle, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
 import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 export default function YourTaskPage() {
     const { user, userData, setUserData } = useAuth();
@@ -22,6 +23,7 @@ export default function YourTaskPage() {
 
     const [campaign, setCampaign] = useState<Campaign | null>(null);
     const [tasks, setTasks] = useState<CampaignTask[]>([]);
+    const [completedTasks, setCompletedTasks] = useState<CampaignTask[]>([]);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,11 +42,15 @@ export default function YourTaskPage() {
             if (campaignDoc.exists()) {
                 const campaignData = { id: campaignDoc.id, ...campaignDoc.data() } as Campaign;
                 setCampaign(campaignData);
-                const completedTasks = userData.campaignInfo.completedTasks || [];
-                const pendingTasks = campaignData.tasks.filter(task => !completedTasks.includes(task.id));
-                setTasks(pendingTasks);
 
-                if(pendingTasks.length === 0) {
+                const completedTaskIds = new Set(userData.campaignInfo.completedTasks || []);
+                const pending = campaignData.tasks.filter(task => !completedTaskIds.has(task.id));
+                const completed = campaignData.tasks.filter(task => completedTaskIds.has(task.id));
+                
+                setTasks(pending);
+                setCompletedTasks(completed);
+
+                if(pending.length === 0 && completed.length === 0) {
                      router.push('/dashboard');
                 }
 
@@ -110,6 +116,11 @@ export default function YourTaskPage() {
             setIsSubmitting(false);
         }
     };
+    
+    const totalPendingBonus = useMemo(() => {
+        return completedTasks.reduce((acc, task) => acc + task.refereeBonus, 0);
+    }, [completedTasks]);
+
 
     if (loading || !campaign) {
         return (
@@ -123,10 +134,40 @@ export default function YourTaskPage() {
     
     if (tasks.length === 0 && !loading) {
          return (
-             <div className="text-center space-y-4">
+             <div className="text-center space-y-6 max-w-2xl mx-auto">
                 <Award className="w-16 h-16 text-green-500 mx-auto" />
-                <h1 className="text-3xl font-bold">All Tasks Completed!</h1>
+                <h1 className="text-3xl font-bold">All Tasks Submitted!</h1>
                 <p className="text-muted-foreground">Thank you! Your submissions are under review. Bonuses will be added to your account upon approval.</p>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Pending Approval</CardTitle>
+                        <CardDescription>Total bonus of <span className="font-bold text-primary">LKR {totalPendingBonus.toFixed(2)}</span> is awaiting admin approval.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Task</TableHead>
+                                    <TableHead>Bonus</TableHead>
+                                    <TableHead>Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {completedTasks.map(task => (
+                                <TableRow key={task.id}>
+                                    <TableCell>{task.description}</TableCell>
+                                    <TableCell>LKR {task.refereeBonus.toFixed(2)}</TableCell>
+                                    <TableCell>
+                                        <Badge variant="secondary" className="gap-1.5"><Clock className="w-3 h-3"/> Pending</Badge>
+                                    </TableCell>
+                                </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
                 <Button onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
             </div>
          )
@@ -150,7 +191,7 @@ export default function YourTaskPage() {
                          {['whatsapp', 'telegram', 'facebook', 'tiktok', 'link'].includes(task.type) && task.link && (
                             <Button asChild className="w-full">
                                 <a href={task.link} target="_blank" rel="noopener noreferrer">
-                                    Open Link
+                                    {task.buttonText || 'Open Link'}
                                 </a>
                             </Button>
                         )}

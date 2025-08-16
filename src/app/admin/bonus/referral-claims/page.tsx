@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface BonusClaim {
     id: string;
@@ -23,6 +24,7 @@ interface BonusClaim {
     refereeId?: string; 
     referrerId?: string;
     campaignId?: string;
+    answer?: string; // The user's submitted answer for verification
 }
 
 export default function ReferralClaimsPage() {
@@ -37,10 +39,30 @@ export default function ReferralClaimsPage() {
             const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
                 const data = claimDoc.data() as BonusClaim;
                 const userDoc = await getDoc(doc(db, 'users', data.userId));
+                
+                // Fetch the answer from the user's campaign info
+                let answer = '';
+                if(data.type === 'referee' && data.refereeId && data.campaignId) {
+                    const campaignInfoDoc = await getDoc(doc(db, `users/${data.refereeId}/active_campaigns`, 'current'));
+                    if(campaignInfoDoc.exists()) {
+                        const campaignInfo = campaignInfoDoc.data();
+                        const taskId = data.campaignTitle.split(':')[1]?.trim() ?? ''; // This is a bit fragile
+                         const campaignDetails = await getDoc(doc(db, 'referral_campaigns', data.campaignId));
+                         if(campaignDetails.exists()){
+                             const tasks = campaignDetails.data().tasks;
+                             const relatedTask = tasks.find((t: any) => t.description.substring(0,30) === data.campaignTitle.split(':')[1]?.trim().substring(0,30));
+                             if(relatedTask && campaignInfo.answers) {
+                                 answer = campaignInfo.answers[relatedTask.id] || 'Not found';
+                             }
+                         }
+                    }
+                }
+
                 return { 
                     ...data, 
                     id: claimDoc.id, 
-                    userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User' 
+                    userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User',
+                    answer: answer
                 };
             });
             const claimsData = await Promise.all(claimsDataPromises);
@@ -112,7 +134,7 @@ export default function ReferralClaimsPage() {
                         <TableRow>
                             <TableHead>User</TableHead>
                             <TableHead>Amount (LKR)</TableHead>
-                            <TableHead>Campaign</TableHead>
+                            <TableHead>Campaign/Task</TableHead>
                             <TableHead>Type</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
@@ -127,7 +149,19 @@ export default function ReferralClaimsPage() {
                                     </Link>
                                 </TableCell>
                                 <TableCell>{claim.amount.toFixed(2)}</TableCell>
-                                <TableCell>{claim.campaignTitle}</TableCell>
+                                <TableCell>
+                                    {claim.campaignTitle}
+                                    {claim.type === 'referee' && claim.answer && (
+                                         <Accordion type="single" collapsible className="w-full max-w-xs">
+                                            <AccordionItem value="item-1" className="border-b-0">
+                                                <AccordionTrigger className="py-1 text-xs">View Submitted Answer</AccordionTrigger>
+                                                <AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md">
+                                                {claim.answer}
+                                                </AccordionContent>
+                                            </AccordionItem>
+                                        </Accordion>
+                                    )}
+                                </TableCell>
                                 <TableCell><Badge variant="secondary" className="capitalize">{claim.type}</Badge></TableCell>
                                 <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                                 <TableCell className="text-right space-x-2">

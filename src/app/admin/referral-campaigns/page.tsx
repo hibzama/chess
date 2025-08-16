@@ -27,6 +27,7 @@ export interface CampaignTask {
     description: string;
     type: 'generic' | 'link' | 'whatsapp' | 'telegram' | 'facebook' | 'tiktok';
     link?: string;
+    buttonText?: string;
     verificationQuestion: string;
     refereeBonus: number;
 }
@@ -54,7 +55,7 @@ export default function ReferralCampaignsPage() {
         referralGoal: '10',
         referrerBonus: '100',
         isActive: true,
-        tasks: [{ id: `task_${Date.now()}`, description: '', type: 'generic', link: '', verificationQuestion: '', refereeBonus: 10 }] as CampaignTask[]
+        tasks: [{ id: `task_${Date.now()}`, description: '', type: 'generic', link: '', buttonText: 'Open Link', verificationQuestion: '', refereeBonus: 10 }] as CampaignTask[]
     });
 
     const fetchCampaigns = async () => {
@@ -83,7 +84,7 @@ export default function ReferralCampaignsPage() {
     const addTask = () => {
         setFormState(prev => ({
             ...prev,
-            tasks: [...prev.tasks, { id: `task_${Date.now()}`, description: '', type: 'generic', link: '', verificationQuestion: '', refereeBonus: 10 }]
+            tasks: [...prev.tasks, { id: `task_${Date.now()}`, description: '', type: 'generic', link: '', buttonText: 'Open Link', verificationQuestion: '', refereeBonus: 10 }]
         }));
     }
 
@@ -102,7 +103,7 @@ export default function ReferralCampaignsPage() {
             referralGoal: '10',
             referrerBonus: '100',
             isActive: true,
-            tasks: [{ id: `task_${Date.now()}`, description: '', type: 'generic', link: '', verificationQuestion: '', refereeBonus: 10 }]
+            tasks: [{ id: `task_${Date.now()}`, description: '', type: 'generic', link: '', buttonText: 'Open Link', verificationQuestion: '', refereeBonus: 10 }]
         });
         setEditingCampaign(null);
     };
@@ -118,7 +119,8 @@ export default function ReferralCampaignsPage() {
             tasks: formState.tasks.map(task => ({
                 ...task, 
                 refereeBonus: Number(task.refereeBonus),
-                link: isLinkRequired(task.type) ? task.link : ''
+                link: isLinkRequired(task.type) ? task.link : '',
+                buttonText: isLinkRequired(task.type) ? (task.buttonText || 'Open Link') : ''
             })),
             referralGoal: Number(formState.referralGoal),
             referrerBonus: Number(formState.referrerBonus),
@@ -147,7 +149,7 @@ export default function ReferralCampaignsPage() {
         setEditingCampaign(campaign);
         setFormState({
             title: campaign.title,
-            tasks: campaign.tasks.map(t => ({...t, link: t.link || ''})), // ensure link is not undefined
+            tasks: campaign.tasks.map(t => ({...t, link: t.link || '', buttonText: t.buttonText || 'Open Link' })), // ensure fields are not undefined
             referralGoal: String(campaign.referralGoal),
             referrerBonus: String(campaign.referrerBonus),
             isActive: campaign.isActive,
@@ -208,7 +210,10 @@ export default function ReferralCampaignsPage() {
                                     </Select>
                                     <Textarea value={task.description} onChange={e => handleTaskChange(index, 'description', e.target.value)} placeholder={`e.g., Join our official group.`} required/>
                                     {isLinkRequired(task.type) && (
+                                        <>
                                         <Input value={task.link} onChange={e => handleTaskChange(index, 'link', e.target.value)} placeholder={`e.g., https://chat.whatsapp.com/...`} required/>
+                                        <Input value={task.buttonText} onChange={e => handleTaskChange(index, 'buttonText', e.target.value)} placeholder={`e.g., Join Group`} required/>
+                                        </>
                                     )}
                                     <Input value={task.verificationQuestion} onChange={e => handleTaskChange(index, 'verificationQuestion', e.target.value)} placeholder={`e.g., What is your WhatsApp number?`} required/>
                                     <div className="space-y-1">
