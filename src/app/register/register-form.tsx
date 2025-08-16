@@ -51,6 +51,7 @@ export default function RegisterForm() {
         const country = target.country.value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
+        const aref = searchParams.get('aref'); // New referral for bonus
         
         if (password !== confirmPassword) {
             toast({
@@ -122,10 +123,15 @@ export default function RegisterForm() {
                 role: 'user',
                 createdAt: serverTimestamp(),
                 l1Count: 0,
+                bonusReferralCount: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
                 emailVerified: true, // Allow login by default
             };
+            
+            if (aref) {
+                userData.bonusReferredBy = aref;
+            }
             
             const directReferrerId = mref || ref;
             if (directReferrerId) {

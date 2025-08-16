@@ -124,7 +124,7 @@ export default function AdminLayout({
                              <Link href="/admin/proxy-detection"><SidebarMenuButton tooltip="Proxy/VPN Users" isActive={isActive('/admin/proxy-detection')}><ShieldAlert /><span>Proxy/VPN Users</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/bonus"><SidebarMenuButton tooltip="Signup Bonus" isActive={isActive('/admin/bonus') && !pathname.includes('deposit') && !pathname.includes('daily') && !pathname.includes('referral')}><Gift /><span>Signup Bonus</span></SidebarMenuButton></Link>
+                             <Link href="/admin/bonus/page.tsx"><SidebarMenuButton tooltip="Signup Bonus" isActive={isActive('/admin/bonus') && !pathname.includes('deposit') && !pathname.includes('daily') && !pathname.includes('referral')}><Gift /><span>Signup Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                              <Link href="/admin/bonus/deposit-bonus"><SidebarMenuButton tooltip="Deposit Bonus" isActive={isActive('/admin/bonus/deposit-bonus')}><PercentCircle /><span>Deposit Bonus</span></SidebarMenuButton></Link>
@@ -178,4 +178,3 @@ export default function AdminLayout({
     )
   }
 
-    

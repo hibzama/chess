@@ -7,6 +7,30 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 admin.initializeApp();
 const cors = require('cors')({origin: true});
 
+// This function triggers whenever a new user document is created
+export const onUserCreate = functions.firestore
+  .document("users/{userId}")
+  .onCreate(async (snap, context) => {
+    const newUser = snap.data();
+    
+    // Increment the referrer's count if 'bonusReferredBy' exists
+    if (newUser.bonusReferredBy) {
+        const referrerId = newUser.bonusReferredBy;
+        const referrerRef = admin.firestore().collection('users').doc(referrerId);
+        
+        try {
+            await referrerRef.update({
+                bonusReferralCount: admin.firestore.FieldValue.increment(1)
+            });
+            functions.logger.log(`Incremented bonusReferralCount for user ${referrerId}`);
+        } catch (error) {
+            functions.logger.error(`Failed to increment bonusReferralCount for user ${referrerId}:`, error);
+        }
+    }
+
+    return null;
+  });
+
 // This function triggers whenever a new document is created in 'game_rooms'
 export const announceNewGame = functions.firestore
   .document("game_rooms/{roomId}")
