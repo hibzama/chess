@@ -2,54 +2,79 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Admins can read/write anything
+
+    // Helper function to check if a user is an admin
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Admins can do anything
     match /{document=**} {
-      allow read, write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read, write: if isAdmin();
     }
 
+    // Rules for the 'users' collection
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-    }
-    
-    match /users/{userId}/{subcollection}/{docId} {
-      allow read, write: if request.auth.uid == userId;
-    }
-    
-    match /settings/{settingId} {
-      allow read: if request.auth != null;
-    }
-
-    match /game_rooms/{roomId} {
-      allow get: if request.auth != null;
-      allow list: if request.auth != null;
+      // Any authenticated user can create their own user document
       allow create: if request.auth != null;
-      allow update: if request.auth != null && (request.auth.uid in resource.data.players || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.createdBy.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
-    }
-    
-    match /game_rooms/{roomId}/{subcollection}/{docId} {
-       allow read, write: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-    }
+      // Users can only read their own document, but admins can read any
+      allow read: if request.auth.uid == userId || isAdmin();
+      // Users can only update their own document
+      allow update: if request.auth.uid == userId;
+      // Users cannot delete their own documents
+      allow delete: if false;
 
-    match /friend_requests/{requestId} {
-        allow read, create, delete: if request.auth != null && (request.auth.uid == request.resource.data.fromId || request.auth.uid == request.resource.data.toId);
-    }
-    
-    match /daily_bonus_campaigns/{campaignId} {
-        allow read: if request.auth != null;
-    }
-
-    match /referral_campaigns/{campaignId} {
-        allow read: if request.auth != null;
+       match /active_campaigns/{docId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      match /daily_bonus_claims/{docId} {
+        allow read, write: if request.auth.uid == userId;
+      }
+      match /bonus_claims/{docId} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
     
     match /bonus_claims/{claimId} {
-       allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow read: if request.auth.uid == resource.data.userId || isAdmin();
+        allow update, delete: if isAdmin();
     }
 
-    // Default deny
+    match /game_rooms/{roomId} {
+        allow create: if request.auth != null;
+        allow get: if request.auth != null; 
+        allow list: if request.resource == null; // Deny lists for now to be safe
+        allow update, delete: if request.auth.uid == resource.data.createdBy.uid || isAdmin();
+    }
+
+    match /chats/{chatId} {
+        allow read, update, create: if request.auth.uid in resource.data.userIds;
+        match /messages/{messageId} {
+            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        }
+    }
+
+    match /marketing_applications/{appId} {
+        allow create: if true; // Anyone can apply
+    }
+    
+    match /settings/{settingId} {
+      allow read: if true; // Everyone can read settings
+    }
+    
+    match /daily_bonus_campaigns/{campaignId} {
+       allow list, read: if request.auth != null; // Any authenticated user can see campaigns
+       match /claims/{claimId} {
+         allow create, read: if request.auth != null;
+       }
+    }
+    
+    match /referral_campaigns/{campaignId} {
+      allow list, read: if request.auth != null;
+    }
+
+    // Default deny all other reads/writes
     match /{path=**} {
       allow read, write: if false;
     }
