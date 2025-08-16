@@ -38,7 +38,7 @@ export default function ReferralClaimsPage() {
 
     useEffect(() => {
         // Listener for pending claims
-        const qPending = query(collectionGroup(db, 'bonus_claims'), where('status', '==', 'pending'));
+        const qPending = query(collectionGroup(db, 'bonus_claims'), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
         const unsubscribePending = onSnapshot(qPending, async (snapshot) => {
             const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
                 const data = claimDoc.data() as BonusClaim;
