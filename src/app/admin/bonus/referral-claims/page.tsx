@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, limit, collectionGroup } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,7 @@ export default function ReferralClaimsPage() {
 
     useEffect(() => {
         // Listener for pending claims
-        const qPending = query(collection(db, 'bonus_claims'), where('status', '==', 'pending'));
+        const qPending = query(collectionGroup(db, 'bonus_claims'), where('status', '==', 'pending'));
         const unsubscribePending = onSnapshot(qPending, async (snapshot) => {
             const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
                 const data = claimDoc.data() as BonusClaim;
@@ -73,7 +73,7 @@ export default function ReferralClaimsPage() {
         });
         
         // Listener for history claims
-        const qHistory = query(collection(db, 'bonus_claims'), where('status', 'in', ['approved', 'rejected']), orderBy('createdAt', 'desc'), limit(50));
+        const qHistory = query(collectionGroup(db, 'bonus_claims'), where('status', 'in', ['approved', 'rejected']), orderBy('createdAt', 'desc'), limit(50));
         const unsubscribeHistory = onSnapshot(qHistory, async (snapshot) => {
             const claimsDataPromises = snapshot.docs.map(async (claimDoc) => {
                 const data = claimDoc.data() as BonusClaim;
