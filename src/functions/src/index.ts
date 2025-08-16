@@ -128,7 +128,7 @@ export const joinGame = onCall(async (request) => {
             const creatorData = creatorDoc.data()!;
             const joinerData = joinerDoc.data()!;
 
-            const creatorFundingWallet = creatorData.primaryWallet || 'main';
+            const creatorFundingWallet = roomData.createdBy.fundingWallet || 'main';
             const joinerFundingWallet = fundingWallet;
 
             const creatorBalance = creatorFundingWallet === 'main' ? (creatorData.balance || 0) : (creatorData.bonusBalance || 0);
@@ -160,24 +160,14 @@ export const joinGame = onCall(async (request) => {
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
             
-            const updatedCreatorData = {
-                ...roomData.createdBy,
-                fundingWallet: creatorFundingWallet,
-                wagerFromMain: creatorWagerFromMain,
-                wagerFromBonus: creatorWagerFromBonus,
-            };
-
             transaction.update(roomRef, {
                 status: 'in-progress',
-                createdBy: updatedCreatorData,
                 player2: {
                     uid: joinerId,
                     name: `${joinerData.firstName} ${joinerData.lastName}`,
                     color: joinerColor,
                     photoURL: joinerData.photoURL || '',
                     fundingWallet: joinerFundingWallet,
-                    wagerFromMain: joinerWagerFromMain,
-                    wagerFromBonus: joinerWagerFromBonus,
                 },
                 players: admin.firestore.FieldValue.arrayUnion(joinerId),
                 turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
@@ -185,46 +175,42 @@ export const joinGame = onCall(async (request) => {
         });
 
         // Handle referral task updates outside of the main transaction for safety
-        const creatorDoc = await db.collection('users').doc(creatorId).get();
-        const joinerDocAfterUpdate = await db.collection('users').doc(joinerId).get();
+        const creatorId = (await db.collection('game_rooms').doc(roomId).get()).data()!.createdBy.uid;
+        const playersForTaskCheck = [
+            {id: creatorId, data: (await db.collection('users').doc(creatorId).get()).data()}, 
+            {id: joinerId, data: (await db.collection('users').doc(joinerId).get()).data()}
+        ];
 
-        if (creatorDoc.exists() && joinerDocAfterUpdate.exists()) {
-            const playersForTaskCheck = [
-                {id: creatorId, data: creatorDoc.data()}, 
-                {id: joinerId, data: joinerDocAfterUpdate.data()}
-            ];
-
-            const batch = db.batch();
-            for(const player of playersForTaskCheck) {
-                if (player.data && player.data.activeReferralTaskId) {
-                    const taskRef = db.collection('referral_tasks').doc(player.data.activeReferralTaskId);
-                    const taskDoc = await taskRef.get();
-                    if (taskDoc.exists) {
-                        const taskData = taskDoc.data();
-                        if (taskData) {
-                            const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
-                            if (gamePlaySubTask && gamePlaySubTask.target > 0) {
-                                const userToUpdateRef = db.collection('users').doc(player.id);
-                                const currentProgress = player.data.taskStatus?.[player.data.activeReferralTaskId]?.[gamePlaySubTask.id]?.progress || 0;
-                                const newProgress = currentProgress + 1;
-                                
-                                batch.set(userToUpdateRef, {
-                                    taskStatus: {
-                                        [player.data.activeReferralTaskId]: {
-                                            [gamePlaySubTask.id]: {
-                                                progress: newProgress,
-                                                status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
-                                            }
+        const batch = db.batch();
+        for(const player of playersForTaskCheck) {
+            if (player.data && player.data.activeReferralTaskId) {
+                const taskRef = db.collection('referral_tasks').doc(player.data.activeReferralTaskId);
+                const taskDoc = await taskRef.get();
+                if (taskDoc.exists) {
+                    const taskData = taskDoc.data();
+                    if (taskData) {
+                        const gamePlaySubTask = taskData.subTasks.find((st: any) => st.type === 'game_play');
+                        if (gamePlaySubTask && gamePlaySubTask.target > 0) {
+                            const userToUpdateRef = db.collection('users').doc(player.id);
+                            const currentProgress = player.data.taskStatus?.[player.data.activeReferralTaskId]?.[gamePlaySubTask.id]?.progress || 0;
+                            const newProgress = currentProgress + 1;
+                            
+                            batch.set(userToUpdateRef, {
+                                taskStatus: {
+                                    [player.data.activeReferralTaskId]: {
+                                        [gamePlaySubTask.id]: {
+                                            progress: newProgress,
+                                            status: newProgress >= Number(gamePlaySubTask.target) ? 'completed' : 'pending'
                                         }
                                     }
-                                }, { merge: true });
-                            }
+                                }
+                            }, { merge: true });
                         }
                     }
                 }
             }
-            await batch.commit();
         }
+        await batch.commit();
 
         return { success: true };
 
@@ -335,20 +321,16 @@ export const endGame = onCall(async (request) => {
             
             for(const p of playersPayoutData) {
                 if (p.payout > 0) {
-                    const wageredFromMain = p.wagerInfo.wagerFromMain || 0;
-                    const wageredFromBonus = p.wagerInfo.wagerFromBonus || 0;
-                    
-                    const profit = p.payout - (wageredFromMain + wageredFromBonus);
+                    const fundingWallet = p.wagerInfo.fundingWallet || 'main';
+                    const profit = p.payout - wager;
                     const updatePayload: {[key: string]: admin.firestore.FieldValue} = {};
 
-                    if (wageredFromMain > 0) {
-                         // Player used main wallet, so all winnings go to main wallet
+                    if (fundingWallet === 'main') {
                          updatePayload.balance = admin.firestore.FieldValue.increment(p.payout);
-                    } else if (wageredFromBonus > 0) {
-                        // Player used bonus wallet
+                    } else if (fundingWallet === 'bonus') {
                         if (profit > 0) {
                             // Return original stake to bonus wallet, profit to main wallet
-                            updatePayload.bonusBalance = admin.firestore.FieldValue.increment(wageredFromBonus);
+                            updatePayload.bonusBalance = admin.firestore.FieldValue.increment(wager);
                             updatePayload.balance = admin.firestore.FieldValue.increment(profit);
                         } else {
                             // It's a refund (draw/resign), so return the payout to bonus wallet
