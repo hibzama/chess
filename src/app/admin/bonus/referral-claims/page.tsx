@@ -80,7 +80,7 @@ export default function ReferralClaimsPage() {
         const unsubscribePending = onSnapshot(pendingQuery, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
             setPendingClaims(claims);
-            setLoading(false);
+            if(loading) setLoading(false);
         }, handleError);
 
         // Listener for history claims
@@ -95,7 +95,7 @@ export default function ReferralClaimsPage() {
             unsubscribePending();
             unsubscribeHistory();
         };
-    }, [toast]);
+    }, [toast, loading]);
 
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
         const claimRef = doc(db, 'bonus_claims', claim.id);
@@ -181,7 +181,7 @@ export default function ReferralClaimsPage() {
                         )}
                     </TabsContent>
                     <TabsContent value="history">
-                         {loading ? <p>Loading history...</p> : historyClaims.length === 0 ? <p className="text-center py-8">No claim history found.</p> : (
+                         {historyClaims.length === 0 ? <p className="text-center py-8">No claim history found.</p> : (
                         <Table>
                             <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Campaign</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
