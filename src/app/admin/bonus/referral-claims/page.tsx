@@ -1,8 +1,8 @@
 
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collectionGroup, query, where, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy } from 'firebase/firestore';
+import { collectionGroup, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 interface BonusClaim {
     id: string;
@@ -61,8 +61,7 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
 }
 
 export default function ReferralClaimsPage() {
-    const [pendingClaims, setPendingClaims] = useState<BonusClaim[]>([]);
-    const [historyClaims, setHistoryClaims] = useState<BonusClaim[]>([]);
+    const [allClaims, setAllClaims] = useState<BonusClaim[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
@@ -70,41 +69,27 @@ export default function ReferralClaimsPage() {
         setLoading(true);
         const handleError = (error: Error, type: string) => {
             console.error(`Error fetching ${type} claims:`, error);
-            toast({ variant: 'destructive', title: `Error fetching ${type} claims.`, description: error.message });
+            toast({ variant: 'destructive', title: `Error fetching claims.`, description: error.message });
         };
         
-        const pendingQuery = query(
+        const q = query(
             collectionGroup(db, 'bonus_claims'),
-            where('status', '==', 'pending'),
-            orderBy('createdAt', 'asc')
+            orderBy('createdAt', 'desc')
         );
 
-        const historyQuery = query(
-            collectionGroup(db, 'bonus_claims'),
-            where('status', 'in', ['approved', 'rejected']),
-            orderBy('createdAt', 'asc')
-        );
-        
-        const unsubPending = onSnapshot(pendingQuery, async (snapshot) => {
+        const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setPendingClaims(claims.reverse());
+            setAllClaims(claims);
             setLoading(false);
-        }, (err) => handleError(err, 'pending'));
-
-        const unsubHistory = onSnapshot(historyQuery, async (snapshot) => {
-            const claims = await enrichClaims(snapshot);
-            setHistoryClaims(claims.reverse());
-        }, (err) => handleError(err, 'history'));
-
-        return () => {
-            unsubPending();
-            unsubHistory();
-        };
+        }, (err) => handleError(err, 'all'));
+        
+        return () => unsubscribe();
     }, [toast]);
+
+    const pendingClaims = useMemo(() => allClaims.filter(c => c.status === 'pending'), [allClaims]);
+    const historyClaims = useMemo(() => allClaims.filter(c => c.status !== 'pending'), [allClaims]);
     
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
-        // This is tricky with collectionGroup. We need the full path to the document.
-        // For simplicity, let's assume claims are under the user who receives the bonus.
         const claimRef = doc(db, 'users', claim.userId, 'bonus_claims', claim.id);
         const userRef = doc(db, 'users', claim.userId);
         
@@ -144,8 +129,6 @@ export default function ReferralClaimsPage() {
 
         } catch (error: any) {
             console.error("Error processing claim: ", error);
-            // This is a common error if the claim document isn't where we expect it.
-            // A more robust solution might involve querying for the doc path first.
             if(error.message.includes('No document to update')){
                  toast({ variant: 'destructive', title: "Error", description: `Could not locate the claim document. This might be a data structure issue.` });
             } else {
@@ -153,6 +136,59 @@ export default function ReferralClaimsPage() {
             }
         }
     };
+    
+    const renderTable = (claims: BonusClaim[], type: 'pending' | 'history') => {
+        if (loading) {
+            return <div className="flex justify-center items-center h-24"><Loader2 className="animate-spin text-primary" /></div>;
+        }
+        if (claims.length === 0) {
+            return <p className="text-center py-8 text-muted-foreground">No {type} claims found.</p>;
+        }
+        
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Campaign/Task</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">{type === 'pending' ? 'Actions' : 'Status'}</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {claims.map((claim) => (
+                        <TableRow key={claim.id}>
+                            <TableCell><Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary">{claim.userName}</Link></TableCell>
+                            <TableCell>{claim.amount.toFixed(2)}</TableCell>
+                            <TableCell>
+                                {claim.campaignTitle}
+                                {claim.type === 'referee' && claim.answer && (
+                                    <Accordion type="single" collapsible className="w-full max-w-xs"><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="py-1 text-xs">View Submitted Answer</AccordionTrigger><AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md">{claim.answer}</AccordionContent></AccordionItem></Accordion>
+                                )}
+                            </TableCell>
+                            <TableCell><Badge variant="secondary" className="capitalize">{claim.type}</Badge></TableCell>
+                            <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
+                            <TableCell className="text-right">
+                                {type === 'pending' ? (
+                                    <div className="space-x-2">
+                                        <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button>
+                                    </div>
+                                ) : (
+                                    <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">
+                                        {claim.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                                        <span className="capitalize">{claim.status}</span>
+                                    </Badge>
+                                )}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        )
+    }
     
     return (
         <Card>
@@ -163,58 +199,14 @@ export default function ReferralClaimsPage() {
             <CardContent>
                 <Tabs defaultValue="pending">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="pending">Pending</TabsTrigger>
-                        <TabsTrigger value="history">History</TabsTrigger>
+                        <TabsTrigger value="pending">Pending ({loading ? '...' : pendingClaims.length})</TabsTrigger>
+                        <TabsTrigger value="history">History ({loading ? '...' : historyClaims.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="pending">
-                        {loading ? <p>Loading claims...</p> : pendingClaims.length === 0 ? <p className="text-center py-8">No pending claims found.</p> : (
-                        <Table>
-                            <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Campaign/Task</TableHead><TableHead>Type</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {pendingClaims.map((claim) => (
-                                <TableRow key={claim.id}>
-                                    <TableCell><Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary">{claim.userName}</Link></TableCell>
-                                    <TableCell>{claim.amount.toFixed(2)}</TableCell>
-                                    <TableCell>
-                                        {claim.campaignTitle}
-                                        {claim.type === 'referee' && claim.answer && (
-                                            <Accordion type="single" collapsible className="w-full max-w-xs"><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="py-1 text-xs">View Submitted Answer</AccordionTrigger><AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md">{claim.answer}</AccordionContent></AccordionItem></Accordion>
-                                        )}
-                                    </TableCell>
-                                    <TableCell><Badge variant="secondary" className="capitalize">{claim.type}</Badge></TableCell>
-                                    <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
-                                    <TableCell className="text-right space-x-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button>
-                                    </TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                        )}
+                        {renderTable(pendingClaims, 'pending')}
                     </TabsContent>
                     <TabsContent value="history">
-                         {loading ? <p>Loading history...</p> : historyClaims.length === 0 ? <p className="text-center py-8">No claim history found.</p> : (
-                        <Table>
-                            <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Campaign</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {historyClaims.map((claim) => (
-                                <TableRow key={claim.id}>
-                                    <TableCell>{claim.userName}</TableCell>
-                                    <TableCell>{claim.amount.toFixed(2)}</TableCell>
-                                    <TableCell>{claim.campaignTitle}</TableCell>
-                                    <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit">
-                                            {claim.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                                            <span className="capitalize">{claim.status}</span>
-                                        </Badge>
-                                    </TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                         )}
+                        {renderTable(historyClaims, 'history')}
                     </TabsContent>
                 </Tabs>
             </CardContent>

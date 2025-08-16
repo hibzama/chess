@@ -14,21 +14,22 @@
           "order": "ASCENDING"
         }
       ]
-    },
+    }
+  ],
+  "fieldOverrides": [
     {
       "collectionGroup": "bonus_claims",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
+      "fieldPath": "createdAt",
+      "indexes": [
         {
-          "fieldPath": "status",
-          "order": "ASCENDING"
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
         },
         {
-          "fieldPath": "createdAt",
-          "order": "ASCENDING"
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
         }
       ]
     }
-  ],
-  "fieldOverrides": []
+  ]
 }
