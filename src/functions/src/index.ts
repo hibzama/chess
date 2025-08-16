@@ -268,13 +268,6 @@ export const endGame = onCall(async (request) => {
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
             
-            const creatorDoc = await transaction.get(creatorRef);
-            const joinerDoc = await transaction.get(joinerRef);
-
-            if (!creatorDoc.exists() || !joinerDoc.exists()) {
-                throw new HttpsError('not-found', 'One or both players could not be found.');
-            }
-
             let creatorPayout = 0;
             let joinerPayout = 0;
             
@@ -284,19 +277,12 @@ export const endGame = onCall(async (request) => {
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
             } else if (method === 'resign' && resignerDetails && typeof resignerDetails.resignerPieceCount === 'number') {
-                let opponentPayoutRate = 1.05;
-                if(wager >= 500) opponentPayoutRate = 1.30;
-                else if(wager >= 250) opponentPayoutRate = 1.25;
-                else if(wager >= 100) opponentPayoutRate = 1.15;
-                else opponentPayoutRate = 1.10;
-
-                let resignerRefundRate = 0.75;
-                 if(wager >= 100) {
-                    if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
-                    else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
-                    else resignerRefundRate = 0.25;
-                 }
-
+                let opponentPayoutRate = 1.30;
+                
+                let resignerRefundRate = 0;
+                if (resignerDetails.resignerPieceCount >= 6) resignerRefundRate = 0.50;
+                else if (resignerDetails.resignerPieceCount >= 3) resignerRefundRate = 0.35;
+                else resignerRefundRate = 0.25;
 
                 winnerObject.resignerId = resignerDetails.id;
                 winnerObject.resignerPieceCount = resignerDetails.resignerPieceCount;
