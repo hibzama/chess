@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, limit, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ interface BonusClaim {
     refereeId?: string; 
     referrerId?: string;
     campaignId?: string;
-    answer?: string; // The user's submitted answer for verification
+    answer?: string;
 }
 
 async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
@@ -61,41 +61,47 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
 }
 
 export default function ReferralClaimsPage() {
-    const [allClaims, setAllClaims] = useState<BonusClaim[]>([]);
+    const [pendingClaims, setPendingClaims] = useState<BonusClaim[]>([]);
+    const [historyClaims, setHistoryClaims] = useState<BonusClaim[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
     useEffect(() => {
         setLoading(true);
-
-        const handleError = (error: any) => {
-             console.error("Error fetching claims:", error);
-             setLoading(false);
-             toast({ variant: 'destructive', title: 'Error fetching claims data.', description: `The query requires an index. You can create it here: ${error.message.substring(error.message.indexOf('https'))}` });
-        }
+        const handleError = (error: Error, type: string) => {
+            console.error(`Error fetching ${type} claims:`, error);
+            toast({ variant: 'destructive', title: `Error fetching ${type} claims.`, description: error.message });
+        };
         
-        // Fetch all bonus claims sorted by date. We will filter client-side.
-        // This is a more robust query that is less likely to fail due to complex indexes.
-        const claimsQuery = query(
-            collectionGroup(db, 'bonus_claims'),
-            orderBy('createdAt', 'desc'),
-            limit(100) // Limit to the last 100 claims for performance
+        const pendingQuery = query(
+            collection(db, 'bonus_claims'),
+            where('status', '==', 'pending'),
+            orderBy('createdAt', 'desc')
+        );
+
+        const historyQuery = query(
+            collection(db, 'bonus_claims'),
+            where('status', 'in', ['approved', 'rejected']),
+            orderBy('createdAt', 'desc')
         );
         
-        const unsubscribe = onSnapshot(claimsQuery, async (snapshot) => {
+        const unsubPending = onSnapshot(pendingQuery, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setAllClaims(claims);
+            setPendingClaims(claims);
             setLoading(false);
-        }, handleError);
+        }, (err) => handleError(err, 'pending'));
 
+        const unsubHistory = onSnapshot(historyQuery, async (snapshot) => {
+            const claims = await enrichClaims(snapshot);
+            setHistoryClaims(claims);
+        }, (err) => handleError(err, 'history'));
 
-        return () => unsubscribe();
+        return () => {
+            unsubPending();
+            unsubHistory();
+        };
     }, [toast]);
     
-    const pendingClaims = allClaims.filter(claim => claim.status === 'pending');
-    const historyClaims = allClaims.filter(claim => claim.status !== 'pending');
-
-
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
         const claimRef = doc(db, 'bonus_claims', claim.id);
         const userRef = doc(db, 'users', claim.userId);
@@ -180,7 +186,7 @@ export default function ReferralClaimsPage() {
                         )}
                     </TabsContent>
                     <TabsContent value="history">
-                         {historyClaims.length === 0 ? <p className="text-center py-8">No claim history found.</p> : (
+                         {loading ? <p>Loading history...</p> : historyClaims.length === 0 ? <p className="text-center py-8">No claim history found.</p> : (
                         <Table>
                             <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Amount</TableHead><TableHead>Campaign</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                             <TableBody>
@@ -206,4 +212,5 @@ export default function ReferralClaimsPage() {
             </CardContent>
         </Card>
     );
-}
+
+  
