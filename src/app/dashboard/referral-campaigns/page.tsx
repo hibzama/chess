@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, doc, getDocs, onSnapshot, query, setDoc, where, writeBatch, serverTimestamp, getDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { collection, doc, getDocs, onSnapshot, query, setDoc, where, writeBatch, serverTimestamp, getDoc, deleteDoc, orderBy, addDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,7 @@ interface ClaimHistory {
     amount: number;
     description: string;
     createdAt: any;
+    status: string;
 }
 
 export default function UserCampaignsPage() {
@@ -98,16 +99,14 @@ export default function UserCampaignsPage() {
 
          // Fetch claim history
         const claimQuery = query(
-            collection(db, 'transactions'), 
-            where('userId', '==', user.uid)
+            collection(db, 'bonus_claims'), 
+            where('userId', '==', user.uid),
+            where('type', '==', 'referrer'),
+            orderBy('createdAt', 'desc')
         );
         const unsubHistory = onSnapshot(claimQuery, (snapshot) => {
-            const allTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}));
-            const bonusHistory = allTransactions
-                .filter(tx => tx.type === 'bonus' && tx.description !== 'Deposit Bonus')
-                .sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
-
-            setClaimHistory(bonusHistory as ClaimHistory[]);
+            const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}) as ClaimHistory);
+            setClaimHistory(history);
         });
 
         return () => {
@@ -165,27 +164,22 @@ export default function UserCampaignsPage() {
         if (!user || !activeUserCampaign || !campaignDetails) return;
         
         try {
-            await runTransaction(db, async (transaction) => {
-                const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
-                const userCampaignDoc = await transaction.get(userCampaignRef);
-
-                if(!userCampaignDoc.exists() || userCampaignDoc.data()?.claimed) {
-                    throw new Error("Reward already claimed or campaign not active.");
-                }
-
-                const userRef = doc(db, 'users', user.uid);
-                const transactionRef = doc(collection(db, 'transactions'));
-                
-                transaction.update(userRef, { balance: increment(campaignDetails.referrerBonus) });
-                transaction.set(transactionRef, {
-                    userId: user.uid, type: 'bonus', amount: campaignDetails.referrerBonus,
-                    status: 'completed', description: `Referral Campaign: ${campaignDetails.title}`,
-                    createdAt: serverTimestamp()
-                });
-                transaction.update(userCampaignRef, { claimed: true });
+            await addDoc(collection(db, 'bonus_claims'), {
+                userId: user.uid,
+                type: 'referrer',
+                amount: campaignDetails.referrerBonus,
+                status: 'pending',
+                campaignId: campaignDetails.id,
+                campaignTitle: `Campaign Completion: ${campaignDetails.title}`,
+                createdAt: serverTimestamp(),
+            });
+            
+            // Mark the local campaign as completed so user cannot claim again until this is processed
+            await updateDoc(doc(db, 'users', user.uid, 'active_campaigns', 'current'), {
+                completed: true
             });
 
-            toast({ title: "Reward Claimed!", description: `LKR ${campaignDetails.referrerBonus} has been added to your balance.` });
+            toast({ title: "Reward Claim Submitted!", description: `Your claim for LKR ${campaignDetails.referrerBonus} is pending admin approval.` });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Claim Failed", description: error.message });
         }
@@ -198,7 +192,8 @@ export default function UserCampaignsPage() {
     
     const validReferrals = referrals.filter(r => campaignDetails && r.campaignInfo.completedTasks.length === campaignDetails.tasks.length);
     const progress = campaignDetails ? (validReferrals.length / campaignDetails.referralGoal) * 100 : 0;
-    const isCampaignComplete = campaignDetails && validReferrals.length >= campaignDetails.referralGoal;
+    const isCampaignGoalMet = campaignDetails && validReferrals.length >= campaignDetails.referralGoal;
+    const hasPendingOrClaimed = activeUserCampaign?.completed || activeUserCampaign?.claimed;
 
     if (loading) {
         return <div className="space-y-4"> <Skeleton className="h-32 w-full" /> <Skeleton className="h-64 w-full" /> </div>
@@ -243,18 +238,19 @@ export default function UserCampaignsPage() {
                  </TabsContent>
                  <TabsContent value="history">
                      <Card>
-                        <CardHeader><CardTitle>Bonus History</CardTitle><CardDescription>Your claimed bonuses from referral campaigns.</CardDescription></CardHeader>
+                        <CardHeader><CardTitle>Bonus History</CardTitle><CardDescription>Your bonus claims from referral campaigns.</CardDescription></CardHeader>
                         <CardContent>
                             <Table>
-                                <TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead></TableRow></TableHeader>
+                                <TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
                                     {claimHistory.length > 0 ? claimHistory.map(claim => (
                                         <TableRow key={claim.id}>
                                             <TableCell>{claim.description}</TableCell>
-                                            <TableCell className="text-green-400 font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
+                                            <TableCell className="font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
                                             <TableCell>{claim.createdAt ? format(claim.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
+                                            <TableCell><Badge variant={claim.status === 'approved' ? 'default' : claim.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{claim.status}</Badge></TableCell>
                                         </TableRow>
-                                    )) : <TableRow><TableCell colSpan={3} className="text-center h-24">No history found.</TableCell></TableRow>}
+                                    )) : <TableRow><TableCell colSpan={4} className="text-center h-24">No history found.</TableCell></TableRow>}
                                 </TableBody>
                             </Table>
                         </CardContent>
@@ -270,13 +266,13 @@ export default function UserCampaignsPage() {
                 <CardHeader>
                     <CardTitle className="flex justify-between items-start">
                         <span className="flex-1">Your Active Campaign: {campaignDetails.title}</span>
-                         {isCampaignComplete && !activeUserCampaign.claimed && (
+                         {isCampaignGoalMet && !hasPendingOrClaimed && (
                             <Button onClick={handleClaimReward} className="bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg animate-pulse">
                                 <Award className="mr-2"/> Claim Reward: LKR {campaignDetails.referrerBonus}
                             </Button>
                         )}
-                        {isCampaignComplete && activeUserCampaign.claimed && (
-                            <Badge variant="secondary" className="bg-green-500/20 text-green-400 text-base py-1 px-3"><Check className="mr-2"/> Reward Claimed</Badge>
+                        {hasPendingOrClaimed && (
+                            <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-400 text-base py-1 px-3"><Check className="mr-2"/> Claim Pending/Submitted</Badge>
                         )}
                     </CardTitle>
                     <CardDescription>Share your link and track your progress below.</CardDescription>
@@ -289,12 +285,7 @@ export default function UserCampaignsPage() {
                         </div>
                          <div className="p-4 bg-background/50 rounded-lg space-y-2">
                             <h4 className="font-semibold text-primary flex items-center gap-2"><Users/> Referrals' Goal</h4>
-                            <p className="text-muted-foreground">Each new user must complete the following tasks:</p>
-                            <ul className="list-disc pl-5 space-y-1">
-                                {campaignDetails.tasks.map(task => (
-                                    <li key={task.id}>{task.description}</li>
-                                ))}
-                            </ul>
+                            <p className="text-muted-foreground">Each new user must complete all tasks to become a valid referral.</p>
                         </div>
                     </div>
                     <div className="space-y-2">

@@ -95,15 +95,25 @@ export default function ReferralClaimsPage() {
         
         try {
             if (newStatus === 'approved') {
-                 // The new system does auto-approval, so this button is just for cleanup.
-                 // We just delete the claim doc. The user has already been paid.
-                await deleteDoc(claimRef);
-                toast({ title: "Claim Cleared", description: "This claim has been removed from the list." });
+                 await runTransaction(db, async (transaction) => {
+                    const userRef = doc(db, 'users', claim.userId);
+                    const transactionRef = doc(collection(db, 'transactions'));
+                    
+                    transaction.update(claimRef, { status: 'approved' });
+                    transaction.update(userRef, { balance: increment(claim.amount) });
+                    transaction.set(transactionRef, {
+                        userId: claim.userId,
+                        type: 'bonus',
+                        amount: claim.amount,
+                        status: 'completed',
+                        description: `Referral Bonus: ${claim.campaignTitle}`,
+                        createdAt: serverTimestamp(),
+                    });
+                });
+                toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
             } else { // Rejected
-                // For a rejection, we must find the original transaction and revert it if needed.
-                // This logic would be complex. For now, we'll just delete the claim notice.
-                await deleteDoc(claimRef);
-                toast({ title: "Claim Rejected & Cleared", description: "The claim has been removed." });
+                await updateDoc(claimRef, { status: 'rejected' });
+                toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
             }
         } catch (error: any) {
             console.error("Error processing claim: ", error);
@@ -147,8 +157,8 @@ export default function ReferralClaimsPage() {
                             <TableCell className="text-right">
                                 {type === 'pending' ? (
                                     <div className="space-x-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Clear Claim</Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject & Clear</Button>
+                                        <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button>
                                     </div>
                                 ) : (
                                     <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">
@@ -168,7 +178,7 @@ export default function ReferralClaimsPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Referral Bonus Claims</CardTitle>
-                <CardDescription>Bonuses are now paid automatically. This page is for viewing historical claims or issues.</CardDescription>
+                <CardDescription>Review and manage all bonus claims from referral campaigns.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">
