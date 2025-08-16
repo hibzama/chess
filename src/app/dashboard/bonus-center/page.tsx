@@ -49,13 +49,12 @@ export default function BonusCenterPage() {
             const now = Timestamp.now();
             const dailyQuery = query(
                 collection(db, 'daily_bonus_campaigns'),
-                where('isActive', '==', true),
-                where('startDate', '<=', now)
+                where('isActive', '==', true)
             );
             const dailySnapshot = await getDocs(dailyQuery);
             const activeCampaigns = dailySnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as DailyBonusCampaign))
-                .filter(c => c.endDate.toDate() > now.toDate());
+                .filter(c => c.endDate.toDate() > now.toDate() && c.startDate.toDate() <= now.toDate());
 
             // Check eligibility
             const eligibleCampaigns = activeCampaigns.filter(c => {

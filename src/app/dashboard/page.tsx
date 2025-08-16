@@ -48,13 +48,13 @@ function CampaignTaskAlert() {
     }
 
     return (
-        <Alert className="border-primary bg-primary/5">
+        <Alert className="mb-4 border-primary bg-primary/5">
              <Award className="h-4 w-4 text-primary" />
             <AlertTitle className="font-bold text-primary">Complete Your Task!</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
                 <p>You have a pending referral task to complete.</p>
                 <Button asChild size="sm">
-                    <Link href="/dashboard/layout">Go to Task <ArrowRight className="w-4 h-4 ml-2"/></Link>
+                    <Link href="/dashboard/referral-campaigns">Go to Task <ArrowRight className="w-4 h-4 ml-2"/></Link>
                 </Button>
             </AlertDescription>
         </Alert>
@@ -81,7 +81,7 @@ function DepositBonusAlert() {
     return (
         <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-green-400/30">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Banknote className="text-green-400"/> Deposit Bonus</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-lg"><Banknote className="text-green-400"/> Deposit Bonus</CardTitle>
                 <CardDescription>Get {bonus.percentage}% bonus on your next deposit!</CardDescription>
             </CardHeader>
             <CardContent>
@@ -104,7 +104,6 @@ function DailyBonusAlert() {
             const dailyQuery = query(
                 collection(db, 'daily_bonus_campaigns'),
                 where('isActive', '==', true),
-                where('startDate', '<=', now),
                 limit(1)
             );
             const dailySnapshot = await getDocs(dailyQuery);
@@ -127,7 +126,7 @@ function DailyBonusAlert() {
     return (
          <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-400/30">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Calendar className="text-blue-400"/> Daily Bonus</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-lg"><Calendar className="text-blue-400"/> Daily Bonus</CardTitle>
                 <CardDescription>A special bonus is available for you today!</CardDescription>
             </CardHeader>
             <CardContent>
@@ -150,7 +149,7 @@ const StatCard = ({ title, value, description, isLoading, colorClass }: { title:
             {isLoading ? (
                 <Skeleton className="h-8 w-1/2" />
             ) : (
-                <p className={cn("text-3xl font-bold", colorClass || 'text-primary')}>{value}</p>
+                <p className={cn("text-3xl font-bold", colorClass)}>{value}</p>
             )}
             {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
         </CardContent>
