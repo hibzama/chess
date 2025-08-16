@@ -156,7 +156,7 @@ function MultiplayerGame() {
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
-    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
+    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : 0;
     const hasSufficientFunds = room ? selectedWalletBalance >= room.wager : false;
 
     useEffect(() => {
@@ -324,10 +324,6 @@ function MultiplayerGame() {
                                         <RadioGroupItem value="main" id="main-wallet" />
                                         <Label htmlFor="main-wallet">Main Wallet</Label>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="bonus" id="bonus-wallet" />
-                                        <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
-                                    </div>
                                 </RadioGroup>
                                 <Card className="p-3 bg-secondary">
                                     <div className="flex items-center justify-between">
@@ -431,3 +427,5 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
+
+    

@@ -108,7 +108,6 @@ export const joinGame = onCall({ cors: true }, async (request) => {
             
             const wager = roomData.wager || 0;
             const creatorId = roomData.createdBy.uid;
-            const creatorFundingWallet = roomData.createdBy.fundingWallet || 'main';
 
             const creatorRef = db.collection('users').doc(creatorId);
             const joinerRef = db.collection('users').doc(joinerId);
@@ -123,14 +122,17 @@ export const joinGame = onCall({ cors: true }, async (request) => {
             const creatorData = creatorDoc.data()!;
             const joinerData = joinerDoc.data()!;
 
-            const creatorWalletField = 'balance';
-            const joinerWalletField = 'balance';
+            const joinerWalletField = fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
 
-            if ((creatorData[creatorWalletField] || 0) < wager) throw new HttpsError('aborted', "The room creator has insufficient funds.");
             if ((joinerData[joinerWalletField] || 0) < wager) throw new HttpsError('failed-precondition', "You have insufficient funds.");
             
-            transaction.update(creatorRef, { [creatorWalletField]: admin.firestore.FieldValue.increment(-wager) });
+            // Deduct from joiner's wallet
             transaction.update(joinerRef, { [joinerWalletField]: admin.firestore.FieldValue.increment(-wager) });
+            // Deduct from creator's wallet
+            const creatorBonusWagered = roomData.createdBy.wagerFromBonus || 0;
+            const creatorMainWagered = roomData.createdBy.wagerFromMain || 0;
+            if(creatorBonusWagered > 0) transaction.update(creatorRef, { bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered) });
+            if(creatorMainWagered > 0) transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(-creatorMainWagered) });
             
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
