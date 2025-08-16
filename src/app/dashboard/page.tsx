@@ -62,7 +62,7 @@ function CampaignTaskAlert() {
 }
 
 const StatCard = ({ title, value, description, isLoading, isNegative = false }: { title: string, value: string | number, description?: string, isLoading: boolean, isNegative?: boolean}) => (
-    <Card className="bg-card/50">
+    <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         </CardHeader>
@@ -191,9 +191,9 @@ export default function DashboardPage() {
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {mainActions.map((action) => (
           <Link href={action.href} key={action.title}>
-            <Card className="bg-card/50 hover:border-primary transition-all cursor-pointer h-full text-left p-6 flex flex-col justify-between">
+            <Card className="bg-card/80 hover:border-primary transition-all cursor-pointer h-full text-left p-6 flex flex-col justify-between backdrop-blur-sm">
                 <div>
-                  <div className="p-3 bg-primary/10 rounded-lg w-fit mb-4">
+                  <div className="w-fit mb-4">
                       <action.icon className="w-6 h-6 text-primary" />
                   </div>
                   <p className="font-semibold text-lg">{action.title}</p>
@@ -207,8 +207,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
         {secondaryActions.map((action) => (
           <Link href={action.href} key={action.title}>
-            <Card className="bg-card/50 hover:border-primary transition-all cursor-pointer h-full text-center items-center flex flex-col justify-center p-4">
-              <div className="p-3 bg-primary/10 rounded-full w-fit mb-4">
+            <Card className="bg-card/80 hover:border-primary transition-all cursor-pointer h-full text-center items-center flex flex-col justify-center p-4 backdrop-blur-sm">
+              <div className="w-fit mb-4">
                   <action.icon className="w-6 h-6 text-primary" />
               </div>
               <p className="font-semibold text-sm">{action.title}</p>
@@ -219,4 +219,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
