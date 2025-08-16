@@ -68,9 +68,9 @@ export default function UserCampaignsPage() {
         }
 
         const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
-        const unsubUserCampaign = onSnapshot(userCampaignRef, (doc) => {
-            if (doc.exists()) {
-                const userCampaignData = doc.data() as UserCampaign;
+        const unsubUserCampaign = onSnapshot(userCampaignRef, (campaignDoc) => {
+            if (campaignDoc.exists()) {
+                const userCampaignData = campaignDoc.data() as UserCampaign;
                 setActiveUserCampaign(userCampaignData);
                 getDoc(doc(db, 'referral_campaigns', userCampaignData.campaignId)).then(campaignSnap => {
                     if (campaignSnap.exists()) {
