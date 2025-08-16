@@ -38,7 +38,6 @@ type GameRoom = {
         name: string;
         color: 'w' | 'b';
         photoURL?: string;
-        fundingWallet: 'main' | 'bonus';
     };
     player2?: {
         uid: string;
@@ -167,26 +166,14 @@ function MultiplayerGame() {
         if (!roomId || !user || !room || room.status !== 'waiting') return;
     
         const roomRef = doc(db, 'game_rooms', roomId as string);
-        const userRef = doc(db, 'users', user.uid);
     
         try {
-            const batch = writeBatch(db);
-            
-            // Delete the room document
-            batch.delete(roomRef);
-
-            // Refund the wager to the correct wallet
-            if (room.wager > 0) {
-                 const refundField = room.createdBy.fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
-                 batch.update(userRef, { [refundField]: increment(room.wager) });
-            }
-
-            await batch.commit();
-
+            await deleteDoc(roomRef);
+    
             if (isAutoCancel) {
-                toast({ title: 'Room Expired', description: 'The room has been closed and your wager refunded.' });
+                toast({ title: 'Room Expired', description: 'The game room has been closed.' });
             } else {
-                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled and your wager refunded.' });
+                toast({ title: 'Room Cancelled', description: 'Your game room has been cancelled.' });
             }
             router.push(`/lobby/${room.gameType}`);
         } catch (error) {
@@ -443,5 +430,3 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
