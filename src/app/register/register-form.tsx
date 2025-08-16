@@ -139,7 +139,8 @@ export default function RegisterForm() {
                 userData.campaignInfo = {
                     campaignId: rcid,
                     referrerId: ref,
-                    taskCompleted: false,
+                    completedTasks: [],
+                    answers: {},
                 };
             }
             

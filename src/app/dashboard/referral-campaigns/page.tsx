@@ -15,13 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-
-interface Campaign {
-    id: string;
-    title: string;
-    referralGoal: number;
-    referrerBonus: number;
-}
+import { Campaign } from '@/app/admin/referral-campaigns/page';
 
 interface UserCampaign {
     campaignId: string;
@@ -35,8 +29,10 @@ interface CampaignReferral {
     firstName: string;
     lastName: string;
     phone: string;
-    taskCompleted: boolean;
-    taskAnswer?: string;
+    campaignInfo: {
+        completedTasks: string[];
+        answers: Record<string, string>;
+    }
 }
 
 export default function UserCampaignsPage() {
@@ -56,13 +52,11 @@ export default function UserCampaignsPage() {
     }, [user, activeUserCampaign]);
 
     useEffect(() => {
-        // Fetch all active campaigns
         const fetchCampaigns = async () => {
             const q = query(collection(db, 'referral_campaigns'), where('isActive', '==', true));
             const snapshot = await getDocs(q);
             setCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign)));
         };
-
         fetchCampaigns();
     }, []);
 
@@ -72,13 +66,11 @@ export default function UserCampaignsPage() {
             return;
         }
 
-        // Listen to user's active campaign
         const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
         const unsubUserCampaign = onSnapshot(userCampaignRef, (doc) => {
             if (doc.exists()) {
                 const userCampaignData = doc.data() as UserCampaign;
                 setActiveUserCampaign(userCampaignData);
-                // Fetch details of the active campaign
                 getDoc(doc(db, 'referral_campaigns', userCampaignData.campaignId)).then(campaignSnap => {
                     if (campaignSnap.exists()) {
                         setCampaignDetails({ id: campaignSnap.id, ...campaignSnap.data() } as Campaign);
@@ -97,17 +89,12 @@ export default function UserCampaignsPage() {
 
     useEffect(() => {
         if (user && activeUserCampaign) {
-            // Listen for referrals for the active campaign
             const referralsQuery = query(collection(db, 'users'), where('campaignInfo.campaignId', '==', activeUserCampaign.campaignId), where('campaignInfo.referrerId', '==', user.uid));
             const unsubReferrals = onSnapshot(referralsQuery, (snapshot) => {
                 const referralsData = snapshot.docs.map(doc => ({
                     id: doc.id,
-                    firstName: doc.data().firstName,
-                    lastName: doc.data().lastName,
-                    phone: doc.data().phone,
-                    taskCompleted: doc.data().campaignInfo.taskCompleted,
-                    taskAnswer: doc.data().campaignInfo.taskAnswer
-                }));
+                    ...doc.data()
+                } as CampaignReferral));
                 setReferrals(referralsData);
             });
             return () => unsubReferrals();
@@ -132,6 +119,18 @@ export default function UserCampaignsPage() {
             setLoading(false);
         }
     };
+    
+    const handleAbandonCampaign = async () => {
+        if (!user) return;
+        const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
+        try {
+            await deleteDoc(userCampaignRef);
+            toast({ title: "Campaign Abandoned", description: "You can now start a new campaign." });
+        } catch (e) {
+            toast({ variant: 'destructive', title: "Error", description: "Could not abandon campaign." });
+        }
+    }
+
 
     const handleClaimReward = async () => {
         if (!user || !activeUserCampaign || !campaignDetails) return;
@@ -167,8 +166,8 @@ export default function UserCampaignsPage() {
         navigator.clipboard.writeText(link);
         toast({ title: "Copied!", description: "Referral link copied to clipboard." });
     };
-
-    const validReferrals = referrals.filter(r => r.taskCompleted);
+    
+    const validReferrals = referrals.filter(r => campaignDetails && r.campaignInfo.completedTasks.length === campaignDetails.tasks.length);
     const progress = campaignDetails ? (validReferrals.length / campaignDetails.referralGoal) * 100 : 0;
     const isCampaignComplete = campaignDetails && validReferrals.length >= campaignDetails.referralGoal;
 
@@ -199,8 +198,8 @@ export default function UserCampaignsPage() {
         <div className="space-y-8">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                        <span>Your Active Campaign: {campaignDetails.title}</span>
+                    <CardTitle className="flex justify-between items-start">
+                        <span className="flex-1">Your Active Campaign: {campaignDetails.title}</span>
                          {isCampaignComplete && !activeUserCampaign.claimed && (
                             <Button onClick={handleClaimReward} className="bg-yellow-400 hover:bg-yellow-500 text-black">
                                 <Award className="mr-2"/> Claim Reward: LKR {campaignDetails.referrerBonus}
@@ -210,7 +209,7 @@ export default function UserCampaignsPage() {
                             <Badge variant="secondary" className="bg-green-500/20 text-green-400"><Check className="mr-2"/> Reward Claimed</Badge>
                         )}
                     </CardTitle>
-                    <CardDescription>Share your link and track your progress below.</CardDescription>
+                    <CardDescription>Share your link and track your progress below. You can abandon this campaign to start a different one.</CardDescription>
                 </CardHeader>
                  <CardContent className="space-y-4">
                     <div className="space-y-2">
@@ -225,6 +224,9 @@ export default function UserCampaignsPage() {
                         <Progress value={progress} />
                     </div>
                 </CardContent>
+                <CardFooter>
+                    <Button variant="destructive" onClick={handleAbandonCampaign}>Abandon Campaign</Button>
+                </CardFooter>
             </Card>
 
             <Card>
@@ -232,14 +234,14 @@ export default function UserCampaignsPage() {
                 <CardContent>
                     <Tabs defaultValue="pending">
                         <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="pending">Pending ({referrals.filter(r => !r.taskCompleted).length})</TabsTrigger>
+                            <TabsTrigger value="pending">Pending ({referrals.length - validReferrals.length})</TabsTrigger>
                             <TabsTrigger value="valid">Valid ({validReferrals.length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="pending">
-                            <ReferralList referrals={referrals.filter(r => !r.taskCompleted)} />
+                            <ReferralList referrals={referrals.filter(r => !campaignDetails || r.campaignInfo.completedTasks.length < campaignDetails.tasks.length)} />
                         </TabsContent>
                         <TabsContent value="valid">
-                            <ReferralList referrals={validReferrals} showAnswer />
+                            <ReferralList referrals={validReferrals} showAnswer campaign={campaignDetails} />
                         </TabsContent>
                     </Tabs>
                 </CardContent>
@@ -248,14 +250,14 @@ export default function UserCampaignsPage() {
     )
 }
 
-const ReferralList = ({ referrals, showAnswer = false }: { referrals: CampaignReferral[], showAnswer?: boolean }) => (
+const ReferralList = ({ referrals, showAnswer = false, campaign }: { referrals: CampaignReferral[], showAnswer?: boolean, campaign?: Campaign | null }) => (
     <ScrollArea className="h-72">
         <Table>
             <TableHeader>
                 <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Contact</TableHead>
-                    {showAnswer && <TableHead>Task Answer</TableHead>}
+                    {showAnswer && <TableHead>Task Answers</TableHead>}
                     <TableHead>Status</TableHead>
                 </TableRow>
             </TableHeader>
@@ -264,10 +266,16 @@ const ReferralList = ({ referrals, showAnswer = false }: { referrals: CampaignRe
                     <TableRow key={ref.id}>
                         <TableCell>{ref.firstName} {ref.lastName}</TableCell>
                         <TableCell><a href={`tel:${ref.phone}`} className="flex items-center gap-1 hover:underline"><Phone className="w-3 h-3"/> {ref.phone}</a></TableCell>
-                        {showAnswer && <TableCell>{ref.taskAnswer || 'N/A'}</TableCell>}
+                        {showAnswer && <TableCell>
+                           <ul className="text-xs">
+                               {campaign?.tasks.map(task => (
+                                   <li key={task.id}><strong>{task.verificationQuestion}:</strong> {ref.campaignInfo.answers[task.id] || 'N/A'}</li>
+                               ))}
+                           </ul>
+                        </TableCell>}
                         <TableCell>
-                            <Badge variant={ref.taskCompleted ? 'default' : 'secondary'}>
-                                {ref.taskCompleted ? 'Completed' : 'Pending'}
+                             <Badge variant={showAnswer ? 'default' : 'secondary'}>
+                                {showAnswer ? 'Completed' : 'Pending Tasks'}
                             </Badge>
                         </TableCell>
                     </TableRow>

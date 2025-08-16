@@ -14,17 +14,23 @@ import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
+export interface CampaignTask {
+    id: string;
+    description: string;
+    verificationQuestion: string;
+    refereeBonus: number;
+}
+
 export interface Campaign {
     id: string;
     title: string;
-    taskDescription: string;
-    verificationQuestion: string;
+    tasks: CampaignTask[];
     referralGoal: number;
     referrerBonus: number;
-    refereeBonus: number;
     isActive: boolean;
     createdAt: any;
 }
+
 
 export default function ReferralCampaignsPage() {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -35,12 +41,10 @@ export default function ReferralCampaignsPage() {
 
     const [formState, setFormState] = useState({
         title: '',
-        taskDescription: '',
-        verificationQuestion: '',
         referralGoal: '10',
         referrerBonus: '100',
-        refereeBonus: '10',
-        isActive: true
+        isActive: true,
+        tasks: [{ id: `task_${Date.now()}`, description: '', verificationQuestion: '', refereeBonus: 10 }] as CampaignTask[]
     });
 
     const fetchCampaigns = async () => {
@@ -55,15 +59,40 @@ export default function ReferralCampaignsPage() {
         fetchCampaigns();
     }, []);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormState(prev => ({ ...prev, [name]: value }));
     };
+    
+    const handleTaskChange = (index: number, field: keyof Omit<CampaignTask, 'id'>, value: string | number) => {
+        const newTasks = [...formState.tasks];
+        newTasks[index] = { ...newTasks[index], [field]: value };
+        setFormState(prev => ({ ...prev, tasks: newTasks }));
+    }
+
+    const addTask = () => {
+        setFormState(prev => ({
+            ...prev,
+            tasks: [...prev.tasks, { id: `task_${Date.now()}`, description: '', verificationQuestion: '', refereeBonus: 10 }]
+        }));
+    }
+
+    const removeTask = (index: number) => {
+        if(formState.tasks.length <= 1) {
+            toast({ variant: "destructive", title: "Cannot remove", description: "A campaign must have at least one task."});
+            return;
+        }
+        setFormState(prev => ({ ...prev, tasks: prev.tasks.filter((_, i) => i !== index) }));
+    }
+
 
     const resetForm = () => {
         setFormState({
-            title: '', taskDescription: '', verificationQuestion: '',
-            referralGoal: '10', referrerBonus: '100', refereeBonus: '10', isActive: true
+            title: '',
+            referralGoal: '10',
+            referrerBonus: '100',
+            isActive: true,
+            tasks: [{ id: `task_${Date.now()}`, description: '', verificationQuestion: '', refereeBonus: 10 }]
         });
         setEditingCampaign(null);
     };
@@ -74,13 +103,10 @@ export default function ReferralCampaignsPage() {
 
         const campaignData = {
             title: formState.title,
-            taskDescription: formState.taskDescription,
-            verificationQuestion: formState.verificationQuestion,
+            tasks: formState.tasks.map(task => ({...task, refereeBonus: Number(task.refereeBonus)})),
             referralGoal: Number(formState.referralGoal),
             referrerBonus: Number(formState.referrerBonus),
-            refereeBonus: Number(formState.refereeBonus),
             isActive: formState.isActive,
-            createdAt: serverTimestamp()
         };
 
         try {
@@ -88,7 +114,7 @@ export default function ReferralCampaignsPage() {
                 await updateDoc(doc(db, 'referral_campaigns', editingCampaign.id), { ...campaignData, updatedAt: serverTimestamp() });
                 toast({ title: 'Success!', description: 'Campaign updated successfully.' });
             } else {
-                await addDoc(collection(db, 'referral_campaigns'), campaignData);
+                await addDoc(collection(db, 'referral_campaigns'), { ...campaignData, createdAt: serverTimestamp() });
                 toast({ title: 'Success!', description: 'New campaign created successfully.' });
             }
             resetForm();
@@ -105,11 +131,9 @@ export default function ReferralCampaignsPage() {
         setEditingCampaign(campaign);
         setFormState({
             title: campaign.title,
-            taskDescription: campaign.taskDescription,
-            verificationQuestion: campaign.verificationQuestion,
+            tasks: campaign.tasks,
             referralGoal: String(campaign.referralGoal),
             referrerBonus: String(campaign.referrerBonus),
-            refereeBonus: String(campaign.refereeBonus),
             isActive: campaign.isActive,
         });
     }
@@ -133,6 +157,8 @@ export default function ReferralCampaignsPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status.' });
         }
     }
+    
+    const totalRefereeBonus = formState.tasks.reduce((acc, task) => acc + Number(task.refereeBonus || 0), 0);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -145,24 +171,32 @@ export default function ReferralCampaignsPage() {
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="title">Campaign Title</Label>
-                            <Input id="title" name="title" value={formState.title} onChange={handleInputChange} placeholder="e.g., Join WhatsApp Group" required/>
+                            <Input id="title" name="title" value={formState.title} onChange={handleInputChange} placeholder="e.g., Complete Onboarding" required/>
                         </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="taskDescription">Task Description for New User</Label>
-                            <Textarea id="taskDescription" name="taskDescription" value={formState.taskDescription} onChange={handleInputChange} placeholder="e.g., Click the button in your dashboard to join our official WhatsApp group." required/>
+                        <div className="border p-4 rounded-md space-y-4">
+                            <h3 className="font-semibold">Tasks for New User</h3>
+                            {formState.tasks.map((task, index) => (
+                                <div key={task.id} className="p-3 border rounded-lg space-y-3 relative bg-background/50">
+                                    <Label>Task {index + 1}</Label>
+                                    <Textarea value={task.description} onChange={e => handleTaskChange(index, 'description', e.target.value)} placeholder={`e.g., Join our official WhatsApp group.`} required/>
+                                    <Input value={task.verificationQuestion} onChange={e => handleTaskChange(index, 'verificationQuestion', e.target.value)} placeholder={`e.g., What is your WhatsApp number?`} required/>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs">Bonus for this task (LKR)</Label>
+                                        <Input type="number" value={task.refereeBonus} onChange={e => handleTaskChange(index, 'refereeBonus', Number(e.target.value))} required/>
+                                    </div>
+                                    <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => removeTask(index)}><X className="h-4 w-4"/></Button>
+                                </div>
+                            ))}
+                            <Button type="button" variant="outline" onClick={addTask}><PlusCircle className="mr-2"/> Add Task</Button>
                         </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="verificationQuestion">Verification Question</Label>
-                            <Input id="verificationQuestion" name="verificationQuestion" value={formState.verificationQuestion} onChange={handleInputChange} placeholder="e.g., What is your WhatsApp number?" required/>
-                        </div>
-                         <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="referralGoal">Referral Goal</Label>
                                 <Input id="referralGoal" name="referralGoal" type="number" value={formState.referralGoal} onChange={handleInputChange} required />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="refereeBonus">Bonus for Referee (LKR)</Label>
-                                <Input id="refereeBonus" name="refereeBonus" type="number" value={formState.refereeBonus} onChange={handleInputChange} required />
+                                <Label>Total Referee Bonus</Label>
+                                <Input value={`LKR ${totalRefereeBonus.toFixed(2)}`} readOnly disabled />
                             </div>
                         </div>
                          <div className="space-y-2">
@@ -200,7 +234,7 @@ export default function ReferralCampaignsPage() {
                                             <CardTitle className="text-lg">{c.title}</CardTitle>
                                             <p className="text-sm text-muted-foreground">Goal: {c.referralGoal} referrals</p>
                                             <p className="text-sm">Referrer Bonus: LKR {c.referrerBonus}</p>
-                                            <p className="text-sm">Referee Bonus: LKR {c.refereeBonus}</p>
+                                            <p className="text-sm">Total Referee Bonus: LKR {c.tasks.reduce((a,b) => a + b.refereeBonus, 0)}</p>
                                         </div>
                                         <div className="flex flex-col items-end gap-2">
                                             <div className="flex items-center gap-2">
@@ -233,4 +267,3 @@ export default function ReferralCampaignsPage() {
         </div>
     );
 }
-

@@ -29,8 +29,8 @@ interface EquipmentSettings {
 interface CampaignInfo {
     campaignId: string;
     referrerId: string;
-    taskCompleted: boolean;
-    taskAnswer?: string;
+    completedTasks: string[];
+    answers: Record<string, string>;
 }
 
 interface UserData {
