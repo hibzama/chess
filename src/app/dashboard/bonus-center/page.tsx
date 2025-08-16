@@ -190,17 +190,19 @@ export default function BonusCenterPage() {
             setLoading(true);
             
             // Daily Bonus Campaigns
-            const now = Timestamp.now();
             const dailyQuery = query(
                 collection(db, 'daily_bonus_campaigns'),
-                where('isActive', '==', true),
-                where('endDate', '>', now) // Only fetch campaigns that haven't ended
+                where('isActive', '==', true)
             );
             const dailySnapshot = await getDocs(dailyQuery);
-            const activeCampaigns = dailySnapshot.docs
+            const allActiveCampaigns = dailySnapshot.docs
                 .map(doc => ({ id: doc.id, ...doc.data() } as DailyBonusCampaign));
             
-            const eligibleCampaignsPromises = activeCampaigns.map(async c => {
+            // Filter out expired campaigns on the client side
+            const now = new Date();
+            const futureCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
+
+            const eligibleCampaignsPromises = futureCampaigns.map(async c => {
                 let isEligible = false;
                 if (c.eligibility === 'all') isEligible = true;
                 else if (c.eligibility === 'below') isEligible = (userData.balance || 0) <= c.balanceThreshold;
