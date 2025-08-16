@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Award, Loader2 } from "lucide-react";
-import { CampaignTask } from "../admin/referral-campaigns/page";
+import { CampaignTask, Campaign } from "../admin/referral-campaigns/page";
 
 
 export default function DashboardLayout({
@@ -23,38 +23,52 @@ export default function DashboardLayout({
     const { user, userData, loading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const [hasPendingTasks, setHasPendingTasks] = useState(false);
 
     useEffect(() => {
-        if (!loading && !user) {
+        if (loading) return;
+
+        if (!user) {
             router.push('/login');
+            return;
         }
-        if (!loading && user && userData?.role === 'admin') {
+
+        if (userData?.role === 'admin') {
             router.push('/admin');
+            return;
         }
-         if (!loading && user && userData?.role === 'marketer') {
+         if (userData?.role === 'marketer') {
             router.push('/marketing/dashboard');
+            return;
         }
         
         // Check for pending campaign tasks
-        if (!loading && userData?.campaignInfo) {
+        if (userData?.campaignInfo) {
             const fetchCampaign = async () => {
-                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
+                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo!.campaignId));
                 if (campaignDoc.exists()) {
-                    const campaignData = campaignDoc.data();
-                    const completedTasks = userData.campaignInfo.completedTasks || [];
-                    const nextTask = campaignData.tasks.find((task: CampaignTask) => !completedTasks.includes(task.id));
+                    const campaignData = campaignDoc.data() as Campaign;
+                    const completedTaskIds = new Set(userData.campaignInfo!.completedTasks || []);
                     
-                    if (nextTask && pathname !== '/dashboard/your-task') {
-                        // If there's a pending task and they are not on the task page, redirect them.
+                    const allTasksCompleted = campaignData.tasks.every(task => completedTaskIds.has(task.id));
+                    
+                    if (!allTasksCompleted && pathname !== '/dashboard/your-task') {
+                        // User has pending tasks and is NOT on the task page -> redirect TO task page
                         router.push('/dashboard/your-task');
-                    } else if (!nextTask && pathname === '/dashboard/your-task') {
-                        // If all tasks are done and they are on the task page, redirect away.
+                    } else if (allTasksCompleted && pathname === '/dashboard/your-task') {
+                        // User has completed all tasks and IS on the task page -> redirect AWAY from task page
+                        router.push('/dashboard');
+                    }
+                } else {
+                    // Campaign may have been deleted by admin
+                    if (pathname === '/dashboard/your-task') {
                         router.push('/dashboard');
                     }
                 }
             };
             fetchCampaign();
+        } else if (pathname === '/dashboard/your-task') {
+            // User has no campaign info but is trying to access task page -> redirect away
+            router.push('/dashboard');
         }
 
     }, [user, userData, loading, router, pathname]);
