@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, Timestamp, setDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc, setDoc } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock, Wallet } from 'lucide-react';
+import { ArrowLeft, PlusCircle, AlertTriangle, Crown, Shuffle, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 
@@ -37,10 +37,6 @@ export default function CreateGamePage() {
     const wagerAmount = parseInt(investmentAmount) || 0;
     const usdtAmount = (wagerAmount / USDT_RATE || 0).toFixed(2);
     
-    const fundingWallet = userData?.primaryWallet || 'main';
-    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
-    const hasSufficientFunds = selectedWalletBalance >= wagerAmount;
-
 
     const handleCreateRoom = async () => {
         if (!user || !userData) {
@@ -53,11 +49,11 @@ export default function CreateGamePage() {
             return;
         }
 
-        if(!hasSufficientFunds) {
-            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your primary wallet (${fundingWallet}) to create this game.`});
+        if (userData.balance < wagerAmount) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
-        
+
         setIsCreating(true);
 
         try {
@@ -78,8 +74,7 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
-                    photoURL: userData.photoURL || '',
-                    fundingWallet: fundingWallet,
+                    photoURL: userData.photoURL || ''
                 },
                 players: [user.uid],
                 p1Time: parseInt(gameTimer),
@@ -90,7 +85,7 @@ export default function CreateGamePage() {
 
             await setDoc(roomRef, roomData);
             
-            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join. Your funds will be deducted when the game starts.' });
+            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
@@ -125,20 +120,6 @@ export default function CreateGamePage() {
                                 Playing against another player on the same device is strictly prohibited.
                             </AlertDescription>
                         </Alert>
-                        
-                        <Card className="p-4 bg-secondary">
-                            <Label>Funding From</Label>
-                            <div className="flex justify-between items-center mt-1">
-                                <p className="text-lg font-bold capitalize">{fundingWallet} Wallet</p>
-                                <Button variant="link" asChild size="sm" className="p-0 h-auto">
-                                    <Link href="/dashboard/wallet?tab=primary-wallet">Change</Link>
-                                </Button>
-                            </div>
-                             <div className="flex justify-between items-center mt-2 pt-2 border-t text-sm">
-                                <span className="text-muted-foreground">Available Balance:</span>
-                                <span className="font-semibold">LKR {selectedWalletBalance.toFixed(2)}</span>
-                            </div>
-                        </Card>
 
                         <div className="space-y-2">
                             <Label htmlFor="investment">Investment Amount (LKR)</Label>
