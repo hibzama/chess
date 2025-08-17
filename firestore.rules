@@ -1,121 +1,94 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isUserAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isUser(userId) {
-      return request.auth.uid == userId;
-    }
-    
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Users Collection
     match /users/{userId} {
-      allow read; 
-      allow create: if request.resource.data.uid == request.auth.uid;
-      allow update: if isUser(userId) || isAdmin();
-
-      // Subcollections
-      match /active_campaigns/{docId} {
-        allow read, write: if isUser(userId);
-        allow delete: if isUser(userId) || isAdmin();
-      }
-      match /bonus_claims/{docId} {
-        allow read, write: if isUser(userId);
-      }
-      match /daily_bonus_claims/{docId} {
-        allow read, write: if isUser(userId);
-      }
-    }
-
-    // Game Rooms Collection
-    match /game_rooms/{roomId} {
-      allow read;
-      allow create: if isUserAuthenticated();
-      allow update, delete: if isUser(resource.data.createdBy.uid) || isAdmin();
+      allow read: if true;
+      allow write: if request.auth.uid == userId;
       
-      match /messages/{messageId} {
-        allow read, create: if isUserAuthenticated() && request.auth.uid in resource.data.players;
+      // Allow users to manage their own subcollections
+      match /active_campaigns/{campaignId} {
+        allow read, write, delete: if request.auth.uid == userId;
+      }
+      match /bonus_claims/{claimId} {
+          allow read, write: if request.auth.uid == userId;
+      }
+      match /daily_bonus_claims/{claimId} {
+        allow read, write: if request.auth.uid == userId;
       }
     }
 
-    // Friend Requests Collection
-    match /friend_requests/{requestId} {
-      allow read, create: if isUserAuthenticated();
-      allow delete: if isUser(resource.data.fromId) || isUser(resource.data.toId) || isAdmin();
+    match /game_rooms/{roomId} {
+        allow read: if true;
+        allow create: if request.auth.uid != null;
+        allow update: if request.auth.uid != null;
+        allow delete: if request.auth.uid == get(/databases/$(database)/documents/game_rooms/$(roomId)).data.createdBy.uid;
     }
     
-    // Notifications Collection
-    match /notifications/{notificationId} {
-      allow read, create: if isUserAuthenticated();
-      allow update, delete: if isUser(resource.data.userId) || isAdmin();
-    }
-    
-    // Chats Collection
-    match /chats/{chatId} {
-       allow read, create, update: if isUserAuthenticated() && request.auth.uid in resource.data.userIds;
-       
-       match /messages/{messageId} {
-         allow read, create: if isUserAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-       }
-    }
-
-    // Transactions and Marketing
     match /transactions/{transactionId} {
-      allow read, create: if isUserAuthenticated();
-      allow update: if isAdmin();
+        allow read, create: if request.auth.uid != null;
+        allow update: if isAdmin();
     }
     
-    match /marketing_applications/{appId} {
-        allow create;
-        allow read, update: if isAdmin();
+    match /notifications/{notificationId} {
+        allow read, update: if request.auth.uid == resource.data.userId;
+        allow create: if request.auth.uid != null;
+    }
+    
+    match /chats/{chatId} {
+        allow read, update, create: if request.auth.uid in resource.data.userIds;
+        
+        match /messages/{messageId} {
+            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        }
     }
 
-    // Bonus & Campaign Collections (Specific rules for each)
+    // Admin Rules
+    match /marketing_applications/{appId} {
+        allow read, write: if isAdmin();
+    }
+    match /settings/{settingId} {
+        allow read, write: if request.auth.uid != null && isAdmin();
+    }
+
+    // Bonus and Campaign Rules
     match /signup_bonus_campaigns/{campaignId} {
-      allow read;
-      allow update, delete, create: if isAdmin();
+      allow get, list: if request.auth.uid != null;
+      allow write: if isAdmin();
       match /claims/{claimId} {
-        allow read, create: if isUser(claimId) || isAdmin();
+        allow read, write: if request.auth.uid != null; // Claims are validated in backend
+      }
+    }
+    
+    match /deposit_bonus_campaigns/{campaignId} {
+      allow read: if request.auth.uid != null;
+      allow write: if isAdmin();
+      match /claims/{claimId} {
+        allow read, write: if request.auth.uid != null;
       }
     }
 
     match /daily_bonus_campaigns/{campaignId} {
-        allow read;
-        allow update, delete, create: if isAdmin();
-        match /claims/{claimId} {
-            allow read, create, delete: if isUser(claimId) || isAdmin();
-        }
+      allow get, list: if request.auth.uid != null;
+      allow write: if isAdmin();
+      match /claims/{claimId} {
+          allow read, write: if request.auth.uid != null;
+      }
     }
 
-    match /deposit_bonus_campaigns/{campaignId} {
-        allow read;
-        allow update, delete, create: if isAdmin();
-        match /claims/{claimId} {
-            allow read, create, delete: if isUser(claimId) || isAdmin();
-        }
-    }
-    
     match /referral_campaigns/{campaignId} {
-        allow read;
-        allow update, delete, create: if isAdmin();
+      allow get, list: if request.auth.uid != null;
+      allow write: if isAdmin();
     }
     
-    // Group for collections that admins have full access to
-    match /{collection}/{docId} {
-       allow read, write: if isAdmin();
-    }
-    
-    // Collection Group Rules for Queries
-    match /{path=**}/bonus_claims/{claimId} {
-       allow read, create: if isUserAuthenticated();
+    match /bonus_claims/{claimId} {
+        allow read, create, update: if request.auth.uid != null;
     }
   }
 }
