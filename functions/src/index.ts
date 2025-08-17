@@ -283,5 +283,3 @@ export const endGame = onCall({ cors: true }, async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
-
-    
