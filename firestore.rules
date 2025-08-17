@@ -4,127 +4,127 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is authenticated
-    function isAuthenticated() {
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    // Helper function to check if the user is the owner of the document
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    // Allow admins full access
+
     function isAdmin() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // USERS collection rules
+    // Users collection
     match /users/{userId} {
-      allow create: if isAuthenticated();
-      allow read, update: if isOwner(userId) || isAdmin();
-      
-      // Allow users to manage their own subcollections
-      match /{document=**} {
-        allow read, write: if isOwner(userId) || isAdmin();
+      // Anyone can create a user account (signup)
+      allow create: if true;
+      // Users can only read/write their own data. Admins can read/write any user data.
+      allow read, update, delete: if isSignedIn() && (isOwner(userId) || isAdmin());
+
+      // Subcollections for users
+      match /active_campaigns/{docId} {
+        allow read, write, delete: if isOwner(userId);
+      }
+      match /daily_bonus_claims/{docId} {
+        allow read, write, delete: if isOwner(userId);
+      }
+      match /bonus_claims/{docId} {
+        allow read, write, delete: if isOwner(userId);
       }
     }
 
-    // TRANSACTIONS collection rules
-    match /transactions/{transactionId} {
-        allow create: if isAuthenticated();
-        allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == resource.data.userId);
-        allow update, delete: if isAdmin();
-    }
-
-    // MARKETING APPLICATIONS collection rules
-    match /marketing_applications/{appId} {
-      allow create: if true; // Anyone can apply
-      allow read, update, delete: if isAdmin();
-    }
-    
-    // GAME ROOMS collection rules
+    // Game Rooms
     match /game_rooms/{roomId} {
-        allow read, create: if isAuthenticated();
-        allow update: if isAuthenticated(); // More granular control in Cloud Functions
-        allow delete: if isAuthenticated() && (isAdmin() || request.auth.uid == resource.data.createdBy.uid);
-        
-        // Chat messages within a game room
-        match /messages/{messageId} {
-            allow read, create: if isAuthenticated() && request.auth.uid in resource.data.players;
-        }
+      allow read: if isSignedIn();
+      // Only signed in users can create rooms.
+      allow create: if isSignedIn();
+      // Only players in the game or admins can update/delete a room.
+      allow update, delete: if isSignedIn() && (resource.data.createdBy.uid == request.auth.uid || request.auth.uid in resource.data.players || isAdmin());
+      
+      match /messages/{messageId} {
+        allow read, create: if isSignedIn() && (request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players);
+      }
     }
     
-    // NOTIFICATIONS collection rules
+    // Transactions
+    match /transactions/{transactionId} {
+        allow create: if isSignedIn();
+        allow read, update, delete: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+    }
+
+    // Notifications
     match /notifications/{notificationId} {
-        allow read, create: if isAuthenticated();
-        allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
-        allow delete: if isAdmin();
-    }
-
-    // FRIEND REQUESTS collection rules
-    match /friend_requests/{reqId} {
-        allow create: if isAuthenticated();
-        allow read, delete: if isAuthenticated() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        allow create: if true;
+        allow read, update: if isSignedIn() && isOwner(resource.data.userId);
     }
     
-    // CHATS collection rules
-    match /chats/{chatId} {
-        allow read, create, update: if isAuthenticated() && request.auth.uid in resource.data.userIds;
-        
-        match /messages/{messageId} {
-            allow read, create: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-        }
+    // Settings & Configs
+    match /settings/{docId} {
+        allow read: if true; // Allow reading settings like bonus configs
+        allow write: if isAdmin(); // Only admins can change settings
     }
     
-    // SETTINGS collection rules (Admin only write, all users read)
-    match /settings/{settingId} {
-        allow read: if isAuthenticated();
-        allow write: if isAdmin();
-    }
-    
-    // Bonus campaign rules
+    // Bonus Campaigns
     match /signup_bonus_campaigns/{campaignId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
-        
+        allow read: if true;
+        allow write: if isAdmin();
         match /claims/{claimId} {
-            allow read: if isAuthenticated() && (isOwner(claimId) || isAdmin());
-            allow create: if isAuthenticated() && isOwner(claimId);
+            allow read: if true;
+            allow create: if isSignedIn() && isOwner(claimId); // Users can claim for themselves
         }
     }
-
+    
     match /daily_bonus_campaigns/{campaignId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
-        
+        allow read: if true;
+        allow write: if isAdmin();
         match /claims/{claimId} {
-            allow read: if isAuthenticated();
-            allow create: if isAuthenticated() && isOwner(claimId);
+            allow read: if true;
+            allow create: if isSignedIn() && isOwner(claimId);
         }
     }
 
     match /deposit_bonus_campaigns/{campaignId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
-        
+        allow read: if true;
+        allow write: if isAdmin();
         match /claims/{claimId} {
-            allow read: if isAuthenticated();
-            allow create: if isAuthenticated() && isOwner(claimId);
+            allow read: if true;
+            allow create: if isSignedIn() && isOwner(claimId);
         }
     }
     
-    // Referral campaign rules
     match /referral_campaigns/{campaignId} {
-        allow read: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
+        allow read: if true;
+        allow write: if isAdmin();
     }
     
-    // Bonus claims rules (collectionGroup for wider access checking)
-    match /{path=**}/bonus_claims/{claimId} {
-        allow read: if isAuthenticated() && (isOwner(get(path).data.userId) || isAdmin());
-        allow create: if isAuthenticated();
-        allow update: if isAdmin();
+    // Bonus Claims (for admin review)
+    match /bonus_claims/{claimId} {
+        allow create: if isSignedIn();
+        allow read, write, delete: if isAdmin() || (isSignedIn() && isOwner(resource.data.userId));
+    }
+    
+    // Friend Requests
+    match /friend_requests/{requestId} {
+      allow create: if isSignedIn() && request.resource.data.fromId == request.auth.uid;
+      allow read, delete: if isSignedIn() && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid || isAdmin());
+    }
+    
+    // Marketing Applications
+    match /marketing_applications/{appId} {
+        allow create: if true;
+        allow read, write: if isAdmin();
+    }
+    
+    // Chats
+    match /chats/{chatId} {
+        allow read, update: if isSignedIn() && request.auth.uid in resource.data.userIds;
+        
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        }
     }
   }
 }
