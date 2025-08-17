@@ -32,13 +32,13 @@ const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {t
     </Card>
 )
 
-const BonusHub = ({ depositBonus, dailyBonus }: { depositBonus: DepositBonusCampaign | null, dailyBonus: DailyBonusCampaign | null }) => {
+const BonusHub = ({ depositBonus, dailyBonus, referralTask }: { depositBonus: DepositBonusCampaign | null, dailyBonus: DailyBonusCampaign | null, referralTask: boolean }) => {
     
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <BonusCardShell 
                 title="Referral Campaigns"
-                description="Start a campaign, invite friends with a special link, and earn big rewards when they complete tasks."
+                description="Invite friends to complete tasks and earn significant rewards for growing the community."
                 icon={<Award className="text-purple-400"/>}
                 href="/dashboard/referral-campaigns"
                 linkText="View Campaigns"
@@ -131,7 +131,6 @@ export default function DashboardPage() {
     
         const fetchBonuses = async () => {
             setCheckingBonuses(true);
-            const now = new Date();
             
             // 1. Deposit Bonus
             try {
@@ -139,6 +138,7 @@ export default function DashboardPage() {
                 const depositSnapshot = await getDocs(depositQuery);
                 const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
                 // Filter expired campaigns on the client side
+                const now = new Date();
                 const stillValidCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
                 setDepositBonus(stillValidCampaign || null);
             } catch (e) { console.error("Error fetching deposit bonus", e); setDepositBonus(null); }
@@ -149,10 +149,11 @@ export default function DashboardPage() {
                 const dailySnapshot = await getDocs(dailyQuery);
                 const allActiveCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
                 
+                const now = new Date();
                 const futureAndActiveCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
+
                 const eligibleNow = futureAndActiveCampaigns.find(c => {
                     const startDate = c.startDate.toDate();
-                    const now = new Date();
                     if (now < startDate) return false;
 
                     let isEligible = false;
@@ -244,7 +245,7 @@ export default function DashboardPage() {
             {checkingBonuses ? (
                 <Skeleton className="h-44 w-full" />
             ) : (
-                <BonusHub depositBonus={depositBonus} dailyBonus={dailyBonus} />
+                <BonusHub depositBonus={depositBonus} dailyBonus={dailyBonus} referralTask={!!userData?.campaignInfo} />
             )}
         </div>
       
@@ -310,3 +311,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
