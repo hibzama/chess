@@ -111,10 +111,13 @@ export default function WalletPage() {
       setLoading(false);
     });
 
-    const bonusQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true), where('expiresAt', '>', Timestamp.now()));
+    const bonusQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true));
     const unsubscribeBonus = onSnapshot(bonusQuery, (snapshot) => {
         if (!snapshot.empty) {
-            setDepositBonus(snapshot.docs[0].data() as DepositBonusCampaign);
+            const now = new Date();
+            const activeCampaigns = snapshot.docs.map(d => d.data() as DepositBonusCampaign);
+            const stillValidCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
+            setDepositBonus(stillValidCampaign || null);
         } else {
             setDepositBonus(null);
         }
