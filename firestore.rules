@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -98,7 +99,7 @@ service cloud.firestore {
     // MARKETING rules
     match /marketing_applications/{appId} {
       allow read: if isAdmin();
-      allow create: if isAuth();
+      allow create;
       allow update: if isAdmin();
     }
     
