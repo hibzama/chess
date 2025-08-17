@@ -22,6 +22,7 @@ import CheckersBoard from '@/components/game/checkers-board';
 import GameLayout from '@/components/game/game-layout';
 import { GameProvider, useGame } from '@/context/game-context';
 import { formatTime } from '@/lib/time';
+import { cn } from '@/lib/utils';
 
 type GameRoom = {
     id: string;
