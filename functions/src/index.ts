@@ -1,3 +1,4 @@
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -75,7 +76,7 @@ export const onUserCreate = functions.firestore
               // Enforce a maximum chain length of 20 to prevent infinite loops and abuse
               if (newChain.length <= 20) {
                   updatesForNewUser.referralChain = newChain;
-                  functions.logger.log(`User ${userId} inherited and extended chain from ${directReferrerId}.`);
+                  functions.logger.log(`User ${userId} inherited and extended chain from ${directReferrerId}. New chain: ${newChain.join(' -> ')}`);
               } else {
                   functions.logger.warn(`Referral chain for user ${userId} exceeds 20 levels. Not extending.`);
               }
@@ -202,3 +203,5 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
+
+    
