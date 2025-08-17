@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
@@ -89,9 +89,6 @@ export default function RegisterForm() {
 
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
-
-            // Send verification email
-            await sendEmailVerification(user);
 
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
             const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
