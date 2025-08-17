@@ -42,7 +42,7 @@ interface CampaignReferral {
 interface ClaimHistory {
     id: string;
     amount: number;
-    description: string;
+    description?: string;
     createdAt: any;
     status: 'pending' | 'approved' | 'rejected';
     type: 'referrer' | 'referee';
@@ -67,14 +67,6 @@ export default function UserCampaignsPage() {
         return '';
     }, [user, activeUserCampaign]);
     
-     const availableCampaigns = useMemo(() => {
-        if (loading || activeUserCampaign) return [];
-        
-        const completedOrPendingCampaignIds = new Set(claimHistory.map(c => c.campaignId));
-        return allCampaigns.filter(c => !completedOrPendingCampaignIds.has(c.id));
-
-    }, [allCampaigns, claimHistory, activeUserCampaign, loading]);
-
     useEffect(() => {
         const fetchCampaigns = async () => {
             const q = query(collection(db, 'referral_campaigns'), where('isActive', '==', true));
@@ -108,7 +100,6 @@ export default function UserCampaignsPage() {
             setLoading(false);
         });
 
-         // Fetch claim history for completed/pending campaigns
         const claimQuery = query(
             collection(db, 'bonus_claims'), 
             where('userId', '==', user.uid),
@@ -124,6 +115,14 @@ export default function UserCampaignsPage() {
             unsubHistory();
         };
     }, [user]);
+
+     const availableCampaigns = useMemo(() => {
+        if (loading || activeUserCampaign) return [];
+        
+        const completedOrPendingCampaignIds = new Set(claimHistory.map(c => c.campaignId));
+        return allCampaigns.filter(c => !completedOrPendingCampaignIds.has(c.id));
+
+    }, [allCampaigns, claimHistory, activeUserCampaign, loading]);
 
     useEffect(() => {
         if (user && activeUserCampaign) {
@@ -179,7 +178,6 @@ export default function UserCampaignsPage() {
             await runTransaction(db, async (transaction) => {
                 const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
                 
-                // Set the claim first
                 transaction.set(claimRef, {
                     userId: user.uid,
                     type: 'referrer',
@@ -190,7 +188,6 @@ export default function UserCampaignsPage() {
                     createdAt: serverTimestamp(),
                 });
                 
-                // Then mark the campaign as completed to prevent re-claiming
                 transaction.update(userCampaignRef, { completed: true });
             });
             
@@ -208,8 +205,19 @@ export default function UserCampaignsPage() {
     const validReferrals = referrals.filter(r => campaignDetails && r.campaignInfo.completedTasks.length === campaignDetails.tasks.length);
     const progress = campaignDetails ? (validReferrals.length / campaignDetails.referralGoal) * 100 : 0;
     const isCampaignGoalMet = campaignDetails && validReferrals.length >= campaignDetails.referralGoal;
-    const hasPendingOrClaimed = activeUserCampaign?.completed;
-
+    
+    const hasPendingClaimForActiveCampaign = activeUserCampaign && claimHistory.some(c => c.campaignId === activeUserCampaign.campaignId && c.status === 'pending');
+    const isClaimButtonDisabled = !isCampaignGoalMet || activeUserCampaign?.completed || hasPendingClaimForActiveCampaign;
+    
+    const getClaimButtonText = () => {
+        if (activeUserCampaign?.completed || hasPendingClaimForActiveCampaign) {
+            return "Claim Submitted / Pending";
+        }
+        if (isCampaignGoalMet) {
+            return `Claim Reward: LKR ${campaignDetails?.referrerBonus}`;
+        }
+        return "Goal Not Met";
+    }
 
     if (loading) {
         return <div className="space-y-4"> <Skeleton className="h-32 w-full" /> <Skeleton className="h-64 w-full" /> </div>
@@ -282,14 +290,9 @@ export default function UserCampaignsPage() {
                 <CardHeader>
                     <CardTitle className="flex justify-between items-start">
                         <span className="flex-1">Your Active Campaign: {campaignDetails.title}</span>
-                         {isCampaignGoalMet && !hasPendingOrClaimed && (
-                            <Button onClick={handleClaimReward} className="bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg animate-pulse">
-                                <Award className="mr-2"/> Claim Reward: LKR {campaignDetails.referrerBonus}
-                            </Button>
-                        )}
-                        {hasPendingOrClaimed && (
-                            <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-400 text-base py-1 px-3"><Check className="mr-2"/> Claim Pending/Submitted</Badge>
-                        )}
+                         <Button onClick={handleClaimReward} disabled={isClaimButtonDisabled} className="bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg animate-pulse disabled:animate-none">
+                            <Award className="mr-2"/> {getClaimButtonText()}
+                        </Button>
                     </CardTitle>
                     <CardDescription>Share your link and track your progress below.</CardDescription>
                 </CardHeader>
