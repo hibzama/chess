@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, ClipboardCheck, Banknote } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, ClipboardCheck, Banknote, Megaphone } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,7 +60,7 @@ const BonusHub = ({ depositBonus, dailyBonus, referralTask }: { depositBonus: De
                 <BonusCardShell 
                     title={dailyBonus.title || "Daily Bonus"}
                     description="A special bonus is available for you to claim today!"
-                    icon={<Calendar className="text-blue-400"/>}
+                    icon={<Gift className="text-blue-400"/>}
                     href="/dashboard/bonus-center"
                     linkText="Claim Now"
                 />
