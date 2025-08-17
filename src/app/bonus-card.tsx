@@ -32,6 +32,16 @@ export function BonusCard() {
         return;
     }
 
+    // Check if the user is new (created within the last 24 hours)
+    const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    if (creationTime < twentyFourHoursAgo) {
+        setHasClaimed(true); // User is not new, so they can't claim
+        return;
+    }
+
+
     const fetchBonusConfig = async () => {
         const campaignsRef = collection(db, 'signup_bonus_campaigns');
         const q = query(campaignsRef, where("isActive", "==", true));
@@ -76,7 +86,7 @@ export function BonusCard() {
     try {
         const userRef = doc(db, 'users', user.uid);
         const campaignRef = doc(db, 'signup_bonus_campaigns', activeCampaign.id);
-        const claimRef = doc(campaignRef, 'claims', user.uid);
+        const claimRef = doc(collection(db, `signup_bonus_campaigns/${activeCampaign.id}/claims`), user.uid);
         const transactionRef = doc(collection(db, 'transactions'));
         
         const batch = writeBatch(db);
