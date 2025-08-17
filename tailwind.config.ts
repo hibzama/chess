@@ -64,6 +64,10 @@ export default {
           'accent-foreground': 'hsl(var(--primary))',
           ring: 'hsl(var(--ring))',
         },
+        'stat-balance': '#B800D6',
+        'stat-deposit': '#00D607',
+        'stat-withdrawal': '#D60000',
+        'stat-earnings': '#D67600',
       },
       borderRadius: {
         lg: 'var(--radius)',

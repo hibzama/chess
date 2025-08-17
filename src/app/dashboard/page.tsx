@@ -3,12 +3,12 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, Calendar, Banknote, Megaphone, ClipboardCheck } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, ClipboardCheck, Banknote } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useState, useMemo } from 'react';
-import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -255,28 +255,28 @@ export default function DashboardPage() {
             value={`LKR ${(userData?.balance ?? 0).toFixed(2)}`}
             description={`~${((userData?.balance ?? 0) / USDT_RATE).toFixed(2)} USDT`}
             isLoading={loading}
-            colorClass="text-primary"
+            colorClass="text-stat-balance"
         />
          <StatCard 
             title="Total Deposit"
             value={`LKR ${financialStats.totalDeposit.toFixed(2)}`}
             description="All funds you've added."
             isLoading={statsLoading}
-            colorClass="text-green-400"
+            colorClass="text-stat-deposit"
         />
          <StatCard 
             title="Total Withdrawals"
             value={`LKR ${financialStats.totalWithdrawal.toFixed(2)}`}
             description="All funds you've taken out."
             isLoading={statsLoading}
-            colorClass="text-red-400"
+            colorClass="text-stat-withdrawal"
         />
          <StatCard 
             title="Total Earnings"
             value={`LKR ${financialStats.totalEarning.toFixed(2)}`}
             description="Your net profit from games."
             isLoading={statsLoading}
-            colorClass={financialStats.totalEarning < 0 ? "text-yellow-400" : "text-green-400"}
+            colorClass={financialStats.totalEarning < 0 ? "text-yellow-400" : "text-stat-earnings"}
         />
       </div>
 
