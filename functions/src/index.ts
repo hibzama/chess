@@ -67,8 +67,13 @@ export const onUserCreate = functions.firestore
 
             // Check if the standard referrer is part of a marketer's chain
             if (referrerData.referralChain && referrerData.referralChain.length > 0) {
-              updates.referralChain = [...referrerData.referralChain, directReferrerId];
-              functions.logger.log(`User ${userId} inherited chain from ${directReferrerId}.`);
+              const newChain = [...referrerData.referralChain, directReferrerId];
+              if (newChain.length <= 20) { // Enforce 20 level limit
+                updates.referralChain = newChain;
+                functions.logger.log(`User ${userId} inherited and extended chain from ${directReferrerId}.`);
+              } else {
+                 functions.logger.log(`User ${userId} not added to chain from ${directReferrerId} as it exceeds 20 levels.`);
+              }
             }
           }
 
