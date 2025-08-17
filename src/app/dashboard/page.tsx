@@ -144,13 +144,9 @@ export default function DashboardPage() {
             try {
                 const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true));
                 const depositSnapshot = await getDocs(depositQuery);
-                if (!depositSnapshot.empty) {
-                    const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
-                    const stillValidCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
-                    setDepositBonus(stillValidCampaign || null);
-                } else {
-                    setDepositBonus(null);
-                }
+                const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
+                const stillValidCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
+                setDepositBonus(stillValidCampaign || null);
             } catch (e) { console.error("Error fetching deposit bonus", e); setDepositBonus(null); }
 
             // 2. Daily Bonus
@@ -159,8 +155,8 @@ export default function DashboardPage() {
                 const dailySnapshot = await getDocs(dailyQuery);
                 const allActiveCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
                 
-                const futureCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
-                const eligibleNow = futureCampaigns.find(c => c.startDate.toDate() < now);
+                const futureAndActiveCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
+                const eligibleNow = futureAndActiveCampaigns.find(c => c.startDate.toDate() <= now);
 
                 if (eligibleNow) {
                     const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, eligibleNow.id));
@@ -331,4 +327,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
