@@ -12,8 +12,30 @@ export const onUserCreate = functions.firestore
   .document("users/{userId}")
   .onCreate(async (snap, context) => {
     const newUser = snap.data();
+    const newUserRef = snap.ref;
     
-    // Increment the referrer's count if 'bonusReferredBy' exists
+    // --- 1. Handle Sign-up Bonus ---
+    const bonusConfigRef = admin.firestore().collection('settings').doc('bonusConfig');
+    const usersCollection = admin.firestore().collection('users');
+    
+    try {
+        const bonusConfigSnap = await bonusConfigRef.get();
+        if (bonusConfigSnap.exists() && bonusConfigSnap.data()?.signupBonusEnabled) {
+            const bonusConfig = bonusConfigSnap.data()!;
+            const snapshot = await usersCollection.count().get();
+            const userCount = snapshot.data().count;
+            
+            if (userCount <= (bonusConfig.signupBonusLimit || 250)) {
+                await newUserRef.update({
+                    balance: bonusConfig.signupBonusAmount || 100
+                });
+            }
+        }
+    } catch (error) {
+        functions.logger.error("Error processing signup bonus:", error);
+    }
+    
+    // --- 2. Handle Bonus Referral Count ---
     if (newUser.bonusReferredBy) {
         const referrerId = newUser.bonusReferredBy;
         const referrerRef = admin.firestore().collection('users').doc(referrerId);
@@ -28,21 +50,30 @@ export const onUserCreate = functions.firestore
         }
     }
     
-    // Increment L1 count for the main referrer
-    if (newUser.referredBy) {
-        const referrerId = newUser.referredBy;
-        const referrerRef = admin.firestore().collection('users').doc(referrerId);
-        
+    // --- 3. Handle Commission Referral Logic ---
+    const directReferrerId = newUser.marketingReferredBy || newUser.standardReferredBy;
+    if (directReferrerId && !newUser.campaignInfo) {
+        const referrerRef = admin.firestore().collection('users').doc(directReferrerId);
         try {
             const referrerDoc = await referrerRef.get();
-            if (referrerDoc.exists() && referrerDoc.data()?.role === 'user') {
-                await referrerRef.update({
-                    l1Count: admin.firestore.FieldValue.increment(1)
-                });
-                functions.logger.log(`Incremented l1Count for user ${referrerId}`);
+            if (referrerDoc.exists()) {
+                const referrerData = referrerDoc.data()!;
+                const updates: {[key: string]: any} = {
+                    referredBy: directReferrerId,
+                };
+
+                if (referrerData.role === 'marketer') {
+                    updates.referralChain = [...(referrerData.referralChain || []), directReferrerId];
+                } else if (referrerData.role === 'user') {
+                     // Only increment L1 count for standard user referrals
+                     await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
+                }
+                
+                // Set the referral chain on the new user
+                await newUserRef.update(updates);
             }
         } catch (error) {
-             functions.logger.error(`Failed to increment l1Count for user ${referrerId}:`, error);
+            functions.logger.error(`Error processing commission referral for user ${directReferrerId}:`, error);
         }
     }
 
