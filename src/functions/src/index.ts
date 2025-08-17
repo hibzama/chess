@@ -21,15 +21,15 @@ export const onUserCreate = functions.firestore
   .onCreate(async (snap, context) => {
     const newUser = snap.data();
     const newUserRef = snap.ref;
-    
+    const db = admin.firestore();
+
     // --- 1. Handle Bonus Referral Count ---
     if (newUser.bonusReferredBy) {
         const referrerId = newUser.bonusReferredBy;
-        const referrerRef = admin.firestore().collection('users').doc(referrerId);
-        
+        const referrerRef = db.collection('users').doc(referrerId);
         try {
             await referrerRef.update({
-                bonusReferralCount: admin.firestore.FieldValue.increment(1)
+                bonusReferralCount: admin.firestore.FieldValue.increment(1),
             });
             functions.logger.log(`Incremented bonusReferralCount for user ${referrerId}`);
         } catch (error) {
@@ -38,9 +38,14 @@ export const onUserCreate = functions.firestore
     }
     
     // --- 2. Handle Commission Referral Logic ---
-    const directReferrerId = newUser.marketingReferredBy || newUser.standardReferredBy;
-    if (directReferrerId && !newUser.campaignInfo) {
-        const referrerRef = admin.firestore().collection('users').doc(directReferrerId);
+    const { marketingReferredBy, standardReferredBy } = newUser;
+
+    // A user can only be referred by one commission-based referrer.
+    // Prioritize marketer referrals over standard referrals.
+    const directReferrerId = marketingReferredBy || standardReferredBy;
+
+    if (directReferrerId) {
+        const referrerRef = db.collection('users').doc(directReferrerId);
         try {
             const referrerDoc = await referrerRef.get();
             if (referrerDoc.exists()) {
@@ -48,21 +53,26 @@ export const onUserCreate = functions.firestore
                 const updates: {[key: string]: any} = {
                     referredBy: directReferrerId,
                 };
-
+                
+                // If the referrer is a marketer, add to the chain
                 if (referrerData.role === 'marketer') {
-                    updates.referralChain = [...(referrerData.referralChain || []), directReferrerId];
-                } else if (referrerData.role === 'user') {
-                     // Only increment L1 count for standard user referrals
-                     await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
+                    const currentChain = referrerData.referralChain || [];
+                    updates.referralChain = [...currentChain, directReferrerId];
                 }
                 
-                // Set the referral chain on the new user
                 await newUserRef.update(updates);
+                
+                // If it was a standard user referral, increment their L1 count
+                if (referrerData.role === 'user' && !marketingReferredBy) {
+                     await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
+                }
+
             }
         } catch (error) {
             functions.logger.error(`Error processing commission referral for user ${directReferrerId}:`, error);
         }
     }
+
 
     return null;
   });
@@ -137,7 +147,7 @@ export const joinGame = onCall({ cors: true }, async (request) => {
     try {
         await db.runTransaction(async (transaction) => {
             const roomDoc = await transaction.get(roomRef);
-            if (!roomDoc.exists || roomDoc.data()?.status !== 'waiting') {
+            if (!roomDoc.exists() || roomDoc.data()?.status !== 'waiting') {
                 throw new HttpsError('not-found', 'Room not available.');
             }
 
@@ -277,3 +287,5 @@ export const endGame = onCall({ cors: true }, async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
+
+    

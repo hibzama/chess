@@ -19,13 +19,8 @@ service cloud.firestore {
       allow read: if isAuth();
       // Allow users to create their own document, and admins to create any
       allow create: if isUser(userId) || isAdmin();
-      
-      // More granular update rules
-      allow update: if (isUser(userId) && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'photoURL', 'equipment', 'binancePayId'])) || isAdmin();
-      
-      // Allow any authenticated user to update another user's balance or win count
-      // This is necessary for game payouts and wager deductions within transactions.
-      allow update: if isAuth() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'wins', 'marketingBalance', 'bonusBalance', 'l1Count', 'bonusReferralCount']);
+      // Allow users to update their own document, but only specific fields if not admin
+      allow update: if (isUser(userId) && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'photoURL', 'equipment', 'binancePayId'])) || isAdmin() || (isAuth() && request.resource.data.keys().hasAny(['l1Count', 'bonusReferralCount', 'referralChain', 'balance', 'wins', 'marketingBalance']));
       
       // Subcollections under users
       match /active_campaigns/{docId} {
@@ -100,8 +95,9 @@ service cloud.firestore {
 
     // MARKETING rules
     match /marketing_applications/{appId} {
-      allow create; // Allow anyone to submit an application
-      allow read, update: if isAdmin();
+      allow read: if isAdmin();
+      allow create;
+      allow update: if isAdmin();
     }
     
     // NOTIFICATIONS rules
@@ -136,3 +132,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
