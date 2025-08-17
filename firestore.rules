@@ -1,83 +1,85 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // Helper Functions
+    function isAdmin() {
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isUser(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
     function isAuth() {
       return request.auth != null;
     }
 
-    function isUser(userId) {
-      return isAuth() && request.auth.uid == userId;
-    }
-
-    function isAdmin() {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
+    // USER rules
     match /users/{userId} {
       allow read: if isAuth();
-      allow create: if request.resource.data.uid == request.auth.uid;
-      allow update: if isUser(userId) || isAdmin();
+      // Allow user creation
+      allow create: if isUser(userId);
+      // Allow user to update their own document, or admin to update any
+      // Also allows any authenticated user to update ONLY the balance and wins fields.
+      allow update: if isUser(userId) || isAdmin() || 
+        (isAuth() && request.resource.data.diff(resource.data).affectedKeys.hasOnly(['balance', 'wins']));
       
-      match /{subcollection}/{docId} {
+      // Subcollections under user
+      match /active_campaigns/{docId} {
+        allow read, write: if isUser(userId) || isAdmin();
+      }
+      match /bonus_claims/{docId} {
+        allow read, write: if isUser(userId) || isAdmin();
+      }
+       match /daily_bonus_claims/{docId} {
         allow read, write: if isUser(userId) || isAdmin();
       }
     }
-
+    
+    // GAME_ROOMS rules
     match /game_rooms/{roomId} {
       allow read: if isAuth();
-      allow create: if isAuth();
-      allow update: if isAuth() && request.auth.uid in resource.data.players;
+      allow create: if isAuth() && request.resource.data.createdBy.uid == request.auth.uid;
+      allow update: if isAuth(); 
       allow delete: if (isAuth() && resource.data.createdBy.uid == request.auth.uid) || isAdmin();
-
+      
       match /messages/{messageId} {
         allow read, create: if isAuth() && request.auth.uid in resource.data.players;
       }
     }
-    
-    match /friend_requests/{requestId} {
-      allow read, create: if isAuth();
-      allow delete: if (isAuth() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId)) || isAdmin();
-    }
-    
+
+    // TRANSACTIONS rules
     match /transactions/{transactionId} {
       allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuth();
       allow update, delete: if isAdmin();
     }
-
-    match /chats/{chatId} {
-      allow read, create, update: if isAuth() && request.auth.uid in resource.data.userIds;
-      match /messages/{messageId} {
-        allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]);
-      }
-    }
-
-    match /notifications/{notificationId} {
-      allow read, update: if isAuth() && resource.data.userId == request.auth.uid;
-      allow create: if isAuth();
-      allow delete: if isAdmin();
+    
+    // FRIEND REQUESTS rules
+    match /friend_requests/{reqId} {
+        allow read, create: if isAuth();
+        allow delete: if isAuth() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
     }
     
-    match /marketing_applications/{appId} {
-      allow create: if isAuth();
-      allow read, update: if isAdmin();
-    }
-    
-    // Bonus & Campaign Collections
+    // BONUS & CAMPAIGN rules
     match /signup_bonus_campaigns/{campaignId} {
       allow read: if isAuth();
       allow write: if isAdmin();
       match /claims/{claimId} {
-        allow read, write: if isAuth();
+        allow read: if isAuth();
+        allow create: if isUser(claimId);
       }
     }
 
     match /daily_bonus_campaigns/{campaignId} {
       allow read: if isAuth();
       allow write: if isAdmin();
-      match /claims/{claimId} {
-        allow read, write: if isUser(claimId) || isAdmin();
+       match /claims/{claimId} {
+        allow read: if isAuth(); // Allow users to check if they've claimed
+        allow create: if isUser(claimId) || isAdmin(); // Allow user to create their own claim
       }
     }
 
@@ -85,29 +87,52 @@ service cloud.firestore {
       allow read: if isAuth();
       allow write: if isAdmin();
        match /claims/{claimId} {
-        allow read, write: if isAuth();
+        allow read: if isAuth();
+        allow create: if isUser(claimId);
       }
     }
-    
+
     match /referral_campaigns/{campaignId} {
         allow read: if isAuth();
         allow write: if isAdmin();
     }
-
+    
+    // Root level claims collection for referrals
     match /bonus_claims/{claimId} {
-        allow read: if (isAuth() && resource.data.userId == request.auth.uid) || isAdmin();
-        allow create: if isAuth();
-        allow update, delete: if isAdmin();
+        allow read, write: if isAuth() || isAdmin();
+    }
+
+    // MARKETING rules
+    match /marketing_applications/{appId} {
+      allow read, update: if isAdmin();
+      allow create: if isAuth();
     }
     
+    // NOTIFICATIONS rules
+    match /notifications/{notificationId} {
+      allow read, update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth();
+    }
+    
+    // CHATS rules
+    match /chats/{chatId} {
+      allow read, update: if isAuth() && request.auth.uid in resource.data.userIds;
+      allow create: if isAuth();
+
+      match /messages/{messageId} {
+        allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]);
+      }
+    }
+
+    // SETTINGS rules
     match /settings/{settingId} {
         allow read: if isAuth();
         allow write: if isAdmin();
     }
     
-    // Collection Group Query rule for admins to read all bonus claims
-    match /{path=**}/bonus_claims/{claimId} {
-        allow read: if isAdmin();
+    // COLLECTION GROUP rules for admin claim review
+    match /{path=**}/bonus_claims/{claimDocId} {
+      allow read: if isAdmin();
     }
   }
 }
