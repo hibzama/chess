@@ -1,5 +1,4 @@
 
-
 'use client'
 
 import { useState } from 'react';
@@ -8,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,43 +34,45 @@ export default function CreateGamePage() {
     const [isCreating, setIsCreating] = useState(false);
 
     const USDT_RATE = 310;
-    const wagerAmount = parseInt(investmentAmount) || 0;
-    const usdtAmount = (wagerAmount / USDT_RATE || 0).toFixed(2);
+    const usdtAmount = (parseFloat(investmentAmount) / USDT_RATE || 0).toFixed(2);
     
-    const hasSufficientFunds = (userData?.balance ?? 0) >= wagerAmount;
-
     const handleCreateRoom = async () => {
         if (!user || !userData) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to create a room.' });
             return;
         }
 
+        const wagerAmount = parseInt(investmentAmount);
         if (isNaN(wagerAmount) || wagerAmount < 10) {
             toast({ variant: 'destructive', title: 'Error', description: 'Minimum investment amount is LKR 10.' });
             return;
         }
 
-        if (!hasSufficientFunds) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds.' });
+        if (userData.balance < wagerAmount) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
             return;
         }
 
         setIsCreating(true);
+        const batch = writeBatch(db);
 
         try {
-            const batch = writeBatch(db);
+            // 1. Deduct wager from user's balance
             const userRef = doc(db, 'users', user.uid);
+            if(wagerAmount > 0) {
+                batch.update(userRef, {
+                    balance: increment(-wagerAmount)
+                });
+            }
 
-            // Deduct wager from balance immediately
-            batch.update(userRef, { balance: increment(-wagerAmount) });
-            
+            // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            const roomRef = doc(collection(db, 'game_rooms'));
-            batch.set(roomRef, {
+            // 2. Create the game room document
+            const roomData = {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -81,23 +82,45 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
-                    photoURL: userData.photoURL || '',
                 },
                 players: [user.uid],
-                p1Time: parseInt(gameTimer),
-                p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
-                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
-            });
+                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
+            };
 
+            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            
+            // 3. Create a transaction log for the wager
+            if(wagerAmount > 0) {
+                const transactionRef = doc(collection(db, 'transactions'));
+                batch.set(transactionRef, {
+                    userId: user.uid,
+                    type: 'wager',
+                    amount: wagerAmount,
+                    status: 'completed',
+                    description: `Wager for ${gameName} game`,
+                    gameRoomId: roomRef.id,
+                    createdAt: serverTimestamp()
+                });
+            }
+            
             await batch.commit();
             
-            toast({ title: 'Room Created!', description: 'Your wager has been placed. Waiting for an opponent.' });
+            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+
+            // 4. Navigate to the game room page
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your wager has been refunded.' });
+            
+            // Revert balance deduction if room creation fails
+             if (wagerAmount > 0) {
+                 const userRef = doc(db, 'users', user.uid);
+                 await updateDoc(userRef, { balance: increment(wagerAmount) });
+             }
+
         } finally {
             setIsCreating(false);
         }
@@ -127,17 +150,6 @@ export default function CreateGamePage() {
                                 Playing against another player on the same device is strictly prohibited.
                             </AlertDescription>
                         </Alert>
-                        
-                        <Card className="p-3 bg-secondary">
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm text-muted-foreground">Available Balance:</span>
-                                <div>
-                                    <p className="font-bold">LKR {(userData?.balance ?? 0).toFixed(2)}</p>
-                                    <p className="text-xs text-muted-foreground text-right">~{((userData?.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
-                                </div>
-                            </div>
-                        </Card>
-
 
                         <div className="space-y-2">
                             <Label htmlFor="investment">Investment Amount (LKR)</Label>
@@ -194,8 +206,8 @@ export default function CreateGamePage() {
                             </div>
                         </div>
 
-                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating || !hasSufficientFunds}>
-                            {isCreating ? 'Creating Game...' : (hasSufficientFunds ? 'Create Game & Wait for Opponent' : 'Insufficient Funds')}
+                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
+                            {isCreating ? 'Creating Game...' : 'Create Game & Wait for Opponent'}
                         </Button>
                     </CardContent>
                 </Card>
