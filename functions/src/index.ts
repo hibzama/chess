@@ -38,15 +38,9 @@ export const onUserCreate = functions.firestore
     }
     
     // --- 2. Handle Commission Referral Logic ---
-    const marketingReferrerId = newUser.marketingReferredBy;
-    const standardReferrerId = newUser.standardReferredBy;
-    let directReferrerId: string | null = null;
-    
-    if (marketingReferrerId) {
-        directReferrerId = marketingReferrerId;
-    } else if (standardReferrerId) {
-        directReferrerId = standardReferrerId;
-    }
+    // The logic is simplified to prioritize marketers. If a marketing ref exists, it's used.
+    // Otherwise, it checks for a standard referral.
+    const directReferrerId = newUser.marketingReferredBy || newUser.standardReferredBy;
 
     if (directReferrerId && !newUser.campaignInfo) {
         const referrerRef = admin.firestore().collection('users').doc(directReferrerId);
@@ -58,15 +52,16 @@ export const onUserCreate = functions.firestore
                     referredBy: directReferrerId,
                 };
 
-                if (referrerData.role === 'marketer') {
-                    // This user was referred by a marketer
+                // If referred by a marketer, set the referral chain
+                if (referrerData.role === 'marketer' && newUser.marketingReferredBy) {
                     updates.referralChain = [...(referrerData.referralChain || []), directReferrerId];
-                } else if (referrerData.role === 'user') {
-                     // This user was referred by a standard user
+                } 
+                // If referred by a standard user, increment their L1 count
+                else if (referrerData.role === 'user' && newUser.standardReferredBy) {
                      await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
                 }
                 
-                // Set the referral chain or referredBy on the new user
+                // Set the referral data on the new user's document
                 await newUserRef.update(updates);
                  functions.logger.log(`Processed referral for new user ${context.params.userId} by ${directReferrerId}`);
             }
@@ -256,14 +251,10 @@ export const endGame = onCall({ cors: true }, async (request) => {
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
             } else if (method === 'resign' && resignerDetails) {
-                const opponentPayoutRate = 1.30;
-                
-                let resignerRefundRate = 0.25; // Default refund
-                if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
-                else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
+                let opponentPayoutRate = 1.05;
+                let resignerRefundRate = 0.75;
                 
                 winnerObject.resignerId = resignerDetails.id;
-                winnerObject.resignerPieceCount = resignerDetails.pieceCount;
                 
                 if (resignerDetails.id === creatorId) {
                     winnerObject.uid = joinerId;
@@ -292,3 +283,5 @@ export const endGame = onCall({ cors: true }, async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
+
+    
