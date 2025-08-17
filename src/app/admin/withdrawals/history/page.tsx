@@ -35,6 +35,7 @@ export default function WithdrawalHistoryPage() {
         const q = query(
             collection(db, 'transactions'), 
             where('type', '==', 'withdrawal'),
+            where('status', 'in', ['approved', 'rejected']),
             orderBy('createdAt', 'desc')
         );
         
@@ -42,14 +43,12 @@ export default function WithdrawalHistoryPage() {
             const history: Transaction[] = [];
             for (const transactionDoc of snapshot.docs) {
                 const withdrawalData = transactionDoc.data() as Omit<Transaction, 'id' | 'user'>;
-                if (withdrawalData.status === 'approved' || withdrawalData.status === 'rejected') {
-                    const userDoc = await getDoc(doc(db, 'users', withdrawalData.userId));
-                    history.push({ 
-                        ...withdrawalData, 
-                        id: transactionDoc.id, 
-                        user: userDoc.exists() ? userDoc.data() as Transaction['user'] : undefined
-                    });
-                }
+                const userDoc = await getDoc(doc(db, 'users', withdrawalData.userId));
+                history.push({ 
+                    ...withdrawalData, 
+                    id: transactionDoc.id, 
+                    user: userDoc.exists() ? userDoc.data() as Transaction['user'] : undefined
+                });
             }
             setWithdrawals(history);
             setLoading(false);
