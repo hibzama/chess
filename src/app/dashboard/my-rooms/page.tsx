@@ -24,7 +24,6 @@ type GameRoom = {
     createdBy: {
         uid: string;
         name: string;
-        fundingWallet: 'main' | 'bonus';
     };
     player2?: {
         uid: string;
@@ -102,7 +101,7 @@ export default function MyRoomsPage() {
     }, [user]);
 
     const handleCancelRoom = async (room: GameRoom) => {
-        if (!user || !room.createdBy.fundingWallet) return;
+        if (!user) return;
         
         const roomRef = doc(db, 'game_rooms', room.id);
         const userRef = doc(db, 'users', user.uid);
@@ -110,14 +109,8 @@ export default function MyRoomsPage() {
         try {
             const batch = writeBatch(db);
             
-            // Delete the room document
             batch.delete(roomRef);
-
-            // Refund the wager to the correct wallet
-            if (room.wager > 0) {
-                 const refundField = room.createdBy.fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
-                 batch.update(userRef, { [refundField]: increment(room.wager) });
-            }
+            batch.update(userRef, { balance: increment(room.wager) });
 
             await batch.commit();
 
@@ -218,3 +211,4 @@ export default function MyRoomsPage() {
         </div>
     );
 }
+

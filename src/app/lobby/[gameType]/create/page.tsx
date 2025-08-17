@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, writeBatch, increment, Timestamp } from 'firebase/firestore';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -58,12 +58,19 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
+            const batch = writeBatch(db);
+            const userRef = doc(db, 'users', user.uid);
+
+            // Deduct wager from balance immediately
+            batch.update(userRef, { balance: increment(-wagerAmount) });
+            
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            const roomData = {
+            const roomRef = doc(collection(db, 'game_rooms'));
+            batch.set(roomRef, {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -81,11 +88,11 @@ export default function CreateGamePage() {
                 p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
-            };
+            });
 
-            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            await batch.commit();
             
-            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join. Your funds will be deducted when the game starts.' });
+            toast({ title: 'Room Created!', description: 'Your wager has been placed. Waiting for an opponent.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
@@ -187,8 +194,8 @@ export default function CreateGamePage() {
                             </div>
                         </div>
 
-                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
-                            {isCreating ? 'Creating Game...' : 'Create Game & Wait for Opponent'}
+                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating || !hasSufficientFunds}>
+                            {isCreating ? 'Creating Game...' : (hasSufficientFunds ? 'Create Game & Wait for Opponent' : 'Insufficient Funds')}
                         </Button>
                     </CardContent>
                 </Card>
