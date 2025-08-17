@@ -41,26 +41,30 @@ export default function DashboardLayout({
             return;
         }
         
-        // Check for pending campaign tasks
-        if (userData?.campaignInfo) {
+        // Check for pending campaign tasks ONLY if campaignInfo exists
+        if (userData && userData.campaignInfo && userData.campaignInfo.campaignId) {
             const fetchCampaign = async () => {
-                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo!.campaignId));
-                if (campaignDoc.exists()) {
-                    const campaignData = campaignDoc.data() as Campaign;
-                    const completedTaskIds = new Set(userData.campaignInfo!.completedTasks || []);
-                    
-                    const allTasksCompleted = campaignData.tasks.every(task => completedTaskIds.has(task.id));
-                    
-                    if (!allTasksCompleted && pathname !== '/dashboard/your-task') {
-                        // User has pending tasks and is NOT on the task page -> redirect TO task page
-                        router.push('/dashboard/your-task');
-                    } else if (allTasksCompleted && pathname === '/dashboard/your-task') {
-                        // User has completed all tasks and IS on the task page -> redirect AWAY from task page
-                        router.push('/dashboard');
+                try {
+                    const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo!.campaignId));
+                    if (campaignDoc.exists()) {
+                        const campaignData = campaignDoc.data() as Campaign;
+                        const completedTaskIds = new Set(userData.campaignInfo!.completedTasks || []);
+                        
+                        const allTasksCompleted = campaignData.tasks.every(task => completedTaskIds.has(task.id));
+                        
+                        if (!allTasksCompleted && pathname !== '/dashboard/your-task') {
+                            router.push('/dashboard/your-task');
+                        } else if (allTasksCompleted && pathname === '/dashboard/your-task') {
+                            router.push('/dashboard');
+                        }
+                    } else {
+                         if (pathname === '/dashboard/your-task') {
+                            router.push('/dashboard');
+                        }
                     }
-                } else {
-                    // Campaign may have been deleted by admin
-                    if (pathname === '/dashboard/your-task') {
+                } catch(e) {
+                    console.error("Permission error fetching campaign, redirecting.", e)
+                     if (pathname === '/dashboard/your-task') {
                         router.push('/dashboard');
                     }
                 }
