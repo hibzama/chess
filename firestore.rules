@@ -3,94 +3,114 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Game Rooms
-    match /game_rooms/{roomId} {
-      // Allow authenticated users to list public, waiting games for the lobby
-      allow list: if request.auth != null && resource.data.isPrivate == false && resource.data.status == 'waiting';
-      
-      // Allow authenticated users to read any room (to join private games or view game state)
-      allow get: if request.auth != null;
-      
-      // Allow users to create a room if they are the creator
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.createdBy.uid;
-      
-      // Allow updates for joining, playing, or ending a game
-      allow update: if request.auth != null && request.auth.uid in resource.data.players;
-      
-      // Allow the creator to delete a waiting room
-      allow delete: if request.auth != null && request.auth.uid == resource.data.createdBy.uid && resource.data.status == 'waiting';
-      
-      // Messages within a game room
-      match /messages/{messageId} {
-        allow read, write: if request.auth != null && request.auth.uid in resource.data.players;
-      }
+
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Users
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
     match /users/{userId} {
       allow read;
-      allow create;
-      // Allow a user to update their own document.
-      // Or allow updates from a transaction if it's a game-related payout.
-      allow update: if request.auth != null && request.auth.uid == userId;
-      
-       match /bonus_claims/{claimId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-      match /daily_bonus_claims/{claimId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-
-       match /active_campaigns/{campaignDoc} {
-        allow read, write: if request.auth.uid == userId;
-      }
+      allow create: if request.resource.data.uid == request.auth.uid;
+      allow update: if isOwner(userId) || 
+      // Allow joining a game to update balances
+      (exists(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)) &&
+       request.resource.data.balance == resource.data.balance - get(/databases/$(database)/documents/game_rooms/$(request.resource.data.gameRoomId)).data.wager) ||
+      // Allow payouts
+      (request.resource.data.balance == resource.data.balance + get(/databases/$(database)/documents/transactions/$(request.resource.data.transactionId)).data.amount);
     }
 
-    // Transactions
-    match /transactions/{transactionId} {
-        allow read, write: if request.auth != null && request.auth.uid == request.resource.data.userId;
-    }
+    match /game_rooms/{roomId} {
+      allow read;
+      allow create: if isSignedIn() && request.resource.data.createdBy.uid == request.auth.uid;
+      allow update: if isSignedIn() && (
+        // Allow joining a game
+        (resource.data.status == 'waiting' && request.resource.data.status == 'in-progress' && request.auth.uid in request.resource.data.players) ||
+        // Allow game moves by players
+        (request.auth.uid in resource.data.players && request.resource.data.status == 'in-progress') ||
+        // Allow completing the game
+        request.resource.data.status == 'completed'
+      );
+      allow delete: if resource.data.createdBy.uid == request.auth.uid;
 
-    // Notifications
-    match /notifications/{notificationId} {
-       allow read, write: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      match /messages/{messageId} {
+        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+      }
     }
-
-    // Bonus Campaigns & Claims
-    match /signup_bonus_campaigns/{campaignId} {
-        allow read;
-        match /claims/{claimId} {
-            allow read, write: if request.auth != null;
+    
+    match /chats/{chatId} {
+        allow read, update: if isSignedIn() && request.auth.uid in resource.data.userIds;
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
         }
+    }
+
+    match /transactions/{transactionId} {
+      allow read, create: if isSignedIn();
+      allow update: if isSignedIn(); // For admin actions
+    }
+
+    match /notifications/{notificationId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /friend_requests/{requestId} {
+        allow read, write, delete: if isSignedIn();
+    }
+    
+    match /marketing_applications/{appId} {
+        allow create: if !isSignedIn();
+        allow read, update: if isSignedIn(); // for admins
+    }
+
+    // Bonus Systems
+    match /settings/referralBonusConfig {
+        allow read: if isSignedIn();
+    }
+
+    match /signup_bonus_campaigns/{campaignId} {
+      allow read;
+      match /claims/{claimId} {
+        allow read: if request.auth.uid == claimId;
+        allow write: if request.auth.uid == claimId;
+      }
     }
     
     match /daily_bonus_campaigns/{campaignId} {
-        allow read;
-        match /claims/{claimId} {
-            allow read, write: if request.auth != null;
-        }
+      allow read;
+      match /claims/{claimId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn();
+      }
     }
-    
+
     match /deposit_bonus_campaigns/{campaignId} {
-        allow read;
-        match /claims/{claimId} {
-            allow read, write: if request.auth != null;
-        }
+      allow read;
+       match /claims/{claimId} {
+        allow read: if isSignedIn();
+        allow write: if isSignedIn();
+      }
     }
     
     match /referral_campaigns/{campaignId} {
-        allow read;
+        allow read: if isSignedIn();
+    }
+
+    match /users/{userId}/daily_bonus_claims/{claimId} {
+        allow read, write: if isOwner(userId);
+    }
+    
+     match /users/{userId}/bonus_claims/{claimId} {
+        allow read, write: if isOwner(userId);
     }
 
     match /bonus_claims/{claimId} {
-        allow read, write: if request.auth != null;
-    }
-
-    // Settings
-    match /settings/{settingId} {
-        allow read: if request.auth != null;
+      allow read, write: if isSignedIn();
     }
   }
 }
+
+    
