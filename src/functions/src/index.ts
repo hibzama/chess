@@ -38,38 +38,38 @@ export const onUserCreate = functions.firestore
     }
     
     // --- 2. Handle Commission Referral Logic ---
-    const { marketingReferredBy, standardReferredBy } = newUser;
-
-    // A user can only be referred by one commission-based referrer.
-    // Prioritize marketer referrals over standard referrals.
-    const directReferrerId = marketingReferredBy || standardReferredBy;
-
-    if (directReferrerId) {
-        const referrerRef = db.collection('users').doc(directReferrerId);
+    const marketingReferrerId = newUser.marketingReferredBy;
+    const standardReferrerId = newUser.standardReferredBy;
+    
+    if (marketingReferrerId) {
+        // Prioritize marketer referrals
+        const referrerRef = db.collection('users').doc(marketingReferrerId);
+        try {
+            const referrerDoc = await referrerRef.get();
+            if (referrerDoc.exists() && referrerDoc.data()?.role === 'marketer') {
+                const referrerChain = referrerDoc.data()?.referralChain || [];
+                const newChain = [...referrerChain, marketingReferrerId];
+                await newUserRef.update({
+                    referralChain: newChain,
+                    referredBy: marketingReferrerId,
+                });
+                functions.logger.log(`User ${context.params.userId} added to marketer ${marketingReferrerId}'s chain.`);
+            }
+        } catch (error) {
+            functions.logger.error(`Error processing marketing referral for new user ${context.params.userId} from referrer ${marketingReferrerId}:`, error);
+        }
+    } else if (standardReferrerId) {
+        // Handle standard user referrals
+        const referrerRef = db.collection('users').doc(standardReferrerId);
         try {
             const referrerDoc = await referrerRef.get();
             if (referrerDoc.exists()) {
-                const referrerData = referrerDoc.data()!;
-                const updates: {[key: string]: any} = {
-                    referredBy: directReferrerId,
-                };
-                
-                // If the referrer is a marketer, add to the chain
-                if (referrerData.role === 'marketer') {
-                    const currentChain = referrerData.referralChain || [];
-                    updates.referralChain = [...currentChain, directReferrerId];
-                }
-                
-                await newUserRef.update(updates);
-                
-                // If it was a standard user referral, increment their L1 count
-                if (referrerData.role === 'user' && !marketingReferredBy) {
-                     await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
-                }
-
+                 await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
+                 await newUserRef.update({ referredBy: standardReferrerId });
+                 functions.logger.log(`Incremented l1Count for standard referrer ${standardReferrerId}.`);
             }
         } catch (error) {
-            functions.logger.error(`Error processing commission referral for user ${directReferrerId}:`, error);
+            functions.logger.error(`Error processing standard referral for new user ${context.params.userId} from referrer ${standardReferrerId}:`, error);
         }
     }
 
