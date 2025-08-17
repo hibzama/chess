@@ -68,12 +68,12 @@ export default function UserCampaignsPage() {
     }, [user, activeUserCampaign]);
     
      const availableCampaigns = useMemo(() => {
-        if (!activeUserCampaign) {
-            const completedOrPendingCampaignIds = new Set(claimHistory.map(c => c.campaignId));
-            return allCampaigns.filter(c => !completedOrPendingCampaignIds.has(c.id));
-        }
-        return [];
-    }, [allCampaigns, claimHistory, activeUserCampaign]);
+        if (loading || activeUserCampaign) return [];
+        
+        const completedOrPendingCampaignIds = new Set(claimHistory.map(c => c.campaignId));
+        return allCampaigns.filter(c => !completedOrPendingCampaignIds.has(c.id));
+
+    }, [allCampaigns, claimHistory, activeUserCampaign, loading]);
 
     useEffect(() => {
         const fetchCampaigns = async () => {
@@ -174,21 +174,26 @@ export default function UserCampaignsPage() {
         if (!user || !activeUserCampaign || !campaignDetails) return;
         
         try {
-            await addDoc(collection(db, 'bonus_claims'), {
-                userId: user.uid,
-                type: 'referrer',
-                amount: campaignDetails.referrerBonus,
-                status: 'pending',
-                campaignId: campaignDetails.id,
-                campaignTitle: `Campaign Completion: ${campaignDetails.title}`,
-                createdAt: serverTimestamp(),
+            const claimRef = doc(collection(db, 'bonus_claims'));
+            
+            await runTransaction(db, async (transaction) => {
+                const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
+                
+                // Set the claim first
+                transaction.set(claimRef, {
+                    userId: user.uid,
+                    type: 'referrer',
+                    amount: campaignDetails.referrerBonus,
+                    status: 'pending',
+                    campaignId: campaignDetails.id,
+                    campaignTitle: `Campaign Completion: ${campaignDetails.title}`,
+                    createdAt: serverTimestamp(),
+                });
+                
+                // Then mark the campaign as completed to prevent re-claiming
+                transaction.update(userCampaignRef, { completed: true });
             });
             
-            // Mark the local campaign as completed so user cannot claim again until this is processed
-            await updateDoc(doc(db, 'users', user.uid, 'active_campaigns', 'current'), {
-                completed: true
-            });
-
             toast({ title: "Reward Claim Submitted!", description: `Your claim for LKR ${campaignDetails.referrerBonus} is pending admin approval.` });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Claim Failed", description: error.message });
@@ -380,5 +385,3 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
         </Table>
     </ScrollArea>
 );
-
-    
