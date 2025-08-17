@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -5,126 +6,144 @@ service cloud.firestore {
 
     // Helper functions
     function isAdmin() {
-      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    function isMarketer() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'marketer';
+    }
+
+    function isUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'user';
+    }
+    
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-    
-    function isAuthenticated() {
-      return request.auth != null;
+      return request.auth.uid == userId;
     }
 
-    // USER MANAGEMENT
+    function isAnyRole() {
+        return request.auth != null && ('role' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
+    }
+    
+    // User can update their own data, but not their balance, role, or referral stats
     match /users/{userId} {
-      // Admins can do anything. Users can only read/write their own data.
-      // Other authenticated users can read a user's data for profiles/games, but cannot see sensitive fields.
-      allow read: if isAdmin() || isOwner(userId) || (isAuthenticated() && !('marketingBalance' in resource.data));
-      allow write: if isAdmin() || isOwner(userId);
+      allow read: if isAnyRole();
+      allow create: if request.resource.data.uid == request.auth.uid;
+      allow update: if isOwner(userId) && 
+                       !('balance' in request.resource.data) &&
+                       !('marketingBalance' in request.resource.data) &&
+                       !('bonusReferralCount' in request.resource.data) &&
+                       !('role' in request.resource.data) &&
+                       !('wins' in request.resource.data);
+      allow delete: if isAdmin();
       
-      // Allow specific subcollections for users
-      match /daily_bonus_claims/{campaignId} {
-        allow read, create: if isOwner(userId);
+      match /active_campaigns/{docId} {
+        allow read, write: if isOwner(userId);
       }
-      match /bonus_claims/{claimId} {
-        allow read, create: if isOwner(userId);
+      match /daily_bonus_claims/{docId} {
+          allow read, write: if isOwner(userId);
       }
-      match /active_campaigns/{campaignDocId} {
-        allow read, create, update, delete: if isOwner(userId);
+       match /bonus_claims/{docId} {
+          allow read, write: if isOwner(userId);
       }
     }
-
-    // GAME ROOMS
+    
     match /game_rooms/{roomId} {
-      // Anyone authenticated can see public games. Admins can see all.
-      allow list, get: if isAuthenticated() || isAdmin();
-      // Users can only create rooms for themselves. Admins can create anything.
-      allow create: if isOwner(request.resource.data.createdBy.uid) || isAdmin();
-      // Room can be updated by a player in the game, or an admin.
-      allow update: if request.auth.uid in resource.data.players || isAdmin();
-      // Room can only be deleted by its creator.
-      allow delete: if isOwner(resource.data.createdBy.uid) || isAdmin();
-      
-      match /messages/{messageId} {
-        allow read, create: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-      }
-    }
-
-    // TRANSACTIONS
-    match /transactions/{transactionId} {
-      // Admins can see all transactions. Users can only see their own.
-      allow list, get: if isAdmin() || isOwner(resource.data.userId);
-      // Users can create transactions for themselves (deposit/withdrawal requests).
-      allow create: if isOwner(request.resource.data.userId);
-      // Only admins can approve/reject transactions.
-      allow update: if isAdmin();
-    }
-    
-    // CHATS
-    match /chats/{chatId} {
-        allow read, update: if request.auth.uid in resource.data.userIds;
+        allow read: if isAnyRole();
+        allow create: if isOwner(request.resource.data.createdBy.uid);
+        // Allow updates only if transitioning from waiting to in-progress (join)
+        // or if a player in the game is updating the board state.
+        allow update: if (request.resource.data.status == 'in-progress' && request.resource.data.player2.uid == request.auth.uid && resource.data.status == 'waiting') ||
+                         (request.auth.uid in resource.data.players && request.resource.data.status == 'in-progress' );
+        allow delete: if isOwner(resource.data.createdBy.uid) || isAdmin();
+        
         match /messages/{messageId} {
-            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+          allow read, write: if request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
         }
     }
     
-    // NOTIFICATIONS
-    match /notifications/{notificationId} {
-        allow read, update: if isOwner(resource.data.userId);
+    match /transactions/{transactionId} {
+        allow read: if isOwner(get(/databases/$(database)/documents/transactions/$(transactionId)).data.userId) || isAdmin();
+        allow create: if isOwner(request.resource.data.userId);
+        allow update, delete: if isAdmin();
     }
     
-    // MARKETING APPLICATIONS
     match /marketing_applications/{appId} {
-        allow create: if !isAuthenticated(); // Anyone can apply
-        allow read, update: if isAdmin(); // Only admins can manage
+        allow read, write, delete: if isAdmin();
+        allow create: if request.auth == null; // Open for anyone to apply
     }
     
-    // REFERRAL CAMPAIGNS
-    match /referral_campaigns/{campaignId} {
-        allow list, get: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
+    // Admins have full access to settings
+    match /settings/{settingId} {
+      allow read, write, delete: if isAdmin();
     }
     
-    // BONUS CAMPAIGNS
-    match /signup_bonus_campaigns/{campaignId} {
-        allow get, list: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
-
-        match /claims/{userId} {
-            allow create: if isOwner(userId);
-            allow read: if isOwner(userId) || isAdmin();
+    // Notifications can only be read/updated by the target user.
+    match /notifications/{notifId} {
+      allow read, update, delete: if isOwner(get(/databases/$(database)/documents/notifications/$(notifId)).data.userId);
+      // Creating notifications is handled by cloud functions
+      allow create: if isAdmin(); // Or allow server-side only
+    }
+    
+    // Friend requests can be created by any user, but only read/deleted by the involved parties
+    match /friend_requests/{reqId} {
+      allow create: if isOwner(request.resource.data.fromId);
+      allow read, delete: if request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId;
+    }
+    
+    match /chats/{chatId} {
+      allow read, write: if request.auth.uid in resource.data.userIds;
+       match /messages/{messageId} {
+          allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
         }
     }
-     match /daily_bonus_campaigns/{campaignId} {
-        allow get, list: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
 
+    // --- Bonus & Campaign Rules ---
+    
+    function isClaimingOwnBonus(campaignType, campaignId) {
+       return request.resource.data.userId == request.auth.uid &&
+              exists(/databases/$(database)/documents/$(campaignType)/$(campaignId));
+    }
+    
+    match /signup_bonus_campaigns/{campaignId} {
+        allow read: if isAnyRole();
+        allow write, create, delete: if isAdmin();
+        
         match /claims/{userId} {
-            allow create: if isOwner(userId);
-            allow read: if isOwner(userId) || isAdmin();
+            allow read: if isAdmin() || isOwner(userId);
+            allow create: if isOwner(userId) && isClaimingOwnBonus('signup_bonus_campaigns', campaignId);
+        }
+    }
+
+    match /daily_bonus_campaigns/{campaignId} {
+        allow read: if isAnyRole();
+        allow write, create, delete: if isAdmin();
+        
+        match /claims/{userId} {
+            allow read: if isAdmin() || isOwner(userId);
+            allow create: if isOwner(userId) && isClaimingOwnBonus('daily_bonus_campaigns', campaignId);
         }
     }
     
     match /deposit_bonus_campaigns/{campaignId} {
-        allow get, list: if isAuthenticated();
-        allow create, update, delete: if isAdmin();
+        allow read: if isAnyRole();
+        allow write, create, delete: if isAdmin();
+        
          match /claims/{userId} {
-            allow create: if isOwner(userId);
-            allow read: if isOwner(userId) || isAdmin();
+            allow read: if isAdmin() || isOwner(userId);
+            allow create: if isOwner(userId) && isClaimingOwnBonus('deposit_bonus_campaigns', campaignId);
         }
     }
     
-    // Bonus claims made by referees (for referral campaigns)
-    match /bonus_claims/{claimId} {
-        allow read, create: if isOwner(request.resource.data.userId);
-        allow update: if isAdmin();
+    match /referral_campaigns/{campaignId} {
+        allow read: if isAnyRole();
+        allow write, create, delete: if isAdmin();
     }
     
-    // GLOBAL SETTINGS
-    match /settings/{settingId} {
-        allow read: if isAuthenticated();
-        allow write: if isAdmin();
+    match /bonus_claims/{claimId} {
+      // User can create their own claim, admin can do anything.
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isAdmin() || isOwner(resource.data.userId);
     }
   }
 }
