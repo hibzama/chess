@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -18,16 +19,17 @@ service cloud.firestore {
       allow read: if isAuth();
       // Allow users to create their own document, and admins to create any
       allow create: if isUser(userId) || isAdmin();
-      // Allow users to update their own document, but only specific fields if not admin
+      
+      // More granular update rules
       allow update: if (isUser(userId) && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'photoURL', 'equipment', 'binancePayId'])) || isAdmin();
       
       // Allow any authenticated user to update another user's balance or win count
       // This is necessary for game payouts and wager deductions within transactions.
-      allow update: if isAuth() && request.resource.data.keys().hasAny(['balance', 'wins', 'marketingBalance']);
+      allow update: if isAuth() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'wins', 'marketingBalance', 'bonusBalance', 'l1Count', 'bonusReferralCount']);
       
       // Subcollections under users
       match /active_campaigns/{docId} {
-        allow read, write, delete: if isUser(userId) || isAdmin();
+        allow read, write: if isUser(userId) || isAdmin();
       }
       match /bonus_claims/{docId} {
         allow read, write: if isUser(userId) || isAdmin();
@@ -58,11 +60,11 @@ service cloud.firestore {
     
     // BONUS & CAMPAIGN rules (Root Level)
     match /signup_bonus_campaigns/{campaignId} {
-      allow read: if isAuth(); // Allow users to see campaigns
-      allow write: if isAdmin(); // Only admin can create/edit campaigns
+      allow read: if isAuth();
+      allow write: if isAdmin();
       match /claims/{claimId} {
-        allow read: if isAuth(); // Allow users to check if they've claimed
-        allow create: if isUser(claimId) || isAdmin(); // User can only create their own claim
+        allow read: if isAuth();
+        allow create: if isUser(claimId) || isAdmin();
       }
     }
 
@@ -71,7 +73,7 @@ service cloud.firestore {
       allow write: if isAdmin();
        match /claims/{claimId} {
         allow create: if isUser(claimId) || isAdmin();
-        allow read: if isAuth();
+        allow read: if isAuth(); // Allow any auth user to read to check if claimed
       }
     }
 
@@ -98,9 +100,8 @@ service cloud.firestore {
 
     // MARKETING rules
     match /marketing_applications/{appId} {
-      allow read: if isAdmin();
-      allow create: if true; // Anyone can apply
-      allow update: if isAdmin();
+      allow create; // Allow anyone to submit an application
+      allow read, update: if isAdmin();
     }
     
     // NOTIFICATIONS rules

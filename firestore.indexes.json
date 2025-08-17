@@ -26,6 +26,13 @@
       ]
     },
     {
+        "collectionGroup": "signup_bonus_campaigns",
+        "queryScope": "COLLECTION",
+        "fields": [
+            { "fieldPath": "isActive", "order": "ASCENDING" }
+        ]
+    },
+    {
       "collectionGroup": "transactions",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
