@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
@@ -91,19 +91,6 @@ export default function RegisterForm() {
             // Send verification email
             await sendEmailVerification(user);
 
-            // Fetch bonus settings
-            const bonusConfigSnap = await getDoc(doc(db, 'settings', 'bonusConfig'));
-            const bonusConfig = bonusConfigSnap.data();
-
-            const usersCollection = collection(db, "users");
-            const snapshot = await getCountFromServer(usersCollection);
-            const userCount = snapshot.data().count;
-            
-            let initialBalance = 0;
-            if (bonusConfig?.signupBonusEnabled && userCount < (bonusConfig.signupBonusLimit || 250)) {
-                initialBalance = bonusConfig.signupBonusAmount || 100;
-            }
-
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
             const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
             const svgString = renderToString(React.createElement(randomAvatar));
@@ -120,7 +107,7 @@ export default function RegisterForm() {
                 country,
                 gender,
                 binancePayId: '',
-                balance: initialBalance,
+                balance: 0, // Balance will be set by the Cloud Function
                 role: 'user',
                 createdAt: serverTimestamp(),
                 l1Count: 0,
@@ -130,37 +117,17 @@ export default function RegisterForm() {
                 emailVerified: true, // Allow login by default
             };
             
-            if (aref) {
-                // The onUserCreate cloud function will handle incrementing the count
-                userData.bonusReferredBy = aref;
-            }
-
-            if (rcid && ref) { // It's a campaign referral
+            // Pass referral info to be handled server-side by the Cloud Function
+            if (aref) userData.bonusReferredBy = aref;
+            if (ref) userData.standardReferredBy = ref;
+            if (mref) userData.marketingReferredBy = mref;
+            if (rcid && ref) {
                 userData.campaignInfo = {
                     campaignId: rcid,
                     referrerId: ref,
                     completedTasks: [],
                     answers: {},
                 };
-            }
-            
-            // This is for the main commission system
-            const directReferrerId = mref || ref;
-            if (directReferrerId && !rcid) { // Ensure it's not a campaign referral
-                const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
-                if (referrerDoc.exists()) {
-                    const referrerData = referrerDoc.data();
-                    userData.referredBy = directReferrerId; // Always set the direct referrer
-
-                    if (referrerData.referralChain) {
-                        userData.referralChain = [...referrerData.referralChain, directReferrerId];
-                    } 
-                    else if (referrerData.role === 'marketer') {
-                        userData.referralChain = [directReferrerId];
-                    }
-                    
-                    // The increment is now handled by a Cloud Function to avoid permission issues.
-                }
             }
 
             await setDoc(doc(db, "users", user.uid), userData);
