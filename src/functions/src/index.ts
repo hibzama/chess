@@ -119,6 +119,99 @@ export const announceNewGame = functions.firestore
     return null;
   });
 
+export const joinGame = onCall({ cors: true }, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+
+    const { roomId, fundingWallet } = request.data;
+    const joinerUid = request.auth.uid;
+
+    if (!roomId || !fundingWallet) {
+        throw new HttpsError('invalid-argument', 'Room ID and funding wallet are required.');
+    }
+
+    const db = admin.firestore();
+    const roomRef = db.doc(`game_rooms/${roomId}`);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists || roomDoc.data()?.status !== 'waiting') {
+                throw new HttpsError('not-found', 'Room not available.');
+            }
+
+            const roomData = roomDoc.data()!;
+            const creatorUid = roomData.createdBy.uid;
+
+            if (creatorUid === joinerUid) {
+                throw new HttpsError('failed-precondition', 'You cannot join your own game.');
+            }
+
+            const creatorRef = db.doc(`users/${creatorUid}`);
+            const joinerRef = db.doc(`users/${joinerUid}`);
+
+            const [creatorDoc, joinerDoc] = await Promise.all([
+                transaction.get(creatorRef),
+                transaction.get(joinerRef)
+            ]);
+
+            if (!creatorDoc.exists() || !joinerDoc.exists()) {
+                throw new HttpsError('not-found', 'One of the players does not exist.');
+            }
+
+            const creatorData = creatorDoc.data()!;
+            const joinerData = joinerDoc.data()!;
+            const wager = roomData.wager;
+
+            // Check balances
+            if ((creatorData.balance || 0) < wager) {
+                throw new HttpsError('failed-precondition', 'Creator has insufficient funds.');
+            }
+            if ((joinerData.balance || 0) < wager) {
+                throw new HttpsError('failed-precondition', 'You have insufficient funds.');
+            }
+
+            // All checks passed, proceed with writes
+            const creatorColor = roomData.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+
+            transaction.update(roomRef, {
+                status: 'in-progress',
+                player2: { uid: joinerUid, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
+                players: admin.firestore.FieldValue.arrayUnion(joinerUid),
+                p1Time: roomData.timeControl, 
+                p2Time: roomData.timeControl, 
+                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Deduct wagers and create transaction logs
+            if (wager > 0) {
+                 transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(-wager) });
+                 transaction.set(db.collection('transactions').doc(), {
+                     userId: creatorUid, type: 'wager', amount: wager, status: 'completed',
+                     description: `Wager for ${roomData.gameType} game vs ${joinerData.firstName}`,
+                     gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                 });
+
+                 transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(-wager) });
+                 transaction.set(db.collection('transactions').doc(), {
+                     userId: joinerUid, type: 'wager', amount: wager, status: 'completed',
+                     description: `Wager for ${roomData.gameType} game vs ${creatorData.firstName}`,
+                     gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                 });
+            }
+        });
+        return { success: true };
+    } catch (error) {
+        functions.logger.error("Error joining game:", error);
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
+    }
+});
+
 export const endGame = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
         throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
