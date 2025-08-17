@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -130,6 +130,9 @@ export default function RegisterForm() {
 
             await setDoc(doc(db, "users", user.uid), userData);
             
+            // No need to send email verification for this app logic
+            // await sendEmailVerification(user);
+
             toast({
                 title: "Account Created!",
                 description: "Welcome to Nexbattle.",
