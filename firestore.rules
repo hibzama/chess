@@ -14,23 +14,13 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
-    function getDoc(path) {
-      return get(/databases/$(database)/documents/$(path));
-    }
 
     function incomingDoc() {
       return request.resource.data;
     }
     
-    // Checks if the user is an admin by looking at their user document.
     function isAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // Checks if the user is a participant in a chat.
-    function isChatParticipant(chatId) {
-        return request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
     }
 
     // =================================
@@ -40,9 +30,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId) && !exists(/databases/$(database)/documents/users/$(userId));
-
       allow update: if 
-        // Allow user to update their own non-critical fields
         (isOwner(userId) && !(
             'balance' in incomingDoc() && incomingDoc().balance != resource.data.balance
           ) && !(
@@ -51,14 +39,8 @@ service cloud.firestore {
             'role' in incomingDoc() && incomingDoc().role != resource.data.role
           )
         ) ||
-        // Allow system processes (like game transactions) to update balance
-        (isSignedIn() && ('balance' in incomingDoc() || 'wins' in incomingDoc() || 'l1Count' in incomingDoc() || 'bonusReferralCount' in incomingDoc())) ||
-        // Allow admins to update any user document
+        (isSignedIn() && 'balance' in incomingDoc()) ||
         isAdmin();
-        
-      match /daily_bonus_claims/{campaignId} {
-        allow read, write: if isOwner(userId);
-      }
     }
     
     match /friend_requests/{requestId} {
@@ -68,21 +50,24 @@ service cloud.firestore {
     }
     
     match /game_rooms/{roomId} {
+      allow create: if isSignedIn() && request.resource.data.createdBy.uid == request.auth.uid;
       allow read: if isSignedIn();
-      allow list: if isSignedIn() && (!('isPrivate' in request.query) || request.query.isPrivate == false);
-      allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
-      allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
-      allow update: if isSignedIn() && (
-        (isOwner(resource.data.player2.uid) || isOwner(resource.data.createdBy.uid)) ||
-        (
-            !isOwner(resource.data.createdBy.uid) &&
-            resource.data.status == 'waiting' &&
-            request.resource.data.status == 'in-progress' &&
-            request.resource.data.player2.uid == request.auth.uid &&
-            !(request.auth.uid in resource.data.players) &&
-            (request.auth.uid in request.resource.data.players)
-        )
-      );
+      allow list: if isSignedIn() && resource.data.isPrivate == false;
+      allow delete: if isSignedIn() && resource.data.createdBy.uid == request.auth.uid;
+      allow update: if 
+          isSignedIn() && 
+          (
+              (
+                  resource.data.status == 'waiting' && 
+                  request.resource.data.status == 'in-progress' &&
+                  request.resource.data.player2.uid == request.auth.uid
+              ) ||
+              (
+                  (resource.data.createdBy.uid == request.auth.uid || resource.data.player2.uid == request.auth.uid) &&
+                  resource.data.status == 'in-progress' &&
+                  (request.resource.data.status == 'in-progress' || request.resource.data.status == 'completed')
+              )
+          );
     }
     
     match /transactions/{transactionId} {
@@ -107,7 +92,6 @@ service cloud.firestore {
 
     match /chats/{chatId} {
         allow read, write, list: if isSignedIn() && request.auth.uid in chatId.split('_');
-
         match /messages/{messageId} {
             allow read, create: if isSignedIn() && request.auth.uid in chatId.split('_');
         }
@@ -119,39 +103,58 @@ service cloud.firestore {
     }
     
     // Bonus System Rules
-    match /daily_bonus_campaigns/{campaignId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-      match /claims/{userId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
-    }
-
-    match /deposit_bonus_campaigns/{campaignId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-      match /claims/{userId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
+    match /signup_bonus_campaigns/{campaignId} {
+        allow read, list: if isSignedIn();
+        allow write: if isAdmin();
+        
+        match /claims/{claimId} {
+            allow read: if isOwner(claimId) || isAdmin();
+            allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+        }
     }
     
-    match /signup_bonus_campaigns/{campaignId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-       match /claims/{userId} {
-        allow read, write: if isOwner(userId) || isAdmin();
-      }
+    match /daily_bonus_campaigns/{campaignId} {
+        allow read, list: if isSignedIn();
+        allow write: if isAdmin();
+        
+        match /claims/{claimId} {
+            allow read: if isOwner(claimId) || isAdmin();
+            allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+        }
     }
-
-    match /referral_campaigns/{campaignId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+    
+    match /deposit_bonus_campaigns/{campaignId} {
+        allow read, list: if isSignedIn();
+        allow write: if isAdmin();
+        
+        match /claims/{claimId} {
+            allow read: if isOwner(claimId) || isAdmin();
+            allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+        }
     }
-
+    
+     match /referral_campaigns/{campaignId} {
+        allow read, list: if isSignedIn();
+        allow write: if isAdmin();
+    }
+    
     match /bonus_claims/{claimId} {
         allow read, list: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
-        allow create: if isSignedIn();
-        allow update, delete: if isAdmin();
+        allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+        allow update: if isAdmin();
     }
+
+    // User-specific subcollections for bonus tracking
+    match /users/{userId}/bonus_claims/{claimId} {
+        allow read, list, create: if isOwner(userId);
+    }
+    
+    match /users/{userId}/daily_bonus_claims/{claimId} {
+        allow read, list, create: if isOwner(userId);
+    }
+     match /users/{userId}/active_campaigns/{docId} {
+        allow read, write, delete: if isOwner(userId);
+    }
+
   }
 }
