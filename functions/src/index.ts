@@ -194,5 +194,3 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
-
-    
