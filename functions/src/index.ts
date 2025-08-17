@@ -23,7 +23,20 @@ export const onUserCreate = functions.firestore
     const db = admin.firestore();
     const { userId } = context.params;
 
-    // --- 1. Handle Commission Referral Logic (mref and ref links) ---
+    // --- 1. Handle Bonus Referral Count (aref link) ---
+    if (newUser.bonusReferredBy) {
+      const bonusReferrerRef = db.doc(`users/${newUser.bonusReferredBy}`);
+      try {
+        await bonusReferrerRef.update({
+          bonusReferralCount: admin.firestore.FieldValue.increment(1),
+        });
+        functions.logger.log(`Incremented bonusReferralCount for ${newUser.bonusReferredBy}`);
+      } catch (error) {
+        functions.logger.error(`Failed to increment bonusReferralCount for ${newUser.bonusReferredBy}`, error);
+      }
+    }
+
+    // --- 2. Handle Commission Referral Logic (mref and ref links) ---
     const marketingReferrerId = newUser.marketingReferredBy;
     const standardReferrerId = newUser.standardReferredBy;
     const directReferrerId = marketingReferrerId || standardReferrerId;
@@ -76,19 +89,6 @@ export const onUserCreate = functions.firestore
         });
       } catch (error) {
         functions.logger.error(`Error processing commission referral for new user ${userId} from referrer ${directReferrerId}:`, error);
-      }
-    }
-
-    // --- 2. Handle Bonus Referral Count (aref link) ---
-    if (newUser.bonusReferredBy) {
-      const bonusReferrerRef = db.doc(`users/${newUser.bonusReferredBy}`);
-      try {
-        await bonusReferrerRef.update({
-          bonusReferralCount: admin.firestore.FieldValue.increment(1),
-        });
-        functions.logger.log(`Incremented bonusReferralCount for ${newUser.bonusReferredBy}`);
-      } catch (error) {
-        functions.logger.error(`Failed to increment bonusReferralCount for ${newUser.bonusReferredBy}`, error);
       }
     }
     
@@ -203,5 +203,4 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
-
     
