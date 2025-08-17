@@ -149,14 +149,12 @@ function MultiplayerGame() {
     const { isGameLoading, gameOver, room } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
-    const [fundingWallet, setFundingWallet] = useState<'main'>('main');
     
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
-    const selectedWalletBalance = userData?.balance ?? 0;
-    const hasSufficientFunds = room ? selectedWalletBalance >= room.wager : false;
+    const hasSufficientFunds = room ? (userData?.balance ?? 0) >= room.wager : false;
 
 
     useEffect(() => {
@@ -215,14 +213,14 @@ function MultiplayerGame() {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
         if(!hasSufficientFunds) {
-            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your ${fundingWallet} wallet.`});
+            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance.`});
             return;
         }
     
         setIsJoining(true);
         try {
             const joinGameFunction = httpsCallable(functions, 'joinGame');
-            await joinGameFunction({ roomId: room.id, fundingWallet: fundingWallet });
+            await joinGameFunction({ roomId: room.id, fundingWallet: 'main' });
             toast({ title: "Game Joined!", description: "The match is starting now."});
     
         } catch (error: any) {
