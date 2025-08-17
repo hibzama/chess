@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyBonusCampaign } from '@/app/admin/bonus/daily-bonus/page';
 import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
 import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
+import { BonusCard } from '../bonus-card';
 
 // #region Bonus Components
 const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string}) => (
@@ -239,6 +240,8 @@ export default function DashboardPage() {
           Your journey to becoming a grandmaster starts now. Choose your game and make your move.
         </p>
       </div>
+
+       <BonusCard />
 
        {/* Bonus Hub Section */}
         <div className="space-y-4">

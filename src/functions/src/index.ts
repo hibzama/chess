@@ -14,38 +14,7 @@ export const onUserCreate = functions.firestore
     const newUser = snap.data();
     const newUserRef = snap.ref;
     
-    // --- 1. Handle Sign-up Bonus ---
-    const campaignsRef = admin.firestore().collection('signup_bonus_campaigns');
-    
-    try {
-        const activeCampaignQuery = campaignsRef.where('isActive', '==', true).limit(1);
-        const activeCampaignSnap = await activeCampaignQuery.get();
-
-        if (!activeCampaignSnap.empty) {
-            const campaignDoc = activeCampaignSnap.docs[0];
-            const campaign = { id: campaignDoc.id, ...campaignDoc.data() };
-            const claimsRef = campaignDoc.ref.collection('claims');
-            
-            const claimsCountSnap = await claimsRef.count().get();
-            const claimsCount = claimsCountSnap.data().count;
-
-            if (claimsCount < campaign.userLimit) {
-                // Award bonus
-                await newUserRef.update({
-                    balance: admin.firestore.FieldValue.increment(campaign.bonusAmount)
-                });
-                // Log the claim
-                await claimsRef.doc(snap.id).set({
-                    userId: snap.id,
-                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-            }
-        }
-    } catch (error) {
-        functions.logger.error("Error processing signup bonus:", error);
-    }
-    
-    // --- 2. Handle Bonus Referral Count ---
+    // --- 1. Handle Bonus Referral Count ---
     if (newUser.bonusReferredBy) {
         const referrerId = newUser.bonusReferredBy;
         const referrerRef = admin.firestore().collection('users').doc(referrerId);
@@ -60,7 +29,7 @@ export const onUserCreate = functions.firestore
         }
     }
     
-    // --- 3. Handle Commission Referral Logic ---
+    // --- 2. Handle Commission Referral Logic ---
     const directReferrerId = newUser.marketingReferredBy || newUser.standardReferredBy;
     if (directReferrerId && !newUser.campaignInfo) {
         const referrerRef = admin.firestore().collection('users').doc(directReferrerId);
