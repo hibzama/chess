@@ -233,7 +233,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tighter mb-2">Welcome, {userData?.firstName}!</h1>
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">Welcome, {userData?.firstName}!</h1>
         <p className="text-muted-foreground md:text-lg">
           Your journey to becoming a grandmaster starts now. Choose your game and make your move.
         </p>
