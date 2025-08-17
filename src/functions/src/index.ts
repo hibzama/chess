@@ -44,40 +44,49 @@ export const onUserCreate = functions.firestore
     if (directReferrerId) {
       const referrerRef = db.doc(`users/${directReferrerId}`);
       try {
-        const referrerDoc = await referrerRef.get();
-        if (referrerDoc.exists) {
-          const referrerData = referrerDoc.data()!;
-          const updates: { [key: string]: any; } = {};
+        await db.runTransaction(async (transaction) => {
+          const referrerDoc = await transaction.get(referrerRef);
+          if (!referrerDoc.exists) {
+            functions.logger.warn(`Referrer with ID ${directReferrerId} not found.`);
+            return;
+          }
 
-          // Always set the direct referrer
-          updates.referredBy = directReferrerId;
+          const referrerData = referrerDoc.data()!;
+          const updatesForNewUser: { [key: string]: any; } = {};
+
+          // Always set the direct referrer ID on the new user's document
+          updatesForNewUser.referredBy = directReferrerId;
 
           // Case 1: The referrer is a marketer (mref link was used)
           if (referrerData.role === 'marketer') {
-            updates.referralChain = [directReferrerId];
+            updatesForNewUser.referralChain = [directReferrerId];
             functions.logger.log(`User ${userId} joined marketer ${directReferrerId}'s chain.`);
           }
           // Case 2: The referrer is a standard user (ref link was used)
           else if (referrerData.role === 'user') {
             // Increment the standard user's L1 count
-            await referrerRef.update({
+            transaction.update(referrerRef, {
               l1Count: admin.firestore.FieldValue.increment(1)
             });
             functions.logger.log(`Incremented l1Count for standard referrer ${directReferrerId}.`);
 
-            // Check if the standard referrer is part of a marketer's chain
+            // Check if the standard referrer is part of a marketer's chain and inherit it
             if (referrerData.referralChain && referrerData.referralChain.length > 0) {
-              updates.referralChain = [...referrerData.referralChain, directReferrerId];
-              functions.logger.log(`User ${userId} inherited chain from ${directReferrerId}.`);
+              const newChain = [...referrerData.referralChain, directReferrerId];
+              // Enforce a maximum chain length of 20 to prevent infinite loops and abuse
+              if (newChain.length <= 20) {
+                  updatesForNewUser.referralChain = newChain;
+                  functions.logger.log(`User ${userId} inherited and extended chain from ${directReferrerId}.`);
+              } else {
+                  functions.logger.warn(`Referral chain for user ${userId} exceeds 20 levels. Not extending.`);
+              }
             }
           }
-
-          if (Object.keys(updates).length > 0) {
-            await newUserRef.update(updates);
+          // Apply updates to the new user's document
+          if (Object.keys(updatesForNewUser).length > 0) {
+            transaction.update(newUserRef, updatesForNewUser);
           }
-        } else {
-            functions.logger.warn(`Referrer with ID ${directReferrerId} not found.`);
-        }
+        });
       } catch (error) {
         functions.logger.error(`Error processing commission referral for new user ${userId} from referrer ${directReferrerId}:`, error);
       }
@@ -194,3 +203,5 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
+    
+    
