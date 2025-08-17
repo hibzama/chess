@@ -27,7 +27,6 @@ export default function DepositHistoryPage() {
         const q = query(
             collection(db, 'transactions'), 
             where('type', '==', 'deposit'),
-            where('status', 'in', ['approved', 'rejected']),
             orderBy('createdAt', 'desc')
         );
         
@@ -35,12 +34,15 @@ export default function DepositHistoryPage() {
             const allDeposits: Transaction[] = [];
             for (const transactionDoc of snapshot.docs) {
                 const depositData = transactionDoc.data() as Omit<Transaction, 'id' | 'user'>;
-                const userDoc = await getDoc(doc(db, 'users', depositData.userId));
-                allDeposits.push({ 
-                    ...depositData, 
-                    id: transactionDoc.id, 
-                    user: userDoc.exists() ? userDoc.data() as Transaction['user'] : undefined
-                });
+                // Fetch only completed or rejected transactions
+                if (depositData.status === 'approved' || depositData.status === 'rejected') {
+                    const userDoc = await getDoc(doc(db, 'users', depositData.userId));
+                    allDeposits.push({ 
+                        ...depositData, 
+                        id: transactionDoc.id, 
+                        user: userDoc.exists() ? userDoc.data() as Transaction['user'] : undefined
+                    });
+                }
             }
             setDeposits(allDeposits);
             setLoading(false);
