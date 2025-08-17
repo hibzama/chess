@@ -1,4 +1,3 @@
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -25,6 +24,7 @@ export const onUserCreate = functions.firestore
     const { userId } = context.params;
 
     // --- 1. Handle Bonus Referral Count ---
+    // This is for separate, one-time bonus campaigns and is independent.
     if (newUser.bonusReferredBy) {
       const bonusReferrerRef = db.doc(`users/${newUser.bonusReferredBy}`);
       try {
@@ -37,40 +37,41 @@ export const onUserCreate = functions.firestore
       }
     }
 
-    // --- 2. Handle Commission Referral Logic ---
-    const marketingReferrerId = newUser.marketingReferredBy;
-    const standardReferrerId = newUser.standardReferredBy;
+    // --- 2. Handle Commission Referral Logic (The main system) ---
+    const marketingReferrerId = newUser.marketingReferredBy; // from mref link
+    const standardReferrerId = newUser.standardReferredBy; // from ref link
 
-    if (marketingReferrerId) {
-      // Prioritize marketer referrals
-      const marketerRef = db.doc(`users/${marketingReferrerId}`);
-      try {
-        const marketerDoc = await marketerRef.get();
-        if (marketerDoc.exists() && marketerDoc.data()?.role === 'marketer') {
-          const referrerChain = marketerDoc.data()?.referralChain || [];
-          const newChain = [...referrerChain, marketingReferrerId];
-          await newUserRef.update({
-            referralChain: newChain,
-            referredBy: marketingReferrerId,
-          });
-          functions.logger.log(`User ${userId} added to marketer ${marketingReferrerId}'s chain.`);
+    const referrerId = marketingReferrerId || standardReferrerId;
+
+    if (referrerId) {
+        const referrerRef = db.doc(`users/${referrerId}`);
+        try {
+            const referrerDoc = await referrerRef.get();
+            if (referrerDoc.exists()) {
+                const referrerData = referrerDoc.data()!;
+                const updates: { [key: string]: any; } = {};
+
+                // Construct the new user's referral chain
+                const referrerChain = referrerData.referralChain || [];
+                updates.referralChain = [...referrerChain, referrerId];
+                
+                // Set the direct referrer
+                updates.referredBy = referrerId;
+                
+                // If the direct referrer is a standard user, increment their L1 count
+                if (referrerData.role === 'user' && !marketingReferrerId) {
+                    await referrerRef.update({
+                        l1Count: admin.firestore.FieldValue.increment(1)
+                    });
+                     functions.logger.log(`Incremented l1Count for standard referrer ${referrerId}.`);
+                }
+
+                await newUserRef.update(updates);
+                functions.logger.log(`User ${userId} referral chain and referredBy updated for referrer ${referrerId}.`);
+            }
+        } catch (error) {
+            functions.logger.error(`Error processing commission referral for new user ${userId} from referrer ${referrerId}:`, error);
         }
-      } catch (error) {
-        functions.logger.error(`Error processing marketing referral for new user ${userId} from referrer ${marketingReferrerId}:`, error);
-      }
-    } else if (standardReferrerId) {
-      // Handle standard user referrals if no marketer ref
-      const standardReferrerRef = db.doc(`users/${standardReferrerId}`);
-      try {
-        const referrerDoc = await standardReferrerRef.get();
-        if (referrerDoc.exists()) {
-          await standardReferrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
-          await newUserRef.update({ referredBy: standardReferrerId });
-          functions.logger.log(`Incremented l1Count for standard referrer ${standardReferrerId}.`);
-        }
-      } catch (error) {
-        functions.logger.error(`Error processing standard referral for new user ${userId} from referrer ${standardReferrerId}:`, error);
-      }
     }
 
     return null;
@@ -287,5 +288,3 @@ export const endGame = onCall({ cors: true }, async (request) => {
         throw new HttpsError('internal', 'An unexpected error occurred.');
     }
 });
-
-    
