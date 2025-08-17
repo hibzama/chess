@@ -152,28 +152,27 @@ export default function DashboardPage() {
                 
                 const now = new Date();
                 const futureAndActiveCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
-
-                const eligibleNow = futureAndActiveCampaigns.find(c => {
-                    const startDate = c.startDate.toDate();
-                    if (now < startDate) return false;
-
+                
+                let foundBonus: DailyBonusCampaign | null = null;
+                for (const campaign of futureAndActiveCampaigns) {
+                    const startDate = campaign.startDate.toDate();
+                    if (now < startDate) continue; // Skip if not started
+                    
                     let isEligible = false;
-                    if (c.eligibility === 'all') isEligible = true;
-                    else if (c.eligibility === 'below') isEligible = (userData.balance || 0) <= c.balanceThreshold;
-                    else if (c.eligibility === 'above') isEligible = (userData.balance || 0) > c.balanceThreshold;
-                    return isEligible;
-                });
+                    if (campaign.eligibility === 'all') isEligible = true;
+                    else if (campaign.eligibility === 'below') isEligible = (userData.balance || 0) <= campaign.balanceThreshold;
+                    else if (campaign.eligibility === 'above') isEligible = (userData.balance || 0) > campaign.balanceThreshold;
 
-                if (eligibleNow) {
-                    const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, eligibleNow.id));
-                    if (!claimSnap.exists()) {
-                        setDailyBonus(eligibleNow);
-                    } else {
-                        setDailyBonus(null);
+                    if (isEligible) {
+                        const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, campaign.id));
+                        if (!claimSnap.exists()) {
+                            foundBonus = campaign;
+                            break; // Found an eligible, unclaimed bonus, stop searching
+                        }
                     }
-                } else {
-                    setDailyBonus(null);
                 }
+                setDailyBonus(foundBonus);
+
             } catch (e) { console.error("Error fetching daily bonus", e); setDailyBonus(null); }
             
             setCheckingBonuses(false);
