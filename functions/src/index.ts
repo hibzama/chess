@@ -27,7 +27,7 @@ export const onUserCreate = functions.firestore
             
             if (userCount <= (bonusConfig.signupBonusLimit || 250)) {
                 await newUserRef.update({
-                    balance: bonusConfig.signupBonusAmount || 100
+                    balance: admin.firestore.FieldValue.increment(bonusConfig.signupBonusAmount || 100)
                 });
             }
         }
