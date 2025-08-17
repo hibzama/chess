@@ -181,15 +181,15 @@ export const announceNewGame = functions.firestore
     const timeControl = timeControlValue ? `${timeControlValue / 60} min` : "Not set";
     const gameLink = `${siteUrl}/game/multiplayer/${roomId}`;
 
-    const message = `⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n` +
-      `<b>Player:</b> ${createdBy}\n` +
-      `<b>Wager:</b> LKR ${wager.toFixed(2)}\n` +
-      `<b>Time:</b> ${timeControl}\n\n` +
-      `<i>Room ID:</i> <code>${roomId}</code>\n\n` +
-      `<a href="${gameLink}">Click Here to Join Game</a>\n\n` +
-      `<i>This room will expire in 3 minutes if no one joins.</i>`;
+    const message = \`⚔️ <b>New Public ${gameType} Room!</b> ⚔️\n\n\` +
+      \`<b>Player:</b> ${createdBy}\n\` +
+      \`<b>Wager:</b> LKR ${wager.toFixed(2)}\n\` +
+      \`<b>Time:</b> ${timeControl}\n\n\` +
+      \`<i>Room ID:</i> <code>${roomId}</code>\n\n\` +
+      \`<a href="${gameLink}">Click Here to Join Game</a>\n\n\` +
+      \`<i>This room will expire in 3 minutes if no one joins.</i>\`;
 
-    const telegramApiUrl = `https://api.telegram.org/bot${telegramBotToken}/sendMessage`;
+    const telegramApiUrl = \`https://api.telegram.org/bot${telegramBotToken}/sendMessage\`;
 
     try {
       await axios.post(telegramApiUrl, {
@@ -197,7 +197,7 @@ export const announceNewGame = functions.firestore
         text: message,
         parse_mode: 'HTML',
       });
-      functions.logger.log(`Successfully sent message for Room ID: ${roomId}`);
+      functions.logger.log(\`Successfully sent message for Room ID: ${roomId}\`);
     } catch (error: any) {
       functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
