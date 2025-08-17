@@ -156,11 +156,7 @@ export default function DashboardPage() {
                 if (!depositSnapshot.empty) {
                     const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
                     const eligibleCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
-                    if (eligibleCampaign) {
-                        setDepositBonus(eligibleCampaign);
-                    } else {
-                        setDepositBonus(null);
-                    }
+                    setDepositBonus(eligibleCampaign || null);
                 } else {
                     setDepositBonus(null);
                 }

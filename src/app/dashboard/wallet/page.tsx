@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db, storage } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp, orderBy, limit, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
 
 
 type Transaction = {
@@ -62,6 +63,8 @@ export default function WalletPage() {
   const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: 'Bank of Ceylon (Boc)', branch: '', accountNumber: '', accountName: '' });
   const [binancePayId, setBinancePayId] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
+  
+  const [depositBonus, setDepositBonus] = useState<DepositBonusCampaign | null>(null);
   
   const usdtAmount = (parseFloat(depositAmount) / USDT_RATE || 0).toFixed(2);
   
@@ -108,7 +111,19 @@ export default function WalletPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const bonusQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true), where('expiresAt', '>', Timestamp.now()));
+    const unsubscribeBonus = onSnapshot(bonusQuery, (snapshot) => {
+        if (!snapshot.empty) {
+            setDepositBonus(snapshot.docs[0].data() as DepositBonusCampaign);
+        } else {
+            setDepositBonus(null);
+        }
+    });
+
+    return () => {
+        unsubscribe();
+        unsubscribeBonus();
+    };
   }, [user, toast]);
   
 
@@ -296,6 +311,15 @@ export default function WalletPage() {
                 </CardHeader>
                 <form onSubmit={handleInitiateDeposit}>
                     <CardContent className="space-y-6">
+                        {depositBonus && (
+                            <Alert className="border-green-500/50 bg-green-500/10 text-green-400">
+                                <Gift className="h-4 w-4 !text-green-400" />
+                                <AlertTitle className="text-green-400">{depositBonus.title}</AlertTitle>
+                                <AlertDescription>
+                                    Active Bonus: Get a {depositBonus.percentage}% bonus on deposits from LKR {depositBonus.minDeposit} to LKR {depositBonus.maxDeposit}!
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         <Tabs value={depositMethod} onValueChange={(v) => setDepositMethod(v as any)} className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="binance">Binance Pay</TabsTrigger>
