@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useState } from 'react';
@@ -57,14 +58,12 @@ export default function CreateGamePage() {
         setIsCreating(true);
 
         try {
-            
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            const roomRef = doc(collection(db, 'game_rooms'));
-            await addDoc(collection(db, 'game_rooms'), {
+            const roomData = {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -81,7 +80,9 @@ export default function CreateGamePage() {
                 p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
                 expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
-            });
+            };
+            
+            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
             
             toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
@@ -194,3 +195,5 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
+    
