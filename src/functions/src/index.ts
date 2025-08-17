@@ -15,19 +15,29 @@ export const onUserCreate = functions.firestore
     const newUserRef = snap.ref;
     
     // --- 1. Handle Sign-up Bonus ---
-    const bonusConfigRef = admin.firestore().collection('settings').doc('bonusConfig');
-    const usersCollection = admin.firestore().collection('users');
+    const campaignsRef = admin.firestore().collection('signup_bonus_campaigns');
     
     try {
-        const bonusConfigSnap = await bonusConfigRef.get();
-        if (bonusConfigSnap.exists() && bonusConfigSnap.data()?.signupBonusEnabled) {
-            const bonusConfig = bonusConfigSnap.data()!;
-            const snapshot = await usersCollection.count().get();
-            const userCount = snapshot.data().count;
+        const activeCampaignQuery = campaignsRef.where('isActive', '==', true).limit(1);
+        const activeCampaignSnap = await activeCampaignQuery.get();
+
+        if (!activeCampaignSnap.empty) {
+            const campaignDoc = activeCampaignSnap.docs[0];
+            const campaign = { id: campaignDoc.id, ...campaignDoc.data() };
+            const claimsRef = campaignDoc.ref.collection('claims');
             
-            if (userCount < (bonusConfig.signupBonusLimit || 250)) {
+            const claimsCountSnap = await claimsRef.count().get();
+            const claimsCount = claimsCountSnap.data().count;
+
+            if (claimsCount < campaign.userLimit) {
+                // Award bonus
                 await newUserRef.update({
-                    balance: admin.firestore.FieldValue.increment(bonusConfig.signupBonusAmount || 100)
+                    balance: admin.firestore.FieldValue.increment(campaign.bonusAmount)
+                });
+                // Log the claim
+                await claimsRef.doc(snap.id).set({
+                    userId: snap.id,
+                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
                 });
             }
         }
