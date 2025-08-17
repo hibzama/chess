@@ -4,8 +4,9 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
-import { doc, onSnapshot, getDoc, writeBatch, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { doc, onSnapshot, getDoc, collection, serverTimestamp, Timestamp, updateDoc, increment, query, where, getDocs, runTransaction, deleteDoc, DocumentData } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import GameChat from '@/components/game/game-chat';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 // Game Components
 import ChessBoard from '@/components/game/chess-board';
@@ -22,7 +25,6 @@ import CheckersBoard from '@/components/game/checkers-board';
 import GameLayout from '@/components/game/game-layout';
 import { GameProvider, useGame } from '@/context/game-context';
 import { formatTime } from '@/lib/time';
-import { cn } from '@/lib/utils';
 
 type GameRoom = {
     id: string;
@@ -35,12 +37,14 @@ type GameRoom = {
         name: string;
         color: 'w' | 'b';
         photoURL?: string;
+        fundingWallet: 'main' | 'bonus';
     };
     player2?: {
         uid: string;
         name: string;
         color: 'w' | 'b';
         photoURL?: string;
+        fundingWallet: 'main' | 'bonus';
     };
     players: string[];
     createdAt: any;
@@ -146,10 +150,14 @@ function MultiplayerGame() {
     const { isGameLoading, gameOver, room } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
+    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
     
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
+
+    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
+    const hasSufficientFunds = room ? selectedWalletBalance >= room.wager : false;
 
     useEffect(() => {
         roomStatusRef.current = room?.status;
@@ -163,9 +171,13 @@ function MultiplayerGame() {
     
         try {
             const batch = writeBatch(db);
+            
             batch.delete(roomRef);
-            // Refund the creator's wager
-            batch.update(userRef, { balance: increment(room.wager) });
+            // Refund the creator's wager. This logic assumes wagers are taken upon creation.
+            const creatorFundingWallet = room.createdBy.fundingWallet || 'main';
+            batch.update(userRef, {
+                [creatorFundingWallet === 'bonus' ? 'bonusBalance' : 'balance']: increment(room.wager)
+            });
 
             await batch.commit();
     
@@ -212,51 +224,26 @@ function MultiplayerGame() {
     const handleJoinGame = async () => {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
-        if(userData.balance < room.wager) {
-            toast({ variant: "destructive", title: "Insufficient Funds", description: "You don't have enough balance to join this game."});
+        if(!hasSufficientFunds) {
+            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your ${fundingWallet} wallet.`});
             return;
         }
     
         setIsJoining(true);
-        const roomRef = doc(db, 'game_rooms', room.id);
-        const joinerRef = doc(db, 'users', user.uid);
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const currentRoomDoc = await transaction.get(roomRef);
-                if (!currentRoomDoc.exists() || currentRoomDoc.data()?.status !== 'waiting') {
-                    throw new Error("Room not available");
-                }
-                const roomData = currentRoomDoc.data();
-                const joinerData = (await transaction.get(joinerRef)).data();
-                if (!joinerData || (joinerData.balance || 0) < room.wager) {
-                    throw new Error("Insufficient funds to join.");
-                }
-
-                // Deduct from joiner's wallet
-                transaction.update(joinerRef, { balance: increment(-room.wager) });
-
-                const creatorColor = roomData.createdBy.color;
-                const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-                
-                transaction.update(roomRef, {
-                    status: 'in-progress',
-                    player2: { uid: user.uid, name: `${userData.firstName} ${userData.lastName}`, color: joinerColor, photoURL: userData.photoURL || '' },
-                    players: [...roomData.players, user.uid],
-                    turnStartTime: serverTimestamp(),
-                });
-            });
-
+            const authToken = await user.getIdToken();
+            const joinGameFunction = httpsCallable(functions, 'joinGame');
+            await joinGameFunction({ authToken, roomId: room.id, fundingWallet: fundingWallet });
             toast({ title: "Game Joined!", description: "The match is starting now."});
     
         } catch (error: any) {
             console.error("Failed to join game:", error);
-            if (error.message === 'Room not available') {
-                 toast({ variant: "destructive", title: "Room Not Available", description: "This room is no longer available to join." });
+            const errorMessage = error.details?.message || error.message || 'An unknown error occurred.';
+            toast({ variant: 'destructive', title: "Error Joining Game", description: errorMessage });
+             if (error.code === 'not-found' && errorMessage === 'Room not available.') {
                  router.push(`/lobby/${room.gameType}`);
-            } else {
-                 toast({ variant: 'destructive', title: "Error", description: `Could not join the game. ${error.message}`});
-            }
+             }
         } finally {
             setIsJoining(false);
         }
@@ -316,8 +303,6 @@ function MultiplayerGame() {
                 </div>
             )
         } else {
-            const hasEnoughBalance = userData.balance >= room.wager;
-
             return (
                  <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
                     <Card className="w-full max-w-lg p-8 bg-card/70 backdrop-blur-sm">
@@ -343,12 +328,35 @@ function MultiplayerGame() {
                                     <p className="text-xs text-muted-foreground">~{(room.wager / USDT_RATE).toFixed(2)} USDT</p>
                                 </div>
                             </div>
+
+                             <div className="space-y-3">
+                                <Label>Funding Wallet</Label>
+                                 <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="main" id="main-wallet" />
+                                        <Label htmlFor="main-wallet">Main Wallet</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="bonus" id="bonus-wallet" />
+                                        <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
+                                    </div>
+                                </RadioGroup>
+                                <Card className="p-3 bg-secondary">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-muted-foreground">Available:</span>
+                                        <div>
+                                            <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
+                                            <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
                             
-                            {!hasEnoughBalance && (
+                            {!hasSufficientFunds && (
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
-                                        You need at least LKR {room.wager.toFixed(2)} to join. Your current balance is LKR {userData.balance.toFixed(2)}.
+                                        You need at least LKR {room.wager.toFixed(2)} in your selected wallet to join.
                                     </CardDescription>
                                      <Button asChild variant="destructive">
                                         <Link href="/dashboard/wallet"><Wallet className="mr-2"/> Top Up Wallet</Link>
@@ -359,7 +367,7 @@ function MultiplayerGame() {
                             <Button 
                                 size="lg" 
                                 className="w-full"
-                                disabled={!hasEnoughBalance || isJoining}
+                                disabled={!hasSufficientFunds || isJoining}
                                 onClick={handleJoinGame}
                             >
                                 {isJoining ? <><Loader2 className="animate-spin mr-2"/> Joining...</> : <><LogIn className="mr-2"/> Join Game & Start Match</>}

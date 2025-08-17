@@ -33,51 +33,41 @@ export default function CreateGamePage() {
     const [pieceColor, setPieceColor] = useState<'w' | 'b' | 'random'>('random');
     const [roomPrivacy, setRoomPrivacy] = useState<'public' | 'private'>('public');
     const [isCreating, setIsCreating] = useState(false);
+    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
 
     const USDT_RATE = 310;
-    const usdtAmount = (parseFloat(investmentAmount) / USDT_RATE || 0).toFixed(2);
+    const wagerAmount = parseInt(investmentAmount) || 0;
+    const usdtAmount = (wagerAmount / USDT_RATE || 0).toFixed(2);
     
+    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
+    const hasSufficientFunds = selectedWalletBalance >= wagerAmount;
+
     const handleCreateRoom = async () => {
         if (!user || !userData) {
             toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to create a room.' });
             return;
         }
 
-        const wagerAmount = parseInt(investmentAmount);
         if (isNaN(wagerAmount) || wagerAmount < 10) {
             toast({ variant: 'destructive', title: 'Error', description: 'Minimum investment amount is LKR 10.' });
             return;
         }
 
-        const totalBalance = (userData.balance || 0) + (userData.bonusBalance || 0);
-        if (totalBalance < wagerAmount) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds to create this room.' });
+        if (!hasSufficientFunds) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Insufficient funds.' });
             return;
         }
 
         setIsCreating(true);
 
         try {
-            const batch = writeBatch(db);
-            const userRef = doc(db, 'users', user.uid);
-
-            // Deduct wager from balance
-            const bonusWagered = Math.min(wagerAmount, userData.bonusBalance || 0);
-            const mainWagered = wagerAmount - bonusWagered;
-            const updatePayload: any = {};
-            if(bonusWagered > 0) updatePayload.bonusBalance = increment(-bonusWagered);
-            if(mainWagered > 0) updatePayload.balance = increment(-mainWagered);
-            batch.update(userRef, updatePayload);
-            
             // Handle random piece color selection
             let finalPieceColor = pieceColor;
             if (pieceColor === 'random') {
                 finalPieceColor = Math.random() > 0.5 ? 'w' : 'b';
             }
             
-            // Create the game room document
-            const roomRef = doc(collection(db, 'game_rooms'));
-            batch.set(roomRef, {
+            const roomData = {
                 gameType,
                 wager: wagerAmount,
                 timeControl: parseInt(gameTimer),
@@ -87,35 +77,24 @@ export default function CreateGamePage() {
                     uid: user.uid,
                     name: `${userData.firstName} ${userData.lastName}`,
                     color: finalPieceColor,
+                    photoURL: userData.photoURL || '',
+                    fundingWallet,
                 },
                 players: [user.uid],
+                p1Time: parseInt(gameTimer),
+                p2Time: parseInt(gameTimer),
                 createdAt: serverTimestamp(),
-                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000) // 3 minutes from now
-            });
-            
-            // Create a transaction log for the wager
-            if(wagerAmount > 0) {
-                const transactionRef = doc(collection(db, 'transactions'));
-                batch.set(transactionRef, {
-                    userId: user.uid,
-                    type: 'wager',
-                    amount: wagerAmount,
-                    status: 'completed',
-                    description: `Wager for ${gameName} game`,
-                    gameRoomId: roomRef.id,
-                    createdAt: serverTimestamp()
-                });
-            }
-            
-            await batch.commit();
-            
-            toast({ title: 'Room Created!', description: 'Waiting for an opponent to join.' });
+                expiresAt: Timestamp.fromMillis(Date.now() + 3 * 60 * 1000)
+            };
 
+            const roomRef = await addDoc(collection(db, 'game_rooms'), roomData);
+            
+            toast({ title: 'Room Created!', description: 'Your wager is set. Waiting for an opponent.' });
             router.push(`/game/multiplayer/${roomRef.id}`);
 
         } catch (error) {
             console.error('Error creating room:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room. Your balance has not been changed.' });
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to create the room.' });
         } finally {
             setIsCreating(false);
         }
@@ -145,6 +124,30 @@ export default function CreateGamePage() {
                                 Playing against another player on the same device is strictly prohibited.
                             </AlertDescription>
                         </Alert>
+                        
+                        <div className="space-y-3">
+                            <Label>Funding Wallet</Label>
+                            <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="main" id="main-wallet" />
+                                    <Label htmlFor="main-wallet">Main Wallet</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="bonus" id="bonus-wallet" />
+                                    <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
+                                </div>
+                            </RadioGroup>
+                            <Card className="p-3 bg-secondary">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">Available Balance:</span>
+                                    <div>
+                                        <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
+                                        <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
+                                    </div>
+                                </div>
+                            </Card>
+                        </div>
+
 
                         <div className="space-y-2">
                             <Label htmlFor="investment">Investment Amount (LKR)</Label>
@@ -201,8 +204,8 @@ export default function CreateGamePage() {
                             </div>
                         </div>
 
-                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating}>
-                            {isCreating ? 'Creating Game...' : 'Create Game & Wait for Opponent'}
+                        <Button size="lg" className="w-full" onClick={handleCreateRoom} disabled={isCreating || !hasSufficientFunds}>
+                            {isCreating ? 'Creating Game...' : (hasSufficientFunds ? 'Create Game & Wait for Opponent' : 'Insufficient Funds')}
                         </Button>
                     </CardContent>
                 </Card>
@@ -210,3 +213,4 @@ export default function CreateGamePage() {
         </div>
     );
 }
+
