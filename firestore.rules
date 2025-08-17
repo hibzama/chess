@@ -1,5 +1,4 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -9,138 +8,84 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
     
     function isUser() {
         return request.auth != null;
     }
 
-    // Default Deny All
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
-    // USERS
-    // Users can read any profile for public info (leaderboards, etc.)
-    // Users can only create their own document and update their own document.
-    // Admins have full access.
+    // Users Collection
+    // - Users can read any single user document (for profiles, leaderboards, etc.)
+    // - Users can only write to their own document.
+    // - Admins can read/write any user document.
     match /users/{userId} {
-      allow read: if isUser();
-      allow create: if isOwner(userId);
-      allow update, delete: if isOwner(userId) || isAdmin();
-      
-      // Subcollections within user docs
-       match /{subcollection}/{docId} {
-         allow read, write: if isOwner(userId) || isAdmin();
-       }
-    }
-    
-    // GAME ROOMS
-    // Any authenticated user can read game rooms (for lobbies).
-    // Any authenticated user can create a game room.
-    // Only players in the game or an admin can update or delete a room.
-    match /game_rooms/{roomId} {
-        allow read, create: if isUser();
-        allow update, delete: if resource.data.players.hasAny([request.auth.uid]) || isAdmin();
-        
-        // Messages within a game room
-        match /messages/{messageId} {
-          allow read, create: if resource.data.players.hasAny([request.auth.uid]) || get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players.hasAny([request.auth.uid]);
-          allow update, delete: if false; // Messages are immutable
-        }
-    }
-    
-    // TRANSACTIONS
-    // Users can read their own transactions.
-    // Users can create their own transactions (deposits, withdrawals).
-    // Admins can read/write all transactions for management.
-    match /transactions/{transactionId} {
-      allow read, create: if isUser() && (isOwner(resource.data.userId) || isOwner(request.resource.data.userId));
-      allow update, delete: if isAdmin();
-    }
-    
-    // NOTIFICATIONS
-    // Users can read and update (to mark as read) their own notifications.
-    match /notifications/{notificationId} {
-        allow read, update: if isOwner(resource.data.userId);
-        allow create: if isUser(); // Functions or app can create notifications for users
-        allow delete: if isOwner(resource.data.userId);
-    }
+      allow get: if isUser() || isAdmin();
+      allow list: if isAdmin(); // Only admins can list all users
+      allow write: if isOwner(userId) || isAdmin();
 
-    // FRIEND REQUESTS
-    // Users can read requests sent to them or from them.
-    // Users can create requests.
-    // Users can delete requests they sent or received.
-    match /friend_requests/{requestId} {
-        allow read: if isUser() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
-        allow create: if isUser() && isOwner(request.resource.data.fromId);
-        allow delete: if isUser() && (isOwner(resource.data.fromId) || isOwner(resource.data.toId));
-    }
-    
-    // CHATS
-    // Only users involved in the chat can read/write.
-    match /chats/{chatId} {
-      allow read, update: if resource.data.userIds.hasAny([request.auth.uid]);
-      allow create: if request.resource.data.userIds.hasAny([request.auth.uid]);
-      
-      match /messages/{messageId} {
-        allow read: if get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]);
-        allow create: if isOwner(request.resource.data.senderId);
+      // Subcollections for users
+      match /{subcollection}/{docId} {
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
-    // MARKETING APPLICATIONS
-    // Users can create an application.
-    // Admins have full access to manage applications.
+    // Game Rooms
+    // - Any user can list/read game rooms (for lobbies)
+    // - Any user can create a game room
+    // - Only players in the game or admins can write to a game room
+    match /game_rooms/{roomId} {
+      allow read, create: if isUser() || isAdmin();
+      allow update, delete: if (isUser() && resource.data.createdBy.uid == request.auth.uid) || isAdmin();
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read, write: if isUser() && request.auth.uid in resource.data.players;
+      }
+    }
+
+    // Transactions
+    // - Users can create transactions for themselves
+    // - Users can read their own transactions
+    // - Admins have full access
+    match /transactions/{transactionId} {
+       allow create: if isUser() && request.resource.data.userId == request.auth.uid;
+       allow read, write: if (isUser() && resource.data.userId == request.auth.uid) || isAdmin();
+    }
+    
+    // Notifications
+    match /notifications/{notificationId} {
+        allow read, write: if (isUser() && resource.data.userId == request.auth.uid) || isAdmin();
+    }
+
+    // Marketing Applications
+    // - Anyone can create an application
+    // - Only admins can read/write
     match /marketing_applications/{appId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if isAdmin();
+        allow create: if true;
+        allow read, write: if isAdmin();
     }
     
-    // SETTINGS, CAMPAIGNS (BONUS, REFERRAL, etc.)
-    // These are considered public information for the app to function.
-    // Any authenticated user can read them.
-    // Only admins can modify them.
+    // Settings collection (e.g., mailer config)
+    // - Only Admins can read/write
     match /settings/{settingId} {
-        allow read: if isUser();
-        allow write: if isAdmin();
+        allow read, write: if isAdmin();
+    }
+
+    // Bonus Campaigns & Claims
+    // - All users can read campaign documents
+    // - Claims subcollections are only writable by admins (implicitly via Cloud Functions)
+    match /{campaignCollection}/{campaignId} {
+      allow read: if isUser() || isAdmin();
+      allow write: if isAdmin(); // Only admins can create/update campaigns
+      
+      match /claims/{claimId} {
+         allow read, write: if (isUser() && request.auth.uid == claimId) || isAdmin();
+      }
     }
     
-    match /signup_bonus_campaigns/{campaignId} {
-        allow read: if isUser();
-        allow write: if isAdmin();
-        match /claims/{claimId} {
-          allow read, write: if isUser(); // Claim logic handled by functions/rules
-        }
-    }
-    
-    match /daily_bonus_campaigns/{campaignId} {
-        allow read: if isUser();
-        allow write: if isAdmin();
-         match /claims/{claimId} {
-          allow read, write: if isUser();
-        }
-    }
-    
-    match /deposit_bonus_campaigns/{campaignId} {
-        allow read: if isUser();
-        allow write: if isAdmin();
-         match /claims/{claimId} {
-          allow read, write: if isUser();
-        }
-    }
-    
-    match /referral_campaigns/{campaignId} {
-        allow read: if isUser();
-        allow write: if isAdmin();
-    }
-    
-    match /bonus_claims/{claimId} {
-        allow read: if isOwner(resource.data.userId);
-        allow create: if isUser() && isOwner(request.resource.data.userId);
-        allow update: if isAdmin();
-    }
-    
+     match /bonus_claims/{claimId} {
+        allow read, write: if isUser() || isAdmin();
+     }
   }
 }
