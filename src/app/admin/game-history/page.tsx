@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ type Game = {
     createdBy: { uid: string, name: string };
     player2?: { uid: string, name: string };
     wager: number;
+    status: 'completed' | 'in-progress' | 'waiting';
 };
 
 export default function GameHistoryPage() {
@@ -27,12 +28,17 @@ export default function GameHistoryPage() {
     useEffect(() => {
         const q = query(
             collection(db, 'game_rooms'), 
-            where('status', '==', 'completed'),
             orderBy('createdAt', 'desc')
         );
         
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Game));
+            const history: Game[] = [];
+            snapshot.docs.forEach(doc => {
+                const gameData = doc.data() as Game;
+                if(gameData.status === 'completed') {
+                    history.push({ id: doc.id, ...gameData });
+                }
+            });
             setGames(history);
             setLoading(false);
         });

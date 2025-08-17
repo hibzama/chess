@@ -34,25 +34,24 @@ export default function WithdrawalHistoryPage() {
     useEffect(() => {
         const q = query(
             collection(db, 'transactions'), 
-            where('type', '==', 'withdrawal'), 
-            where('status', 'in', ['approved', 'rejected']),
+            where('type', '==', 'withdrawal'),
             orderBy('createdAt', 'desc')
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const history: Transaction[] = [];
             for (const transactionDoc of snapshot.docs) {
-                const withdrawalData = transactionDoc.data() as Transaction;
-                const userDoc = await getDoc(doc(db, 'users', withdrawalData.userId));
-                if (userDoc.exists()) {
+                const withdrawalData = transactionDoc.data() as Omit<Transaction, 'id' | 'user'>;
+                if (withdrawalData.status === 'approved' || withdrawalData.status === 'rejected') {
+                    const userDoc = await getDoc(doc(db, 'users', withdrawalData.userId));
                     history.push({ 
                         ...withdrawalData, 
                         id: transactionDoc.id, 
-                        user: userDoc.data() as Transaction['user'] 
+                        user: userDoc.exists() ? userDoc.data() as Transaction['user'] : undefined
                     });
                 }
             }
-            setWithdrawals(history); // Already sorted
+            setWithdrawals(history);
             setLoading(false);
         });
 

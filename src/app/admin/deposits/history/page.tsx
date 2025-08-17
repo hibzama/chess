@@ -26,25 +26,25 @@ export default function DepositHistoryPage() {
     useEffect(() => {
         const q = query(
             collection(db, 'transactions'), 
-            where('type', '==', 'deposit'), 
-            where('status', 'in', ['approved', 'rejected']),
+            where('type', '==', 'deposit'),
             orderBy('createdAt', 'desc')
         );
         
         const unsubscribe = onSnapshot(q, async (snapshot) => {
-            const history: Transaction[] = [];
+            const allDeposits: Transaction[] = [];
             for (const transactionDoc of snapshot.docs) {
-                const depositData = transactionDoc.data() as Transaction;
-                const userDoc = await getDoc(doc(db, 'users', depositData.userId));
-                if (userDoc.exists()) {
-                    history.push({ 
+                const depositData = transactionDoc.data() as Omit<Transaction, 'id' | 'user'>;
+                // Client-side filter
+                if (depositData.status === 'approved' || depositData.status === 'rejected') {
+                    const userDoc = await getDoc(doc(db, 'users', depositData.userId));
+                    allDeposits.push({ 
                         ...depositData, 
                         id: transactionDoc.id, 
-                        user: userDoc.data() as Transaction['user'] 
+                        user: userDoc.exists() ? userDoc.data() as Transaction['user'] : undefined
                     });
                 }
             }
-            setDeposits(history); // Already sorted by query
+            setDeposits(allDeposits);
             setLoading(false);
         });
 
