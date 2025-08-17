@@ -1,11 +1,19 @@
 
+/**
+ * Import function triggers from their respective submodules:
+ *
+ * import {onCall} from "firebase-functions/v2/onCall";
+ * import {onDocumentWritten} from "firebase-functions/v2/firestore";
+ *
+ * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ */
+
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 
 admin.initializeApp();
-const cors = require('cors')({origin: true});
 
 // This function triggers whenever a new user document is created
 export const onUserCreate = functions.firestore
@@ -110,83 +118,6 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
-
-export const joinGame = onCall({ cors: true }, async (request) => {
-    if (!request.auth) {
-        throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-    
-    const { roomId, fundingWallet } = request.data;
-    if (!roomId) throw new HttpsError('invalid-argument', 'Room ID is required.');
-    if (!fundingWallet) throw new HttpsError('invalid-argument', 'Funding wallet is required.');
-
-    const joinerId = request.auth.uid;
-    const db = admin.firestore();
-    const roomRef = db.collection('game_rooms').doc(roomId);
-
-    try {
-        await db.runTransaction(async (transaction) => {
-            const roomDoc = await transaction.get(roomRef);
-            if (!roomDoc.exists) throw new HttpsError('not-found', "Room not available.");
-            
-            const roomData = roomDoc.data();
-            if (!roomData) throw new HttpsError('not-found', "Room data is missing.");
-            if (roomData.status !== 'waiting') throw new HttpsError('failed-precondition', "Room is not available for joining.");
-            if (roomData.createdBy.uid === joinerId) throw new HttpsError('failed-precondition', "You cannot join your own game.");
-            
-            const wager = roomData.wager || 0;
-            const creatorId = roomData.createdBy.uid;
-
-            const creatorRef = db.collection('users').doc(creatorId);
-            const joinerRef = db.collection('users').doc(joinerId);
-
-            const [creatorDoc, joinerDoc] = await Promise.all([
-                transaction.get(creatorRef),
-                transaction.get(joinerRef)
-            ]);
-            
-            if (!creatorDoc.exists() || !joinerDoc.exists()) throw new HttpsError('aborted', "One of the players could not be found.");
-            
-            const creatorData = creatorDoc.data()!;
-            const joinerData = joinerDoc.data()!;
-
-            const joinerWalletField = fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
-
-            if ((joinerData[joinerWalletField] || 0) < wager) throw new HttpsError('failed-precondition', "You have insufficient funds.");
-            
-            // Deduct from joiner's wallet
-            transaction.update(joinerRef, { [joinerWalletField]: admin.firestore.FieldValue.increment(-wager) });
-            // Deduct from creator's wallet
-            const creatorBonusWagered = roomData.createdBy.wagerFromBonus || 0;
-            const creatorMainWagered = roomData.createdBy.wagerFromMain || 0;
-            if(creatorBonusWagered > 0) transaction.update(creatorRef, { bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered) });
-            if(creatorMainWagered > 0) transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(-creatorMainWagered) });
-            
-            const creatorColor = roomData.createdBy.color;
-            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
-            
-            transaction.update(roomRef, {
-                status: 'in-progress',
-                player2: { 
-                    uid: joinerId, 
-                    name: `${joinerData.firstName} ${joinerData.lastName}`, 
-                    color: joinerColor, 
-                    photoURL: joinerData.photoURL || '',
-                    fundingWallet: fundingWallet,
-                },
-                players: admin.firestore.FieldValue.arrayUnion(joinerId),
-                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
-            });
-        });
-
-        return { success: true };
-
-    } catch (error: any) {
-        functions.logger.error('Error joining game:', error);
-        if (error instanceof HttpsError) throw error;
-        throw new HttpsError('internal', 'An unexpected error occurred while joining the game.');
-    }
-});
 
 export const endGame = onCall({ cors: true }, async (request) => {
     if (!request.auth) {
