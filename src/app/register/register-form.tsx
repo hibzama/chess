@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
@@ -240,7 +240,7 @@ export default function RegisterForm() {
                 <p className="text-xs text-muted-foreground px-6 text-center">
                     By creating an account, you agree to our{' '}
                     <Link href="/terms" className="underline hover:text-primary">
-                        Terms &amp; Conditions
+                        Terms & Conditions
                     </Link>
                     .
                 </p>
@@ -256,5 +256,3 @@ export default function RegisterForm() {
       </Card>
   );
 }
-
-    

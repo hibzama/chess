@@ -22,7 +22,7 @@ export const onUserCreate = functions.firestore
     const db = admin.firestore();
     const { userId } = context.params;
 
-    // --- 1. Handle Bonus Referral Count ---
+    // --- 1. Handle Bonus Referral Count (aref link) ---
     // This is for separate, one-time bonus campaigns and is independent.
     if (newUser.bonusReferredBy) {
       const bonusReferrerRef = db.doc(`users/${newUser.bonusReferredBy}`);
@@ -36,41 +36,48 @@ export const onUserCreate = functions.firestore
       }
     }
 
-    // --- 2. Handle Commission Referral Logic (The main system) ---
-    const marketingReferrerId = newUser.marketingReferredBy; // from mref link
-    const standardReferrerId = newUser.standardReferredBy; // from ref link
+    // --- 2. Handle Commission Referral Logic (mref and ref links) ---
+    const marketingReferrerId = newUser.marketingReferredBy;
+    const standardReferrerId = newUser.standardReferredBy;
 
-    const referrerId = marketingReferrerId || standardReferrerId;
+    // A marketer link (mref) takes precedence over a standard link (ref).
+    const directReferrerId = marketingReferrerId || standardReferrerId;
 
-    if (referrerId) {
-        const referrerRef = db.doc(`users/${referrerId}`);
-        try {
-            const referrerDoc = await referrerRef.get();
-            if (referrerDoc.exists()) {
-                const referrerData = referrerDoc.data()!;
-                const updates: { [key: string]: any; } = {};
+    if (directReferrerId) {
+      const referrerRef = db.doc(`users/${directReferrerId}`);
+      try {
+        const referrerDoc = await referrerRef.get();
+        if (referrerDoc.exists()) {
+          const referrerData = referrerDoc.data()!;
+          const updates: { [key: string]: any; } = {};
 
-                // Construct the new user's referral chain
-                const referrerChain = referrerData.referralChain || [];
-                updates.referralChain = [...referrerChain, referrerId];
-                
-                // Set the direct referrer
-                updates.referredBy = referrerId;
-                
-                // If the direct referrer is a standard user, increment their L1 count
-                if (referrerData.role === 'user' && !marketingReferrerId) {
-                    await referrerRef.update({
-                        l1Count: admin.firestore.FieldValue.increment(1)
-                    });
-                     functions.logger.log(`Incremented l1Count for standard referrer ${referrerId}.`);
-                }
+          // Always set the direct referrer
+          updates.referredBy = directReferrerId;
 
-                await newUserRef.update(updates);
-                functions.logger.log(`User ${userId} referral chain and referredBy updated for referrer ${referrerId}.`);
-            }
-        } catch (error) {
-            functions.logger.error(`Error processing commission referral for new user ${userId} from referrer ${referrerId}:`, error);
+          // If the referrer is a marketer, the new user joins their chain.
+          if (referrerData.role === 'marketer') {
+            updates.referralChain = [directReferrerId];
+          } 
+          // If the referrer is a standard user who is part of a marketer's chain,
+          // the new user inherits that chain and adds the standard user to it.
+          else if (referrerData.referralChain && referrerData.referralChain.length > 0) {
+            updates.referralChain = [...referrerData.referralChain, directReferrerId];
+          }
+
+          await newUserRef.update(updates);
+          functions.logger.log(`User ${userId} referral chain updated based on referrer ${directReferrerId}.`);
+
+          // If the direct referrer was a standard user (not a marketer), increment their L1 count.
+          if (referrerData.role === 'user' && !marketingReferrerId) {
+              await referrerRef.update({
+                  l1Count: admin.firestore.FieldValue.increment(1)
+              });
+              functions.logger.log(`Incremented l1Count for standard referrer ${directReferrerId}.`);
+          }
         }
+      } catch (error) {
+        functions.logger.error(`Error processing commission referral for new user ${userId} from referrer ${directReferrerId}:`, error);
+      }
     }
 
     return null;

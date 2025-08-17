@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -11,7 +10,10 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == userId;
     }
     function isAdmin() {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Check if the user document exists and has the admin role.
+      // Use exists() for safe checking.
+      return isAuth() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     // USER rules
@@ -19,8 +21,13 @@ service cloud.firestore {
       allow read: if isAuth();
       // Allow users to create their own document, and admins to create any
       allow create: if isUser(userId) || isAdmin();
-      // Allow users to update their own document, but only specific fields if not admin
-      allow update: if (isUser(userId) && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'photoURL', 'equipment', 'binancePayId'])) || isAdmin() || (isAuth() && request.resource.data.keys().hasAny(['l1Count', 'bonusReferralCount', 'referralChain', 'balance', 'wins', 'marketingBalance']));
+      // Allow users to update their own non-critical fields.
+      allow update: if (isUser(userId) && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'photoURL', 'equipment', 'binancePayId', 'gender', 'address', 'city', 'country'])) || isAdmin();
+      
+      // Allow specific fields to be updated by backend logic (or admins) only.
+      // This is crucial for security. l1Count, balance etc. should not be client-writable.
+      // The isAdmin() check allows a trusted backend (like a Cloud Function running with admin privileges) to update these.
+      allow update: if isAdmin() && request.resource.data.keys().hasAny(['balance', 'wins', 'l1Count', 'bonusReferralCount', 'referralChain', 'referredBy', 'campaignInfo', 'emailVerified', 'marketingBalance']);
       
       // Subcollections under users
       match /active_campaigns/{docId} {
@@ -68,7 +75,7 @@ service cloud.firestore {
       allow write: if isAdmin();
        match /claims/{claimId} {
         allow create: if isUser(claimId) || isAdmin();
-        allow read: if isAuth(); // Allow any auth user to read to check if claimed
+        allow read: if isAuth();
       }
     }
 
@@ -90,13 +97,14 @@ service cloud.firestore {
     match /bonus_claims/{claimId} {
         allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
         allow create: if isAuth();
-        allow update: if isAdmin(); // Only admins can approve/reject
+        allow update: if isAdmin();
     }
 
     // MARKETING rules
     match /marketing_applications/{appId} {
       allow read: if isAdmin();
-      allow create;
+      // Allow anyone to create an application, even unauthenticated users
+      allow create: if true;
       allow update: if isAdmin();
     }
     
@@ -132,5 +140,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
