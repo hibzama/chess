@@ -94,9 +94,21 @@ export default function ReferralClaimsPage() {
                         description: `Referral Bonus: ${claim.campaignTitle}`,
                         createdAt: serverTimestamp(),
                     });
+
+                    // If it's a referrer bonus, finalize the campaign for the user
+                    if (claim.type === 'referrer') {
+                        const userCampaignRef = doc(db, 'users', claim.userId, 'active_campaigns', 'current');
+                        transaction.delete(userCampaignRef);
+                    }
                 });
                 toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
             } else { // Rejected
+                 // If a referrer claim is rejected, we should allow them to try again.
+                 // We reset their campaign status by setting `completed` to false.
+                 if (claim.type === 'referrer') {
+                     const userCampaignRef = doc(db, 'users', claim.userId, 'active_campaigns', 'current');
+                     await updateDoc(userCampaignRef, { completed: false });
+                 }
                 await updateDoc(claimRef, { status: 'rejected' });
                 toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
             }

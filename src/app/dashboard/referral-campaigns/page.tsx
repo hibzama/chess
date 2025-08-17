@@ -46,13 +46,15 @@ interface ClaimHistory {
     createdAt: any;
     status: string;
     type: 'referrer' | 'referee';
+    campaignId?: string;
+    campaignTitle?: string;
 }
 
 export default function UserCampaignsPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
-    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-    const [claimHistory, setClaimHistory] = useState<ClaimHistory[]>([]);
+    const [allCampaigns, setAllCampaigns] = useState<Campaign[]>([]);
+    const [completedCampaigns, setCompletedCampaigns] = useState<ClaimHistory[]>([]);
     const [activeUserCampaign, setActiveUserCampaign] = useState<UserCampaign | null>(null);
     const [campaignDetails, setCampaignDetails] = useState<Campaign | null>(null);
     const [referrals, setReferrals] = useState<CampaignReferral[]>([]);
@@ -64,12 +66,20 @@ export default function UserCampaignsPage() {
         }
         return '';
     }, [user, activeUserCampaign]);
+    
+     const availableCampaigns = useMemo(() => {
+        if (!activeUserCampaign && completedCampaigns.length >= 0) {
+            const completedCampaignIds = new Set(completedCampaigns.map(c => c.campaignId));
+            return allCampaigns.filter(c => !completedCampaignIds.has(c.id));
+        }
+        return [];
+    }, [allCampaigns, completedCampaigns, activeUserCampaign]);
 
     useEffect(() => {
         const fetchCampaigns = async () => {
             const q = query(collection(db, 'referral_campaigns'), where('isActive', '==', true));
             const snapshot = await getDocs(q);
-            setCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign)));
+            setAllCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Campaign)));
         };
         fetchCampaigns();
     }, []);
@@ -98,17 +108,15 @@ export default function UserCampaignsPage() {
             setLoading(false);
         });
 
-         // Fetch claim history
+         // Fetch claim history for completed campaigns
         const claimQuery = query(
             collection(db, 'bonus_claims'), 
-            where('userId', '==', user.uid)
+            where('userId', '==', user.uid),
+            where('type', '==', 'referrer'),
         );
         const unsubHistory = onSnapshot(claimQuery, (snapshot) => {
-            const allClaims = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}) as ClaimHistory);
-            const referrerClaims = allClaims
-                .filter(claim => claim.type === 'referrer')
-                .sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
-            setClaimHistory(referrerClaims);
+            const completed = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}) as ClaimHistory);
+            setCompletedCampaigns(completed.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
         });
 
         return () => {
@@ -206,13 +214,13 @@ export default function UserCampaignsPage() {
             <Tabs defaultValue="campaigns">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="campaigns">Available Campaigns</TabsTrigger>
-                    <TabsTrigger value="history">Claim History</TabsTrigger>
+                    <TabsTrigger value="history">Completed Campaigns</TabsTrigger>
                 </TabsList>
                  <TabsContent value="campaigns">
                     <Card>
                         <CardHeader><CardTitle>Start a Referral Campaign</CardTitle><CardDescription>Choose a campaign to start earning rewards.</CardDescription></CardHeader>
                         <CardContent className="space-y-4">
-                            {campaigns.length > 0 ? campaigns.map(c => (
+                            {availableCampaigns.length > 0 ? availableCampaigns.map(c => (
                                 <Card key={c.id} className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                     <div>
                                         <p className="font-bold">{c.title}</p>
@@ -234,20 +242,20 @@ export default function UserCampaignsPage() {
                                         <Button onClick={() => handleStartCampaign(c.id)}>Start</Button>
                                     </div>
                                 </Card>
-                            )) : <p className="text-muted-foreground text-center">No active campaigns available right now.</p>}
+                            )) : <p className="text-muted-foreground text-center">No new campaigns available right now.</p>}
                         </CardContent>
                     </Card>
                  </TabsContent>
                  <TabsContent value="history">
                      <Card>
-                        <CardHeader><CardTitle>Bonus History</CardTitle><CardDescription>Your bonus claims from referral campaigns.</CardDescription></CardHeader>
+                        <CardHeader><CardTitle>Bonus History</CardTitle><CardDescription>Your bonus claims from completed referral campaigns.</CardDescription></CardHeader>
                         <CardContent>
                             <Table>
                                 <TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {claimHistory.length > 0 ? claimHistory.map(claim => (
+                                    {completedCampaigns.length > 0 ? completedCampaigns.map(claim => (
                                         <TableRow key={claim.id}>
-                                            <TableCell>{claim.description}</TableCell>
+                                            <TableCell>{claim.campaignTitle}</TableCell>
                                             <TableCell className="font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
                                             <TableCell>{claim.createdAt ? format(claim.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                                             <TableCell><Badge variant={claim.status === 'approved' ? 'default' : claim.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{claim.status}</Badge></TableCell>
@@ -371,5 +379,3 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
         </Table>
     </ScrollArea>
 );
-
-    
