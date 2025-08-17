@@ -142,10 +142,12 @@ export default function DashboardPage() {
             
             // 1. Deposit Bonus
             try {
-                const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true), where('expiresAt', '>', Timestamp.now()));
+                const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true));
                 const depositSnapshot = await getDocs(depositQuery);
                 if (!depositSnapshot.empty) {
-                    setDepositBonus(depositSnapshot.docs[0].data() as DepositBonusCampaign);
+                    const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
+                    const stillValidCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
+                    setDepositBonus(stillValidCampaign || null);
                 } else {
                     setDepositBonus(null);
                 }
@@ -153,19 +155,17 @@ export default function DashboardPage() {
 
             // 2. Daily Bonus
             try {
-                const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true), where('endDate', '>', Timestamp.now()));
+                const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true));
                 const dailySnapshot = await getDocs(dailyQuery);
-                if (!dailySnapshot.empty) {
-                    const activeCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
-                    const eligibleNow = activeCampaigns.find(c => c.startDate.toDate() < now);
+                const allActiveCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
+                
+                const futureCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
+                const eligibleNow = futureCampaigns.find(c => c.startDate.toDate() < now);
 
-                    if(eligibleNow) {
-                        const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, eligibleNow.id));
-                        if (!claimSnap.exists()) {
-                            setDailyBonus(eligibleNow);
-                        } else {
-                            setDailyBonus(null);
-                        }
+                if (eligibleNow) {
+                    const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, eligibleNow.id));
+                    if (!claimSnap.exists()) {
+                        setDailyBonus(eligibleNow);
                     } else {
                         setDailyBonus(null);
                     }
@@ -331,3 +331,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
