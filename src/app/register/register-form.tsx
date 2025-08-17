@@ -49,7 +49,7 @@ export default function RegisterForm() {
         const city = target.city.value;
         const country = target.country.value;
 
-        // Capture all potential referral parameters
+        // Capture all potential referral parameters from URL
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
         const aref = searchParams.get('aref');
@@ -114,7 +114,7 @@ export default function RegisterForm() {
                 emailVerified: true, 
             };
             
-            // Pass all referral info to be handled server-side by the Cloud Function
+            // Correctly add referral fields to the user document if they exist in the URL
             if (aref) userData.bonusReferredBy = aref;
             if (ref) userData.standardReferredBy = ref;
             if (mref) userData.marketingReferredBy = mref;
