@@ -271,7 +271,4 @@ const CommissionTable = ({ commissions, loading }: { commissions: Commission[], 
         </Table>
     )
 }
-
-    
-
     
