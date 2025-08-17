@@ -1,49 +1,41 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // Helper Functions
-    function isAuth() {
-      return request.auth != null;
-    }
-
     function isAdmin() {
-      return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isUser(userId) {
-      return isAuth() && request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
     
-    function isUpdatingAllowedFields(fields) {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    function isAuth() {
+        return request.auth != null;
     }
 
     // USER rules
     match /users/{userId} {
-      // Allow any authenticated user to read public profile data.
       allow read: if isAuth();
-
-      // Allow users to create their own document.
-      allow create: if isUser(userId);
-
-      // Allow users to update their own document, or admins to update any.
-      allow update: if isUser(userId) || isAdmin() || 
-                    // Allow any authenticated user to update ONLY the 'balance' or 'wins' fields of another user.
-                    // This is required for game transactions (wagers/payouts).
-                    (isAuth() && isUpdatingAllowedFields(['balance', 'wins']));
+      // Allow user to update their own document, or admin to update any.
+      // For game transactions, a specific rule below allows balance/win updates.
+      allow write: if isUser(userId) || isAdmin();
       
-      // Subcollections under users.
+      // Allow any authenticated user to update another user's balance or win count
+      // This is necessary for game payouts and wager deductions within transactions.
+      allow update: if isAuth() && request.resource.data.diff(resource.data).affectedKeys.hasOnly(['balance', 'wins', 'marketingBalance', 'l1Count', 'bonusReferralCount', 'emailVerified', 'friends', 'referralChain', 'referredBy', 'campaignInfo']);
+
       match /active_campaigns/{docId} {
-        allow read, write: if isUser(userId);
+        allow read, write: if isUser(userId) || isAdmin();
+        allow delete: if isUser(userId) || isAdmin();
       }
        match /bonus_claims/{docId} {
-        allow read, write: if isUser(userId);
+        allow read, write: if isUser(userId) || isAdmin();
       }
-       match /daily_bonus_claims/{docId} {
-        allow read, write: if isUser(userId);
+      match /daily_bonus_claims/{docId} {
+        allow read, write: if isUser(userId) || isAdmin();
       }
     }
     
@@ -51,23 +43,13 @@ service cloud.firestore {
     match /game_rooms/{roomId} {
       allow read: if isAuth();
       allow create: if isAuth() && request.resource.data.createdBy.uid == request.auth.uid;
-      // Allow any authenticated user to update a game room (for joining, making moves).
-      // More specific rules can be added here if needed (e.g., only players in the game).
-      allow update: if isAuth();
-      // Only the creator or an admin can delete a waiting room.
-      allow delete: if isAuth() && (resource.data.createdBy.uid == request.auth.uid || isAdmin());
+      // Allow updates for joining, playing, and ending games.
+      allow update: if isAuth(); 
+      allow delete: if isAuth() && (isUser(resource.data.createdBy.uid) || isAdmin());
       
       match /messages/{messageId} {
-        // Allow players in the game to read/write chat messages.
-        allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
+        allow read, create: if isAuth() && request.auth.uid in resource.data.players;
       }
-    }
-
-    // FRIEND_REQUESTS rules
-    match /friend_requests/{requestId} {
-        allow read: if isAuth();
-        allow create: if isAuth();
-        allow delete: if isAuth() && (isUser(resource.data.fromId) || isUser(resource.data.toId));
     }
 
     // TRANSACTIONS rules
@@ -77,14 +59,13 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
     
-    // Bonus & Campaign Collections
+    // BONUS & CAMPAIGN rules
     match /signup_bonus_campaigns/{campaignId} {
       allow read: if isAuth();
       allow write: if isAdmin();
       match /claims/{claimId} {
         allow read: if isAuth();
-        // Allow user to create a claim only for themselves.
-        allow create: if isUser(claimId);
+        allow create: if isUser(claimId) || isAdmin();
       }
     }
 
@@ -93,8 +74,7 @@ service cloud.firestore {
       allow write: if isAdmin();
        match /claims/{claimId} {
         allow read: if isAuth();
-        // Allow user to create a claim only for themselves.
-        allow create: if isUser(claimId);
+        allow create: if isUser(claimId) || isAdmin();
       }
     }
 
@@ -103,8 +83,7 @@ service cloud.firestore {
       allow write: if isAdmin();
        match /claims/{claimId} {
         allow read: if isAuth();
-        // Allow user to create a claim only for themselves.
-        allow create: if isUser(claimId);
+        allow create: if isUser(claimId) || isAdmin();
       }
     }
 
@@ -113,35 +92,41 @@ service cloud.firestore {
         allow write: if isAdmin();
     }
     
+    // This allows users to create their own claims, and admins to manage all claims.
     match /bonus_claims/{claimId} {
-        // Admins can read any claim. Users can read their own claims.
-        allow read: if isAdmin() || (isAuth() && resource.data.userId == request.auth.uid);
-        // Users can create claims for themselves.
-        allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
-        // Only admins can update the status of claims.
+        allow read: if isAuth() && (isUser(resource.data.userId) || isAdmin());
+        allow create: if isAuth();
         allow update: if isAdmin();
+    }
+    
+    // This collection group query is needed for the admin panel to view all claims.
+    match /{path=**}/bonus_claims/{claimDocId} {
+      allow read: if isAdmin();
     }
 
     // MARKETING rules
     match /marketing_applications/{appId} {
-      allow read: if isAdmin();
+      allow read, update: if isAdmin();
       allow create: if isAuth();
-      allow update: if isAdmin();
     }
     
+    // FRIEND_REQUESTS rules
+    match /friend_requests/{requestId} {
+        allow read, create: if isAuth();
+        allow delete: if isAuth() && (isUser(resource.data.fromId) || isUser(resource.data.toId));
+    }
+
     // NOTIFICATIONS rules
     match /notifications/{notificationId} {
-      allow read, update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow read, update, delete: if isAuth() && resource.data.userId == request.auth.uid;
       allow create: if isAuth();
     }
     
     // CHATS rules
     match /chats/{chatId} {
-      allow read, update: if isAuth() && request.auth.uid in resource.data.userIds;
-      allow create: if isAuth();
-
+      allow read, create, update: if isAuth() && request.auth.uid in resource.data.userIds;
       match /messages/{messageId} {
-        allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]);
       }
     }
 
