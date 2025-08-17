@@ -99,7 +99,7 @@ export const onUserCreate = functions.firestore
                                         .get();
 
         if (!campaignsQuery.empty) {
-            const campaignDoc = campaignsQuery.docs[0]; // Assuming only one active campaign at a time
+            const campaignDoc = campaignsQuery.docs[0];
             const campaign = campaignDoc.data();
             
             const claimsRef = db.collection(`signup_bonus_campaigns/${campaignDoc.id}/claims`);
