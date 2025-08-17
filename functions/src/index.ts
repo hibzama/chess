@@ -1,3 +1,5 @@
+
+'use server';
 /**
  * Import function triggers from their respective submodules:
  *
@@ -23,7 +25,7 @@ export const onUserCreate = functions.firestore
     const { userId } = context.params;
 
     // --- 1. Handle Bonus Referral Count (aref link) ---
-    // This is for one-time bonus campaigns and is independent.
+    // This is for separate, one-time bonus campaigns and is independent.
     if (newUser.bonusReferredBy) {
       const bonusReferrerRef = db.doc(`users/${newUser.bonusReferredBy}`);
       try {
@@ -40,68 +42,104 @@ export const onUserCreate = functions.firestore
     const marketingReferrerId = newUser.marketingReferredBy;
     const standardReferrerId = newUser.standardReferredBy;
 
-    // A marketer link (mref) takes precedence for starting a referral chain.
-    if (marketingReferrerId) {
-        try {
-            await newUserRef.update({
-                referralChain: [marketingReferrerId],
-                referredBy: marketingReferrerId,
-            });
-            functions.logger.log(`New user ${userId} added to marketer ${marketingReferrerId}'s chain.`);
-        } catch (error) {
-             functions.logger.error(`Error processing MREF for user ${userId} from marketer ${marketingReferrerId}`, error);
-        }
-    } 
-    // If no marketer link, process the standard referral link.
-    else if (standardReferrerId) {
-        const referrerRef = db.doc(`users/${standardReferrerId}`);
-        try {
-            const referrerDoc = await referrerRef.get();
-            if (referrerDoc.exists()) {
-                const referrerData = referrerDoc.data()!;
-                const newUserData: {[k: string]: any} = { referredBy: standardReferrerId };
+    // A marketer link (mref) takes precedence over a standard link (ref).
+    const directReferrerId = marketingReferrerId || standardReferrerId;
 
-                // If the standard referrer is part of a chain, the new user joins it.
-                if (referrerData.referralChain && referrerData.referralChain.length > 0) {
-                    newUserData.referralChain = [...referrerData.referralChain, standardReferrerId];
-                }
-                
-                // Update the new user with their direct referrer and chain (if any)
-                await newUserRef.update(newUserData);
+    if (directReferrerId) {
+      const referrerRef = db.doc(`users/${directReferrerId}`);
+      try {
+        const referrerDoc = await referrerRef.get();
+        if (referrerDoc.exists()) {
+          const referrerData = referrerDoc.data()!;
+          const updates: { [key: string]: any; } = {};
 
-                // Increment the L1 count for the standard referrer
-                await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
-                functions.logger.log(`Processed REF for user ${userId} from standard user ${standardReferrerId}.`);
-            }
-        } catch (error) {
-             functions.logger.error(`Error processing REF for user ${userId} from standard user ${standardReferrerId}`, error);
+          // Always set the direct referrer
+          updates.referredBy = directReferrerId;
+
+          // If the referrer is a marketer, the new user joins their chain.
+          if (referrerData.role === 'marketer') {
+            updates.referralChain = [directReferrerId];
+            functions.logger.log(`User ${userId} joined marketer ${directReferrerId}'s chain.`);
+          }
+          // If the referrer is a standard user who is part of a marketer's chain,
+          // the new user inherits that chain and adds the standard user to it.
+          else if (referrerData.referralChain && referrerData.referralChain.length > 0) {
+            updates.referralChain = [...referrerData.referralChain, directReferrerId];
+            functions.logger.log(`User ${userId} inherited chain and added standard referrer ${directReferrerId}.`);
+          }
+
+          await newUserRef.update(updates);
+
+          // If the direct referrer was a standard user (not a marketer), increment their L1 count.
+          if (referrerData.role === 'user' && !marketingReferrerId) {
+              await referrerRef.update({
+                  l1Count: admin.firestore.FieldValue.increment(1)
+              });
+              functions.logger.log(`Incremented l1Count for standard referrer ${directReferrerId}.`);
+          }
+        } else {
+            functions.logger.warn(`Referrer with ID ${directReferrerId} not found.`);
         }
+      } catch (error) {
+        functions.logger.error(`Error processing commission referral for new user ${userId} from referrer ${directReferrerId}:`, error);
+      }
     }
-
+    
     // --- 3. Handle Sign-up Bonus ---
-    // This logic is independent of referrals.
+    // This logic is independent of referrals and runs for every new user.
     try {
-        const settingsDoc = await db.doc('settings/signupBonusConfig').get();
-        if (settingsDoc.exists()) {
-            const config = settingsDoc.data();
-            if (config && config.enabled && config.bonusAmount > 0) {
-                 const usersCountSnap = await db.collection('users').count().get();
-                 const userCount = usersCountSnap.data().count;
+        const campaignsQuery = await db.collection('signup_bonus_campaigns')
+                                        .where('isActive', '==', true)
+                                        .get();
 
-                if (userCount <= config.userLimit) {
-                    await newUserRef.update({
-                        balance: admin.firestore.FieldValue.increment(config.bonusAmount),
-                    });
-                     await db.collection("transactions").add({
-                        userId: userId,
-                        type: 'bonus',
-                        amount: config.bonusAmount,
-                        status: 'completed',
-                        description: 'Sign-up Bonus',
-                        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                    });
-                    functions.logger.log(`Awarded sign-up bonus of ${config.bonusAmount} to user ${userId}.`);
-                }
+        if (!campaignsQuery.empty) {
+            const campaignDoc = campaignsQuery.docs[0]; // Process the first active campaign found
+            const campaign = campaignDoc.data();
+            
+            const claimsRef = db.collection(`signup_bonus_campaigns/${campaignDoc.id}/claims`);
+            const claimsSnapshot = await claimsRef.count().get();
+            const claimsCount = claimsSnapshot.data().count;
+
+            if (claimsCount < campaign.userLimit) {
+                const batch = db.batch();
+                
+                // Award bonus to user
+                batch.update(newUserRef, {
+                    balance: admin.firestore.FieldValue.increment(campaign.bonusAmount),
+                });
+                
+                // Log the claim for the user
+                const userClaimRef = db.doc(`users/${userId}/bonus_claims/${campaignDoc.id}`);
+                batch.set(userClaimRef, {
+                    campaignId: campaignDoc.id,
+                    title: campaign.title,
+                    amount: campaign.bonusAmount,
+                    type: 'signup',
+                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Log the claim in the campaign's subcollection for counting
+                const campaignClaimRef = db.doc(`signup_bonus_campaigns/${campaignDoc.id}/claims/${userId}`);
+                batch.set(campaignClaimRef, {
+                    userId: userId,
+                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+
+                // Create a transaction log
+                const transactionRef = db.collection('transactions').doc();
+                 batch.set(transactionRef, {
+                    userId: userId,
+                    type: 'bonus',
+                    amount: campaign.bonusAmount,
+                    status: 'completed',
+                    description: `Sign-up Bonus: ${campaign.title}`,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                
+                await batch.commit();
+                functions.logger.log(`Awarded sign-up bonus of ${campaign.bonusAmount} to user ${userId} from campaign "${campaign.title}".`);
+            } else {
+                 functions.logger.log(`Sign-up bonus campaign "${campaign.title}" has reached its user limit.`);
             }
         }
     } catch(error) {

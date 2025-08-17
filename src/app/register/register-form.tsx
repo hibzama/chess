@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -53,7 +53,7 @@ export default function RegisterForm() {
         // Capture all potential referral parameters
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
-        const aref = searchParams.get('aref'); 
+        const aref = searchParams.get('aref');
         const rcid = searchParams.get('rcid');
         
         if (password !== confirmPassword) {
@@ -133,7 +133,7 @@ export default function RegisterForm() {
             
             toast({
                 title: "Account Created!",
-                description: "Welcome to Nexbattle. Please check your email to verify your account.",
+                description: "Welcome to Nexbattle.",
             });
             router.push('/dashboard');
 
