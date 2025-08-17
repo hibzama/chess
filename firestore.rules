@@ -14,7 +14,16 @@ service cloud.firestore {
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
+
+    function getDoc(path) {
+      return get(/databases/$(database)/documents/$(path));
+    }
+
+    function incomingDoc() {
+      return request.resource.data;
+    }
     
+    // Checks if the user is an admin by looking at their user document.
     function isAdmin() {
       return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
@@ -24,21 +33,12 @@ service cloud.firestore {
     // =================================
 
     match /users/{userId} {
-      // Any signed-in user can read another user's profile.
       allow read: if isSignedIn();
-
-      // A user can only create their own user document.
       allow create: if isOwner(userId);
-
-      // A user can update their own profile, but not critical fields like balance or role.
-      // Admins can update any field.
-      // The system (via Cloud Functions) is allowed to update balances during game transactions.
-      allow update: if 
-        (isOwner(userId) && 
-            !('balance' in request.resource.data && request.resource.data.balance != resource.data.balance) &&
-            !('marketingBalance' in request.resource.data && request.resource.data.marketingBalance != resource.data.marketingBalance) &&
-            !('role' in request.resource.data && request.resource.data.role != resource.data.role)
-        ) || isAdmin();
+      // Allow user to update their own document, but not critical fields like balance or role.
+      // Allow another user to update this document's balance ONLY IF part of joining a game.
+      // Allow admin to update anything.
+      allow update: if (isOwner(userId) && !('balance' in incomingDoc()) && !('marketingBalance' in incomingDoc()) && !('role' in incomingDoc())) || isAdmin();
     }
     
     match /friend_requests/{requestId} {
@@ -48,28 +48,27 @@ service cloud.firestore {
     }
     
     match /game_rooms/{roomId} {
-      // Any signed-in user can list public games.
       allow list, read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(request.resource.data.createdBy.uid);
       allow delete: if isSignedIn() && isOwner(resource.data.createdBy.uid);
-      // Allow joining, playing moves, and completing the game.
-      allow update: if isSignedIn(); 
+      // Allow updates for joining a game, playing moves, or completing the game.
+      allow update: if isSignedIn();
     }
     
     match /transactions/{transactionId} {
-      allow list, read: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
+      allow read, list: if (isSignedIn() && isOwner(resource.data.userId)) || isAdmin();
       allow create: if isSignedIn();
       allow update: if isAdmin();
     }
     
     match /notifications/{notificationId} {
-      allow read, list, update: if isSignedIn() && isOwner(resource.data.userId);
-      allow create: if isSignedIn();
+        allow read, list, update: if isSignedIn() && isOwner(resource.data.userId);
+        allow create: if isSignedIn();
     }
     
     match /marketing_applications/{appId} {
-      allow create; 
-      allow read, update, delete: if isAdmin();
+        allow create; 
+        allow read, update, delete: if isAdmin();
     }
     
     match /game_rooms/{roomId}/messages/{messageId} {
@@ -77,10 +76,11 @@ service cloud.firestore {
     }
 
     match /chats/{chatId} {
-      allow read, write, list: if isSignedIn() && request.auth.uid in resource.data.userIds;
-      match /messages/{messageId} {
-        allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-      }
+        allow read, write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+
+        match /messages/{messageId} {
+            allow read, create: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.users;
+        }
     }
     
     match /settings/{docId} {
@@ -88,53 +88,60 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // --- Bonus System Rules ---
-    
-    // Campaigns are readable by any signed-in user, but only writable by admins.
+    // Bonus System Rules
     match /signup_bonus_campaigns/{campaignId} {
-        allow read: if isSignedIn();
+        allow read: if true;
         allow write: if isAdmin();
+        
         match /claims/{userId} {
-            allow read, write: if isOwner(userId) || isAdmin();
+            allow read: if isOwner(userId) || isAdmin();
+            allow create: if isSignedIn() && isOwner(userId);
+        }
+    }
+    
+    match /deposit_bonus_campaigns/{campaignId} {
+        allow read: if true;
+        allow write: if isAdmin();
+
+        match /claims/{userId} {
+            allow read: if isOwner(userId) || isAdmin();
+            allow create: if isSignedIn() && isOwner(userId);
         }
     }
 
     match /daily_bonus_campaigns/{campaignId} {
-        allow read: if isSignedIn();
+        allow read: if true;
         allow write: if isAdmin();
+
         match /claims/{userId} {
-            allow read, write: if isOwner(userId) || isAdmin();
+            allow read: if isOwner(userId) || isAdmin();
+            allow create: if isSignedIn() && isOwner(userId);
         }
     }
-
-    match /deposit_bonus_campaigns/{campaignId} {
-        allow read: if isSignedIn();
-        allow write: if isAdmin();
-        match /claims/{userId} {
-            allow read, write: if isOwner(userId) || isAdmin();
-        }
-    }
-
+    
     match /referral_campaigns/{campaignId} {
-        allow read: if isSignedIn();
+        allow read: if true;
         allow write: if isAdmin();
     }
 
-    // Users can write to their own subcollections for claims, but only admins can read them all.
-    match /users/{userId}/daily_bonus_claims/{campaignId} {
-        allow read, write: if isOwner(userId);
+    match /bonus_claims/{claimId} {
+        allow read, list: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+        allow create: if isSignedIn() && isOwner(request.resource.data.userId);
+        allow update: if isAdmin();
     }
-     match /users/{userId}/bonus_claims/{claimId} {
-        allow read, write: if isOwner(userId);
+
+     match /users/{userId}/daily_bonus_claims/{campaignId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
     }
-    
+
+    match /users/{userId}/bonus_claims/{claimId} {
+      allow read, list: if isOwner(userId);
+      allow create: if isOwner(userId);
+    }
      match /users/{userId}/active_campaigns/{docId} {
-        allow read, write: if isOwner(userId);
+      allow read, write, delete: if isOwner(userId);
     }
-    
-    // Collection group for admins to manage all claims.
-    match /{path=**}/bonus_claims/{claimId} {
-      allow read, write: if isAdmin();
-    }
+
   }
 }
