@@ -22,7 +22,7 @@ export const onUserCreate = functions.firestore
     const newUser = snap.data();
     const newUserRef = snap.ref;
     
-    // --- 1. Handle Bonus Referral Count ---
+    // --- 1. Handle Bonus Referral Count (aref) ---
     if (newUser.bonusReferredBy) {
         const referrerId = newUser.bonusReferredBy;
         const referrerRef = admin.firestore().collection('users').doc(referrerId);
@@ -38,7 +38,16 @@ export const onUserCreate = functions.firestore
     }
     
     // --- 2. Handle Commission Referral Logic ---
-    const directReferrerId = newUser.marketingReferredBy || newUser.standardReferredBy;
+    const marketingReferrerId = newUser.marketingReferredBy;
+    const standardReferrerId = newUser.standardReferredBy;
+    let directReferrerId: string | null = null;
+    
+    if (marketingReferrerId) {
+        directReferrerId = marketingReferrerId;
+    } else if (standardReferrerId) {
+        directReferrerId = standardReferrerId;
+    }
+
     if (directReferrerId && !newUser.campaignInfo) {
         const referrerRef = admin.firestore().collection('users').doc(directReferrerId);
         try {
@@ -50,17 +59,19 @@ export const onUserCreate = functions.firestore
                 };
 
                 if (referrerData.role === 'marketer') {
+                    // This user was referred by a marketer
                     updates.referralChain = [...(referrerData.referralChain || []), directReferrerId];
                 } else if (referrerData.role === 'user') {
-                     // Only increment L1 count for standard user referrals
+                     // This user was referred by a standard user
                      await referrerRef.update({ l1Count: admin.firestore.FieldValue.increment(1) });
                 }
                 
-                // Set the referral chain on the new user
+                // Set the referral chain or referredBy on the new user
                 await newUserRef.update(updates);
+                 functions.logger.log(`Processed referral for new user ${context.params.userId} by ${directReferrerId}`);
             }
         } catch (error) {
-            functions.logger.error(`Error processing commission referral for user ${directReferrerId}:`, error);
+            functions.logger.error(`Error processing commission referral for new user ${context.params.userId} by ${directReferrerId}:`, error);
         }
     }
 
@@ -245,16 +256,21 @@ export const endGame = onCall({ cors: true }, async (request) => {
                 creatorPayout = joinerPayout = wager * 0.9;
                 winnerObject.uid = null;
             } else if (method === 'resign' && resignerDetails) {
-                let opponentPayoutRate = 1.05;
-                let resignerRefundRate = 0.75;
+                const opponentPayoutRate = 1.30;
+                
+                let resignerRefundRate = 0.25; // Default refund
+                if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
+                else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
                 
                 winnerObject.resignerId = resignerDetails.id;
-                winnerObject.uid = resignerDetails.id === creatorId ? joinerId : creatorId;
+                winnerObject.resignerPieceCount = resignerDetails.pieceCount;
                 
                 if (resignerDetails.id === creatorId) {
+                    winnerObject.uid = joinerId;
                     creatorPayout = wager * resignerRefundRate;
                     joinerPayout = wager * opponentPayoutRate;
                 } else {
+                    winnerObject.uid = creatorId;
                     creatorPayout = wager * opponentPayoutRate;
                     joinerPayout = wager * resignerRefundRate;
                 }

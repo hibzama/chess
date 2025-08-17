@@ -49,10 +49,12 @@ export default function RegisterForm() {
         const address = target.address.value;
         const city = target.city.value;
         const country = target.country.value;
+
+        // Capture all potential referral parameters
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
-        const aref = searchParams.get('aref'); // Bonus referral link
-        const rcid = searchParams.get('rcid'); // Referral Campaign ID
+        const aref = searchParams.get('aref'); 
+        const rcid = searchParams.get('rcid');
         
         if (password !== confirmPassword) {
             toast({
@@ -107,17 +109,17 @@ export default function RegisterForm() {
                 country,
                 gender,
                 binancePayId: '',
-                balance: 0, // Balance will be set by the Cloud Function
+                balance: 0,
                 role: 'user',
                 createdAt: serverTimestamp(),
                 l1Count: 0,
                 bonusReferralCount: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
-                emailVerified: true, // Allow login by default
+                emailVerified: true, 
             };
             
-            // Pass referral info to be handled server-side by the Cloud Function
+            // Pass all referral info to be handled server-side by the Cloud Function
             if (aref) userData.bonusReferredBy = aref;
             if (ref) userData.standardReferredBy = ref;
             if (mref) userData.marketingReferredBy = mref;
