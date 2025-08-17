@@ -134,58 +134,88 @@ export default function DashboardPage() {
             setStatsLoading(false);
         });
 
-        // --- Fetch all bonuses ---
+        return () => {
+            unsubscribeTrans();
+        };
+    }, [user]);
+
+    useEffect(() => {
+        if (!user || !userData) {
+            setCheckingBonuses(false);
+            return;
+        }
+    
         const fetchBonuses = async () => {
+            setCheckingBonuses(true);
             const now = new Date();
             
             // 1. Deposit Bonus
-            const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true));
-            const depositSnapshot = await getDocs(depositQuery);
-            if (!depositSnapshot.empty) {
-                const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
-                const eligibleCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
-                if (eligibleCampaign) {
-                    setDepositBonus(eligibleCampaign);
+            try {
+                const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true));
+                const depositSnapshot = await getDocs(depositQuery);
+                if (!depositSnapshot.empty) {
+                    const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
+                    const eligibleCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
+                    if (eligibleCampaign) {
+                        setDepositBonus(eligibleCampaign);
+                    } else {
+                        setDepositBonus(null);
+                    }
+                } else {
+                    setDepositBonus(null);
                 }
-            }
+            } catch (e) { console.error("Error fetching deposit bonus", e); setDepositBonus(null); }
 
             // 2. Daily Bonus
-            const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true));
-            const dailySnapshot = await getDocs(dailyQuery);
-            if (!dailySnapshot.empty) {
-                const activeCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
-                const eligibleNow = activeCampaigns.find(c => c.endDate.toDate() > now && c.startDate.toDate() < now);
+            try {
+                const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true));
+                const dailySnapshot = await getDocs(dailyQuery);
+                if (!dailySnapshot.empty) {
+                    const activeCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
+                    const eligibleNow = activeCampaigns.find(c => c.endDate.toDate() > now && c.startDate.toDate() < now);
 
-                if(eligibleNow) {
-                    const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, eligibleNow.id));
-                    if (!claimSnap.exists()) {
-                        setDailyBonus(eligibleNow);
+                    if(eligibleNow) {
+                        const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, eligibleNow.id));
+                        if (!claimSnap.exists()) {
+                            setDailyBonus(eligibleNow);
+                        } else {
+                            setDailyBonus(null);
+                        }
+                    } else {
+                        setDailyBonus(null);
                     }
+                } else {
+                    setDailyBonus(null);
                 }
-            }
+            } catch (e) { console.error("Error fetching daily bonus", e); setDailyBonus(null); }
             
             // 3. Referral Task
-            if (userData.campaignInfo?.campaignId) {
-                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
-                if (campaignDoc.exists()) {
-                    const campaignData = campaignDoc.data() as Campaign;
-                    const completedTaskIds = new Set(userData.campaignInfo.completedTasks || []);
-                    const nextTask = campaignData.tasks.find(t => !completedTaskIds.has(t.id));
-                    if (nextTask) {
-                        setReferralTask({ task: nextTask, campaign: campaignData });
+            try {
+                if (userData.campaignInfo?.campaignId) {
+                    const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
+                    if (campaignDoc.exists()) {
+                        const campaignData = campaignDoc.data() as Campaign;
+                        const completedTaskIds = new Set(userData.campaignInfo.completedTasks || []);
+                        const nextTask = campaignData.tasks.find(t => !completedTaskIds.has(t.id));
+                        if (nextTask) {
+                            setReferralTask({ task: nextTask, campaign: campaignData });
+                        } else {
+                             setReferralTask(null);
+                        }
+                    } else {
+                        setReferralTask(null);
                     }
+                } else {
+                    setReferralTask(null);
                 }
-            }
+            } catch(e) { console.error("Error fetching referral task", e); setReferralTask(null); }
             
             setCheckingBonuses(false);
         };
         
         fetchBonuses();
-
-        return () => {
-            unsubscribeTrans();
-        };
     }, [user, userData]);
+
 
     const financialStats = useMemo(() => {
         let totalDeposit = 0;
