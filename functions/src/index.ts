@@ -14,31 +14,7 @@ export const onUserCreate = functions.firestore
     const newUser = snap.data();
     const newUserRef = snap.ref;
     
-    // --- 1. Handle Sign-up Bonus ---
-    const bonusConfigRef = admin.firestore().collection('settings').doc('bonusConfig');
-    const usersCollection = admin.firestore().collection('users');
-    
-    try {
-        const bonusConfigSnap = await bonusConfigRef.get();
-        if (bonusConfigSnap.exists() && bonusConfigSnap.data()?.signupBonusEnabled) {
-            const bonusConfig = bonusConfigSnap.data()!;
-            // Get the count of users *before* this new one was created.
-            // Since onUserCreate fires *after* creation, the current count includes the new user.
-            // So we subtract 1 to get the count at the moment of registration.
-            const snapshot = await usersCollection.count().get();
-            const userCountBeforeThisUser = snapshot.data().count - 1;
-            
-            if (userCountBeforeThisUser < (bonusConfig.signupBonusLimit || 250)) {
-                await newUserRef.update({
-                    balance: admin.firestore.FieldValue.increment(bonusConfig.signupBonusAmount || 100)
-                });
-            }
-        }
-    } catch (error) {
-        functions.logger.error("Error processing signup bonus:", error);
-    }
-    
-    // --- 2. Handle Bonus Referral Count ---
+    // --- 1. Handle Bonus Referral Count ---
     if (newUser.bonusReferredBy) {
         const referrerId = newUser.bonusReferredBy;
         const referrerRef = admin.firestore().collection('users').doc(referrerId);
@@ -53,7 +29,7 @@ export const onUserCreate = functions.firestore
         }
     }
     
-    // --- 3. Handle Commission Referral Logic ---
+    // --- 2. Handle Commission Referral Logic ---
     const directReferrerId = newUser.marketingReferredBy || newUser.standardReferredBy;
     if (directReferrerId && !newUser.campaignInfo) {
         const referrerRef = admin.firestore().collection('users').doc(directReferrerId);
@@ -171,20 +147,11 @@ export const joinGame = onCall({ cors: true }, async (request) => {
             
             if (!creatorDoc.exists() || !joinerDoc.exists()) throw new HttpsError('aborted', "One of the players could not be found.");
             
-            const creatorData = creatorDoc.data()!;
             const joinerData = joinerDoc.data()!;
 
-            const joinerWalletField = fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
+            const joinerWalletField = 'balance'; // Hardcode to main balance for simplicity now
 
             if ((joinerData[joinerWalletField] || 0) < wager) throw new HttpsError('failed-precondition', "You have insufficient funds.");
-            
-            // Deduct from joiner's wallet
-            transaction.update(joinerRef, { [joinerWalletField]: admin.firestore.FieldValue.increment(-wager) });
-            // Deduct from creator's wallet
-            const creatorBonusWagered = roomData.createdBy.wagerFromBonus || 0;
-            const creatorMainWagered = roomData.createdBy.wagerFromMain || 0;
-            if(creatorBonusWagered > 0) transaction.update(creatorRef, { bonusBalance: admin.firestore.FieldValue.increment(-creatorBonusWagered) });
-            if(creatorMainWagered > 0) transaction.update(creatorRef, { balance: admin.firestore.FieldValue.increment(-creatorMainWagered) });
             
             const creatorColor = roomData.createdBy.color;
             const joinerColor = creatorColor === 'w' ? 'b' : 'w';
