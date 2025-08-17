@@ -51,7 +51,7 @@ export default function RegisterForm() {
         const country = target.country.value;
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
-        const aref = searchParams.get('aref');
+        const aref = searchParams.get('aref'); // Bonus referral link
         const rcid = searchParams.get('rcid'); // Referral Campaign ID
         
         if (password !== confirmPassword) {
@@ -131,8 +131,8 @@ export default function RegisterForm() {
             };
             
             if (aref) {
-                const referrerRef = doc(db, 'users', aref);
-                await updateDoc(referrerRef, { bonusReferralCount: increment(1) });
+                // The onUserCreate cloud function will handle incrementing the count
+                userData.bonusReferredBy = aref;
             }
 
             if (rcid && ref) { // It's a campaign referral
@@ -144,6 +144,7 @@ export default function RegisterForm() {
                 };
             }
             
+            // This is for the main commission system
             const directReferrerId = mref || ref;
             if (directReferrerId && !rcid) { // Ensure it's not a campaign referral
                 const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
@@ -157,10 +158,8 @@ export default function RegisterForm() {
                     else if (referrerData.role === 'marketer') {
                         userData.referralChain = [directReferrerId];
                     }
-
-                    if (referrerData.role === 'user') {
-                        await updateDoc(doc(db, 'users', directReferrerId), { l1Count: increment(1) });
-                    }
+                    
+                    // The increment is now handled by a Cloud Function to avoid permission issues.
                 }
             }
 
