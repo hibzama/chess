@@ -28,7 +28,7 @@ type Commission = {
     id: string;
     amount: number;
     createdAt: any;
-    fromUserId?: string;
+    fromUserId: string;
     level: 1;
     fromUserName?: string;
 };
@@ -85,42 +85,37 @@ export default function ReferAndEarnPage() {
             return;
         }
 
-        const fetchAllData = async () => {
+        const fetchReferrals = async () => {
             setLoading(true);
             
-            // Fetch Referrals
             const l1Query = query(collection(db, 'users'), where('referredBy', '==', user.uid));
             const l1Docs = await getDocs(l1Query);
             const l1Data = l1Docs.docs.map(doc => ({ ...doc.data(), uid: doc.id } as Referral));
+            
             setLevel1(l1Data);
-            
-            // Fetch ALL transactions and filter client-side
-            const transQuery = query(collection(db, 'transactions'), where('userId', '==', user.uid));
-            const transSnapshot = await getDocs(transQuery);
-            const allTransactions = transSnapshot.docs.map(d => ({ ...d.data(), id: d.id }));
-            
-            const commsDataPromises = allTransactions
-                .filter(tx => tx.type === 'commission' && tx.level === 1)
-                .map(async (commission) => {
-                    const comm = commission as Commission;
-                    if (comm.fromUserId) {
-                        const fromUserDoc = await getDoc(doc(db, 'users', comm.fromUserId));
-                        if(fromUserDoc.exists()){
-                            const fromUserData = fromUserDoc.data();
-                            comm.fromUserName = `${fromUserData.firstName} ${fromUserData.lastName}`;
-                        }
-                    }
-                    return comm;
-                });
-
-            const commsData = await Promise.all(commsDataPromises);
-            setCommissions(commsData.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
-
             setLoading(false);
         };
         
-        fetchAllData();
+        fetchReferrals();
 
+         const commQuery = query(collection(db, 'transactions'), where('type', '==', 'commission'), where('userId', '==', user.uid), where('level', '==', 1));
+         const unsubscribe = onSnapshot(commQuery, async (snapshot) => {
+             const commsDataPromises = snapshot.docs.map(async (d) => {
+                const commission = {...d.data(), id: d.id} as Commission;
+                if (commission.fromUserId) {
+                    const fromUserDoc = await getDoc(doc(db, 'users', commission.fromUserId));
+                    if(fromUserDoc.exists()){
+                        const fromUserData = fromUserDoc.data();
+                        commission.fromUserName = `${fromUserData.firstName} ${fromUserData.lastName}`;
+                    }
+                }
+                return commission;
+             });
+             const commsData = await Promise.all(commsDataPromises);
+             setCommissions(commsData.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
+         });
+
+         return () => unsubscribe();
     }, [user]);
     
     const copyLink = () => {
