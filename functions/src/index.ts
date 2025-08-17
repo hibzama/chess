@@ -22,10 +22,13 @@ export const onUserCreate = functions.firestore
         const bonusConfigSnap = await bonusConfigRef.get();
         if (bonusConfigSnap.exists() && bonusConfigSnap.data()?.signupBonusEnabled) {
             const bonusConfig = bonusConfigSnap.data()!;
+            // Get the count of users *before* this new one was created.
+            // Since onUserCreate fires *after* creation, the current count includes the new user.
+            // So we subtract 1 to get the count at the moment of registration.
             const snapshot = await usersCollection.count().get();
-            const userCount = snapshot.data().count;
+            const userCountBeforeThisUser = snapshot.data().count - 1;
             
-            if (userCount <= (bonusConfig.signupBonusLimit || 250)) {
+            if (userCountBeforeThisUser < (bonusConfig.signupBonusLimit || 250)) {
                 await newUserRef.update({
                     balance: admin.firestore.FieldValue.increment(bonusConfig.signupBonusAmount || 100)
                 });
