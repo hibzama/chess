@@ -69,8 +69,8 @@ export default function UserCampaignsPage() {
     
      const availableCampaigns = useMemo(() => {
         if (!activeUserCampaign && completedCampaigns.length >= 0) {
-            const completedCampaignIds = new Set(completedCampaigns.map(c => c.campaignId));
-            return allCampaigns.filter(c => !completedCampaignIds.has(c.id));
+            const completedOrPendingCampaignIds = new Set(completedCampaigns.map(c => c.campaignId));
+            return allCampaigns.filter(c => !completedOrPendingCampaignIds.has(c.id));
         }
         return [];
     }, [allCampaigns, completedCampaigns, activeUserCampaign]);
