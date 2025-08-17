@@ -2,122 +2,126 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+  
     // Helper Functions
-    function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    function isAuth() {
+      return request.auth != null;
     }
     
     function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isJoiningGame(requestData, resourceData) {
-      return requestData.status == 'in-progress' && resourceData.status == 'waiting';
-    }
-
-    // USER rules:
-    // Read: Any authenticated user can read any user's profile.
-    // Write: A user can only write to their own document.
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if isOwner(userId) || isAdmin();
-      
-      // Allow users to manage their own subcollections
-      match /{subcollection}/{docId} {
-        allow read, write: if isOwner(userId);
-      }
-    }
-
-    // GAME ROOM rules:
-    // Read: Any authenticated user can see public game rooms.
-    // Create: Any authenticated user can create a game room.
-    // Update: A user can only update a room if they are joining it. Admins have full access.
-    match /game_rooms/{roomId} {
-      allow read, create: if request.auth != null;
-      allow update, delete: if isOwner(resource.data.createdBy.uid) || isAdmin() || isJoiningGame(request.resource.data, resource.data);
+      return isAuth() && request.auth.uid == userId;
     }
     
-    // CHAT rules:
-    // A user can only read/write to chats they are a part of.
+    function isAdmin() {
+        return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // USER-LEVEL RULES
+    match /users/{userId} {
+      allow read: if isAuth();
+      allow write: if isOwner(userId) || isAdmin();
+      
+      // Subcollections for a user
+      match /{subcollection}/{docId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+    
+    // GAME-LEVEL RULES
+    match /game_rooms/{roomId} {
+      allow read: if isAuth();
+      // Allow create for any authenticated user
+      allow create: if isAuth();
+      
+      // Allow updates only by a player joining the game or players in the game
+      allow update: if isAuth() && (
+        // Case 1: A new player is joining a 'waiting' room
+        (request.resource.data.status == 'in-progress' && resource.data.status == 'waiting' && request.auth.uid == request.resource.data.player2.uid)
+        ||
+        // Case 2: An existing player is updating an 'in-progress' game
+        (resource.data.status == 'in-progress' && request.auth.uid in resource.data.players)
+      );
+      
+      allow delete: if isAuth() && (
+        // Allow the creator to delete a waiting room
+        (resource.data.status == 'waiting' && isOwner(resource.data.createdBy.uid)) ||
+        // Allow admins to delete any room
+        isAdmin()
+      );
+      
+      match /messages/{messageId} {
+        allow read, create: if isAuth() && request.auth.uid in resource.data.players;
+      }
+    }
+    
+    // TRANSACTION-LEVEL RULES
+    match /transactions/{transactionId} {
+      allow create: if isAuth();
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // CHAT-LEVEL RULES
     match /chats/{chatId} {
-        allow read, write: if request.auth.uid in resource.data.userIds;
-        
+        allow read, update: if isAuth() && request.auth.uid in resource.data.userIds;
         match /messages/{messageId} {
-            allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+            allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
         }
     }
 
-    // TRANSACTION rules:
-    // Users can create transactions for themselves, but not view others' unless they are admin.
-    match /transactions/{transactionId} {
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      allow create: if isOwner(request.resource.data.userId);
-      allow update, delete: if isAdmin();
-    }
-
-    // BONUS CAMPAIGN rules:
-    // Read: All authenticated users can read all active bonus campaigns.
-    // Write: Only admins can create/edit campaigns.
+    // BONUS & CAMPAIGN RULES
     match /signup_bonus_campaigns/{campaignId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-       match /claims/{claimId} {
-        allow read, write: if isOwner(claimId) || isAdmin();
-      }
-    }
-    match /daily_bonus_campaigns/{campaignId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-      match /claims/{claimId} {
-        allow read, write: if isOwner(claimId) || isAdmin();
-      }
-    }
-     match /deposit_bonus_campaigns/{campaignId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-      match /claims/{claimId} {
-        allow read, write: if isOwner(claimId) || isAdmin();
-      }
+        allow read: if isAuth();
+        allow write: if isAdmin();
+        match /claims/{claimId} {
+            allow read: if isOwner(claimId) || isAdmin();
+            allow create: if isOwner(claimId);
+        }
     }
     
-    // REFERRAL CAMPAIGN rules:
-    // Read: Authenticated users can read the campaigns to participate.
-    // Write: Admins manage campaigns.
+    match /deposit_bonus_campaigns/{campaignId} {
+        allow read: if isAuth();
+        allow write: if isAdmin();
+        match /claims/{claimId} {
+            allow read: if isOwner(claimId) || isAdmin();
+            allow create: if isOwner(claimId);
+        }
+    }
+
+    match /daily_bonus_campaigns/{campaignId} {
+        allow read: if isAuth();
+        allow write: if isAdmin();
+        match /claims/{claimId} {
+            allow read: if isOwner(claimId) || isAdmin();
+            allow create: if isOwner(claimId);
+        }
+    }
+    
     match /referral_campaigns/{campaignId} {
-        allow read: if request.auth != null;
+        allow read: if isAuth();
         allow write: if isAdmin();
     }
     
-    // BONUS CLAIM rules:
-    // Create: A user can create a claim for themselves.
-    // Read/Update: An admin can read/update any claim to approve/reject it. A user can read their own.
+    // Allow users to create bonus claims for themselves, and admins to manage them
     match /bonus_claims/{claimId} {
-        allow create: if isOwner(request.resource.data.userId);
-        allow read, update: if isAdmin() || isOwner(resource.data.userId);
-        allow delete: if isAdmin();
-    }
-
-    // NOTIFICATION rules:
-    // Users can only read their own notifications.
-    match /notifications/{notificationId} {
-      allow read, update: if isOwner(resource.data.userId);
-      allow create: if request.auth != null; // Allow server-side creation
-    }
-
-    // MARKETING APPLICATION rules:
-    // Create: Anyone can create (submit) an application.
-    // Read/Write: Only admins can read/update them.
-    match /marketing_applications/{appId} {
-        allow create: if request.auth == null || request.auth != null; // Open for anyone to apply
+        allow create: if isAuth() && isOwner(request.resource.data.userId);
         allow read, update, delete: if isAdmin();
     }
-
-    // SETTINGS rules:
-    // Admins can write to any settings document. Authenticated users can read some settings.
+    
+    // MARKETING-SPECIFIC RULES
+    match /marketing_applications/{appId} {
+        allow create: if true;
+        allow read, write: if isAdmin();
+    }
+    
+    // SETTINGS RULES
     match /settings/{settingId} {
-        allow read: if request.auth != null;
-        allow write: if isAdmin();
+        allow read, write: if isAdmin();
+    }
+
+    // NOTIFICATIONS
+    match /notifications/{notificationId} {
+        allow read, update: if isAuth() && isOwner(resource.data.userId);
+        allow create: if isAuth(); // Allow creation for friend requests etc.
     }
   }
 }
