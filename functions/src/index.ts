@@ -58,12 +58,12 @@ export const onUserCreate = functions.firestore
           updatesForNewUser.referredBy = directReferrerId;
 
           // Case 1: The referrer is a marketer (mref link was used)
-          if (referrerData.role === 'marketer') {
+          if (referrerData.role === 'marketer' && marketingReferrerId) {
             updatesForNewUser.referralChain = [directReferrerId];
             functions.logger.log(`User ${userId} joined marketer ${directReferrerId}'s chain.`);
           }
           // Case 2: The referrer is a standard user (ref link was used)
-          else if (referrerData.role === 'user') {
+          else if (referrerData.role === 'user' && standardReferrerId) {
             // Increment the standard user's L1 count
             transaction.update(referrerRef, {
               l1Count: admin.firestore.FieldValue.increment(1)
