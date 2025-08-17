@@ -45,17 +45,8 @@ const BonusHub = ({ depositBonus, dailyBonus, referralTask }: { depositBonus: De
         );
     }
     
-    const gridColsClass = useMemo(() => {
-        switch (activeBonuses.length) {
-            case 1: return "md:grid-cols-1";
-            case 2: return "md:grid-cols-2";
-            case 3: return "md:grid-cols-3";
-            default: return "";
-        }
-    }, [activeBonuses.length]);
-
     return (
-        <div className={cn("grid grid-cols-1 gap-4", gridColsClass)}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {depositBonus && (
                 <BonusCardShell 
                     title={depositBonus.title || "Deposit Bonus"}
@@ -137,7 +128,7 @@ export default function DashboardPage() {
         return () => {
             unsubscribeTrans();
         };
-    }, [user]);
+    }, [user, userData]);
 
     useEffect(() => {
         if (!user || !userData) {
@@ -151,12 +142,10 @@ export default function DashboardPage() {
             
             // 1. Deposit Bonus
             try {
-                const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true));
+                const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true), where('expiresAt', '>', Timestamp.now()));
                 const depositSnapshot = await getDocs(depositQuery);
                 if (!depositSnapshot.empty) {
-                    const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
-                    const eligibleCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
-                    setDepositBonus(eligibleCampaign || null);
+                    setDepositBonus(depositSnapshot.docs[0].data() as DepositBonusCampaign);
                 } else {
                     setDepositBonus(null);
                 }
@@ -164,11 +153,11 @@ export default function DashboardPage() {
 
             // 2. Daily Bonus
             try {
-                const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true));
+                const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true), where('endDate', '>', Timestamp.now()));
                 const dailySnapshot = await getDocs(dailyQuery);
                 if (!dailySnapshot.empty) {
                     const activeCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
-                    const eligibleNow = activeCampaigns.find(c => c.endDate.toDate() > now && c.startDate.toDate() < now);
+                    const eligibleNow = activeCampaigns.find(c => c.startDate.toDate() < now);
 
                     if(eligibleNow) {
                         const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, eligibleNow.id));
