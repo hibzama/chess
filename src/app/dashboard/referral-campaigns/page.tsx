@@ -44,7 +44,7 @@ interface ClaimHistory {
     amount: number;
     description: string;
     createdAt: any;
-    status: string;
+    status: 'pending' | 'approved' | 'rejected';
     type: 'referrer' | 'referee';
     campaignId?: string;
     campaignTitle?: string;
@@ -54,7 +54,7 @@ export default function UserCampaignsPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
     const [allCampaigns, setAllCampaigns] = useState<Campaign[]>([]);
-    const [completedCampaigns, setCompletedCampaigns] = useState<ClaimHistory[]>([]);
+    const [claimHistory, setClaimHistory] = useState<ClaimHistory[]>([]);
     const [activeUserCampaign, setActiveUserCampaign] = useState<UserCampaign | null>(null);
     const [campaignDetails, setCampaignDetails] = useState<Campaign | null>(null);
     const [referrals, setReferrals] = useState<CampaignReferral[]>([]);
@@ -68,12 +68,12 @@ export default function UserCampaignsPage() {
     }, [user, activeUserCampaign]);
     
      const availableCampaigns = useMemo(() => {
-        if (!activeUserCampaign && completedCampaigns.length >= 0) {
-            const completedOrPendingCampaignIds = new Set(completedCampaigns.map(c => c.campaignId));
+        if (!activeUserCampaign) {
+            const completedOrPendingCampaignIds = new Set(claimHistory.map(c => c.campaignId));
             return allCampaigns.filter(c => !completedOrPendingCampaignIds.has(c.id));
         }
         return [];
-    }, [allCampaigns, completedCampaigns, activeUserCampaign]);
+    }, [allCampaigns, claimHistory, activeUserCampaign]);
 
     useEffect(() => {
         const fetchCampaigns = async () => {
@@ -108,15 +108,15 @@ export default function UserCampaignsPage() {
             setLoading(false);
         });
 
-         // Fetch claim history for completed campaigns
+         // Fetch claim history for completed/pending campaigns
         const claimQuery = query(
             collection(db, 'bonus_claims'), 
             where('userId', '==', user.uid),
             where('type', '==', 'referrer'),
         );
         const unsubHistory = onSnapshot(claimQuery, (snapshot) => {
-            const completed = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}) as ClaimHistory);
-            setCompletedCampaigns(completed.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
+            const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}) as ClaimHistory);
+            setClaimHistory(history.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
         });
 
         return () => {
@@ -203,7 +203,8 @@ export default function UserCampaignsPage() {
     const validReferrals = referrals.filter(r => campaignDetails && r.campaignInfo.completedTasks.length === campaignDetails.tasks.length);
     const progress = campaignDetails ? (validReferrals.length / campaignDetails.referralGoal) * 100 : 0;
     const isCampaignGoalMet = campaignDetails && validReferrals.length >= campaignDetails.referralGoal;
-    const hasPendingOrClaimed = activeUserCampaign?.completed || activeUserCampaign?.claimed;
+    const hasPendingOrClaimed = activeUserCampaign?.completed;
+
 
     if (loading) {
         return <div className="space-y-4"> <Skeleton className="h-32 w-full" /> <Skeleton className="h-64 w-full" /> </div>
@@ -253,7 +254,7 @@ export default function UserCampaignsPage() {
                             <Table>
                                 <TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                 <TableBody>
-                                    {completedCampaigns.length > 0 ? completedCampaigns.map(claim => (
+                                    {claimHistory.length > 0 ? claimHistory.map(claim => (
                                         <TableRow key={claim.id}>
                                             <TableCell>{claim.campaignTitle}</TableCell>
                                             <TableCell className="font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
@@ -379,3 +380,5 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
         </Table>
     </ScrollArea>
 );
+
+    
