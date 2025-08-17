@@ -1,3 +1,4 @@
+
 'use client';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -104,7 +105,6 @@ export default function RegisterForm() {
                 city,
                 country,
                 gender,
-                binancePayId: '',
                 balance: 0,
                 role: 'user',
                 createdAt: serverTimestamp(),
@@ -129,9 +129,6 @@ export default function RegisterForm() {
             }
 
             await setDoc(doc(db, "users", user.uid), userData);
-            
-            // No need to send email verification for this app logic
-            // await sendEmailVerification(user);
 
             toast({
                 title: "Account Created!",
