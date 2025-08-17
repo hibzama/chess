@@ -37,14 +37,12 @@ type GameRoom = {
         name: string;
         color: 'w' | 'b';
         photoURL?: string;
-        fundingWallet: 'main' | 'bonus';
     };
     player2?: {
         uid: string;
         name: string;
         color: 'w' | 'b';
         photoURL?: string;
-        fundingWallet: 'main' | 'bonus';
     };
     players: string[];
     createdAt: any;
@@ -150,14 +148,12 @@ function MultiplayerGame() {
     const { isGameLoading, gameOver, room } = useGame();
     const [isJoining, setIsJoining] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
-    const [fundingWallet, setFundingWallet] = useState<'main' | 'bonus'>('main');
     
     const isCreator = room?.createdBy.uid === user?.uid;
     const roomStatusRef = useRef(room?.status);
     const USDT_RATE = 310;
 
-    const selectedWalletBalance = fundingWallet === 'main' ? userData?.balance ?? 0 : userData?.bonusBalance ?? 0;
-    const hasSufficientFunds = room ? selectedWalletBalance >= room.wager : false;
+    const hasSufficientFunds = room ? (userData?.balance ?? 0) >= room.wager : false;
 
     useEffect(() => {
         roomStatusRef.current = room?.status;
@@ -174,9 +170,8 @@ function MultiplayerGame() {
             
             batch.delete(roomRef);
             // Refund the creator's wager. This logic assumes wagers are taken upon creation.
-            const creatorFundingWallet = room.createdBy.fundingWallet || 'main';
             batch.update(userRef, {
-                [creatorFundingWallet === 'bonus' ? 'bonusBalance' : 'balance']: increment(room.wager)
+                balance: increment(room.wager)
             });
 
             await batch.commit();
@@ -225,7 +220,7 @@ function MultiplayerGame() {
         if (!user || !userData || !room || room.createdBy.uid === user.uid) return;
     
         if(!hasSufficientFunds) {
-            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance in your ${fundingWallet} wallet.`});
+            toast({ variant: "destructive", title: "Insufficient Funds", description: `You don't have enough balance.`});
             return;
         }
     
@@ -234,7 +229,7 @@ function MultiplayerGame() {
         try {
             const authToken = await user.getIdToken();
             const joinGameFunction = httpsCallable(functions, 'joinGame');
-            await joinGameFunction({ authToken, roomId: room.id, fundingWallet: fundingWallet });
+            await joinGameFunction({ authToken, roomId: room.id });
             toast({ title: "Game Joined!", description: "The match is starting now."});
     
         } catch (error: any) {
@@ -329,34 +324,21 @@ function MultiplayerGame() {
                                 </div>
                             </div>
 
-                             <div className="space-y-3">
-                                <Label>Funding Wallet</Label>
-                                 <RadioGroup value={fundingWallet} onValueChange={(v) => setFundingWallet(v as 'main' | 'bonus')} className="flex gap-4">
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="main" id="main-wallet" />
-                                        <Label htmlFor="main-wallet">Main Wallet</Label>
+                             <Card className="p-3 bg-secondary">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm text-muted-foreground">Your Balance:</span>
+                                    <div>
+                                        <p className="font-bold">LKR {(userData.balance || 0).toFixed(2)}</p>
+                                        <p className="text-xs text-muted-foreground text-right">~{((userData.balance || 0) / USDT_RATE).toFixed(2)} USDT</p>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                        <RadioGroupItem value="bonus" id="bonus-wallet" />
-                                        <Label htmlFor="bonus-wallet">Bonus Wallet</Label>
-                                    </div>
-                                </RadioGroup>
-                                <Card className="p-3 bg-secondary">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-muted-foreground">Available:</span>
-                                        <div>
-                                            <p className="font-bold">LKR {selectedWalletBalance.toFixed(2)}</p>
-                                            <p className="text-xs text-muted-foreground text-right">~{(selectedWalletBalance / USDT_RATE).toFixed(2)} USDT</p>
-                                        </div>
-                                    </div>
-                                </Card>
-                            </div>
+                                </div>
+                            </Card>
                             
                             {!hasSufficientFunds && (
                                  <Card className="bg-destructive/20 border-destructive text-center p-4">
                                     <CardTitle className="text-destructive">Insufficient Balance</CardTitle>
                                     <CardDescription className="text-destructive/80 mb-4">
-                                        You need at least LKR {room.wager.toFixed(2)} in your selected wallet to join.
+                                        You need at least LKR {room.wager.toFixed(2)} to join.
                                     </CardDescription>
                                      <Button asChild variant="destructive">
                                         <Link href="/dashboard/wallet"><Wallet className="mr-2"/> Top Up Wallet</Link>
@@ -443,6 +425,4 @@ export default function MultiplayerGamePage() {
         </GameProvider>
     )
 }
-
-    
 

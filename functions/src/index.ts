@@ -120,13 +120,13 @@ export const joinGame = functions.https.onRequest(async (req, res) => {
             return;
         }
 
-        const { authToken, roomId, fundingWallet } = req.body.data;
+        const { authToken, roomId } = req.body.data;
         if (!authToken) {
             res.status(401).send({ error: "Unauthorized: Auth token is missing." });
             return;
         }
-        if (!roomId || !fundingWallet) {
-            res.status(400).send({ error: "Bad Request: Room ID and funding wallet are required." });
+        if (!roomId) {
+            res.status(400).send({ error: "Bad Request: Room ID is required." });
             return;
         }
 
@@ -146,24 +146,18 @@ export const joinGame = functions.https.onRequest(async (req, res) => {
                 if (roomData.createdBy.uid === joinerId) throw new functions.https.HttpsError('failed-precondition', "You cannot join your own game.");
 
                 const wager = roomData.wager || 0;
-                const creatorId = roomData.createdBy.uid;
-
-                const creatorRef = db.collection('users').doc(creatorId);
+                
                 const joinerRef = db.collection('users').doc(joinerId);
+                const joinerDoc = await transaction.get(joinerRef);
 
-                const [creatorDoc, joinerDoc] = await Promise.all([
-                    transaction.get(creatorRef),
-                    transaction.get(joinerRef)
-                ]);
-
-                if (!creatorDoc.exists() || !joinerDoc.exists()) throw new functions.https.HttpsError('aborted', "One of the players could not be found.");
+                if (!joinerDoc.exists()) throw new functions.https.HttpsError('aborted', "Your user profile could not be found.");
                 
                 const joinerData = joinerDoc.data()!;
-                const joinerWalletField = fundingWallet === 'bonus' ? 'bonusBalance' : 'balance';
 
-                if ((joinerData[joinerWalletField] || 0) < wager) throw new functions.https.HttpsError('failed-precondition', "You have insufficient funds.");
+                if ((joinerData.balance || 0) < wager) throw new functions.https.HttpsError('failed-precondition', "You have insufficient funds.");
                 
-                transaction.update(joinerRef, { [joinerWalletField]: admin.firestore.FieldValue.increment(-wager) });
+                // Deduct wager from joiner's balance
+                transaction.update(joinerRef, { balance: admin.firestore.FieldValue.increment(-wager) });
 
                 const creatorColor = roomData.createdBy.color;
                 const joinerColor = creatorColor === 'w' ? 'b' : 'w';
@@ -175,7 +169,6 @@ export const joinGame = functions.https.onRequest(async (req, res) => {
                         name: `${joinerData.firstName} ${joinerData.lastName}`, 
                         color: joinerColor, 
                         photoURL: joinerData.photoURL || '',
-                        fundingWallet: fundingWallet,
                     },
                     players: admin.firestore.FieldValue.arrayUnion(joinerId),
                     turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
