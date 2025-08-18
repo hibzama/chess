@@ -166,7 +166,6 @@ export default function MainLayout({
         { href: '/dashboard/friends', icon: Users, label: 'Friends & Community' },
         { href: '/dashboard/rankings', icon: Trophy, label: 'Rankings' },
         { href: '/dashboard/equipment', icon: Gamepad2, label: 'My Equipment' },
-        { href: '/dashboard/referral-program', icon: Megaphone, label: 'Referral Program' },
         { href: '/dashboard/referral-campaigns', icon: Award, label: 'Referral Campaigns' },
         { href: '/dashboard/chat', icon: MessageSquare, label: 'Direct Messages' },
         { href: '/about', icon: Info, label: 'About Us' },
@@ -308,4 +307,3 @@ export default function MainLayout({
         </DialogContent>
         </Dialog>
     )
-  }
