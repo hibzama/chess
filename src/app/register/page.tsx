@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, Suspense } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp, updateDoc, increment, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -16,6 +16,7 @@ import { Ban } from "lucide-react";
 import { boyAvatars, girlAvatars } from "@/components/icons/avatars";
 import { renderToString } from "react-dom/server";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Campaign } from "../admin/referral-campaigns/page";
 
 
 function RegisterForm() {
@@ -89,8 +90,6 @@ function RegisterForm() {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             
-            await sendEmailVerification(user);
-
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
             const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
             const svgString = renderToString(React.createElement(randomAvatar));
@@ -115,7 +114,7 @@ function RegisterForm() {
                 l1Count: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
-                emailVerified: false, 
+                emailVerified: true, // Auto-verify users
                 friends: [],
                 wins: 0,
             };
@@ -163,9 +162,9 @@ function RegisterForm() {
             
             toast({
                 title: "Account Created!",
-                description: "Please check your email to verify your account before logging in.",
+                description: "You can now log in.",
             });
-            router.push(`/verify-email?email=${email}`);
+            router.push(`/login`);
 
         } catch (error: any) {
             console.error("Error signing up:", error);
