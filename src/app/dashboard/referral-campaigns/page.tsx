@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Megaphone, Copy, Share, Users, Check, Loader2, Award, Phone, Info, History, DollarSign, Layers, ShieldCheck, CheckCircle } from 'lucide-react';
+import { Megaphone, Copy, Share, Users, Check, Loader2, Award, Phone, Info, History, DollarSign, Layers, ShieldCheck, CheckCircle, Languages } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -20,6 +20,7 @@ import { runTransaction, increment } from 'firebase/firestore';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { format } from 'date-fns';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 interface UserCampaign {
     campaignId: string;
@@ -49,6 +50,55 @@ interface ClaimHistory {
     campaignId?: string;
     campaignTitle?: string;
 }
+
+const CampaignIntroduction = () => {
+    const [language, setLanguage] = useState('en');
+
+    return (
+        <Card className="mb-8">
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <CardTitle className="flex items-center gap-2">
+                        <Info className="w-5 h-5"/>
+                        {language === 'en' ? 'How Referral Campaigns Work' : 'හඳුන්වාදීමේ ප්‍රවර්ධන ක්‍රියා කරන ආකාරය'}
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                         <Languages className="w-4 h-4 text-muted-foreground"/>
+                        <button onClick={() => setLanguage('en')} className={cn("text-xs font-semibold", language === 'en' ? 'text-primary' : 'text-muted-foreground')}>EN</button>
+                        <span className="text-muted-foreground">|</span>
+                        <button onClick={() => setLanguage('si')} className={cn("text-xs font-semibold", language === 'si' ? 'text-primary' : 'text-muted-foreground')}>සිං</button>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="text-sm space-y-4">
+                {language === 'en' ? (
+                    <>
+                        <p>Referral Campaigns are a powerful way to earn significant rewards by helping grow the Nexbattle community. Here's how it works:</p>
+                        <ol className="list-decimal list-inside space-y-2">
+                            <li><strong>Start a Campaign:</strong> Choose an available campaign from the list below to begin.</li>
+                            <li><strong>Share Your Link:</strong> You will get a unique referral link for your active campaign. Share this with friends who are not yet on Nexbattle.</li>
+                            <li><strong>Friends Complete Tasks:</strong> When a new user signs up using your link, they will be given a set of simple tasks to complete (like joining a social media group). For each task they complete, they earn a small bonus.</li>
+                            <li><strong>Become a Valid Referral:</strong> Once your referred friend completes ALL their assigned tasks, they become a "valid referral" for your campaign.</li>
+                            <li><strong>Claim Your Reward:</strong> After you collect enough valid referrals to meet your campaign's goal, you can claim your large reward bonus! Your claim will be reviewed and approved by an admin.</li>
+                        </ol>
+                    </>
+                ) : (
+                    <>
+                        <p>Nexbattle ප්‍රජාව වර්ධනය කිරීමට උදවු වීමෙන් සැලකිය යුතු ත්‍යාග උපයා ගැනීමට Referral Campaigns යනු потужний спосіб වේ. එය ක්‍රියාත්මක වන ආකාරය මෙසේය:</p>
+                        <ol className="list-decimal list-inside space-y-2">
+                            <li><strong>ප්‍රවර්ධනයක් ආරම්භ කරන්න:</strong> ආරම්භ කිරීමට පහත ලැයිස්තුවෙන් පවතින ප්‍රවර්ධනයක් තෝරන්න.</li>
+                            <li><strong>ඔබේ සබැඳිය බෙදා ගන්න:</strong> ඔබේ සක්‍රිය ප්‍රවර්ධනය සඳහා ඔබට අනන්‍ය වූ හඳුන්වාදීමේ සබැඳියක් ලැබෙනු ඇත. එය Nexbattle හි තවමත් නැති මිතුරන් සමඟ බෙදා ගන්න.</li>
+                            <li><strong>මිතුරන් කාර්යයන් සම්පූර්ණ කරයි:</strong> නව පරිශීලකයෙකු ඔබේ සබැඳිය භාවිතයෙන් ලියාපදිංචි වූ විට, ඔවුන්ට සම්පූර්ණ කිරීමට සරල කාර්යයන් මාලාවක් ලබා දෙනු ඇත (සමාජ මාධ්‍ය කණ්ඩායමකට සම්බන්ධ වීම වැනි). ඔවුන් සම්පූර්ණ කරන සෑම කාර්යයක් සඳහාම, ඔවුන්ට කුඩා ප්‍රසාද දීමනාවක් ලැබේ.</li>
+                            <li><strong>වලංගු හඳුන්වාදීමක් වන්න:</strong> ඔබ හඳුන්වා දුන් මිතුරා ඔවුන්ට පවරා ඇති සියලුම කාර්යයන් සම්පූර්ණ කළ පසු, ඔවුන් ඔබේ ප්‍රවර්ධනය සඳහා "වලංගු හඳුන්වාදීමක්" බවට පත්වේ.</li>
+                            <li><strong>ඔබේ ත්‍යාගය ලබා ගන්න:</strong> ඔබේ ප්‍රවර්ධන ඉලක්කය සපුරාලීමට තරම් වලංගු හඳුන්වාදීම් එකතු කළ පසු, ඔබට ඔබේ විශාල ත්‍යාග ප්‍රසාද දීමනාව ලබා ගත හැකිය! ඔබේ ඉල්ලීම පරිපාලකයෙකු විසින් සමාලෝචනය කර අනුමත කරනු ලැබේ.</li>
+                        </ol>
+                    </>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
 
 const MarketingIntro = () => {
     return (
@@ -303,7 +353,8 @@ export default function UserCampaignsPage() {
         <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight">Referral Campaigns</h1>
             <p className="text-muted-foreground">
-                Participate in referral campaigns to earn rewards. Start a campaign, share your unique link, and guide new users to complete tasks.
+                Participate in referral campaigns to earn rewards. Start a campaign, share your unique link, and guide new users to complete
+                tasks.
             </p>
         </div>
     );
@@ -321,71 +372,71 @@ export default function UserCampaignsPage() {
     if (!activeUserCampaign || !campaignDetails) {
         return (
             <div className="space-y-8">
-            {pageIntro}
-            <Tabs defaultValue="campaigns">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="campaigns">Available Campaigns</TabsTrigger>
-                    <TabsTrigger value="history">Completed Campaigns</TabsTrigger>
-                </TabsList>
-                 <TabsContent value="campaigns">
-                    <Card>
-                        <CardHeader><CardTitle>Start a Referral Campaign</CardTitle><CardDescription>Choose a campaign to start earning rewards.</CardDescription></CardHeader>
-                        <CardContent className="space-y-4">
-                            {availableCampaigns.length > 0 ? availableCampaigns.map(c => (
-                                <Card key={c.id} className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                    <div>
-                                        <p className="font-bold">{c.title}</p>
-                                        <p className="text-sm text-muted-foreground">Goal: {c.referralGoal} referrals | Reward: LKR {c.referrerBonus}</p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Dialog>
-                                            <DialogTrigger asChild><Button variant="secondary">Details</Button></DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Tasks for "{c.title}"</DialogTitle>
-                                                    <DialogDescription>A new user must complete all these tasks for you to get referral credit.</DialogDescription>
-                                                </DialogHeader>
-                                                <ul className="list-disc space-y-2 pl-5 mt-4 text-sm">
-                                                    {c.tasks.map(task => <li key={task.id}>{task.description} (Reward: LKR {task.refereeBonus})</li>)}
-                                                </ul>
-                                            </DialogContent>
-                                        </Dialog>
-                                        <Button onClick={() => handleStartCampaign(c.id)}>Start</Button>
-                                    </div>
-                                </Card>
-                            )) : <p className="text-muted-foreground text-center">No new campaigns available right now.</p>}
-                        </CardContent>
-                    </Card>
-                 </TabsContent>
-                 <TabsContent value="history">
-                     <Card>
-                        <CardHeader><CardTitle>Bonus History</CardTitle><CardDescription>Your bonus claims from completed referral campaigns.</CardDescription></CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
-                                <TableBody>
-                                    {claimHistory.length > 0 ? claimHistory.map(claim => (
-                                        <TableRow key={claim.id}>
-                                            <TableCell>{claim.campaignTitle}</TableCell>
-                                            <TableCell className="font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
-                                            <TableCell>{claim.createdAt ? format(claim.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
-                                            <TableCell><Badge variant={claim.status === 'approved' ? 'default' : claim.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{claim.status}</Badge></TableCell>
-                                        </TableRow>
-                                    )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No history found.</TableCell></TableRow>}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                     </Card>
-                 </TabsContent>
-            </Tabs>
-            <MarketingIntro />
+                <CampaignIntroduction/>
+                <Tabs defaultValue="campaigns">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="campaigns">Available Campaigns</TabsTrigger>
+                        <TabsTrigger value="history">Completed Campaigns</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="campaigns">
+                        <Card>
+                            <CardHeader><CardTitle>Start a Referral Campaign</CardTitle><CardDescription>Choose a campaign to start earning rewards.</CardDescription></CardHeader>
+                            <CardContent className="space-y-4">
+                                {availableCampaigns.length > 0 ? availableCampaigns.map(c => (
+                                    <Card key={c.id} className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                        <div>
+                                            <p className="font-bold">{c.title}</p>
+                                            <p className="text-sm text-muted-foreground">Goal: {c.referralGoal} referrals | Reward: LKR {c.referrerBonus}</p>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Dialog>
+                                                <DialogTrigger asChild><Button variant="secondary">Details</Button></DialogTrigger>
+                                                <DialogContent>
+                                                    <DialogHeader>
+                                                        <DialogTitle>Tasks for "{c.title}"</DialogTitle>
+                                                        <DialogDescription>A new user must complete all these tasks for you to get referral credit.</DialogDescription>
+                                                    </DialogHeader>
+                                                    <ul className="list-disc space-y-2 pl-5 mt-4 text-sm">
+                                                        {c.tasks.map(task => <li key={task.id}>{task.description} (Reward: LKR {task.refereeBonus})</li>)}
+                                                    </ul>
+                                                </DialogContent>
+                                            </Dialog>
+                                            <Button onClick={() => handleStartCampaign(c.id)}>Start</Button>
+                                        </div>
+                                    </Card>
+                                )) : <p className="text-muted-foreground text-center">No new campaigns available right now.</p>}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="history">
+                        <Card>
+                            <CardHeader><CardTitle>Bonus History</CardTitle><CardDescription>Your bonus claims from completed referral campaigns.</CardDescription></CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                                    <TableBody>
+                                        {claimHistory.length > 0 ? claimHistory.map(claim => (
+                                            <TableRow key={claim.id}>
+                                                <TableCell>{claim.campaignTitle}</TableCell>
+                                                <TableCell className="font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
+                                                <TableCell>{claim.createdAt ? format(claim.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
+                                                <TableCell><Badge variant={claim.status === 'approved' ? 'default' : claim.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{claim.status}</Badge></TableCell>
+                                            </TableRow>
+                                        )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No history found.</TableCell></TableRow>}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+                <MarketingIntro />
             </div>
         );
     }
     
     return (
         <div className="space-y-8">
-            {pageIntro}
+            <CampaignIntroduction />
             <Card className="border-primary bg-primary/5">
                 <CardHeader>
                     <CardTitle className="flex justify-between items-start">
