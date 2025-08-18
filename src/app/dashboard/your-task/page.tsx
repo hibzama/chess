@@ -35,6 +35,9 @@ export default function YourTaskPage() {
             router.push('/dashboard');
             return;
         }
+        
+        // Use locally stored answers if they exist
+        setAnswers(userData.campaignInfo.answers || {});
 
         const fetchCampaignData = async () => {
             setLoading(true);
@@ -69,7 +72,6 @@ export default function YourTaskPage() {
         setIsSubmitting(true);
         
         try {
-            const batch = writeBatch(db);
             const userRef = doc(db, 'users', user.uid);
             
             const newCompletedTasks = [...(userData.campaignInfo.completedTasks || []), task.id];
@@ -78,28 +80,28 @@ export default function YourTaskPage() {
                 [task.id]: answer
             };
             
-            batch.update(userRef, {
+            // Only update the user's own document. This is a permitted action.
+            await updateDoc(userRef, {
                 'campaignInfo.completedTasks': newCompletedTasks,
                 'campaignInfo.answers': newAnswers
             });
+            
+            // Create a pending bonus claim for the admin to approve.
+            // This is now allowed by the new firestore rule.
+            const claimRef = doc(collection(db, 'bonus_claims'));
+            await setDoc(claimRef, {
+                userId: user.uid,
+                type: 'referee',
+                amount: task.refereeBonus,
+                status: 'pending',
+                campaignId: campaign.id,
+                campaignTitle: `Task: ${task.description}`,
+                answer: answer,
+                createdAt: serverTimestamp(),
+            });
 
-            if (task.refereeBonus > 0) {
-                 const claimRef = doc(collection(db, 'bonus_claims'));
-                 batch.set(claimRef, {
-                    userId: user.uid,
-                    type: 'referee',
-                    amount: task.refereeBonus,
-                    status: 'pending',
-                    campaignId: campaign.id,
-                    campaignTitle: `Task: ${task.description}`,
-                    answer: answer,
-                    createdAt: serverTimestamp(),
-                });
-            }
 
-            await batch.commit();
-
-            toast({ title: "Task Submitted!", description: `Your answer has been submitted for review. Any bonus will be added upon approval.`});
+            toast({ title: "Task Submitted!", description: `Your answer has been submitted. Your bonus of LKR ${task.refereeBonus.toFixed(2)} is pending approval.`});
             
             // Manually update local state to reflect change immediately
             setUserData(prev => {
@@ -116,7 +118,7 @@ export default function YourTaskPage() {
 
         } catch (e) {
             console.error(e);
-            toast({ variant: "destructive", title: "Error", description: "Could not submit your task."});
+            toast({ variant: "destructive", title: "Error", description: "Could not submit your task. Please try again."});
         } finally {
             setIsSubmitting(false);
         }

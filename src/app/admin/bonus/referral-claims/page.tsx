@@ -34,7 +34,6 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
         const data = claimDoc.data() as BonusClaim;
         const userDoc = await getDoc(doc(db, 'users', data.userId));
         
-        // This logic is simplified as the answer is now stored directly on the claim.
         return { 
             ...data, 
             id: claimDoc.id, 
