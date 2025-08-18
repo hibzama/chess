@@ -69,6 +69,7 @@ export default function YourTaskPage() {
         setIsSubmitting(true);
         
         try {
+            const batch = writeBatch(db);
             const userRef = doc(db, 'users', user.uid);
             
             const newCompletedTasks = [...(userData.campaignInfo.completedTasks || []), task.id];
@@ -77,15 +78,14 @@ export default function YourTaskPage() {
                 [task.id]: answer
             };
             
-            // This is a secure operation as users are allowed to update their own document.
-            await updateDoc(userRef, {
+            batch.update(userRef, {
                 'campaignInfo.completedTasks': newCompletedTasks,
                 'campaignInfo.answers': newAnswers
             });
 
-            // This creates the pending claim for admin review
             if (task.refereeBonus > 0) {
-                 await addDoc(collection(db, 'bonus_claims'), {
+                 const claimRef = doc(collection(db, 'bonus_claims'));
+                 batch.set(claimRef, {
                     userId: user.uid,
                     type: 'referee',
                     amount: task.refereeBonus,
@@ -96,6 +96,8 @@ export default function YourTaskPage() {
                     createdAt: serverTimestamp(),
                 });
             }
+
+            await batch.commit();
 
             toast({ title: "Task Submitted!", description: `Your answer has been submitted for review. Any bonus will be added upon approval.`});
             
