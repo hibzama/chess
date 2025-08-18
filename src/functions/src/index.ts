@@ -60,10 +60,20 @@ export const onUserCreate = functions.firestore
 
 // This function triggers whenever a bonus claim is created
 export const onBonusClaim = functions.firestore
-  .document("{campaignCollection}/{campaignId}/claims/{userId}")
+  .document("{campaignCollection}/{campaignId}/claims/{claimId}")
   .onCreate(async (snap, context) => {
-    const { campaignCollection, campaignId, userId } = context.params;
+    const { campaignCollection, campaignId, claimId } = context.params;
     const db = admin.firestore();
+
+    // For user-specific claims, userId is the claimId.
+    // For transaction-specific claims (like deposit), claimId is the transactionId.
+    const claimData = snap.data();
+    const userId = claimData.userId;
+
+    if (!userId) {
+        functions.logger.error("Claim document is missing userId field.", {claimId});
+        return null;
+    }
 
     // Ensure it's a valid bonus campaign collection
     const validCollections = ['signup_bonus_campaigns', 'daily_bonus_campaigns', 'deposit_bonus_campaigns'];
@@ -99,6 +109,16 @@ export const onBonusClaim = functions.firestore
                 bonusAmount = (user?.balance || 0) * (campaign.bonusValue / 100);
             }
             description = `Daily Bonus: ${campaign?.title}`;
+        } else if (campaignCollection === 'deposit_bonus_campaigns') {
+            // For deposit bonus, the claimId is the transactionId
+            const depositTransactionRef = db.collection('transactions').doc(claimId);
+            const depositTransactionDoc = await transaction.get(depositTransactionRef);
+            if (!depositTransactionDoc.exists) {
+                 throw new Error(`Deposit transaction ${claimId} not found.`);
+            }
+            const depositAmount = depositTransactionDoc.data()?.amount || 0;
+            bonusAmount = depositAmount * (campaign?.percentage / 100);
+            description = `Deposit Bonus: ${campaign?.title}`;
         } else {
              functions.logger.log("Unsupported campaign type for auto-payout.");
              return;
