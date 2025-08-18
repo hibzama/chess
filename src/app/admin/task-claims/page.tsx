@@ -49,11 +49,13 @@ export default function TaskClaimsPage() {
     useEffect(() => {
         setLoading(true);
         
-        const q = query(collection(db, 'bonus_claims'), where('type', '==', 'task'), orderBy('createdAt', 'desc'), limit(200));
+        const q = query(collection(db, 'bonus_claims'), where('type', '==', 'task'));
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setAllClaims(claims);
+            // Sort client-side
+            const sortedClaims = claims.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+            setAllClaims(sortedClaims);
             setLoading(false);
         }, (error) => {
             console.error("Error fetching claims:", error);
