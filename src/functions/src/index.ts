@@ -14,8 +14,6 @@ import axios from "axios";
 
 admin.initializeApp();
 
-// This function now only creates the basic user document.
-// All other details are added by the user post-registration.
 export const onUserCreate = functions.auth.user().onCreate(async (user) => {
     try {
         const userRef = admin.firestore().doc(`users/${user.uid}`);
@@ -23,11 +21,10 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
         await userRef.set({
             uid: user.uid,
             email: user.email || '',
-            emailVerified: user.emailVerified,
+            emailVerified: true, // Auto-verify
             balance: 0,
             role: 'user',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            // Initialize other fields to sane defaults
             firstName: '',
             lastName: '',
             phone: '',
@@ -157,3 +154,94 @@ export const onBonusClaim = functions.firestore
     
     return null;
   });
+
+
+export const claimDailyBonus = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+
+    const { campaignId } = data;
+    const userId = context.auth.uid;
+    const db = admin.firestore();
+
+    if (!campaignId) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a "campaignId".');
+    }
+
+    try {
+        const result = await db.runTransaction(async (transaction) => {
+            const campaignRef = db.doc(`daily_bonus_campaigns/${campaignId}`);
+            const userRef = db.doc(`users/${userId}`);
+            const claimRef = db.doc(`daily_bonus_campaigns/${campaignId}/claims/${userId}`);
+            
+            const [campaignDoc, userDoc, claimDoc] = await transaction.getAll(campaignRef, userRef, claimRef);
+
+            if (!campaignDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Bonus campaign not found.');
+            }
+            if (claimDoc.exists) {
+                throw new functions.https.HttpsError('already-exists', 'You have already claimed this bonus today.');
+            }
+             if (!userDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'User data not found.');
+            }
+
+            const campaign = campaignDoc.data();
+            const user = userDoc.data();
+            const now = new Date();
+            
+            if (!campaign?.isActive || campaign.endDate.toDate() < now) {
+                throw new functions.https.HttpsError('failed-precondition', 'This bonus is no longer active.');
+            }
+            if ((campaign.claimsCount || 0) >= campaign.userLimit) {
+                throw new functions.https.HttpsError('failed-precondition', 'This bonus has reached its claim limit.');
+            }
+            
+            // Eligibility Check
+            if (campaign.eligibility === 'below' && user?.balance > campaign.balanceThreshold) {
+                throw new functions.https.HttpsError('failed-precondition', `Your balance must be below LKR ${campaign.balanceThreshold} to claim.`);
+            }
+            if (campaign.eligibility === 'above' && user?.balance < campaign.balanceThreshold) {
+                throw new functions.https.HttpsError('failed-precondition', `Your balance must be above LKR ${campaign.balanceThreshold} to claim.`);
+            }
+            
+            // Calculate Bonus
+            let bonusAmount = 0;
+            if(campaign.bonusType === 'fixed') {
+                bonusAmount = campaign.bonusValue;
+            } else if (campaign.bonusType === 'percentage') {
+                bonusAmount = (user?.balance || 0) * (campaign.bonusValue / 100);
+            }
+
+            if (bonusAmount <= 0) {
+                 throw new functions.https.HttpsError('failed-precondition', 'Bonus amount must be greater than zero.');
+            }
+            
+            // Perform writes
+            transaction.set(claimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp() });
+            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(bonusAmount) });
+            
+            const transactionRef = db.collection('transactions').doc();
+            transaction.set(transactionRef, {
+                userId,
+                type: 'bonus',
+                amount: bonusAmount,
+                status: 'completed',
+                description: `Daily Bonus: ${campaign.title}`,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            return { success: true, bonusAmount };
+        });
+
+        return result;
+
+    } catch (error) {
+        console.error("Error claiming daily bonus:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred.');
+    }
+});

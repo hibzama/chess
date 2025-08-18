@@ -2,7 +2,8 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, writeBatch, collection, getDocs, query, where, Timestamp, addDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -76,26 +77,21 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
     }, [user, campaign]);
 
     const handleClaimDailyBonus = async (campaign: DailyBonusCampaign) => {
-        if (!user || !userData || (campaign.claimsCount || 0) >= campaign.userLimit) {
-            toast({ variant: 'destructive', title: "Not eligible", description: "This bonus is no longer available." });
-            return;
-        }
-        
         setIsClaiming(true);
-
-        const claimRef = doc(db, `daily_bonus_campaigns/${campaign.id}/claims`, user.uid);
-        
         try {
-            await setDoc(claimRef, {
-                userId: user.uid,
-                claimedAt: serverTimestamp(),
-            });
-
-            toast({ title: "Success!", description: `Your bonus is being processed.`});
-            setClaimed(true);
-        } catch (error) {
-            console.error("Error creating daily bonus claim: ", error);
-            toast({ variant: 'destructive', title: "Error", description: "Could not claim daily bonus." });
+            const claimDailyBonusFunction = httpsCallable(functions, 'claimDailyBonus');
+            const result: any = await claimDailyBonusFunction({ campaignId: campaign.id });
+            
+            if (result.data.success) {
+                toast({ title: "Success!", description: `LKR ${result.data.bonusAmount.toFixed(2)} has been added to your wallet.`});
+                setClaimed(true);
+            } else {
+                 throw new Error("Claim failed on the server.");
+            }
+        } catch (error: any) {
+            console.error("Error claiming daily bonus: ", error);
+            const errorMessage = error.details?.message || error.message || "An unknown error occurred.";
+            toast({ variant: 'destructive', title: "Error", description: errorMessage });
         } finally {
             setIsClaiming(false);
         }
