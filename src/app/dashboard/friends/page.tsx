@@ -38,7 +38,7 @@ type UserProfile = {
   lastSeen?: any;
 };
 
-const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove' | 'suggestion', loading: boolean, onUserClick: (uid: string) => void }) => (
+const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { person: UserProfile, onAction: (id: string, name: string) => void, actionType: 'add' | 'remove', loading: boolean, onUserClick: (uid: string) => void }) => (
     <Card className="flex items-center p-4 gap-4">
         <button onClick={() => onUserClick(person.uid)} className="relative flex items-center gap-4 text-left flex-grow">
             <Avatar>
@@ -59,24 +59,15 @@ const UserCard = ({ person, onAction, actionType, loading, onUserClick }: { pers
         </button>
         <div className="flex gap-2">
             {actionType === 'remove' && <Button variant="ghost" size="icon" asChild><Link href={`/dashboard/chat/${getChatId(person.uid)}`}><MessageSquare /></Link></Button>}
-            {actionType !== 'suggestion' && 
-                <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
-                     {actionType === 'add' ? <UserPlus /> : <UserMinus />}
-                </Button>
-            }
-             {actionType === 'suggestion' && 
-                <Button variant="outline" size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
-                    <UserPlus />
-                </Button>
-            }
+            <Button variant={actionType === 'add' ? 'outline' : 'destructive'} size="icon" onClick={() => onAction(person.uid, `${person.firstName} ${person.lastName}`)} disabled={loading}>
+                    {actionType === 'add' ? <UserPlus /> : <UserMinus />}
+            </Button>
         </div>
     </Card>
 );
 
 const getChatId = (otherUserId: string) => {
-    // This is a placeholder. You'll need to pass the current user's ID
-    // or get it from context to generate the correct chat ID.
-    const currentUserId = "currentUser"; // Replace with actual current user ID
+    const currentUserId = "currentUser"; 
     return [currentUserId, otherUserId].sort().join('_');
 };
 
@@ -120,7 +111,6 @@ export default function FriendsPage() {
     const [friends, setFriends] = useState<UserProfile[]>([]);
     const [requests, setRequests] = useState<FriendRequest[]>([]);
     const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
-    const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [searchEmail, setSearchEmail] = useState('');
@@ -170,7 +160,6 @@ export default function FriendsPage() {
 
             await fetchFriends();
             
-            // Received Requests Listener
             const reqQuery = query(collection(db, 'friend_requests'), where('toId', '==', user.uid), where('status', '==', 'pending'));
             const unsubscribeReqs = onSnapshot(reqQuery, (snapshot) => {
                 const reqsData = snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as FriendRequest));
@@ -178,7 +167,6 @@ export default function FriendsPage() {
             });
             unsubscribes.push(unsubscribeReqs);
 
-            // Sent Requests Listener
             const sentReqQuery = query(collection(db, 'friend_requests'), where('fromId', '==', user.uid), where('status', '==', 'pending'));
             const unsubscribeSentReqs = onSnapshot(sentReqQuery, async (snapshot) => {
                 const sentReqsDataPromises = snapshot.docs.map(async (d) => {
@@ -195,22 +183,6 @@ export default function FriendsPage() {
                 setSentRequests(sentReqsData);
             });
             unsubscribes.push(unsubscribeSentReqs);
-            
-             // Suggestions listener
-             const usersQuery = query(collection(db, 'users'), limit(100));
-             const unsubscribeUsers = onSnapshot(usersQuery, (usersSnapshot) => {
-                 const allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
-                 
-                 // We need to know who NOT to suggest
-                 const friendIds = userData?.friends || [];
-                 const sentRequestIds = sentRequests.map(req => req.toId);
-                 const receivedRequestIds = requests.map(req => req.fromId);
-                 const excludeIds = [user.uid, ...friendIds, ...sentRequestIds, ...receivedRequestIds];
-                 
-                 const suggestedUsers = allUsers.filter(u => !excludeIds.includes(u.uid));
-                 setSuggestions(sortUsers(suggestedUsers));
-             });
-             unsubscribes.push(unsubscribeUsers);
 
             setLoading(false);
         };
@@ -448,7 +420,7 @@ export default function FriendsPage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Find New Friends</CardTitle>
-                            <CardDescription>Search for players by email or discover them from the suggestions below.</CardDescription>
+                            <CardDescription>Search for players by email to send them a friend request.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <form onSubmit={handleSearch} className="flex gap-2">
@@ -461,15 +433,6 @@ export default function FriendsPage() {
                                     <UserCard person={searchResult} onAction={handleAddFriend} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
                                 </div>
                             )}
-
-                            <div>
-                                <h3 className="font-semibold mb-2">Suggestions</h3>
-                                <div className="space-y-4">
-                                     {loading ? <p>Loading suggestions...</p> : suggestions.length > 0 ? suggestions.map(person => (
-                                       <UserCard key={person.uid} person={person} onAction={handleAddFriend} actionType="suggestion" loading={actionLoading === person.uid} onUserClick={handleUserClick} />
-                                   )) : <p className="text-muted-foreground text-center p-4">No suggestions right now. Check back later!</p>}
-                                </div>
-                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
