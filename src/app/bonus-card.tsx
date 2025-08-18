@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,8 +53,11 @@ export function BonusCard() {
             for (const docRef of querySnapshot.docs) {
                 const campaignData = { id: docRef.id, ...docRef.data() } as BonusCampaign;
                 
-                const userClaimDoc = await getDoc(doc(db, `signup_bonus_campaigns/${docRef.id}/claims`, user.uid));
-                if(userClaimDoc.exists()) {
+                // Check in the new central bonus_claims collection
+                const userClaimQuery = query(collection(db, `bonus_claims`), where('userId', '==', user.uid), where('campaignId', '==', campaignData.id));
+                const userClaimSnapshot = await getDocs(userClaimQuery);
+                
+                if(!userClaimSnapshot.empty) {
                     setHasClaimed(true);
                     setActiveCampaign(null); 
                     setLoading(false);
@@ -82,13 +84,24 @@ export function BonusCard() {
     setIsClaiming(true);
 
     try {
-        const claimRef = doc(db, `signup_bonus_campaigns/${activeCampaign.id}/claims`, user.uid);
+        const claimRef = doc(collection(db, `bonus_claims`));
         await setDoc(claimRef, {
             userId: user.uid,
-            claimedAt: serverTimestamp()
+            type: 'signup',
+            amount: activeCampaign.bonusAmount,
+            status: 'pending',
+            campaignId: activeCampaign.id,
+            campaignTitle: `Signup Bonus: ${activeCampaign.title}`,
+            createdAt: serverTimestamp()
         });
 
-        toast({ title: 'Bonus Claimed!', description: `LKR ${activeCampaign.bonusAmount.toFixed(2)} is being added to your wallet.` });
+        // Also update the campaign's claim count
+        const campaignRef = doc(db, 'signup_bonus_campaigns', activeCampaign.id);
+        await updateDoc(campaignRef, {
+            claimsCount: increment(1)
+        });
+
+        toast({ title: 'Bonus Claimed!', description: `Your bonus of LKR ${activeCampaign.bonusAmount.toFixed(2)} is pending admin approval.` });
         setHasClaimed(true);
 
     } catch (error) {

@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
@@ -20,7 +19,7 @@ interface BonusClaim {
     userName?: string;
     amount: number;
     campaignTitle: string;
-    type: 'referee' | 'referrer';
+    type: 'signup' | 'referee' | 'referrer';
     status: 'pending' | 'approved' | 'rejected';
     createdAt: any;
     refereeId?: string; 
@@ -89,7 +88,7 @@ export default function ReferralClaimsPage() {
                         type: 'bonus',
                         amount: claim.amount,
                         status: 'completed',
-                        description: `Bonus: ${claim.campaignTitle}`,
+                        description: `${claim.campaignTitle}`,
                         createdAt: serverTimestamp(),
                     });
                 });
