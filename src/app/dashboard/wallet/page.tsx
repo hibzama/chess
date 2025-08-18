@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db, storage } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp, orderBy, limit, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, where, onSnapshot, doc, updateDoc, increment, getDoc, writeBatch, Timestamp, orderBy, limit, getDocs, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -36,6 +36,16 @@ type Transaction = {
     level?: number;
 };
 
+interface SignupBonusCampaign {
+    id: string;
+    title: string;
+    bonusAmount: number;
+    userLimit: number;
+    claimsCount?: number;
+    isActive: boolean;
+}
+
+
 const USDT_RATE = 310;
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -44,6 +54,95 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
         <path d="M22 2L15 22L11 13L2 9L22 2Z" />
     </svg>
 )
+
+const SignupBonusClaimCard = () => {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [campaign, setCampaign] = useState<SignupBonusCampaign | null>(null);
+    const [hasClaimed, setHasClaimed] = useState(true);
+    const [isClaiming, setIsClaiming] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+
+        const checkEligibility = async () => {
+            setLoading(true);
+            const campaignsRef = collection(db, 'signup_bonus_campaigns');
+            const q = query(campaignsRef, where("isActive", "==", true), limit(1));
+            const campaignSnapshot = await getDocs(q);
+
+            if (campaignSnapshot.empty) {
+                setLoading(false);
+                return;
+            }
+
+            const campaignData = { id: campaignSnapshot.docs[0].id, ...campaignSnapshot.docs[0].data() } as SignupBonusCampaign;
+            
+            const claimsQuery = query(collection(db, "bonus_claims"), where("userId", "==", user.uid), where("campaignId", "==", campaignData.id));
+            const userClaimSnapshot = await getDocs(claimsQuery);
+
+            if (userClaimSnapshot.empty) {
+                setCampaign(campaignData);
+                setHasClaimed(false);
+            } else {
+                setHasClaimed(true);
+            }
+            setLoading(false);
+        };
+
+        checkEligibility();
+    }, [user]);
+
+    const handleClaim = async () => {
+        if (!user || !campaign) return;
+        setIsClaiming(true);
+        try {
+            const claimRef = doc(collection(db, 'bonus_claims'));
+            await setDoc(claimRef, {
+                userId: user.uid,
+                type: 'signup',
+                amount: campaign.bonusAmount,
+                status: 'pending',
+                campaignId: campaign.id,
+                campaignTitle: `Signup Bonus: ${campaign.title}`,
+                createdAt: serverTimestamp()
+            });
+
+            toast({ title: "Bonus Claimed!", description: `Your bonus is pending admin approval.` });
+            setHasClaimed(true); // Hide card after claiming
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error", description: "Could not claim bonus." });
+        } finally {
+            setIsClaiming(false);
+        }
+    };
+
+    if (loading || hasClaimed || !campaign) {
+        return null;
+    }
+
+    return (
+        <Card className="bg-primary/10 border-primary/20">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Gift /> {campaign.title}</CardTitle>
+                <CardDescription>A special welcome bonus is available for you!</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <p>Claim your <span className="font-bold text-primary">LKR {campaign.bonusAmount.toFixed(2)}</span> bonus now. It will be added to your wallet after admin approval.</p>
+            </CardContent>
+            <CardFooter>
+                <Button className="w-full" onClick={handleClaim} disabled={isClaiming}>
+                    {isClaiming ? 'Claiming...' : 'Claim Welcome Bonus'}
+                </Button>
+            </CardFooter>
+        </Card>
+    );
+};
+
 
 export default function WalletPage() {
   const { user, userData, loading: authLoading } = useAuth();
@@ -279,6 +378,8 @@ export default function WalletPage() {
         <h1 className="text-4xl font-bold tracking-tight text-center">Your Wallet</h1>
         <p className="text-muted-foreground text-center">Manage your funds for the games ahead.</p>
       </div>
+
+      <SignupBonusClaimCard />
 
       <Card>
         <CardHeader>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Gift, Loader2, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, serverTimestamp, increment, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, serverTimestamp, increment, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -37,30 +37,27 @@ export function BonusCard() {
     const fetchBonusConfig = async () => {
         try {
             const campaignsRef = collection(db, 'signup_bonus_campaigns');
-            const q = query(campaignsRef, where("isActive", "==", true), where("userLimit", ">", 0));
+            const q = query(campaignsRef, where("isActive", "==", true), limit(1));
             const querySnapshot = await getDocs(q);
             
             if (!querySnapshot.empty) {
                 const campaignDoc = querySnapshot.docs[0];
                 const campaignData = { id: campaignDoc.id, ...campaignDoc.data() } as BonusCampaign;
-
-                if ((campaignData.claimsCount || 0) >= campaignData.userLimit) {
-                    setActiveCampaign(null);
-                    setHasClaimed(true);
-                    setLoading(false);
-                    return;
-                }
-
-                const userClaimQuery = query(collection(db, `bonus_claims`), where('userId', '==', user.uid), where('campaignId', '==', campaignData.id));
-                const userClaimSnapshot = await getDocs(userClaimQuery);
+                
+                const claimsQuery = query(collection(db, "bonus_claims"), where("userId", "==", user.uid), where("campaignId", "==", campaignData.id));
+                const userClaimSnapshot = await getDocs(claimsQuery);
                 
                 if(!userClaimSnapshot.empty) {
                     setHasClaimed(true);
                     setActiveCampaign(null); 
-                } else {
+                } else if ((campaignData.claimsCount || 0) < campaignData.userLimit) {
                     setActiveCampaign(campaignData);
                     setHasClaimed(false);
+                } else {
+                    setActiveCampaign(null);
+                    setHasClaimed(true);
                 }
+
             } else {
                  setActiveCampaign(null);
                  setHasClaimed(true);
@@ -91,7 +88,7 @@ export function BonusCard() {
             campaignTitle: `Signup Bonus: ${activeCampaign.title}`,
             createdAt: serverTimestamp()
         });
-
+        
         toast({ title: 'Bonus Claimed!', description: `Your bonus of LKR ${activeCampaign.bonusAmount.toFixed(2)} is pending admin approval.` });
         setHasClaimed(true);
 

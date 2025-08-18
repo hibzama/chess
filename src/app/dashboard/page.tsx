@@ -15,7 +15,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DailyBonusCampaign } from '@/app/admin/bonus/daily-bonus/page';
 import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
 import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
-import { BonusCard } from '../bonus-card';
+
+interface SignupBonusCampaign {
+    id: string;
+    title: string;
+    bonusAmount: number;
+    userLimit: number;
+    claimsCount?: number;
+    isActive: boolean;
+}
 
 // #region Bonus Components
 const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string}) => (
@@ -32,6 +40,24 @@ const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {t
         </CardContent>
     </Card>
 )
+
+const SignupBonusAlert = ({ campaign, onClaimed }: { campaign: SignupBonusCampaign, onClaimed: () => void }) => {
+    return (
+        <Alert className="border-primary/50 bg-primary/10 text-primary-foreground">
+            <Gift className="h-4 w-4 !text-primary" />
+            <AlertTitle className="text-primary">Welcome Bonus Available!</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+                <div>
+                   You're eligible for the "{campaign.title}" campaign. Claim your LKR {campaign.bonusAmount.toFixed(2)} bonus now!
+                </div>
+                <Button asChild>
+                    <Link href="/dashboard/wallet">Go to Wallet to Claim</Link>
+                </Button>
+            </AlertDescription>
+        </Alert>
+    );
+};
+
 
 const BonusHub = ({ depositBonus, dailyBonus, referralTask }: { depositBonus: DepositBonusCampaign | null, dailyBonus: DailyBonusCampaign | null, referralTask: boolean }) => {
     
@@ -97,7 +123,10 @@ export default function DashboardPage() {
     const [transactions, setTransactions] = useState<any[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
     
-    // State for all available bonuses
+    const [signupBonus, setSignupBonus] = useState<SignupBonusCampaign | null>(null);
+    const [hasClaimedSignup, setHasClaimedSignup] = useState(true);
+    
+    // State for other bonuses
     const [depositBonus, setDepositBonus] = useState<DepositBonusCampaign | null>(null);
     const [dailyBonus, setDailyBonus] = useState<DailyBonusCampaign | null>(null);
     const [checkingBonuses, setCheckingBonuses] = useState(true);
@@ -111,13 +140,36 @@ export default function DashboardPage() {
             return;
         }
 
-        // Fetch Transactions
         const transQuery = query(collection(db, 'transactions'), where('userId', '==', user.uid));
         const unsubscribeTrans = onSnapshot(transQuery, (snapshot) => {
             const userTransactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setTransactions(userTransactions);
             setStatsLoading(false);
         });
+
+        // Check for signup bonus eligibility
+        const checkSignupBonus = async () => {
+            const campaignsRef = collection(db, 'signup_bonus_campaigns');
+            const q = query(campaignsRef, where("isActive", "==", true), limit(1));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                const campaignDoc = querySnapshot.docs[0];
+                const campaignData = { id: campaignDoc.id, ...campaignDoc.data() } as SignupBonusCampaign;
+                
+                const claimsQuery = query(collection(db, "bonus_claims"), where("userId", "==", user.uid), where("campaignId", "==", campaignData.id));
+                const userClaimSnapshot = await getDocs(claimsQuery);
+                
+                if (userClaimSnapshot.empty) {
+                    setSignupBonus(campaignData);
+                    setHasClaimedSignup(false);
+                } else {
+                    setHasClaimedSignup(true);
+                }
+            }
+        };
+        checkSignupBonus();
+
 
         return () => {
             unsubscribeTrans();
@@ -133,18 +185,15 @@ export default function DashboardPage() {
         const fetchBonuses = async () => {
             setCheckingBonuses(true);
             
-            // 1. Deposit Bonus
             try {
                 const depositQuery = query(collection(db, 'deposit_bonus_campaigns'), where('isActive', '==', true));
                 const depositSnapshot = await getDocs(depositQuery);
                 const activeCampaigns = depositSnapshot.docs.map(d => d.data() as DepositBonusCampaign);
-                // Filter expired campaigns on the client side
                 const now = new Date();
                 const stillValidCampaign = activeCampaigns.find(c => c.expiresAt && c.expiresAt.toDate() > now);
                 setDepositBonus(stillValidCampaign || null);
-            } catch (e) { console.error("Error fetching deposit bonus", e); setDepositBonus(null); }
+            } catch (e) { setDepositBonus(null); }
 
-            // 2. Daily Bonus
             try {
                 const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true));
                 const dailySnapshot = await getDocs(dailyQuery);
@@ -156,7 +205,7 @@ export default function DashboardPage() {
                 let foundBonus: DailyBonusCampaign | null = null;
                 for (const campaign of futureAndActiveCampaigns) {
                     const startDate = campaign.startDate.toDate();
-                    if (now < startDate) continue; // Skip if not started
+                    if (now < startDate) continue;
                     
                     let isEligible = false;
                     if (campaign.eligibility === 'all') isEligible = true;
@@ -167,13 +216,13 @@ export default function DashboardPage() {
                         const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, campaign.id));
                         if (!claimSnap.exists()) {
                             foundBonus = campaign;
-                            break; // Found an eligible, unclaimed bonus, stop searching
+                            break; 
                         }
                     }
                 }
                 setDailyBonus(foundBonus);
 
-            } catch (e) { console.error("Error fetching daily bonus", e); setDailyBonus(null); }
+            } catch (e) { setDailyBonus(null); }
             
             setCheckingBonuses(false);
         };
@@ -240,10 +289,9 @@ export default function DashboardPage() {
         </p>
       </div>
 
-       <BonusCard />
+       {!hasClaimedSignup && signupBonus && <SignupBonusAlert campaign={signupBonus} onClaimed={() => setHasClaimedSignup(true)} />}
 
-       {/* Bonus Hub Section */}
-        <div className="space-y-4">
+       <div className="space-y-4">
             {checkingBonuses ? (
                 <Skeleton className="h-44 w-full" />
             ) : (
@@ -313,7 +361,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
-
-    
