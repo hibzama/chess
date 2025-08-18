@@ -50,10 +50,10 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
     return <span className="font-mono font-bold text-lg">{timeLeft}</span>;
 }
 
-const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
+const DailyBonusCard = ({ campaign, onClaimSuccess }: { campaign: DailyBonusCampaign, onClaimSuccess: (campaignId: string) => void }) => {
     const { user, userData } = useAuth();
     const { toast } = useToast();
-    const [claimed, setClaimed] = useState(false);
+    const [claimed, setClaimed] = useState<boolean | null>(null);
     const [isClaiming, setIsClaiming] = useState(false);
     const [status, setStatus] = useState<'pending' | 'active' | 'expired'>('pending');
     
@@ -84,7 +84,7 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
             
             if (result.data.success) {
                 toast({ title: "Success!", description: `LKR ${result.data.bonusAmount.toFixed(2)} has been added to your wallet.`});
-                setClaimed(true);
+                onClaimSuccess(campaign.id);
             } else {
                  throw new Error(result.data.message || "Claim failed on the server.");
             }
@@ -97,7 +97,7 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
         }
     };
     
-    if (status === 'expired') return null; // Don't show expired bonuses
+    if (status === 'expired' || claimed) return null;
     
     const claimsLeft = campaign.userLimit - (campaign.claimsCount || 0);
 
@@ -128,8 +128,8 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
                              <Countdown targetDate={campaign.endDate.toDate()} />
                         </>
                     )}
-                    <Button disabled={claimed || isClaiming || status !== 'active'} onClick={() => handleClaimDailyBonus(campaign)} className="w-full">
-                        {isClaiming ? <Loader2 className="animate-spin" /> : claimed ? <><Check className="mr-2"/> Claimed</> : 'Claim Now'}
+                    <Button disabled={isClaiming || status !== 'active'} onClick={() => handleClaimDailyBonus(campaign)} className="w-full">
+                        {isClaiming ? <Loader2 className="animate-spin" /> : 'Claim Now'}
                     </Button>
                 </div>
             </div>
@@ -139,7 +139,7 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
 
 
 export default function BonusCenterPage() {
-    const { user, userData } = useAuth();
+    const { user, userData, setUserData } = useAuth();
     const { toast } = useToast();
 
     // Daily Bonus State
@@ -153,58 +153,72 @@ export default function BonusCenterPage() {
 
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
+    const fetchAllSettings = useCallback(async () => {
         if (!user || !userData) {
             setLoading(false);
             return;
         }
 
+        setLoading(true);
         setBonusReferralCount(userData.bonusReferralCount || 0);
 
-        const fetchAllSettings = async () => {
-            setLoading(true);
-            
-            // Daily Bonus Campaigns
-            const dailyQuery = query(
-                collection(db, 'daily_bonus_campaigns'),
-                where('isActive', '==', true)
-            );
-            const dailySnapshot = await getDocs(dailyQuery);
-            const allActiveCampaigns = dailySnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as DailyBonusCampaign));
-            
-            // Filter out expired campaigns on the client side
-            const now = new Date();
-            const futureCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
-
-            const eligibleCampaigns = futureCampaigns.filter(c => {
-                if (c.eligibility === 'all') return true;
-                if (c.eligibility === 'below') return (userData.balance || 0) <= c.balanceThreshold;
-                if (c.eligibility === 'above') return (userData.balance || 0) > c.balanceThreshold;
-                return false;
-            });
-            setDailyCampaigns(eligibleCampaigns);
-
-
-            // Referral Bonus Settings & Status
-            const referralSettingsRef = doc(db, 'settings', 'referralBonusConfig');
-            const referralSettingsSnap = await getDoc(referralSettingsRef);
-            if (referralSettingsSnap.exists()) {
-                setReferralBonusSettings(referralSettingsSnap.data() as ReferralBonusSettings);
-            }
-            const referralClaimsRef = collection(db, 'users', user.uid, 'bonus_claims');
-            const referralClaimsSnap = await getDocs(referralClaimsRef);
-            const claimedTiers = referralClaimsSnap.docs
-                .filter(doc => doc.id.startsWith('referral_'))
-                .map(doc => parseInt(doc.id.split('_')[1]));
-            setClaimedReferralTiers(claimedTiers);
-
-            setLoading(false);
-        };
+        // Daily Bonus Campaigns
+        const dailyQuery = query(
+            collection(db, 'daily_bonus_campaigns'),
+            where('isActive', '==', true)
+        );
+        const dailySnapshot = await getDocs(dailyQuery);
+        const allActiveCampaigns = dailySnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as DailyBonusCampaign));
         
-        fetchAllSettings();
+        const now = new Date();
+        const futureCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
+
+        const claimChecks = await Promise.all(futureCampaigns.map(c => getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, c.id))));
+        const claimedIds = new Set(claimChecks.filter(snap => snap.exists()).map(snap => snap.id));
+        
+        const eligibleCampaigns = futureCampaigns.filter(c => {
+            if (claimedIds.has(c.id)) return false;
+            if (c.eligibility === 'all') return true;
+            if (c.eligibility === 'below') return (userData.balance || 0) <= c.balanceThreshold;
+            if (c.eligibility === 'above') return (userData.balance || 0) > c.balanceThreshold;
+            return false;
+        });
+        setDailyCampaigns(eligibleCampaigns);
+
+
+        // Referral Bonus Settings & Status
+        const referralSettingsRef = doc(db, 'settings', 'referralBonusConfig');
+        const referralSettingsSnap = await getDoc(referralSettingsRef);
+        if (referralSettingsSnap.exists()) {
+            setReferralBonusSettings(referralSettingsSnap.data() as ReferralBonusSettings);
+        }
+        const referralClaimsRef = collection(db, 'users', user.uid, 'bonus_claims');
+        const referralClaimsSnap = await getDocs(referralClaimsRef);
+        const claimedTiers = referralClaimsSnap.docs
+            .filter(doc => doc.id.startsWith('referral_'))
+            .map(doc => parseInt(doc.id.split('_')[1]));
+        setClaimedReferralTiers(claimedTiers);
+
+        setLoading(false);
     }, [user, userData]);
+
+    useEffect(() => {
+        fetchAllSettings();
+    }, [fetchAllSettings]);
     
+    const handleDailyBonusClaimSuccess = (claimedCampaignId: string) => {
+        // Optimistically remove the claimed bonus from the UI
+        setDailyCampaigns(prev => prev.filter(c => c.id !== claimedCampaignId));
+        // Manually refetch user data to update balance
+        if(user) {
+            getDoc(doc(db, 'users', user.uid)).then(docSnap => {
+                if (docSnap.exists()) {
+                    setUserData(docSnap.data() as any);
+                }
+            })
+        }
+    }
     
     const handleClaimReferralBonus = async (tier: {referrals: number, amount: number}) => {
         if (!user || !userData || (bonusReferralCount || 0) < tier.referrals || claimedReferralTiers.includes(tier.referrals)) return;
@@ -253,7 +267,7 @@ export default function BonusCenterPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {dailyCampaigns.length > 0 ? dailyCampaigns.map(campaign => (
-                        <DailyBonusCard key={campaign.id} campaign={campaign} />
+                        <DailyBonusCard key={campaign.id} campaign={campaign} onClaimSuccess={handleDailyBonusClaimSuccess} />
                     )) : (
                         <p className="text-center text-muted-foreground py-4">No daily bonuses available for you right now.</p>
                     )}
