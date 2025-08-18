@@ -173,3 +173,84 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred while approving the claim.');
     }
 });
+
+export const joinGame = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to join a game.');
+    }
+
+    const { roomId } = data;
+    const joinerId = context.auth.uid;
+    const db = admin.firestore();
+
+    if (!roomId) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a "roomId".');
+    }
+
+    const roomRef = db.doc(`game_rooms/${roomId}`);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const roomDoc = await transaction.get(roomRef);
+            if (!roomDoc.exists || roomDoc.data()?.status !== 'waiting') {
+                throw new functions.https.HttpsError('not-found', 'Room not available.');
+            }
+
+            const roomData = roomDoc.data()!;
+            const creatorId = roomData.createdBy.uid;
+
+            if (creatorId === joinerId) {
+                throw new functions.https.HttpsError('failed-precondition', 'You cannot join your own game.');
+            }
+            
+            const joinerRef = db.doc(`users/${joinerId}`);
+            const joinerDoc = await transaction.get(joinerRef);
+
+            if (!joinerDoc.exists()) {
+                throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
+            }
+            const joinerData = joinerDoc.data()!;
+
+            if (joinerData.balance < roomData.wager) {
+                 throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds.');
+            }
+            
+            const creatorColor = roomData.createdBy.color;
+            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+
+            transaction.update(roomRef, {
+                status: 'in-progress',
+                player2: { uid: joinerId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
+                players: admin.firestore.FieldValue.arrayUnion(joinerId),
+                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            
+            // Handle wagers and commissions for both players
+            const playersToProcess = [
+                { id: creatorId, name: roomData.createdBy.name },
+                { id: joinerId, name: `${joinerData.firstName} ${joinerData.lastName}` }
+            ];
+
+            for (const player of playersToProcess) {
+                const userRef = db.doc(`users/${player.id}`);
+                transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(-roomData.wager) });
+
+                const wagerTransactionRef = db.collection('transactions').doc();
+                transaction.set(wagerTransactionRef, {
+                    userId: player.id, type: 'wager', amount: roomData.wager, status: 'completed',
+                    description: `Wager for ${roomData.gameType} game vs ${player.id === creatorId ? playersToProcess[1].name : playersToProcess[0].name}`,
+                    gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+
+        });
+         return { success: true };
+    } catch (error: any) {
+        functions.logger.error("Error joining game:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the game.');
+    }
+});
+
