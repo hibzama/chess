@@ -115,6 +115,14 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "bonus_claims",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "type", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
