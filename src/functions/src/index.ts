@@ -54,19 +54,8 @@ export const onUserCreate = functions.firestore
     // --- Handle Sign-up Bonus ---
     // The frontend now creates a pending `bonus_claims` document.
     // The onBonusClaim function below will handle the payout.
-    const bonusQuery = await admin.firestore().collection("signup_bonus_campaigns").where("isActive", "==", true).limit(1).get();
-    if (!bonusQuery.empty) {
-        const campaign = bonusQuery.docs[0];
-        const claimsCollection = admin.firestore().collection(`signup_bonus_campaigns/${campaign.id}/claims`);
-        const claimsSnapshot = await claimsCollection.count().get();
-        if (claimsSnapshot.data().count < (campaign.data().userLimit || 0)) {
-            await claimsCollection.doc(userId).set({
-                userId: userId,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
-             functions.logger.log(`Signup bonus claim created for user ${userId} for campaign ${campaign.id}`);
-        }
-    }
+    // This logic is now handled by the onBonusClaim function.
+    // No action is needed here for sign-up bonuses.
 
     return null;
   });
@@ -202,5 +191,3 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
-
-    
