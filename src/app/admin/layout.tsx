@@ -1,3 +1,4 @@
+
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -131,14 +132,11 @@ export default function AdminLayout({
                          <SidebarMenuItem>
                              <Link href="/admin/bonus/referral-bonus"><SidebarMenuButton tooltip="Referral Bonus" isActive={isActive('/admin/bonus/referral-bonus')}><Users /><span>Referral Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
-                         <SidebarMenuItem>
-                             <Link href="/admin/referral-campaigns"><SidebarMenuButton tooltip="Referral Campaigns" isActive={isActive('/admin/referral-campaigns')}><Award /><span>Referral Campaigns</span></SidebarMenuButton></Link>
+                        <SidebarMenuItem>
+                             <Link href="/admin/tasks"><SidebarMenuButton tooltip="Task Campaigns" isActive={isActive('/admin/tasks')}><Award /><span>Task Campaigns</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                              <Link href="/admin/bonus/referral-claims"><SidebarMenuButton tooltip="Bonus Claims" isActive={isActive('/admin/bonus/referral-claims')}><CheckSquare /><span>Bonus Claims</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                             <Link href="/admin/tasks"><SidebarMenuButton tooltip="Tasks" isActive={isActive('/admin/tasks')}><ClipboardCheck /><span>Task Setup</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                              <Link href="/admin/task-claims"><SidebarMenuButton tooltip="Task Claims" isActive={isActive('/admin/task-claims')}><CheckSquare /><span>Task Claims</span></SidebarMenuButton></Link>

@@ -12,7 +12,7 @@ import { Award, Loader2, Check, CheckCircle, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRouter } from 'next/navigation';
-import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
+import { Campaign, CampaignTask } from '@/app/admin/tasks/page';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
