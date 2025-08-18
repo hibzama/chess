@@ -18,14 +18,6 @@
       ]
     },
     {
-      "collectionGroup": "daily_bonus_campaigns",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "isActive", "order": "ASCENDING" },
-        { "fieldPath": "endDate", "order": "ASCENDING" }
-      ]
-    },
-    {
         "collectionGroup": "signup_bonus_campaigns",
         "queryScope": "COLLECTION",
         "fields": [
@@ -136,6 +128,22 @@
           "fieldPath": "createdAt",
           "order": "DESCENDING"
         }
+      ]
+    },
+    {
+      "collectionGroup": "bonus_claims",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "isActive", "order": "ASCENDING" },
+        { "fieldPath": "endDate", "order": "ASCENDING" }
       ]
     }
   ],
