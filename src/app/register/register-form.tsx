@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db, functions } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -111,19 +111,23 @@ export default function RegisterForm() {
             // 3. Call Cloud Function to create user document in Firestore
             const createDbUser = httpsCallable(functions, 'createDbUser');
             await createDbUser(userData);
+            
+            // 4. Send verification email from the client
+            await sendEmailVerification(user);
 
             toast({
                 title: "Account Created!",
-                description: "Welcome to Nexbattle.",
+                description: "Please check your email to verify your account before logging in.",
             });
-            router.push('/dashboard');
+            
+            router.push(`/verify-email?email=${email}`);
 
         } catch (error: any) {
             console.error("Error signing up:", error);
             let errorMessage = "An unknown error occurred.";
             if (error.code === 'auth/email-already-in-use') {
                 errorMessage = "This email address is already in use.";
-            } else if (error.code === 'functions/internal') {
+            } else if (error.code === 'functions/internal' || error.message.includes('createDbUser')) {
                 errorMessage = "An error occurred creating your user profile. Please contact support.";
             } else if (error.message) {
                 errorMessage = error.message;
