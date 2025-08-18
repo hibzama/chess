@@ -8,22 +8,61 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ClipboardCheck, Loader2, Check } from 'lucide-react';
+import { ClipboardCheck, Loader2, Check, Clock } from 'lucide-react';
 import { Task } from '@/app/admin/tasks/page';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 
-const TaskCard = ({ task, onClaimed, alreadyClaimed }: { task: Task, onClaimed: (taskId: string) => void, alreadyClaimed: boolean }) => {
+const CountdownTimer = ({ targetDate, onEnd }: { targetDate: Date, onEnd?: () => void }) => {
+    const [timeLeft, setTimeLeft] = useState('');
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = new Date();
+            const diff = targetDate.getTime() - now.getTime();
+            if (diff <= 0) {
+                setTimeLeft('00:00:00');
+                clearInterval(interval);
+                onEnd?.();
+            } else {
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                setTimeLeft(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [targetDate, onEnd]);
+
+    return <span className="font-mono">{timeLeft}</span>;
+}
+
+const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, onClaimed: (taskId: string) => void, alreadyClaimed: boolean, balance: number }) => {
     const { user } = useAuth();
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [answer, setAnswer] = useState('');
+    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [currentWorkIndex, setCurrentWorkIndex] = useState(0);
+
+    const bonus = balance <= 10 ? task.bonusAmountLow : task.bonusAmountHigh;
+
+    const handleNextWork = () => {
+        if (!answers[task.works[currentWorkIndex].id]?.trim()) {
+            toast({ variant: 'destructive', title: 'Answer Required', description: 'Please provide an answer for the current work.'});
+            return;
+        }
+        if (currentWorkIndex < task.works.length - 1) {
+            setCurrentWorkIndex(prev => prev + 1);
+        } else {
+            handleSubmit();
+        }
+    };
 
     const handleSubmit = async () => {
-        if (!user || !answer.trim()) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Please provide an answer.'});
+        if (!user || Object.keys(answers).length !== task.works.length) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please complete all work items.'});
             return;
         }
         setIsSubmitting(true);
@@ -32,11 +71,11 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed }: { task: Task, onClaimed: 
             await setDoc(claimRef, {
                 userId: user.uid,
                 type: 'task',
-                amount: task.bonusAmount,
+                amount: bonus,
                 status: 'pending',
-                campaignId: task.id, // Using campaignId field for task ID
+                campaignId: task.id,
                 campaignTitle: `Task: ${task.title}`,
-                answer: answer,
+                answers,
                 createdAt: serverTimestamp(),
             });
 
@@ -51,17 +90,14 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed }: { task: Task, onClaimed: 
     };
     
     return (
-        <Card>
+        <Card className="flex flex-col">
             <CardHeader>
                 <CardTitle>{task.title}</CardTitle>
-                <CardDescription>{task.description}</CardDescription>
+                <CardDescription>Ends in: <CountdownTimer targetDate={task.endDate.toDate()} /></CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-grow">
                 <div className="text-sm font-semibold text-green-400">
-                    Reward: LKR {task.bonusAmount.toFixed(2)}
-                </div>
-                 <div className="text-xs text-muted-foreground mt-2">
-                    Ends in {formatDistanceToNowStrict(task.endDate.toDate())}
+                    Reward: LKR {bonus.toFixed(2)}
                 </div>
             </CardContent>
             <CardFooter>
@@ -74,15 +110,29 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed }: { task: Task, onClaimed: 
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>{task.title}</DialogTitle>
-                            <DialogDescription>{task.description}</DialogDescription>
+                             <DialogDescription>
+                                Work {currentWorkIndex + 1} of {task.works.length}. Complete all to claim your reward.
+                            </DialogDescription>
                         </DialogHeader>
-                         <div className="py-4 space-y-2">
-                            <Label htmlFor="answer" className="font-semibold">{task.verificationQuestion}</Label>
-                            <Textarea id="answer" value={answer} onChange={e => setAnswer(e.target.value)} placeholder="Your answer here..." />
+                         <div className="py-4 space-y-4">
+                            <div className="p-4 bg-muted rounded-md space-y-2">
+                                <p className="font-semibold">{task.works[currentWorkIndex].description}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="answer" className="font-semibold">{task.works[currentWorkIndex].verificationQuestion}</Label>
+                                <Textarea 
+                                    id="answer" 
+                                    value={answers[task.works[currentWorkIndex].id] || ''}
+                                    onChange={e => setAnswers(prev => ({...prev, [task.works[currentWorkIndex].id]: e.target.value}))} 
+                                    placeholder="Your answer here..." 
+                                />
+                            </div>
                          </div>
                         <DialogFooter>
-                            <Button onClick={handleSubmit} disabled={isSubmitting}>
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit for Review"}
+                            <Button onClick={handleNextWork} disabled={isSubmitting}>
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : 
+                                 currentWorkIndex < task.works.length - 1 ? 'Next Work' : 'Submit for Review'
+                                }
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -93,45 +143,47 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed }: { task: Task, onClaimed: 
 }
 
 export default function TasksPage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [tasks, setTasks] = useState<Task[]>([]);
     const [claimedTaskIds, setClaimedTaskIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchTasks = async () => {
-            if (!user) {
-                setLoading(false);
-                return;
-            }
-            setLoading(true);
-
-            // Fetch active tasks
-            const now = new Date();
-            const tasksQuery = query(collection(db, 'tasks'), where('isActive', '==', true));
-            const tasksSnapshot = await getDocs(tasksQuery);
-            // Client-side filtering for endDate
-            const activeTasks = tasksSnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Task))
-                .filter(task => task.endDate.toDate() > now);
-            
-            // Fetch user's claims for these tasks
-            const claimsQuery = query(collection(db, 'bonus_claims'), where('userId', '==', user.uid), where('type', '==', 'task'));
-            const claimsSnapshot = await getDocs(claimsQuery);
-            const claimedIds = new Set(claimsSnapshot.docs.map(doc => doc.data().campaignId));
-            
-            setTasks(activeTasks);
-            setClaimedTaskIds(claimedIds);
+    const fetchTasks = async () => {
+        if (!user) {
             setLoading(false);
-        };
+            return;
+        }
+        setLoading(true);
+
+        const tasksQuery = query(collection(db, 'tasks'), where('isActive', '==', true));
+        const tasksSnapshot = await getDocs(tasksQuery);
+
+        const now = new Date();
+        const activeTasks = tasksSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Task))
+            .filter(task => task.endDate.toDate() > now);
+        
+        const claimsQuery = query(collection(db, 'bonus_claims'), where('userId', '==', user.uid), where('type', '==', 'task'));
+        const claimsSnapshot = await getDocs(claimsQuery);
+        const claimedIds = new Set(claimsSnapshot.docs.map(doc => doc.data().campaignId));
+        
+        setTasks(activeTasks);
+        setClaimedTaskIds(claimedIds);
+        setLoading(false);
+    };
+
+    useEffect(() => {
         fetchTasks();
     }, [user]);
 
     const handleClaimed = (taskId: string) => {
         setClaimedTaskIds(prev => new Set(prev).add(taskId));
+        fetchTasks();
     }
 
-    const availableTasks = tasks.filter(t => !claimedTaskIds.has(t.id));
+    const now = new Date();
+    const availableTasks = tasks.filter(t => !claimedTaskIds.has(t.id) && t.startDate.toDate() <= now);
+    const upcomingTasks = tasks.filter(t => !claimedTaskIds.has(t.id) && t.startDate.toDate() > now);
 
     if (loading) {
         return (
@@ -161,13 +213,40 @@ export default function TasksPage() {
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {availableTasks.length > 0 ? (
                         availableTasks.map(task => (
-                            <TaskCard key={task.id} task={task} onClaimed={handleClaimed} alreadyClaimed={claimedTaskIds.has(task.id)} />
+                            <TaskCard key={task.id} task={task} onClaimed={handleClaimed} alreadyClaimed={claimedTaskIds.has(task.id)} balance={userData?.balance || 0} />
                         ))
                     ) : (
                         <p className="text-center text-muted-foreground py-8 col-span-full">No new tasks available right now. Check back later!</p>
                     )}
                 </CardContent>
             </Card>
+
+            {upcomingTasks.length > 0 && (
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Clock/> Upcoming Tasks</CardTitle>
+                        <CardDescription>These tasks are not yet active. Check back soon!</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {upcomingTasks.map(task => (
+                             <Card key={task.id} className="opacity-60">
+                                <CardHeader>
+                                    <CardTitle>{task.title}</CardTitle>
+                                    <CardDescription>Starts in: <CountdownTimer targetDate={task.startDate.toDate()} onEnd={fetchTasks} /></CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-sm font-semibold text-green-400/70">
+                                        Reward: LKR {task.bonusAmountLow.toFixed(2)} / LKR {task.bonusAmountHigh.toFixed(2)}
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button className="w-full" disabled>Not Active</Button>
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

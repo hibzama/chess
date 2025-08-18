@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { db, functions } from '@/lib/firebase';
@@ -12,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface BonusClaim {
     id: string;
@@ -22,7 +24,7 @@ interface BonusClaim {
     type: 'task';
     status: 'pending' | 'approved' | 'rejected';
     createdAt: any;
-    answer?: string;
+    answers?: Record<string, string>;
 }
 
 async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
@@ -100,7 +102,7 @@ export default function TaskClaimsPage() {
                     <TableRow>
                         <TableHead>User</TableHead>
                         <TableHead>Task</TableHead>
-                        <TableHead>Answer</TableHead>
+                        <TableHead>Answers</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">{type === 'pending' ? 'Actions' : 'Status'}</TableHead>
@@ -111,7 +113,18 @@ export default function TaskClaimsPage() {
                         <TableRow key={claim.id}>
                             <TableCell><Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary">{claim.userName}</Link></TableCell>
                             <TableCell>{claim.campaignTitle}</TableCell>
-                            <TableCell><p className="text-xs max-w-xs truncate">{claim.answer}</p></TableCell>
+                            <TableCell>
+                                <Accordion type="single" collapsible className="w-full max-w-xs">
+                                    <AccordionItem value="item-1" className="border-b-0">
+                                        <AccordionTrigger className="py-1 text-xs">View Answers</AccordionTrigger>
+                                        <AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md space-y-1">
+                                           {claim.answers ? Object.entries(claim.answers).map(([key, value]) => (
+                                               <p key={key}><strong>Q:</strong> ...{key.slice(-4)} <strong>A:</strong> {value}</p>
+                                           )) : <p>No answer submitted.</p>}
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
+                            </TableCell>
                             <TableCell>LKR {claim.amount.toFixed(2)}</TableCell>
                             <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                             <TableCell className="text-right">
