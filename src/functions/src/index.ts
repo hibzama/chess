@@ -14,68 +14,47 @@ import axios from "axios";
 
 admin.initializeApp();
 
-// This function triggers whenever a new user document is created
-export const onUserCreate = functions.firestore
-  .document("users/{userId}")
-  .onCreate(async (snap, context) => {
-    const newUser = snap.data();
-    const newUserRef = snap.ref;
-    const { userId } = context.params;
+// This function triggers whenever a new user is created in Firebase Auth
+export const onUserCreate = functions.auth.user().onCreate(async (user) => {
+    const { uid, email, metadata } = user;
+    const { creationTime } = metadata;
 
-    // --- Handle Commission Referral Logic ---
-    const marketingReferrerId = newUser.marketingReferredBy; // mref
-    const standardReferrerId = newUser.standardReferredBy; // ref (from campaign)
+    const userRef = admin.firestore().doc(`users/${uid}`);
 
-    if (marketingReferrerId) {
-      const marketerDoc = await admin
-        .firestore()
-        .collection("users")
-        .doc(marketingReferrerId)
-        .get();
-      if (marketerDoc.exists && marketerDoc.data()?.role === "marketer") {
-        const referralChain = (marketerDoc.data()?.referralChain || []).concat(
-          marketingReferrerId
-        );
-        await newUserRef.update({
-          referralChain: referralChain,
-          referredBy: marketingReferrerId,
-        });
-        functions.logger.log(
-          `User ${userId} joined marketer ${marketingReferrerId}'s chain.`
-        );
-      }
-    } else if (standardReferrerId) {
-      await newUserRef.update({ referredBy: standardReferrerId });
-      functions.logger.log(
-        `User ${userId} was referred by standard user ${standardReferrerId}.`
-      );
-    }
-    
-    // Sign-up bonus logic is now handled by the onBonusClaim function,
-    // which is triggered when the frontend creates a claim document.
-    // No action is needed here for sign-up bonuses.
+    // Create a basic user profile document in Firestore
+    // The user can fill in the rest of the details on their profile page
+    await userRef.set({
+        uid: uid,
+        email: email,
+        firstName: 'New',
+        lastName: 'User',
+        phone: '',
+        balance: 0,
+        role: 'user',
+        createdAt: creationTime,
+        emailVerified: false,
+    });
 
+    functions.logger.log(`New user document created for ${uid}`);
     return null;
-  });
+});
+
 
 // This function triggers whenever a bonus claim is created
 export const onBonusClaim = functions.firestore
   .document("{campaignCollection}/{campaignId}/claims/{claimId}")
   .onCreate(async (snap, context) => {
-    const { campaignCollection, campaignId, claimId } = context.params;
+    const { campaignCollection, campaignId } = context.params;
     const db = admin.firestore();
 
-    // For user-specific claims, userId is the claimId.
-    // For transaction-specific claims (like deposit), claimId is the transactionId.
     const claimData = snap.data();
     const userId = claimData.userId;
 
     if (!userId) {
-        functions.logger.error("Claim document is missing userId field.", {claimId});
+        functions.logger.error("Claim document is missing userId field.", {claimId: context.params.claimId});
         return null;
     }
 
-    // Ensure it's a valid bonus campaign collection
     const validCollections = ['signup_bonus_campaigns', 'daily_bonus_campaigns', 'deposit_bonus_campaigns'];
     if (!validCollections.includes(campaignCollection)) {
       functions.logger.log(`Invalid collection for bonus claim: ${campaignCollection}`);
@@ -110,25 +89,21 @@ export const onBonusClaim = functions.firestore
             }
             description = `Daily Bonus: ${campaign?.title}`;
         } else if (campaignCollection === 'deposit_bonus_campaigns') {
-            // For deposit bonus, the claimId is the transactionId
-            const depositTransactionRef = db.collection('transactions').doc(claimId);
-            const depositTransactionDoc = await transaction.get(depositTransactionRef);
-            if (!depositTransactionDoc.exists) {
-                 throw new Error(`Deposit transaction ${claimId} not found.`);
+            const depositAmount = claimData.depositAmount || 0;
+            if (depositAmount > 0) {
+                 bonusAmount = depositAmount * (campaign?.percentage / 100);
+                 description = `Deposit Bonus: ${campaign?.title}`;
+            } else {
+                 functions.logger.error("Deposit amount not found on claim document.");
+                 return;
             }
-            const depositAmount = depositTransactionDoc.data()?.amount || 0;
-            bonusAmount = depositAmount * (campaign?.percentage / 100);
-            description = `Deposit Bonus: ${campaign?.title}`;
         } else {
              functions.logger.log("Unsupported campaign type for auto-payout.");
              return;
         }
 
         if (bonusAmount > 0) {
-            // 1. Increment user's balance
             transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(bonusAmount) });
-
-            // 2. Create a transaction record
             const transactionRef = db.collection("transactions").doc();
             transaction.set(transactionRef, {
                 userId: userId,
@@ -138,8 +113,6 @@ export const onBonusClaim = functions.firestore
                 description: description,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-
-             // 3. Increment the campaign's claimsCount
             transaction.update(campaignRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
         }
       });
@@ -166,7 +139,6 @@ export const announceNewGame = functions.firestore
 
     let telegramBotToken;
     try {
-      // Use environment variables for sensitive data
       telegramBotToken = functions.config().telegram.token;
     } catch (error) {
       functions.logger.error("Could not retrieve telegram.token from Functions config. Make sure it's set by running 'firebase functions:config:set telegram.token=YOUR_TOKEN'");
@@ -179,7 +151,7 @@ export const announceNewGame = functions.firestore
     }
 
     const chatId = "@nexbattlerooms";
-    const siteUrl = "http://nexbattle.com"; // Consider making this configurable
+    const siteUrl = "http://nexbattle.com";
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
@@ -209,3 +181,5 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
+
+    
