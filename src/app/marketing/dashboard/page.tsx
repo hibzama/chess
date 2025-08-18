@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Copy, Share, Users, Wallet, Percent, Layers, ShieldCheck, DollarSign, BarChart } from 'lucide-react';
+import { Copy, Share, Users, Wallet, Percent, Layers, ShieldCheck, DollarSign, BarChart, Phone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -22,8 +22,13 @@ type Referral = {
     uid: string;
     firstName: string;
     lastName: string;
+    phone: string;
     createdAt: any;
     level?: number;
+    campaignInfo?: {
+        completedTasks: string[];
+        totalTasks?: number;
+    }
 };
 
 type Commission = {
@@ -86,8 +91,7 @@ export default function MarketingDashboardPage() {
             const allReferralsDocs = await getDocs(allReferralsQuery);
             const referralsData = allReferralsDocs.docs.map(doc => {
                  const data = doc.data();
-                 // Correctly calculate level based on the length of the chain.
-                 const level = data.referralChain?.length || 0;
+                 const level = data.referralChain ? data.referralChain.indexOf(user.uid) + 1 : 0;
                  return { ...data, uid: doc.id, level } as Referral
             });
             setAllReferrals(referralsData);
@@ -214,14 +218,31 @@ export default function MarketingDashboardPage() {
 
 
 const ReferralTable = ({ referrals, loading, showLevel = false }: { referrals: Referral[], loading: boolean, showLevel?: boolean }) => {
+    
+    const getTaskStatus = (ref: Referral) => {
+        if (!ref.campaignInfo) {
+            return <Badge variant="secondary">N/A</Badge>;
+        }
+        const completed = ref.campaignInfo.completedTasks?.length || 0;
+        const total = ref.campaignInfo.totalTasks || 0;
+
+        if (total === 0) return <Badge variant="secondary">N/A</Badge>;
+
+        if (completed === total) {
+            return <Badge variant="default" className="bg-green-500/20 text-green-400">All Tasks Done</Badge>;
+        }
+
+        return <Badge variant="destructive">{completed}/{total} Tasks Done</Badge>;
+    }
+
     return (
         <Table>
             <TableHeader>
                 <TableRow>
                     <TableHead>Username</TableHead>
-                    <TableHead>Join Date</TableHead>
+                    <TableHead>Contact</TableHead>
                     {showLevel && <TableHead>Level</TableHead>}
-                    <TableHead>Status</TableHead>
+                    <TableHead>Task Status</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -230,9 +251,9 @@ const ReferralTable = ({ referrals, loading, showLevel = false }: { referrals: R
                 ) : referrals.length > 0 ? referrals.map(ref => (
                     <TableRow key={ref.uid}>
                         <TableCell>{ref.firstName} {ref.lastName}</TableCell>
-                        <TableCell>{ref.createdAt ? format(ref.createdAt.toDate(), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                        <TableCell><a href={`tel:${ref.phone}`} className="flex items-center gap-1 hover:underline"><Phone className="w-3 h-3"/> {ref.phone}</a></TableCell>
                         {showLevel && <TableCell><Badge variant="secondary">Level {ref.level}</Badge></TableCell>}
-                        <TableCell><Badge>Active</Badge></TableCell>
+                        <TableCell>{getTaskStatus(ref)}</TableCell>
                     </TableRow>
                 )) : (
                      <TableRow><TableCell colSpan={showLevel ? 4 : 3} className="h-24 text-center">No referrals found.</TableCell></TableRow>
@@ -271,4 +292,3 @@ const CommissionTable = ({ commissions, loading }: { commissions: Commission[], 
         </Table>
     )
 }
-    

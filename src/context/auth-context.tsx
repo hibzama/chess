@@ -31,6 +31,7 @@ interface CampaignInfo {
     referrerId: string;
     completedTasks: string[];
     answers: Record<string, string>;
+    totalTasks: number;
 }
 
 interface UserData {

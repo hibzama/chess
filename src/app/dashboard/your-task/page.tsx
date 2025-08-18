@@ -80,14 +80,11 @@ export default function YourTaskPage() {
                 [task.id]: answer
             };
             
-            // Only update the user's own document. This is a permitted action.
             await updateDoc(userRef, {
                 'campaignInfo.completedTasks': newCompletedTasks,
                 'campaignInfo.answers': newAnswers
             });
             
-            // Create a pending bonus claim for the admin to approve.
-            // This is now allowed by the new firestore rule.
             const claimRef = doc(collection(db, 'bonus_claims'));
             await setDoc(claimRef, {
                 userId: user.uid,
@@ -103,7 +100,6 @@ export default function YourTaskPage() {
 
             toast({ title: "Task Submitted!", description: `Your answer has been submitted. Your bonus of LKR ${task.refereeBonus.toFixed(2)} is pending approval.`});
             
-            // Manually update local state to reflect change immediately
             setUserData(prev => {
                 if (!prev || !prev.campaignInfo) return prev;
                 return {

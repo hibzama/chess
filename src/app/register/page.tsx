@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, Suspense } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc, getCountFromServer, collection, getDoc, serverTimestamp, updateDoc, increment } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp, updateDoc, increment, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
@@ -49,8 +49,11 @@ function RegisterForm() {
         const address = target.address.value;
         const city = target.city.value;
         const country = target.country.value;
+        
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
+        const rcid = searchParams.get('rcid');
+
 
         if (password !== confirmPassword) {
             toast({
@@ -86,7 +89,6 @@ function RegisterForm() {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
             
-            // Send verification email
             await sendEmailVerification(user);
 
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
@@ -113,41 +115,57 @@ function RegisterForm() {
                 l1Count: 0,
                 photoURL: defaultAvatarUri,
                 ipAddress: ipAddress,
-                emailVerified: true, 
+                emailVerified: false, 
+                friends: [],
+                wins: 0,
             };
+            
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, "users", user.uid);
             
             const directReferrerId = mref || ref;
             if (directReferrerId) {
-                const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
+                const referrerDocRef = doc(db, 'users', directReferrerId);
+                const referrerDoc = await getDoc(referrerDocRef);
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    userData.referredBy = directReferrerId; // Always set the direct referrer
+                    userData.referredBy = directReferrerId; 
 
-                    // If the referrer has a chain, it means they are part of a marketer's downline.
-                    // The new user should inherit this chain and add the direct referrer to it.
                     if (referrerData.referralChain) {
                         userData.referralChain = [...referrerData.referralChain, directReferrerId];
                     } 
-                    // If the referrer is a marketer themselves (and thus the start of a chain)
                     else if (referrerData.role === 'marketer') {
                         userData.referralChain = [directReferrerId];
                     }
 
-                    // Increment the direct referrer's L1 count if they are a regular user
                     if (referrerData.role === 'user') {
-                        await updateDoc(doc(db, 'users', directReferrerId), { l1Count: increment(1) });
+                        batch.update(referrerDocRef, { l1Count: increment(1) });
                     }
                 }
             }
 
-
-            await setDoc(doc(db, "users", user.uid), userData);
+            if (rcid && ref) {
+                const campaignDoc = await getDoc(doc(db, 'referral_campaigns', rcid));
+                if (campaignDoc.exists()) {
+                    const campaignData = campaignDoc.data() as Campaign;
+                    userData.campaignInfo = {
+                        campaignId: rcid,
+                        referrerId: ref,
+                        completedTasks: [],
+                        answers: {},
+                        totalTasks: campaignData.tasks.length || 0
+                    };
+                }
+            }
+            
+            batch.set(userDocRef, userData);
+            await batch.commit();
             
             toast({
                 title: "Account Created!",
-                description: "Welcome to Nexbattle! You can now explore your dashboard.",
+                description: "Please check your email to verify your account before logging in.",
             });
-            router.push('/dashboard');
+            router.push(`/verify-email?email=${email}`);
 
         } catch (error: any) {
             console.error("Error signing up:", error);
@@ -275,5 +293,3 @@ export default function RegisterPage() {
         </div>
     )
 }
-
-    
