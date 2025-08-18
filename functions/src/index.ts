@@ -14,79 +14,6 @@ import axios from "axios";
 
 admin.initializeApp();
 
-// This new callable function will be triggered from the frontend after auth creation.
-export const createDbUser = functions.https.onCall(async (data, context) => {
-    // Check if the user is authenticated.
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-
-    const { uid } = context.auth;
-    const { 
-        email, firstName, lastName, phone, address, 
-        city, country, gender, photoURL,
-        standardReferredBy, marketingReferredBy, campaignInfo 
-    } = data;
-
-    try {
-        let ipAddress = 'unknown';
-        if (context.rawRequest.ip) {
-            ipAddress = context.rawRequest.ip;
-        }
-        
-        const userRef = admin.firestore().doc(`users/${uid}`);
-        
-        const userData: any = {
-            uid,
-            email,
-            firstName,
-            lastName,
-            phone,
-            address,
-            city,
-            country,
-            gender,
-            photoURL,
-            balance: 0,
-            commissionBalance: 0,
-            marketingBalance: 0,
-            role: 'user',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            l1Count: 0,
-            ipAddress: ipAddress,
-            emailVerified: false, // User needs to verify their email
-        };
-
-        // Handle referral logic
-        if (marketingReferredBy) {
-          const marketerDoc = await admin.firestore().collection("users").doc(marketingReferredBy).get();
-          if (marketerDoc.exists && marketerDoc.data()?.role === 'marketer') {
-            const referralChain = (marketerDoc.data()?.referralChain || []).concat(marketingReferredBy);
-            userData.referralChain = referralChain;
-            userData.referredBy = marketingReferredBy;
-          }
-        } else if (standardReferredBy) {
-          userData.referredBy = standardReferredBy;
-        }
-
-        if (campaignInfo) {
-            userData.campaignInfo = {
-                ...campaignInfo,
-                completedTasks: [],
-                answers: {},
-            };
-        }
-
-        await userRef.set(userData);
-        
-        return { status: 'success', message: 'User created successfully in Firestore.' };
-
-    } catch (error) {
-        console.error("Error creating user in Firestore:", error);
-        throw new functions.https.HttpsError('internal', 'Could not create user profile.');
-    }
-});
-
 
 // This function triggers whenever a new document is created in 'game_rooms'
 export const announceNewGame = functions.firestore
@@ -142,5 +69,55 @@ export const announceNewGame = functions.firestore
     } catch (error: any) {
       functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
+    return null;
+  });
+
+// This function triggers whenever a bonus claim is created
+export const onBonusClaim = functions.firestore
+  .document("bonus_claims/{claimId}")
+  .onCreate(async (snap, context) => {
+    const claimData = snap.data();
+    if (!claimData) {
+      functions.logger.error("No data in claim document");
+      return null;
+    }
+
+    const { campaignId, type } = claimData;
+
+    if (!campaignId) {
+      functions.logger.error(`Claim ${context.params.claimId} has no campaignId.`);
+      return null;
+    }
+    
+    let campaignCollectionName: string;
+    
+    // Determine the collection based on the claim type
+    switch(type) {
+        case 'signup':
+            campaignCollectionName = 'signup_bonus_campaigns';
+            break;
+        case 'daily':
+            campaignCollectionName = 'daily_bonus_campaigns';
+            break;
+        case 'referrer':
+        case 'referee':
+             campaignCollectionName = 'referral_campaigns';
+            break;
+        default:
+            functions.logger.error(`Unknown claim type: ${type}`);
+            return null;
+    }
+
+    const campaignRef = admin.firestore().doc(`${campaignCollectionName}/${campaignId}`);
+
+    try {
+        await campaignRef.update({
+            claimsCount: admin.firestore.FieldValue.increment(1)
+        });
+        functions.logger.log(`Incremented claimsCount for campaign ${campaignId} in ${campaignCollectionName}`);
+    } catch (error) {
+        functions.logger.error(`Failed to increment claimsCount for campaign ${campaignId} in ${campaignCollectionName}`, error);
+    }
+    
     return null;
   });

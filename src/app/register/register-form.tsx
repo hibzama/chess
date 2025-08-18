@@ -9,7 +9,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc, getDoc, updateDoc, increment } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, increment, serverTimestamp, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
@@ -46,7 +46,6 @@ export default function RegisterForm() {
         const city = target.city.value;
         const country = target.country.value;
 
-        // --- referral params ---
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
         const rcid = searchParams.get('rcid');
@@ -62,56 +61,68 @@ export default function RegisterForm() {
         }
 
         try {
-            // 1. Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
-            
-             // 2. The onUserCreate function will trigger and create the basic user document.
-            // Now, we update that document with the form details.
-            const userDocRef = doc(db, 'users', user.uid);
 
             let ipAddress = 'unknown';
-             try {
+            try {
                 const response = await fetch('https://api.ipify.org?format=json');
                 const data = await response.json();
                 ipAddress = data.ip;
             } catch (ipError) {
                 console.error("Could not fetch IP address:", ipError);
             }
-
-            const profileData: any = {
+            
+            const userData: any = {
+                uid: user.uid,
                 firstName,
                 lastName,
                 phone,
+                email,
                 address,
                 city,
                 country,
-                ipAddress,
+                gender: '',
+                binancePayId: '',
+                balance: 0,
+                commissionBalance: 0,
+                marketingBalance: 0,
+                role: 'user',
+                createdAt: serverTimestamp(),
+                l1Count: 0,
+                photoURL: '',
+                ipAddress: ipAddress,
+                emailVerified: false,
+                friends: [],
+                wins: 0,
             };
+
+            const batch = writeBatch(db);
+            const userDocRef = doc(db, 'users', user.uid);
             
-            // Handle referral logic
             const directReferrerId = mref || ref;
             if (directReferrerId) {
-                const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
+                const referrerDocRef = doc(db, 'users', directReferrerId);
+                const referrerDoc = await getDoc(referrerDocRef);
+
                 if (referrerDoc.exists()) {
                     const referrerData = referrerDoc.data();
-                    profileData.referredBy = directReferrerId;
+                    userData.referredBy = directReferrerId;
 
                     if (referrerData.referralChain) {
-                        profileData.referralChain = [...referrerData.referralChain, directReferrerId];
+                        userData.referralChain = [...referrerData.referralChain, directReferrerId];
                     } else if (referrerData.role === 'marketer') {
-                        profileData.referralChain = [directReferrerId];
+                        userData.referralChain = [directReferrerId];
                     }
 
                     if (referrerData.role === 'user') {
-                        await updateDoc(doc(db, 'users', directReferrerId), { l1Count: increment(1) });
+                        batch.update(referrerDocRef, { l1Count: increment(1) });
                     }
                 }
             }
-            
-            // Handle campaign-specific info
-             if (rcid && ref) {
-                profileData.campaignInfo = {
+
+            if (rcid && ref) {
+                userData.campaignInfo = {
                     campaignId: rcid,
                     referrerId: ref,
                     completedTasks: [],
@@ -119,10 +130,10 @@ export default function RegisterForm() {
                 };
             }
 
-            await updateDoc(userDocRef, profileData);
+            batch.set(userDocRef, userData);
 
-
-            // 3. Send verification email from the client
+            await batch.commit();
+            
             await sendEmailVerification(user);
 
             toast({
