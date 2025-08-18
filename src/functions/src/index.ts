@@ -11,7 +11,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import axios from "axios";
-import { httpsCallable } from "firebase-functions/v2/https";
 
 admin.initializeApp();
 
@@ -184,8 +183,11 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
                  throw new functions.https.HttpsError('failed-precondition', 'Bonus amount must be greater than zero.');
             }
             
+            const newBalance = currentBalance + bonusAmount;
+
+            // Perform writes
             transaction.set(claimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp(), campaignId: campaignId });
-            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(bonusAmount) });
+            transaction.update(userRef, { balance: newBalance });
             transaction.update(campaignRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
             
             const transactionRef = db.collection('transactions').doc();
