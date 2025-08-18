@@ -2,17 +2,20 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc, query, where, getCountFromServer } from 'firebase/firestore';
+import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc, query, where, getCountFromServer, onSnapshot, runTransaction, increment } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, Loader2, Users, Gift, Check, X } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Loader2, Users, Gift, Check, X, CheckSquare, User } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { format } from 'date-fns';
+import Link from 'next/link';
 
 interface SignupBonusCampaign {
     id: string;
@@ -24,10 +27,36 @@ interface SignupBonusCampaign {
     createdAt: any;
 }
 
+interface BonusClaim {
+    id: string;
+    userId: string;
+    userName?: string;
+    amount: number;
+    campaignTitle: string;
+    createdAt: any;
+}
+
+
+async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
+    const claimsDataPromises = snapshot.docs.map(async (claimDoc: any) => {
+        const data = claimDoc.data();
+        const userDoc = await getDoc(doc(db, 'users', data.userId));
+        
+        return { 
+            ...data, 
+            id: claimDoc.id, 
+            userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User',
+        };
+    });
+    return Promise.all(claimsDataPromises);
+}
+
 
 export default function BonusSettingsPage() {
     const [campaigns, setCampaigns] = useState<SignupBonusCampaign[]>([]);
+    const [pendingClaims, setPendingClaims] = useState<BonusClaim[]>([]);
     const [loading, setLoading] = useState(true);
+    const [claimsLoading, setClaimsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingCampaign, setEditingCampaign] = useState<SignupBonusCampaign | null>(null);
     const { toast } = useToast();
@@ -39,23 +68,32 @@ export default function BonusSettingsPage() {
         userLimit: 250,
     });
     
-    const fetchCampaigns = async () => {
-        setLoading(true);
-        const campaignsSnapshot = await getDocs(collection(db, 'signup_bonus_campaigns'));
-        const campaignsData = campaignsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SignupBonusCampaign));
-        
-        const campaignsWithCounts = await Promise.all(campaignsData.map(async (campaign) => {
-             const claimsQuery = query(collection(db, `signup_bonus_campaigns/${campaign.id}/claims`));
-             const claimsSnapshot = await getCountFromServer(claimsQuery);
-             return { ...campaign, claimsCount: claimsSnapshot.data().count };
-        }));
-
-        setCampaigns(campaignsWithCounts.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds));
-        setLoading(false);
-    };
-
     useEffect(() => {
-        fetchCampaigns();
+        setLoading(true);
+        const campaignsQuery = query(collection(db, 'signup_bonus_campaigns'), orderBy('createdAt', 'desc'));
+        const unsubscribeCampaigns = onSnapshot(campaignsQuery, async (snapshot) => {
+            const campaignsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SignupBonusCampaign));
+             const campaignsWithCounts = await Promise.all(campaignsData.map(async (campaign) => {
+                const claimsQuery = query(collection(db, `bonus_claims`), where('campaignId', '==', campaign.id));
+                const claimsSnapshot = await getCountFromServer(claimsQuery);
+                return { ...campaign, claimsCount: claimsSnapshot.data().count };
+            }));
+            setCampaigns(campaignsWithCounts);
+            setLoading(false);
+        });
+
+        setClaimsLoading(true);
+        const claimsQuery = query(collection(db, 'bonus_claims'), where('type', '==', 'signup'), where('status', '==', 'pending'));
+        const unsubscribeClaims = onSnapshot(claimsQuery, async (snapshot) => {
+            const claims = await enrichClaims(snapshot);
+            setPendingClaims(claims);
+            setClaimsLoading(false);
+        });
+
+        return () => {
+            unsubscribeCampaigns();
+            unsubscribeClaims();
+        };
     }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,7 +126,6 @@ export default function BonusSettingsPage() {
                 toast({ title: 'Success!', description: 'New campaign created successfully.' });
             }
             resetForm();
-            fetchCampaigns();
         } catch (error) {
             console.error("Error saving campaign:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to save campaign.' });
@@ -111,7 +148,6 @@ export default function BonusSettingsPage() {
         try {
             await deleteDoc(doc(db, 'signup_bonus_campaigns', campaignId));
             toast({ title: 'Campaign Deleted', description: 'The campaign has been removed.' });
-            fetchCampaigns();
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete campaign.' });
         }
@@ -121,50 +157,125 @@ export default function BonusSettingsPage() {
         try {
             await updateDoc(doc(db, 'signup_bonus_campaigns', campaign.id), { isActive: !campaign.isActive });
             toast({ title: 'Status Updated', description: `Campaign is now ${!campaign.isActive ? 'active' : 'inactive'}.` });
-            fetchCampaigns();
         } catch (error) {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status.' });
         }
     }
+    
+     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
+        const claimRef = doc(db, 'bonus_claims', claim.id);
+        
+        try {
+            if (newStatus === 'approved') {
+                 await runTransaction(db, async (transaction) => {
+                    const userRef = doc(db, 'users', claim.userId);
+                    const transactionRef = doc(collection(db, 'transactions'));
+                    
+                    transaction.update(claimRef, { status: 'approved' });
+                    transaction.update(userRef, { balance: increment(claim.amount) });
+                    transaction.set(transactionRef, {
+                        userId: claim.userId,
+                        type: 'bonus',
+                        amount: claim.amount,
+                        status: 'completed',
+                        description: `Signup Bonus: ${claim.campaignTitle}`,
+                        createdAt: serverTimestamp(),
+                    });
+                });
+                toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
+            } else { // Rejected
+                await updateDoc(claimRef, { status: 'rejected' });
+                toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
+            }
+        } catch (error: any) {
+            console.error("Error processing claim: ", error);
+            toast({ variant: 'destructive', title: "Error", description: error.message });
+        }
+    };
 
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <Card className="lg:col-span-1 sticky top-4">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Gift/> {editingCampaign ? 'Edit Bonus' : 'Create Sign-up Bonus'}</CardTitle>
-                    <CardDescription>Set up rules for a sign-up bonus campaign.</CardDescription>
-                </CardHeader>
-                <form onSubmit={handleSubmit}>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="title">Campaign Title</Label>
-                            <Input id="title" name="title" value={formState.title} onChange={handleInputChange} placeholder="e.g., Launch Promotion" required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="bonusAmount">Bonus Amount (LKR)</Label>
-                            <Input id="bonusAmount" name="bonusAmount" type="number" value={formState.bonusAmount} onChange={handleInputChange}/>
-                        </div>
-                         <div className="space-y-2">
-                            <Label htmlFor="userLimit">User Limit</Label>
-                            <Input id="userLimit" name="userLimit" type="number" value={formState.userLimit} onChange={handleInputChange}/>
-                             <p className="text-xs text-muted-foreground">The first N users to register during this campaign will receive this bonus.</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                            <Switch id="isActive" name="isActive" checked={formState.isActive} onCheckedChange={(checked) => setFormState(s => ({...s, isActive: checked}))} />
-                            <Label htmlFor="isActive">Campaign is Active</Label>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-between">
-                        <Button type="submit" disabled={isSubmitting}>
-                            {isSubmitting ? <Loader2 className="animate-spin" /> : (editingCampaign ? 'Save Changes' : 'Create Campaign')}
-                        </Button>
-                         {editingCampaign && <Button variant="ghost" onClick={resetForm}>Cancel Edit</Button>}
-                    </CardFooter>
-                </form>
-            </Card>
+            <div className="lg:col-span-1 space-y-8">
+                <Card className="sticky top-4">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Gift/> {editingCampaign ? 'Edit Bonus' : 'Create Sign-up Bonus'}</CardTitle>
+                        <CardDescription>Set up rules for a sign-up bonus campaign.</CardDescription>
+                    </CardHeader>
+                    <form onSubmit={handleSubmit}>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="title">Campaign Title</Label>
+                                <Input id="title" name="title" value={formState.title} onChange={handleInputChange} placeholder="e.g., Launch Promotion" required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="bonusAmount">Bonus Amount (LKR)</Label>
+                                <Input id="bonusAmount" name="bonusAmount" type="number" value={formState.bonusAmount} onChange={handleInputChange}/>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="userLimit">User Limit</Label>
+                                <Input id="userLimit" name="userLimit" type="number" value={formState.userLimit} onChange={handleInputChange}/>
+                                <p className="text-xs text-muted-foreground">The first N users to register during this campaign will receive this bonus.</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <Switch id="isActive" name="isActive" checked={formState.isActive} onCheckedChange={(checked) => setFormState(s => ({...s, isActive: checked}))} />
+                                <Label htmlFor="isActive">Campaign is Active</Label>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="flex justify-between">
+                            <Button type="submit" disabled={isSubmitting}>
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : (editingCampaign ? 'Save Changes' : 'Create Campaign')}
+                            </Button>
+                            {editingCampaign && <Button variant="ghost" onClick={resetForm}>Cancel Edit</Button>}
+                        </CardFooter>
+                    </form>
+                </Card>
+            </div>
 
             <div className="lg:col-span-2 space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><CheckSquare /> Pending Sign-up Claims</CardTitle>
+                        <CardDescription>Approve or reject new user bonus claims.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>User</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {claimsLoading ? (
+                                    <TableRow><TableCell colSpan={4} className="h-24 text-center">Loading claims...</TableCell></TableRow>
+                                ) : pendingClaims.length > 0 ? (
+                                    pendingClaims.map(claim => (
+                                        <TableRow key={claim.id}>
+                                            <TableCell>
+                                                <Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary flex items-center gap-2">
+                                                    <User className="w-4 h-4" />
+                                                    {claim.userName}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell>LKR {claim.amount.toFixed(2)}</TableCell>
+                                            <TableCell>{claim.createdAt ? format(claim.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
+                                            <TableCell className="text-right space-x-2">
+                                                <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button>
+                                                <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending sign-up claims.</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
                 {loading ? [...Array(2)].map((_, i) => <Skeleton key={i} className="h-48 w-full" />)
                  : campaigns.length > 0 ? campaigns.map(c => (
                     <Card key={c.id}>
@@ -173,7 +284,7 @@ export default function BonusSettingsPage() {
                             <CardDescription>Reward: LKR {c.bonusAmount.toFixed(2)}</CardDescription>
                         </CardHeader>
                         <CardContent className="text-sm text-muted-foreground">
-                             <p><strong>Limit:</strong> {c.claimsCount} / {c.userLimit} claimed</p>
+                             <p><strong>Limit:</strong> {c.claimsCount || 0} / {c.userLimit} claimed</p>
                         </CardContent>
                         <CardFooter className="gap-2">
                             <Button size="sm" variant="outline" onClick={() => handleEdit(c)}><Edit className="w-4 h-4 mr-2"/> Edit</Button>

@@ -20,7 +20,7 @@ interface BonusClaim {
     userName?: string;
     amount: number;
     campaignTitle: string;
-    type: 'signup' | 'referee' | 'referrer';
+    type: 'referee' | 'referrer';
     status: 'pending' | 'approved' | 'rejected';
     createdAt: any;
     refereeId?: string; 
@@ -50,13 +50,14 @@ export default function BonusClaimsPage() {
 
     useEffect(() => {
         setLoading(true);
-        const handleError = (error: Error, type: string) => {
-            console.error(`Error fetching ${type} claims:`, error);
+        const handleError = (error: Error) => {
+            console.error(`Error fetching referral claims:`, error);
             toast({ variant: 'destructive', title: `Error fetching claims.`, description: error.message });
         };
         
         const q = query(
             collection(db, 'bonus_claims'),
+            where('type', 'in', ['referee', 'referrer']),
             orderBy('createdAt', 'desc'),
             limit(200) 
         );
@@ -65,7 +66,7 @@ export default function BonusClaimsPage() {
             const claims = await enrichClaims(snapshot);
             setAllClaims(claims);
             setLoading(false);
-        }, (err) => handleError(err, 'all'));
+        }, (err) => handleError(err));
         
         return () => unsubscribe();
     }, [toast]);
@@ -160,8 +161,8 @@ export default function BonusClaimsPage() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Bonus Claims Management</CardTitle>
-                <CardDescription>Review and manage all bonus claims from sign-ups, daily bonuses, and referral campaigns.</CardDescription>
+                <CardTitle>Referral Bonus Claims</CardTitle>
+                <CardDescription>Review and manage all bonus claims from referral campaigns (both task and campaign completion).</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">
@@ -180,5 +181,3 @@ export default function BonusClaimsPage() {
         </Card>
     );
 }
-
-    
