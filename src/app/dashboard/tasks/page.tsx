@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ClipboardCheck, Loader2, Check } from 'lucide-react';
-import { Task } from '@/app/admin/tasks/page.tsx';
+import { Task } from '@/app/admin/tasks/page';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -67,7 +68,7 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed }: { task: Task, onClaimed: 
                  <Dialog>
                     <DialogTrigger asChild>
                         <Button className="w-full" disabled={alreadyClaimed}>
-                            {alreadyClaimed ? &lt;&gt;&lt;Check className="mr-2"/&gt; Submitted&lt;/&gt; : "Complete Task"}
+                            {alreadyClaimed ? <><Check className="mr-2"/> Submitted</> : "Complete Task"}
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
@@ -75,30 +76,30 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed }: { task: Task, onClaimed: 
                             <DialogTitle>{task.title}</DialogTitle>
                             <DialogDescription>{task.description}</DialogDescription>
                         </DialogHeader>
-                         &lt;div className="py-4 space-y-2"&gt;
-                            &lt;Label htmlFor="answer" className="font-semibold"&gt;{task.verificationQuestion}&lt;/Label&gt;
-                            &lt;Textarea id="answer" value={answer} onChange={e =&gt; setAnswer(e.target.value)} placeholder="Your answer here..." /&gt;
-                         &lt;/div&gt;
-                        &lt;DialogFooter&gt;
-                            &lt;Button onClick={handleSubmit} disabled={isSubmitting}&gt;
-                                {isSubmitting ? &lt;Loader2 className="animate-spin" /&gt; : "Submit for Review"}
-                            &lt;/Button&gt;
-                        &lt;/DialogFooter&gt;
-                    &lt;/DialogContent&gt;
-                &lt;/Dialog&gt;
+                         <div className="py-4 space-y-2">
+                            <Label htmlFor="answer" className="font-semibold">{task.verificationQuestion}</Label>
+                            <Textarea id="answer" value={answer} onChange={e => setAnswer(e.target.value)} placeholder="Your answer here..." />
+                         </div>
+                        <DialogFooter>
+                            <Button onClick={handleSubmit} disabled={isSubmitting}>
+                                {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit for Review"}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </CardFooter>
-        &lt;/Card&gt;
+        </Card>
     )
 }
 
 export default function TasksPage() {
     const { user } = useAuth();
-    const [tasks, setTasks] = useState&lt;Task[]&gt;([]);
-    const [claimedTaskIds, setClaimedTaskIds] = useState&lt;Set&lt;string&gt;&gt;(new Set());
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [claimedTaskIds, setClaimedTaskIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
 
-    useEffect(() =&gt; {
-        const fetchTasks = async () =&gt; {
+    useEffect(() => {
+        const fetchTasks = async () => {
             if (!user) {
                 setLoading(false);
                 return;
@@ -107,14 +108,14 @@ export default function TasksPage() {
 
             // Fetch active tasks
             const now = Timestamp.now();
-            const tasksQuery = query(collection(db, 'tasks'), where('isActive', '==', true), where('endDate', '&gt;', now));
+            const tasksQuery = query(collection(db, 'tasks'), where('isActive', '==', true), where('endDate', '>', now));
             const tasksSnapshot = await getDocs(tasksQuery);
-            const activeTasks = tasksSnapshot.docs.map(doc =&gt; ({ id: doc.id, ...doc.data() } as Task));
+            const activeTasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
             
             // Fetch user's claims for these tasks
             const claimsQuery = query(collection(db, 'bonus_claims'), where('userId', '==', user.uid), where('type', '==', 'task'));
             const claimsSnapshot = await getDocs(claimsQuery);
-            const claimedIds = new Set(claimsSnapshot.docs.map(doc =&gt; doc.data().campaignId));
+            const claimedIds = new Set(claimsSnapshot.docs.map(doc => doc.data().campaignId));
             
             setTasks(activeTasks);
             setClaimedTaskIds(claimedIds);
@@ -123,47 +124,47 @@ export default function TasksPage() {
         fetchTasks();
     }, [user]);
 
-    const handleClaimed = (taskId: string) =&gt; {
-        setClaimedTaskIds(prev =&gt; new Set(prev).add(taskId));
+    const handleClaimed = (taskId: string) => {
+        setClaimedTaskIds(prev => new Set(prev).add(taskId));
     }
 
-    const availableTasks = tasks.filter(t =&gt; !claimedTaskIds.has(t.id));
+    const availableTasks = tasks.filter(t => !claimedTaskIds.has(t.id));
 
     if (loading) {
         return (
-            &lt;div className="space-y-6"&gt;
-                &lt;Skeleton className="h-8 w-1/2" /&gt;
-                &lt;div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"&gt;
-                    &lt;Skeleton className="h-48 w-full" /&gt;
-                    &lt;Skeleton className="h-48 w-full" /&gt;
-                    &lt;Skeleton className="h-48 w-full" /&gt;
-                &lt;/div&gt;
-            &lt;/div&gt;
+            <div className="space-y-6">
+                <Skeleton className="h-8 w-1/2" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                    <Skeleton className="h-48 w-full" />
+                </div>
+            </div>
         )
     }
 
     return (
-        &lt;div className="space-y-8"&gt;
-            &lt;div className="text-center"&gt;
-                &lt;h1 className="text-4xl font-bold tracking-tight"&gt;Task &amp; Earn&lt;/h1&gt;
-                &lt;p className="text-muted-foreground mt-2"&gt;Complete simple tasks to earn bonus rewards.&lt;/p&gt;
-            &lt;/div&gt;
+        <div className="space-y-8">
+            <div className="text-center">
+                <h1 className="text-4xl font-bold tracking-tight">Task &amp; Earn</h1>
+                <p className="text-muted-foreground mt-2">Complete simple tasks to earn bonus rewards.</p>
+            </div>
             
-            &lt;Card&gt;
-                &lt;CardHeader&gt;
-                    &lt;CardTitle className="flex items-center gap-2"&gt;&lt;ClipboardCheck/&gt; Available Tasks&lt;/CardTitle&gt;
-                    &lt;CardDescription&gt;Complete these tasks before they expire to claim your bonus.&lt;/CardDescription&gt;
-                &lt;/CardHeader&gt;
-                &lt;CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"&gt;
-                    {availableTasks.length &gt; 0 ? (
-                        availableTasks.map(task =&gt; (
-                            &lt;TaskCard key={task.id} task={task} onClaimed={handleClaimed} alreadyClaimed={claimedTaskIds.has(task.id)} /&gt;
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><ClipboardCheck/> Available Tasks</CardTitle>
+                    <CardDescription>Complete these tasks before they expire to claim your bonus.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {availableTasks.length > 0 ? (
+                        availableTasks.map(task => (
+                            <TaskCard key={task.id} task={task} onClaimed={handleClaimed} alreadyClaimed={claimedTaskIds.has(task.id)} />
                         ))
                     ) : (
-                        &lt;p className="text-center text-muted-foreground py-8 col-span-full"&gt;No new tasks available right now. Check back later!&lt;/p&gt;
+                        <p className="text-center text-muted-foreground py-8 col-span-full">No new tasks available right now. Check back later!</p>
                     )}
-                &lt;/CardContent&gt;
-            &lt;/Card&gt;
-        &lt;/div&gt;
+                </CardContent>
+            </Card>
+        </div>
     )
 }

@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -156,18 +157,18 @@ export default function TasksPage() {
                         <div className="space-y-2">
                             <Label>Start Date &amp; Time</Label>
                             <div className="flex gap-2">
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.startDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formState.startDate ? format(formState.startDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent><Calendar mode="single" selected={formState.startDate} onSelect={(d) => d && setFormState(s=&gt;({...s, startDate:d}))} initialFocus/></PopoverContent></Popover>
-                                <Input type="number" min="0" max="23" placeholder="HH" value={formState.startHour} onChange={e => setFormState(s=&gt;({...s, startHour: Number(e.target.value)}))} className="w-20" />
-                                <Input type="number" min="0" max="59" placeholder="MM" value={formState.startMinute} onChange={e => setFormState(s=&gt;({...s, startMinute: Number(e.target.value)}))} className="w-20" />
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.startDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formState.startDate ? format(formState.startDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent><Calendar mode="single" selected={formState.startDate} onSelect={(d) => d && setFormState(s=>({...s, startDate:d}))} initialFocus/></PopoverContent></Popover>
+                                <Input type="number" min="0" max="23" placeholder="HH" value={formState.startHour} onChange={e => setFormState(s=>({...s, startHour: Number(e.target.value)}))} className="w-20" />
+                                <Input type="number" min="0" max="59" placeholder="MM" value={formState.startMinute} onChange={e => setFormState(s=>({...s, startMinute: Number(e.target.value)}))} className="w-20" />
                             </div>
                         </div>
 
                         <div className="space-y-2">
                             <Label>End Date &amp; Time</Label>
                              <div className="flex gap-2">
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.endDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formState.endDate ? format(formState.endDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent><Calendar mode="single" selected={formState.endDate} onSelect={(d) => d && setFormState(s=&gt;({...s, endDate:d}))} initialFocus/></PopoverContent></Popover>
-                                <Input type="number" min="0" max="23" placeholder="HH" value={formState.endHour} onChange={e => setFormState(s=&gt;({...s, endHour: Number(e.target.value)}))} className="w-20" />
-                                <Input type="number" min="0" max="59" placeholder="MM" value={formState.endMinute} onChange={e => setFormState(s=&gt;({...s, endMinute: Number(e.target.value)}))} className="w-20" />
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formState.endDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{formState.endDate ? format(formState.endDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent><Calendar mode="single" selected={formState.endDate} onSelect={(d) => d && setFormState(s=>({...s, endDate:d}))} initialFocus/></PopoverContent></Popover>
+                                <Input type="number" min="0" max="23" placeholder="HH" value={formState.endHour} onChange={e => setFormState(s=>({...s, endHour: Number(e.target.value)}))} className="w-20" />
+                                <Input type="number" min="0" max="59" placeholder="MM" value={formState.endMinute} onChange={e => setFormState(s=>({...s, endMinute: Number(e.target.value)}))} className="w-20" />
                             </div>
                         </div>
                         
@@ -182,7 +183,7 @@ export default function TasksPage() {
 
             <div className="lg:col-span-2 space-y-4">
                 {loading ? [...Array(2)].map((_, i) => <Skeleton key={i} className="h-48 w-full" />)
-                 : tasks.length &gt; 0 ? tasks.map(t => (
+                 : tasks.length > 0 ? tasks.map(t => (
                     <Card key={t.id}>
                         <CardHeader>
                             <CardTitle className="flex justify-between items-center">{t.title} <Badge variant={t.isActive ? 'default' : 'destructive'}>{t.isActive ? 'Active' : 'Inactive'}</Badge></CardTitle>
