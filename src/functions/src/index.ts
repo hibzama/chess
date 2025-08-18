@@ -14,76 +14,39 @@ import axios from "axios";
 
 admin.initializeApp();
 
-// This new callable function will be triggered from the frontend after auth creation.
-export const createDbUser = functions.https.onCall(async (data, context) => {
-    // Check if the user is authenticated.
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
-    }
-
-    const { uid } = context.auth;
-    const { 
-        email, firstName, lastName, phone, address, 
-        city, country, gender, photoURL,
-        standardReferredBy, marketingReferredBy, campaignInfo 
-    } = data;
-
+// This function now only creates the basic user document.
+// All other details are added by the user post-registration.
+export const onUserCreate = functions.auth.user().onCreate(async (user) => {
     try {
-        let ipAddress = 'unknown';
-        if (context.rawRequest.ip) {
-            ipAddress = context.rawRequest.ip;
-        }
+        const userRef = admin.firestore().doc(`users/${user.uid}`);
         
-        const userRef = admin.firestore().doc(`users/${uid}`);
-        
-        const userData: any = {
-            uid,
-            email,
-            firstName,
-            lastName,
-            phone,
-            address,
-            city,
-            country,
-            gender,
-            photoURL,
+        await userRef.set({
+            uid: user.uid,
+            email: user.email,
+            emailVerified: user.emailVerified,
             balance: 0,
-            commissionBalance: 0,
-            marketingBalance: 0,
             role: 'user',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            // Initialize other fields to sane defaults
+            firstName: '',
+            lastName: '',
+            phone: '',
+            address: '',
+            city: '',
+            country: '',
+            gender: '',
+            photoURL: '',
+            commissionBalance: 0,
+            marketingBalance: 0,
             l1Count: 0,
-            ipAddress: ipAddress,
-            emailVerified: false, // User needs to verify their email
-        };
-
-        // Handle referral logic
-        if (marketingReferredBy) {
-          const marketerDoc = await admin.firestore().collection("users").doc(marketingReferredBy).get();
-          if (marketerDoc.exists && marketerDoc.data()?.role === 'marketer') {
-            const referralChain = (marketerDoc.data()?.referralChain || []).concat(marketingReferredBy);
-            userData.referralChain = referralChain;
-            userData.referredBy = marketingReferredBy;
-          }
-        } else if (standardReferredBy) {
-          userData.referredBy = standardReferredBy;
-        }
-
-        if (campaignInfo) {
-            userData.campaignInfo = {
-                ...campaignInfo,
-                completedTasks: [],
-                answers: {},
-            };
-        }
-
-        await userRef.set(userData);
+            wins: 0,
+            friends: [],
+        });
         
-        return { status: 'success', message: 'User created successfully in Firestore.' };
+        console.log(`User document created for UID: ${user.uid}`);
 
     } catch (error) {
-        console.error("Error creating user in Firestore:", error);
-        throw new functions.https.HttpsError('internal', 'Could not create user profile.');
+        console.error("Error creating user document in Firestore:", error);
     }
 });
 

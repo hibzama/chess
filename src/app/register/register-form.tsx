@@ -9,21 +9,16 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
 import { auth, db, functions } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { httpsCallable } from "firebase/functions";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
-import { boyAvatars, girlAvatars } from "@/components/icons/avatars";
-import { renderToString } from "react-dom/server";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
 
 export default function RegisterForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
-    const [gender, setGender] = useState("");
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -65,53 +60,11 @@ export default function RegisterForm() {
             return;
         }
 
-        if (!gender) {
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Please select your gender.",
-            });
-            setIsLoading(false);
-            return;
-        }
-
         try {
             // 1. Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
-            const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
-            const svgString = renderToString(React.createElement(randomAvatar));
-            const defaultAvatarUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
-
-            // 2. Prepare user data for Cloud Function
-            const userData: any = {
-                uid: user.uid,
-                email: user.email,
-                firstName,
-                lastName,
-                phone,
-                address,
-                city,
-                country,
-                gender,
-                photoURL: defaultAvatarUri,
-            };
-
-            if (ref) userData.standardReferredBy = ref;
-            if (mref) userData.marketingReferredBy = mref;
-            if (rcid && ref) {
-                userData.campaignInfo = {
-                    campaignId: rcid,
-                    referrerId: ref,
-                };
-            }
-
-            // 3. Call Cloud Function to create user document in Firestore
-            const createDbUser = httpsCallable(functions, 'createDbUser');
-            await createDbUser(userData);
-            
             // 4. Send verification email from the client
             await sendEmailVerification(user);
 
@@ -169,19 +122,7 @@ export default function RegisterForm() {
                             <Input id="last-name" placeholder="Robinson" required />
                         </div>
                     </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="gender">Gender</Label>
-                        <RadioGroup onValueChange={setGender} value={gender} className="flex gap-4">
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="male" id="male" />
-                                <Label htmlFor="male">Male</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="female" id="female" />
-                                <Label htmlFor="female">Female</Label>
-                            </div>
-                        </RadioGroup>
-                    </div>
+                   
                     <div className="grid gap-2">
                         <Label htmlFor="phone">Phone Number</Label>
                         <Input id="phone" type="tel" placeholder="+1 234 567 890" required />
@@ -235,3 +176,4 @@ export default function RegisterForm() {
         </Card>
     );
 }
+
