@@ -173,7 +173,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const roomDoc = await transaction.get(roomRef);
     
                 if (!roomDoc.exists() || !roomDoc.data()?.player2) throw "Room not found or not ready";
-                if (roomDoc.data().payoutTransactionId) throw "Payout already processed";
+                if (roomDoc.data().payoutTransactionId) return { myPayout: 0 }; // Payout already processed
     
                 const roomData = roomDoc.data() as GameRoom;
                 const wager = roomData.wager;
