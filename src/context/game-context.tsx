@@ -185,13 +185,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 if (resignerDetails) { // Resignation logic
                     const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
-                    const opponentPayoutRate = 1.30;
+                    const opponentPayoutRate = 1.05; // 105% payout
+                    const resignerRefundRate = 0.75; // 75% refund
     
-                    let resignerRefundRate = 0;
-                    if (resignerDetails.pieceCount >= 6) resignerRefundRate = 0.50;
-                    else if (resignerDetails.pieceCount >= 3) resignerRefundRate = 0.35;
-                    else resignerRefundRate = 0.25;
-
                     if (isCreatorResigner) {
                         creatorPayout = wager * resignerRefundRate;
                         joinerPayout = wager * opponentPayoutRate;
@@ -245,33 +241,27 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             });
             return payoutResult;
         } catch (error) {
+            console.error("Payout Transaction failed:", error);
+            // Fallback for when payout is already processed to avoid showing 0
             if (String(error).includes('Payout already processed')) {
-                 const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
-                 if (roomDoc.exists()) {
-                    const roomData = roomDoc.data() as GameRoom;
-                    const wager = roomData.wager || 0;
-                    const winnerData = roomData.winner;
-                    const resignerDetails = winnerData?.resignerId ? {id: winnerData.resignerId, pieceCount: winnerData.resignerPieceCount || 0} : null;
-
-                    if (resignerDetails) { // Resignation
-                        let refundRate = 0;
-                        if (resignerDetails.pieceCount >= 6) refundRate = 0.50;
-                        else if (resignerDetails.pieceCount >= 3) refundRate = 0.35;
-                        else refundRate = 0.25;
-
-                        return { myPayout: resignerDetails.id === user.uid ? wager * refundRate : wager * 1.30 };
-                    } else if (roomData.draw) { // Draw
-                        return { myPayout: wager * 0.9 };
-                    } else if (winnerData?.uid === user.uid) { // I won
-                        return { myPayout: wager * 1.8 };
-                    }
-                 }
-            } else {
-                 console.error("Payout Transaction failed:", error);
-            }
+                const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
+                if (roomDoc.exists()) {
+                   const roomData = roomDoc.data() as GameRoom;
+                   const wager = roomData.wager || 0;
+                   const winnerData = roomData.winner;
+                   const resignerId = winnerData?.resignerId;
+                   const amIWinner = winnerData?.uid === user.uid;
+                   const amIResigner = resignerId === user.uid;
+                   
+                   if(amIResigner) return { myPayout: wager * 0.75 };
+                   if(resignerId) return { myPayout: wager * 1.05 };
+                   if(roomData.draw) return { myPayout: wager * 0.9 };
+                   if(amIWinner) return { myPayout: wager * 1.8 };
+                }
+           }
             return { myPayout: 0 };
         }
-    }, [user, roomId, gameType]);
+    }, [user, roomId]);
 
     const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerDetails: {id: string, pieceCount: number} | null = null) => {
         if (gameOverHandledRef.current) return;
@@ -318,14 +308,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let myPayout = 0;
 
                  if (iAmResigner) {
-                    const pieceCount = roomData.winner?.resignerPieceCount || 0;
-                    let refundRate = 0;
-                    if (pieceCount >= 6) refundRate = 0.50;
-                    else if (pieceCount >= 3) refundRate = 0.35;
-                    else refundRate = 0.25;
-                    myPayout = wager * refundRate;
+                    myPayout = wager * 0.75;
                 } else if (roomData.winner?.resignerId) {
-                    myPayout = wager * 1.30;
+                    myPayout = wager * 1.05;
                 } else if (roomData.draw) {
                     myPayout = wager * 0.9;
                 } else if (winnerIsMe) {
