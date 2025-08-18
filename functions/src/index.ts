@@ -140,15 +140,23 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
         const result = await db.runTransaction(async (transaction) => {
             const campaignRef = db.doc(`daily_bonus_campaigns/${campaignId}`);
             const userRef = db.doc(`users/${userId}`);
-            const userClaimRef = db.doc(`users/${userId}/daily_bonus_claims/${campaignId}`);
             
-            const [campaignDoc, userDoc, claimDoc] = await transaction.getAll(campaignRef, userRef, userClaimRef);
+            // Check for existing claim in the root collection
+            const claimsQuery = db.collection('bonus_claims')
+                .where('userId', '==', userId)
+                .where('campaignId', '==', campaignId);
+
+            const [campaignDoc, userDoc, existingClaimsSnapshot] = await Promise.all([
+                transaction.get(campaignRef),
+                transaction.get(userRef),
+                transaction.get(claimsQuery)
+            ]);
 
             if (!campaignDoc.exists) {
                 throw new functions.https.HttpsError('not-found', 'Bonus campaign not found.');
             }
-            if (claimDoc.exists) {
-                throw new functions.https.HttpsError('already-exists', 'You have already claimed this bonus today.');
+            if (!existingClaimsSnapshot.empty) {
+                 throw new functions.https.HttpsError('already-exists', 'You have already claimed this bonus today.');
             }
              if (!userDoc.exists) {
                 throw new functions.https.HttpsError('not-found', 'User data not found.');
@@ -185,8 +193,8 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
             }
 
             // Create a claim document in the top-level collection
-            const bonusClaimRef = db.collection('bonus_claims').doc();
-            transaction.set(bonusClaimRef, {
+            const newClaimRef = db.collection('bonus_claims').doc();
+            transaction.set(newClaimRef, {
                 userId,
                 campaignId,
                 type: 'daily',
@@ -195,9 +203,6 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
                 campaignTitle: `Daily Bonus: ${campaign.title}`,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
-
-            // Set the user-specific claim doc to prevent re-claims
-            transaction.set(userClaimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp(), campaignId: campaignId });
             
             return { success: true, bonusAmount };
         });
