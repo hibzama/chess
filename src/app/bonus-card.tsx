@@ -1,10 +1,11 @@
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Gift, Loader2, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp, increment, addDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, serverTimestamp, increment, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
