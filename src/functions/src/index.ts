@@ -14,39 +14,6 @@ import axios from "axios";
 
 admin.initializeApp();
 
-export const onUserCreate = functions.auth.user().onCreate(async (user) => {
-    try {
-        const userRef = admin.firestore().doc(`users/${user.uid}`);
-        
-        await userRef.set({
-            uid: user.uid,
-            email: user.email || '',
-            emailVerified: true, // Auto-verify
-            balance: 0,
-            role: 'user',
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            firstName: '',
-            lastName: '',
-            phone: '',
-            address: '',
-            city: '',
-            country: '',
-            gender: '',
-            photoURL: '',
-            commissionBalance: 0,
-            marketingBalance: 0,
-            l1Count: 0,
-            wins: 0,
-            friends: [],
-        });
-        
-        console.log(`User document created for UID: ${user.uid}`);
-
-    } catch (error) {
-        console.error("Error creating user document in Firestore:", error);
-    }
-});
-
 
 // This function triggers whenever a new document is created in 'game_rooms'
 export const announceNewGame = functions.firestore
@@ -130,8 +97,9 @@ export const onBonusClaim = functions.firestore
             campaignCollectionName = 'signup_bonus_campaigns';
             break;
         case 'daily':
-            campaignCollectionName = 'daily_bonus_campaigns';
-            break;
+             // This is now handled by the onCall function, but we keep the case for safety.
+             // No increment needed here as the onCall function does it transactionally.
+             return null;
         case 'referrer':
         case 'referee':
              campaignCollectionName = 'referral_campaigns';
@@ -173,7 +141,8 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
         const result = await db.runTransaction(async (transaction) => {
             const campaignRef = db.doc(`daily_bonus_campaigns/${campaignId}`);
             const userRef = db.doc(`users/${userId}`);
-            const claimRef = db.doc(`daily_bonus_campaigns/${campaignId}/claims/${userId}`);
+            // The claim document is now specific to the user, not the campaign subcollection
+            const claimRef = db.doc(`users/${userId}/daily_bonus_claims/${campaignId}`);
             
             const [campaignDoc, userDoc, claimDoc] = await transaction.getAll(campaignRef, userRef, claimRef);
 
@@ -219,8 +188,9 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
             }
             
             // Perform writes
-            transaction.set(claimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp() });
+            transaction.set(claimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp(), campaignId: campaignId });
             transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(bonusAmount) });
+            transaction.update(campaignRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
             
             const transactionRef = db.collection('transactions').doc();
             transaction.set(transactionRef, {

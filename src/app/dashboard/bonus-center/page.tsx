@@ -53,14 +53,14 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
 const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
     const { user, userData } = useAuth();
     const { toast } = useToast();
-    const [claimed, setClaimed] = useState(false);
+    const [claimed, setClaimed] = useState(true); // Assume claimed initially
     const [isClaiming, setIsClaiming] = useState(false);
     const [status, setStatus] = useState<'pending' | 'active' | 'expired'>('pending');
     
     useEffect(() => {
         const checkClaimStatus = async () => {
             if (!user) return;
-            const claimRef = doc(db, `daily_bonus_campaigns/${campaign.id}/claims/${user.uid}`);
+            const claimRef = doc(db, `users/${user.uid}/daily_bonus_claims/${campaign.id}`);
             const claimSnap = await getDoc(claimRef);
             setClaimed(claimSnap.exists());
         };
@@ -86,11 +86,11 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
                 toast({ title: "Success!", description: `LKR ${result.data.bonusAmount.toFixed(2)} has been added to your wallet.`});
                 setClaimed(true);
             } else {
-                 throw new Error("Claim failed on the server.");
+                 throw new Error(result.data.message || "Claim failed on the server.");
             }
         } catch (error: any) {
             console.error("Error claiming daily bonus: ", error);
-            const errorMessage = error.details?.message || error.message || "An unknown error occurred.";
+            const errorMessage = error.code ? error.message : "An unknown error occurred.";
             toast({ variant: 'destructive', title: "Error", description: errorMessage });
         } finally {
             setIsClaiming(false);
@@ -298,5 +298,3 @@ export default function BonusCenterPage() {
         </div>
     )
 }
-
-    
