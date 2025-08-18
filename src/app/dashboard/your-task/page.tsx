@@ -50,10 +50,6 @@ export default function YourTaskPage() {
                 setTasks(pending);
                 setCompletedTasks(completed);
 
-                if(pending.length === 0 && campaignData.tasks.length > 0) { // Check if all tasks are done
-                    // This condition is handled by the redirect logic in the layout
-                }
-
             } else {
                 router.push('/dashboard');
             }
@@ -86,17 +82,17 @@ export default function YourTaskPage() {
                 },
             });
             
-            // 2. Create a submission document for admin review.
+            // 2. Create a pending bonus claim for admin review.
             if (task.refereeBonus > 0) {
-                const submissionRef = doc(collection(db, 'campaign_submissions'));
-                batch.set(submissionRef, {
+                 const claimRef = doc(collection(db, 'bonus_claims'));
+                 batch.set(claimRef, {
                     userId: user.uid,
+                    type: 'referee',
+                    amount: task.refereeBonus,
+                    status: 'pending',
                     campaignId: campaign.id,
-                    taskId: task.id,
-                    taskDescription: task.description,
+                    campaignTitle: `Task Completion: ${task.description}`,
                     answer: answer,
-                    bonusAmount: task.refereeBonus,
-                    status: 'pending', // Admins will review this
                     createdAt: serverTimestamp(),
                 });
             }
@@ -116,14 +112,6 @@ export default function YourTaskPage() {
                     }
                 };
             });
-            setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
-            setCompletedTasks(prevCompleted => [...prevCompleted, task]);
-            setAnswers(prevAns => {
-                const newAns = {...prevAns};
-                delete newAns[task.id];
-                return newAns;
-            });
-
 
         } catch (e) {
             console.error(e);

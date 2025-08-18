@@ -23,115 +23,30 @@ export const onUserCreate = functions.firestore
     const db = admin.firestore();
     const { userId } = context.params;
 
-    // --- 1. Handle Commission Referral Logic (mref and aref links) ---
-    const marketingReferrerId = newUser.marketingReferredBy;
-    const bonusReferrerId = newUser.bonusReferredBy; // Now using bonusReferredBy for the chain
-    const directReferrerId = marketingReferrerId || bonusReferrerId;
+    // --- 1. Handle Commission Referral Logic ---
+    const marketingReferrerId = newUser.marketingReferredBy; // mref
+    const standardReferrerId = newUser.standardReferredBy;   // ref (from campaign)
 
-    if (directReferrerId) {
-      const referrerRef = db.doc(`users/${directReferrerId}`);
-      try {
-        await db.runTransaction(async (transaction) => {
-          const referrerDoc = await transaction.get(referrerRef);
-          if (!referrerDoc.exists) {
-            functions.logger.warn(`Referrer with ID ${directReferrerId} not found.`);
-            return;
-          }
-
-          const referrerData = referrerDoc.data()!;
-          const updatesForNewUser: { [key: string]: any; } = {};
-
-          // Always set the direct referrer ID on the new user's document
-          updatesForNewUser.referredBy = directReferrerId;
-
-          // Case 1: The referrer is a marketer (mref link was used)
-          if (referrerData.role === 'marketer' && marketingReferrerId) {
-            updatesForNewUser.referralChain = [directReferrerId];
-            functions.logger.log(`User ${userId} joined marketer ${directReferrerId}'s chain as Level 1.`);
-          }
-          // Case 2: The referrer is a standard user (aref link was used)
-          else if (bonusReferrerId) {
-            // Check if the standard referrer is part of a marketer's chain and inherit it
-            if (referrerData.referralChain && referrerData.referralChain.length > 0) {
-              const newChain = [...referrerData.referralChain, directReferrerId];
-              // Enforce a maximum chain length of 20 to prevent infinite loops and abuse
-              if (newChain.length <= 20) {
-                  updatesForNewUser.referralChain = newChain;
-                  functions.logger.log(`User ${userId} inherited and extended chain from ${directReferrerId}. New chain: ${newChain.join(' -> ')}`);
-              } else {
-                  functions.logger.warn(`Referral chain for user ${userId} exceeds 20 levels. Not extending.`);
-              }
-            }
-          }
-          // Apply updates to the new user's document
-          if (Object.keys(updatesForNewUser).length > 0) {
-            transaction.update(newUserRef, updatesForNewUser);
-          }
-        });
-      } catch (error) {
-        functions.logger.error(`Error processing commission referral for new user ${userId} from referrer ${directReferrerId}:`, error);
-      }
+    if (marketingReferrerId) {
+        // Direct referral from a marketer
+        const updates: { [key: string]: any; } = {
+            referralChain: [marketingReferrerId],
+            referredBy: marketingReferrerId
+        };
+        await newUserRef.update(updates);
+        functions.logger.log(`User ${userId} joined marketer ${marketingReferrerId}'s chain as Level 1.`);
+    } else if (standardReferrerId) {
+        // Referral from a standard user, likely via a campaign link.
+        // We set referredBy, but the referralChain is only added
+        // when the new user becomes a "valid referral".
+        await newUserRef.update({ referredBy: standardReferrerId });
+        functions.logger.log(`User ${userId} was referred by standard user ${standardReferrerId}. Chain will be updated upon validation.`);
     }
     
     // --- 2. Handle Sign-up Bonus ---
-    try {
-        const campaignsQuery = await db.collection('signup_bonus_campaigns')
-                                        .where('isActive', '==', true)
-                                        .get();
-
-        if (!campaignsQuery.empty) {
-            const campaignDoc = campaignsQuery.docs[0];
-            const campaign = campaignDoc.data();
-            
-            const claimsRef = db.collection(`signup_bonus_campaigns/${campaignDoc.id}/claims`);
-            const claimsSnapshot = await claimsRef.count().get();
-            const claimsCount = claimsSnapshot.data().count;
-
-            if (claimsCount < campaign.userLimit) {
-                const batch = db.batch();
-                
-                batch.update(newUserRef, {
-                    balance: admin.firestore.FieldValue.increment(campaign.bonusAmount),
-                });
-                
-                // Creates a claim in the root bonus_claims collection
-                const userClaimRef = db.collection('bonus_claims').doc();
-                batch.set(userClaimRef, {
-                    userId: userId,
-                    campaignId: campaignDoc.id,
-                    title: campaign.title,
-                    amount: campaign.bonusAmount,
-                    type: 'signup',
-                    status: 'approved', // Sign-up bonuses are auto-approved
-                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                const campaignClaimRef = db.doc(`signup_bonus_campaigns/${campaignDoc.id}/claims/${userId}`);
-                batch.set(campaignClaimRef, {
-                    userId: userId,
-                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                const transactionRef = db.collection('transactions').doc();
-                 batch.set(transactionRef, {
-                    userId: userId,
-                    type: 'bonus',
-                    amount: campaign.bonusAmount,
-                    status: 'completed',
-                    description: `Sign-up Bonus: ${campaign.title}`,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-                
-                await batch.commit();
-                functions.logger.log(`Awarded sign-up bonus of ${campaign.bonusAmount} to user ${userId} from campaign "${campaign.title}".`);
-            } else {
-                 functions.logger.log(`Sign-up bonus campaign "${campaign.title}" has reached its user limit.`);
-            }
-        }
-    } catch(error) {
-        functions.logger.error(`Error processing sign-up bonus for user ${userId}`, error);
-    }
-
+    // This logic is now handled by the frontend creating a pending `bonus_claims` document.
+    // The backend logic is removed from here to prevent conflicts and permission errors.
+    
     return null;
   });
 
