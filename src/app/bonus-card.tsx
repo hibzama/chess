@@ -36,35 +36,38 @@ export function BonusCard() {
 
     setLoading(true);
     const fetchBonusConfig = async () => {
-        const campaignsRef = collection(db, 'signup_bonus_campaigns');
-        const q = query(campaignsRef, where("isActive", "==", true));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-            for (const docRef of querySnapshot.docs) {
-                const campaignData = { id: docRef.id, ...docRef.data() } as BonusCampaign;
-                
-                // Check in the new central bonus_claims collection
-                const userClaimQuery = query(collection(db, `bonus_claims`), where('userId', '==', user.uid), where('campaignId', '==', campaignData.id));
-                const userClaimSnapshot = await getDocs(userClaimQuery);
-                
-                if(!userClaimSnapshot.empty) {
-                    setHasClaimed(true);
-                    setActiveCampaign(null); 
-                    setLoading(false);
-                    return; 
-                }
-                
-                const claimsCountQuery = query(collection(db, 'bonus_claims'), where('campaignId', '==', campaignData.id));
-                const claimsCountSnapshot = await getDocs(claimsCountQuery);
+        try {
+            const campaignsRef = collection(db, 'signup_bonus_campaigns');
+            const q = query(campaignsRef, where("isActive", "==", true));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                for (const docRef of querySnapshot.docs) {
+                    const campaignData = { id: docRef.id, ...docRef.data() } as BonusCampaign;
+                    
+                    const userClaimQuery = query(collection(db, `bonus_claims`), where('userId', '==', user.uid), where('campaignId', '==', campaignData.id));
+                    const userClaimSnapshot = await getDocs(userClaimQuery);
+                    
+                    if(!userClaimSnapshot.empty) {
+                        setHasClaimed(true);
+                        setActiveCampaign(null); 
+                        setLoading(false);
+                        return; 
+                    }
+                    
+                    const claimsCountQuery = query(collection(db, 'bonus_claims'), where('campaignId', '==', campaignData.id));
+                    const claimsCountSnapshot = await getDocs(claimsCountQuery);
 
-                if (claimsCountSnapshot.size < campaignData.userLimit) {
-                    setActiveCampaign({...campaignData, claimsCount: claimsCountSnapshot.size});
-                    setHasClaimed(false);
-                    setLoading(false);
-                    return;
+                    if (claimsCountSnapshot.size < campaignData.userLimit) {
+                        setActiveCampaign({...campaignData, claimsCount: claimsCountSnapshot.size});
+                        setHasClaimed(false);
+                        setLoading(false);
+                        return;
+                    }
                 }
             }
+        } catch (error) {
+            console.error("Error fetching bonus config:", error);
         }
         setHasClaimed(true); 
         setActiveCampaign(null);
@@ -100,8 +103,8 @@ export function BonusCard() {
     }
   }
 
-  // Do not show the card if there is no active campaign, if the user has already claimed it, or if they have a balance.
-  if (loading || hasClaimed === null || hasClaimed || !activeCampaign || (userData && userData.balance > 0)) {
+  // Do not show the card if there is no active campaign, or if the user has already claimed it.
+  if (loading || hasClaimed === null || hasClaimed || !activeCampaign) {
     return null;
   }
 
@@ -124,5 +127,3 @@ export function BonusCard() {
     </Card>
   );
 }
-
-    
