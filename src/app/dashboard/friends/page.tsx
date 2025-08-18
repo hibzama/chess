@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, onSnapshot, doc, writeBatch, arrayUnion, arrayRemove, serverTimestamp, addDoc, getDoc, limit, orderBy, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, doc, writeBatch, arrayUnion, arrayRemove, serverTimestamp, addDoc, getDoc, limit, orderBy, deleteDoc, startAt, endAt } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -111,10 +111,11 @@ export default function FriendsPage() {
     const [friends, setFriends] = useState<UserProfile[]>([]);
     const [requests, setRequests] = useState<FriendRequest[]>([]);
     const [sentRequests, setSentRequests] = useState<FriendRequest[]>([]);
+    const [suggestedFriends, setSuggestedFriends] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
-    const [searchEmail, setSearchEmail] = useState('');
-    const [searchResult, setSearchResult] = useState<UserProfile | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
     const [isSearching, setIsSearching] = useState(false);
 
     const sortUsers = (users: UserProfile[]) => {
@@ -183,6 +184,18 @@ export default function FriendsPage() {
                 setSentRequests(sentReqsData);
             });
             unsubscribes.push(unsubscribeSentReqs);
+            
+             // Fetch suggestions
+            const randomId = doc(collection(db, 'users')).id;
+            const suggestionsQuery = query(collection(db, 'users'), where('__name__', '>=', randomId), limit(10));
+            const suggestionsSnapshot = await getDocs(suggestionsQuery);
+            const allFriendIds = new Set([...(userData.friends || []), ...sentRequests.map(r => r.toId), user.uid]);
+            const suggestions = suggestionsSnapshot.docs
+                .map(d => ({...d.data(), uid: d.id} as UserProfile))
+                .filter(u => !allFriendIds.has(u.uid))
+                .slice(0, 5);
+            setSuggestedFriends(suggestions);
+
 
             setLoading(false);
         };
@@ -330,22 +343,24 @@ export default function FriendsPage() {
     
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
-        if(!searchEmail.trim()) return;
+        if(!searchTerm.trim()) return;
         setIsSearching(true);
-        setSearchResult(null);
+        setSearchResults([]);
         try {
-            const q = query(collection(db, 'users'), where('email', '==', searchEmail.trim()));
+            const q = query(
+                collection(db, 'users'), 
+                orderBy('firstName'), 
+                startAt(searchTerm.trim()), 
+                endAt(searchTerm.trim() + '\uf8ff')
+            );
             const querySnapshot = await getDocs(q);
             if(querySnapshot.empty) {
-                toast({ variant: 'destructive', title: 'Not Found', description: 'No user found with that email.' });
+                toast({ variant: 'destructive', title: 'Not Found', description: 'No user found with that name.' });
             } else {
-                const foundUserDoc = querySnapshot.docs[0];
-                const foundUser = {...foundUserDoc.data(), uid: foundUserDoc.id } as UserProfile;
-                 if(foundUser.uid === user?.uid) {
-                     toast({ variant: 'destructive', title: 'Error', description: "You can't add yourself as a friend."});
-                     return;
-                 }
-                setSearchResult(foundUser);
+                const foundUsers = querySnapshot.docs
+                    .map(d => ({...d.data(), uid: d.id } as UserProfile))
+                    .filter(u => u.uid !== user?.uid);
+                setSearchResults(foundUsers);
             }
         } catch(e) {
             console.error(e);
@@ -420,19 +435,29 @@ export default function FriendsPage() {
                      <Card>
                         <CardHeader>
                             <CardTitle>Find New Friends</CardTitle>
-                            <CardDescription>Search for players by email to send them a friend request.</CardDescription>
+                            <CardDescription>Search for players by their first name to send them a friend request.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <form onSubmit={handleSearch} className="flex gap-2">
-                                <Input type="email" placeholder="Enter user's email" value={searchEmail} onChange={(e) => setSearchEmail(e.target.value)} />
+                                <Input placeholder="Enter player's name..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                 <Button type="submit" disabled={isSearching}>{isSearching ? <Loader2 className="animate-spin" /> : <Search />}</Button>
                             </form>
-                            {searchResult && (
+                            {searchResults.length > 0 && (
                                 <div>
-                                    <h3 className="font-semibold mb-2">Search Result</h3>
-                                    <UserCard person={searchResult} onAction={handleAddFriend} actionType="add" loading={actionLoading === searchResult.uid} onUserClick={handleUserClick}/>
+                                    <h3 className="font-semibold mb-2">Search Results</h3>
+                                     <div className="space-y-4">
+                                        {searchResults.map(res => (
+                                             <UserCard key={res.uid} person={res} onAction={handleAddFriend} actionType="add" loading={actionLoading === res.uid} onUserClick={handleUserClick}/>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
+                             <div className="space-y-4">
+                                <h3 className="font-semibold">Friend Suggestions</h3>
+                                {loading ? <p>Loading suggestions...</p> : suggestedFriends.length > 0 ? suggestedFriends.map(friend => (
+                                    <UserCard key={friend.uid} person={friend} onAction={handleAddFriend} actionType="add" loading={actionLoading === friend.uid} onUserClick={handleUserClick}/>
+                                )) : <p className="text-muted-foreground text-center p-4">No suggestions right now.</p>}
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>
