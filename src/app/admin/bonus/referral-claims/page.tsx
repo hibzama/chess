@@ -90,7 +90,7 @@ export default function ReferralClaimsPage() {
                         type: 'bonus',
                         amount: claim.amount,
                         status: 'completed',
-                        description: `Referral Bonus: ${claim.campaignTitle}`,
+                        description: `Bonus: ${claim.campaignTitle}`,
                         createdAt: serverTimestamp(),
                     });
                 });
