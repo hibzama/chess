@@ -22,23 +22,10 @@ export const onUserCreate = functions.firestore
     const db = admin.firestore();
     const { userId } = context.params;
 
-    // --- 1. Handle Bonus Referral Count (aref link) ---
-    if (newUser.bonusReferredBy) {
-      const bonusReferrerRef = db.doc(`users/${newUser.bonusReferredBy}`);
-      try {
-        await bonusReferrerRef.update({
-          bonusReferralCount: admin.firestore.FieldValue.increment(1),
-        });
-        functions.logger.log(`Incremented bonusReferralCount for ${newUser.bonusReferredBy}`);
-      } catch (error) {
-        functions.logger.error(`Failed to increment bonusReferralCount for ${newUser.bonusReferredBy}`, error);
-      }
-    }
-
-    // --- 2. Handle Commission Referral Logic (mref and ref links) ---
+    // --- 1. Handle Commission Referral Logic (mref and aref links) ---
     const marketingReferrerId = newUser.marketingReferredBy;
-    const standardReferrerId = newUser.standardReferredBy;
-    const directReferrerId = marketingReferrerId || standardReferrerId;
+    const bonusReferrerId = newUser.bonusReferredBy; // Now using bonusReferredBy for the chain
+    const directReferrerId = marketingReferrerId || bonusReferrerId;
 
     if (directReferrerId) {
       const referrerRef = db.doc(`users/${directReferrerId}`);
@@ -59,23 +46,17 @@ export const onUserCreate = functions.firestore
           // Case 1: The referrer is a marketer (mref link was used)
           if (referrerData.role === 'marketer' && marketingReferrerId) {
             updatesForNewUser.referralChain = [directReferrerId];
-            functions.logger.log(`User ${userId} joined marketer ${directReferrerId}'s chain.`);
+            functions.logger.log(`User ${userId} joined marketer ${directReferrerId}'s chain as Level 1.`);
           }
-          // Case 2: The referrer is a standard user (ref link was used)
-          else if (referrerData.role === 'user' && standardReferrerId) {
-            // Increment the standard user's L1 count
-            transaction.update(referrerRef, {
-              l1Count: admin.firestore.FieldValue.increment(1)
-            });
-            functions.logger.log(`Incremented l1Count for standard referrer ${directReferrerId}.`);
-
+          // Case 2: The referrer is a standard user (aref link was used)
+          else if (bonusReferrerId) {
             // Check if the standard referrer is part of a marketer's chain and inherit it
             if (referrerData.referralChain && referrerData.referralChain.length > 0) {
               const newChain = [...referrerData.referralChain, directReferrerId];
               // Enforce a maximum chain length of 20 to prevent infinite loops and abuse
               if (newChain.length <= 20) {
                   updatesForNewUser.referralChain = newChain;
-                  functions.logger.log(`User ${userId} inherited and extended chain from ${directReferrerId}.`);
+                  functions.logger.log(`User ${userId} inherited and extended chain from ${directReferrerId}. New chain: ${newChain.join(' -> ')}`);
               } else {
                   functions.logger.warn(`Referral chain for user ${userId} exceeds 20 levels. Not extending.`);
               }
@@ -91,7 +72,7 @@ export const onUserCreate = functions.firestore
       }
     }
     
-    // --- 3. Handle Sign-up Bonus ---
+    // --- 2. Handle Sign-up Bonus ---
     try {
         const campaignsQuery = await db.collection('signup_bonus_campaigns')
                                         .where('isActive', '==', true)
