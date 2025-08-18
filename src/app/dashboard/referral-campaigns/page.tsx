@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Megaphone, Copy, Share, Users, Check, Loader2, Award, Phone, Info, History, DollarSign, Layers, ShieldCheck, CheckCircle, Languages } from 'lucide-react';
+import { Megaphone, Copy, Share, Users, Check, Loader2, Award, Phone, Info, History, DollarSign, Layers, ShieldCheck, CheckCircle, Languages, Target, ClipboardCheck, Gift } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
@@ -21,6 +21,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 interface UserCampaign {
     campaignId: string;
@@ -380,31 +381,42 @@ export default function UserCampaignsPage() {
                     </TabsList>
                     <TabsContent value="campaigns">
                         <Card>
-                            <CardHeader><CardTitle>Start a Referral Campaign</CardTitle><CardDescription>Choose a campaign to start earning rewards.</CardDescription></CardHeader>
-                            <CardContent className="space-y-4">
+                            <CardHeader>
+                                <CardTitle>Start a Referral Campaign</CardTitle>
+                                <CardDescription>Choose a campaign to start earning rewards.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {availableCampaigns.length > 0 ? availableCampaigns.map(c => (
-                                    <Card key={c.id} className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                        <div>
-                                            <p className="font-bold">{c.title}</p>
-                                            <p className="text-sm text-muted-foreground">Goal: {c.referralGoal} referrals | Reward: LKR {c.referrerBonus}</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <Dialog>
-                                                <DialogTrigger asChild><Button variant="secondary">Details</Button></DialogTrigger>
-                                                <DialogContent>
-                                                    <DialogHeader>
-                                                        <DialogTitle>Tasks for "{c.title}"</DialogTitle>
-                                                        <DialogDescription>A new user must complete all these tasks for you to get referral credit.</DialogDescription>
-                                                    </DialogHeader>
-                                                    <ul className="list-disc space-y-2 pl-5 mt-4 text-sm">
-                                                        {c.tasks.map(task => <li key={task.id}>{task.description} (Reward: LKR {task.refereeBonus})</li>)}
-                                                    </ul>
-                                                </DialogContent>
-                                            </Dialog>
-                                            <Button onClick={() => handleStartCampaign(c.id)}>Start</Button>
-                                        </div>
+                                    <Card key={c.id} className="bg-card/50 flex flex-col">
+                                        <CardHeader>
+                                            <CardTitle>{c.title}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex-grow space-y-4">
+                                            <div className="flex justify-around text-center">
+                                                <div>
+                                                    <p className="text-sm text-muted-foreground">Goal</p>
+                                                    <p className="text-2xl font-bold flex items-center gap-2"><Target/> {c.referralGoal}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm text-muted-foreground">Reward</p>
+                                                    <p className="text-2xl font-bold text-primary">LKR {c.referrerBonus}</p>
+                                                </div>
+                                            </div>
+                                            <Separator />
+                                            <div>
+                                                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><ClipboardCheck/> Referee Tasks</h4>
+                                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                                    {c.tasks.map((task, i) => (
+                                                        <li key={i}>{task.description} (+ LKR {task.refereeBonus})</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </CardContent>
+                                        <CardFooter>
+                                            <Button className="w-full" onClick={() => handleStartCampaign(c.id)}>Start Campaign</Button>
+                                        </CardFooter>
                                     </Card>
-                                )) : <p className="text-muted-foreground text-center">No new campaigns available right now.</p>}
+                                )) : <p className="text-muted-foreground text-center col-span-full">No new campaigns available right now.</p>}
                             </CardContent>
                         </Card>
                     </TabsContent>
