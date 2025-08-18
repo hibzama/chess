@@ -145,10 +145,9 @@ function RegisterForm() {
             
             toast({
                 title: "Account Created!",
-                description: "A verification email has been sent. Please verify your email before logging in.",
+                description: "Welcome to Nexbattle! You can now explore your dashboard.",
             });
-            await auth.signOut();
-            router.push('/login');
+            router.push('/dashboard');
 
         } catch (error: any) {
             console.error("Error signing up:", error);
@@ -276,3 +275,5 @@ export default function RegisterPage() {
         </div>
     )
 }
+
+    

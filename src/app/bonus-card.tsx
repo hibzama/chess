@@ -100,7 +100,8 @@ export function BonusCard() {
     }
   }
 
-  if (loading || hasClaimed === null || hasClaimed || !activeCampaign) {
+  // Do not show the card if there is no active campaign, if the user has already claimed it, or if they have a balance.
+  if (loading || hasClaimed === null || hasClaimed || !activeCampaign || (userData && userData.balance > 0)) {
     return null;
   }
 
@@ -123,3 +124,5 @@ export function BonusCard() {
     </Card>
   );
 }
+
+    
