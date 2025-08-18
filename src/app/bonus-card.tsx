@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Gift, Loader2, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp, increment, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp, increment, addDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -25,10 +25,12 @@ export function BonusCard() {
   const [activeCampaign, setActiveCampaign] = useState<BonusCampaign | null>(null);
   const [hasClaimed, setHasClaimed] = useState<boolean | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
-        setHasClaimed(true); // Don't show if not logged in
+        setHasClaimed(true);
+        setLoading(false);
         return;
     }
 
@@ -37,11 +39,12 @@ export function BonusCard() {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     if (creationTime < twentyFourHoursAgo) {
-        setHasClaimed(true); // User is not new, so they can't claim
+        setHasClaimed(true);
+        setLoading(false);
         return;
     }
 
-
+    setLoading(true);
     const fetchBonusConfig = async () => {
         const campaignsRef = collection(db, 'signup_bonus_campaigns');
         const q = query(campaignsRef, where("isActive", "==", true));
@@ -51,25 +54,25 @@ export function BonusCard() {
             for (const docRef of querySnapshot.docs) {
                 const campaignData = { id: docRef.id, ...docRef.data() } as BonusCampaign;
                 
-                // Check if user has already claimed this specific campaign
                 const userClaimDoc = await getDoc(doc(db, `signup_bonus_campaigns/${docRef.id}/claims`, user.uid));
                 if(userClaimDoc.exists()) {
                     setHasClaimed(true);
-                    setActiveCampaign(null); // Ensure we don't show any campaign if one has been claimed.
-                    return; // User has claimed this campaign, stop checking
+                    setActiveCampaign(null); 
+                    setLoading(false);
+                    return; 
                 }
 
-                // Check against the aggregated claimsCount on the document
                 if ((campaignData.claimsCount || 0) < campaignData.userLimit) {
                     setActiveCampaign(campaignData);
                     setHasClaimed(false);
-                    return; // Found an active, available campaign
+                    setLoading(false);
+                    return;
                 }
             }
         }
-        // If loop finishes, no active and available campaign was found
         setHasClaimed(true); 
         setActiveCampaign(null);
+        setLoading(false);
     };
     fetchBonusConfig();
   }, [user]);
@@ -79,8 +82,8 @@ export function BonusCard() {
     setIsClaiming(true);
 
     try {
-        const claimRef = doc(collection(db, `signup_bonus_campaigns/${activeCampaign.id}/claims`), user.uid);
-        await addDoc(collection(db, `signup_bonus_campaigns/${activeCampaign.id}/claims`), {
+        const claimRef = doc(db, `signup_bonus_campaigns/${activeCampaign.id}/claims`, user.uid);
+        await setDoc(claimRef, {
             userId: user.uid,
             claimedAt: serverTimestamp()
         });
@@ -96,7 +99,7 @@ export function BonusCard() {
     }
   }
 
-  if (hasClaimed === null || hasClaimed || !activeCampaign) {
+  if (loading || hasClaimed === null || hasClaimed || !activeCampaign) {
     return null;
   }
 
@@ -119,5 +122,3 @@ export function BonusCard() {
     </Card>
   );
 }
-
-    
