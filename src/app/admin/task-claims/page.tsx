@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { collection, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, orderBy, limit, deleteDoc, where, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
@@ -19,12 +19,9 @@ interface BonusClaim {
     userName?: string;
     amount: number;
     campaignTitle: string;
-    type: 'referee' | 'referrer' | 'signup' | 'daily' | 'task';
+    type: 'task';
     status: 'pending' | 'approved' | 'rejected';
     createdAt: any;
-    refereeId?: string; 
-    referrerId?: string;
-    campaignId?: string;
     answer?: string;
 }
 
@@ -42,7 +39,7 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
     return Promise.all(claimsDataPromises);
 }
 
-export default function BonusClaimsPage() {
+export default function TaskClaimsPage() {
     const [allClaims, setAllClaims] = useState<BonusClaim[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
@@ -50,12 +47,7 @@ export default function BonusClaimsPage() {
     useEffect(() => {
         setLoading(true);
         
-        const q = query(
-            collection(db, 'bonus_claims'), 
-            where('type', 'in', ['signup', 'referrer', 'referee']),
-            orderBy('createdAt', 'desc'),
-            limit(200)
-        );
+        const q = query(collection(db, 'bonus_claims'), where('type', '==', 'task'), orderBy('createdAt', 'desc'), limit(200));
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
@@ -63,7 +55,7 @@ export default function BonusClaimsPage() {
             setLoading(false);
         }, (error) => {
             console.error("Error fetching claims:", error);
-            toast({ variant: 'destructive', title: "Error", description: "Failed to fetch claims history."});
+            toast({ variant: 'destructive', title: "Error", description: "Failed to fetch task claims."});
             setLoading(false);
         });
 
@@ -78,21 +70,8 @@ export default function BonusClaimsPage() {
         
         try {
             if (newStatus === 'approved') {
-                 await runTransaction(db, async (transaction) => {
-                    const userRef = doc(db, 'users', claim.userId);
-                    const transactionRef = doc(collection(db, 'transactions'));
-                    
-                    transaction.update(claimRef, { status: 'approved' });
-                    transaction.update(userRef, { balance: increment(claim.amount) });
-                    transaction.set(transactionRef, {
-                        userId: claim.userId,
-                        type: 'bonus',
-                        amount: claim.amount,
-                        status: 'completed',
-                        description: `${claim.campaignTitle}`,
-                        createdAt: serverTimestamp(),
-                    });
-                });
+                const approveClaimFunction = httpsCallable(functions, 'approveBonusClaim');
+                await approveClaimFunction({ claimId: claim.id });
                 toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
             } else { // Rejected
                 await updateDoc(claimRef, { status: 'rejected' });
@@ -120,9 +99,9 @@ export default function BonusClaimsPage() {
                 <TableHeader>
                     <TableRow>
                         <TableHead>User</TableHead>
+                        <TableHead>Task</TableHead>
+                        <TableHead>Answer</TableHead>
                         <TableHead>Amount</TableHead>
-                        <TableHead>Campaign/Task</TableHead>
-                        <TableHead>Type</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">{type === 'pending' ? 'Actions' : 'Status'}</TableHead>
                     </TableRow>
@@ -131,14 +110,9 @@ export default function BonusClaimsPage() {
                     {claims.map((claim) => (
                         <TableRow key={claim.id}>
                             <TableCell><Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary">{claim.userName}</Link></TableCell>
+                            <TableCell>{claim.campaignTitle}</TableCell>
+                            <TableCell><p className="text-xs max-w-xs truncate">{claim.answer}</p></TableCell>
                             <TableCell>LKR {claim.amount.toFixed(2)}</TableCell>
-                            <TableCell>
-                                {claim.campaignTitle}
-                                {claim.type === 'referee' && claim.answer && (
-                                    <Accordion type="single" collapsible className="w-full max-w-xs"><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="py-1 text-xs">View Submitted Answer</AccordionTrigger><AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md">{claim.answer}</AccordionContent></AccordionItem></Accordion>
-                                )}
-                            </TableCell>
-                            <TableCell><Badge variant="secondary" className="capitalize">{claim.type}</Badge></TableCell>
                             <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                             <TableCell className="text-right">
                                 {type === 'pending' ? (
@@ -163,8 +137,8 @@ export default function BonusClaimsPage() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Bonus Claims</CardTitle>
-                <CardDescription>Review and manage all types of bonus claims (Signup, Referral).</CardDescription>
+                <CardTitle>Task Claims</CardTitle>
+                <CardDescription>Review and manage all user submissions for tasks.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">

@@ -1,9 +1,8 @@
-
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle, CalendarClock, Award, CheckSquare } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle, CalendarClock, Award, CheckSquare, ClipboardCheck } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -130,9 +129,6 @@ export default function AdminLayout({
                              <Link href="/admin/bonus/deposit-bonus"><SidebarMenuButton tooltip="Deposit Bonus" isActive={isActive('/admin/bonus/deposit-bonus')}><PercentCircle /><span>Deposit Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
-                             <Link href="/admin/bonus/daily-bonus"><SidebarMenuButton tooltip="Daily Bonus" isActive={isActive('/admin/bonus/daily-bonus')}><CalendarClock /><span>Daily Bonus</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                         <SidebarMenuItem>
                              <Link href="/admin/bonus/referral-bonus"><SidebarMenuButton tooltip="Referral Bonus" isActive={isActive('/admin/bonus/referral-bonus')}><Users /><span>Referral Bonus</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
@@ -140,6 +136,12 @@ export default function AdminLayout({
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                              <Link href="/admin/bonus/referral-claims"><SidebarMenuButton tooltip="Bonus Claims" isActive={isActive('/admin/bonus/referral-claims')}><CheckSquare /><span>Bonus Claims</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                             <Link href="/admin/tasks"><SidebarMenuButton tooltip="Tasks" isActive={isActive('/admin/tasks')}><ClipboardCheck /><span>Task Setup</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                             <Link href="/admin/task-claims"><SidebarMenuButton tooltip="Task Claims" isActive={isActive('/admin/task-claims')}><CheckSquare /><span>Task Claims</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/mailer"><SidebarMenuButton tooltip="Mailer" isActive={pathname === '/admin/mailer'}><Mail /><span>Mailer</span></SidebarMenuButton></Link>

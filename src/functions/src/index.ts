@@ -1,4 +1,3 @@
-
 /**
  * Import function triggers from their respective submodules:
  *
@@ -96,8 +95,9 @@ export const onBonusClaim = functions.firestore
         case 'signup':
             campaignCollectionName = 'signup_bonus_campaigns';
             break;
-        case 'daily':
-             return null;
+        case 'task':
+            campaignCollectionName = 'tasks';
+            break;
         case 'referrer':
         case 'referee':
              campaignCollectionName = 'referral_campaigns';
@@ -122,94 +122,54 @@ export const onBonusClaim = functions.firestore
   });
 
 
-export const claimDailyBonus = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+export const approveBonusClaim = functions.https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.admin) {
+        throw new functions.https.HttpsError('permission-denied', 'Must be an administrative user to approve claims.');
     }
 
-    const { campaignId } = data;
-    const userId = context.auth.uid;
+    const { claimId } = data;
     const db = admin.firestore();
 
-    if (!campaignId) {
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a "campaignId".');
+    if (!claimId) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a "claimId".');
     }
 
+    const claimRef = db.doc(`bonus_claims/${claimId}`);
+
     try {
-        const result = await db.runTransaction(async (transaction) => {
-            const campaignRef = db.doc(`daily_bonus_campaigns/${campaignId}`);
-            const userRef = db.doc(`users/${userId}`);
-            const claimRef = db.doc(`users/${userId}/daily_bonus_claims/${campaignId}`);
-            
-            const [campaignDoc, userDoc, claimDoc] = await transaction.getAll(campaignRef, userRef, claimRef);
+        await db.runTransaction(async (transaction) => {
+            const claimDoc = await transaction.get(claimRef);
+            if (!claimDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Claim document not found.');
+            }
+            const claimData = claimDoc.data()!;
 
-            if (!campaignDoc.exists) {
-                throw new functions.https.HttpsError('not-found', 'Bonus campaign not found.');
-            }
-            if (claimDoc.exists) {
-                throw new functions.https.HttpsError('already-exists', 'You have already claimed this bonus today.');
-            }
-             if (!userDoc.exists) {
-                throw new functions.https.HttpsError('not-found', 'User data not found.');
+            if (claimData.status === 'approved') {
+                 throw new functions.https.HttpsError('failed-precondition', 'This claim has already been approved.');
             }
 
-            const campaign = campaignDoc.data()!;
-            const user = userDoc.data()!;
-            const now = new Date();
-            
-            if (!campaign.isActive || campaign.endDate.toDate() < now) {
-                throw new functions.https.HttpsError('failed-precondition', 'This bonus is no longer active.');
-            }
-            if ((campaign.claimsCount || 0) >= campaign.userLimit) {
-                throw new functions.https.HttpsError('failed-precondition', 'This bonus has reached its claim limit.');
-            }
-            
-            const currentBalance = user.balance || 0;
-            if (campaign.eligibility === 'below' && currentBalance > campaign.balanceThreshold) {
-                throw new functions.https.HttpsError('failed-precondition', `Your balance must be below LKR ${campaign.balanceThreshold} to claim.`);
-            }
-            if (campaign.eligibility === 'above' && currentBalance < campaign.balanceThreshold) {
-                throw new functions.https.HttpsError('failed-precondition', `Your balance must be above LKR ${campaign.balanceThreshold} to claim.`);
-            }
-            
-            let bonusAmount = 0;
-            if (campaign.bonusType === 'fixed') {
-                bonusAmount = campaign.bonusValue;
-            } else if (campaign.bonusType === 'percentage') {
-                bonusAmount = currentBalance * (campaign.bonusValue / 100);
-            }
-
-            if (bonusAmount <= 0) {
-                 throw new functions.https.HttpsError('failed-precondition', 'Bonus amount must be greater than zero.');
-            }
-            
-            const newBalance = currentBalance + bonusAmount;
-
-            // Perform writes
-            transaction.set(claimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp(), campaignId: campaignId });
-            transaction.update(userRef, { balance: newBalance });
-            transaction.update(campaignRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
+            const userRef = db.doc(`users/${claimData.userId}`);
+            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(claimData.amount) });
             
             const transactionRef = db.collection('transactions').doc();
             transaction.set(transactionRef, {
-                userId,
+                userId: claimData.userId,
                 type: 'bonus',
-                amount: bonusAmount,
+                amount: claimData.amount,
                 status: 'completed',
-                description: `Daily Bonus: ${campaign.title}`,
+                description: `${claimData.campaignTitle}`,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            return { success: true, bonusAmount };
+            transaction.update(claimRef, { status: 'approved' });
         });
-
-        return result;
-
+        
+        return { success: true };
     } catch (error: any) {
-        functions.logger.error("Error claiming daily bonus:", error);
+        functions.logger.error("Error approving claim:", error);
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        throw new functions.https.HttpsError('internal', 'An unexpected error occurred. Please try again.');
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while approving the claim.');
     }
 });

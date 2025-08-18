@@ -161,7 +161,7 @@ export default function MainLayout({
         { href: '/dashboard/profile', icon: User, label: 'My Profile' },
         { href: '/dashboard/my-rooms', icon: List, label: 'My Rooms' },
         { href: '/dashboard/wallet', icon: Wallet, label: 'Wallet' },
-        { href: '/dashboard/bonus-center', icon: Gift, label: 'Bonus Center' },
+        { href: '/dashboard/tasks', icon: ClipboardCheck, label: 'Task & Earn' },
         { href: '/dashboard/your-task', icon: ClipboardCheck, label: 'Your Tasks', condition: !!userData?.campaignInfo },
         { href: '/dashboard/friends', icon: Users, label: 'Friends & Community' },
         { href: '/dashboard/rankings', icon: Trophy, label: 'Rankings' },

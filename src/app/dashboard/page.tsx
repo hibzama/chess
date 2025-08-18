@@ -1,4 +1,3 @@
-
 'use client'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,8 +11,6 @@ import { collection, query, where, getDocs, onSnapshot, limit, doc, Timestamp, g
 import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { DailyBonusCampaign } from '@/app/admin/bonus/daily-bonus/page';
-import { Campaign, CampaignTask } from '@/app/admin/referral-campaigns/page';
 import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
 
 interface SignupBonusCampaign {
@@ -59,7 +56,7 @@ const SignupBonusAlert = ({ campaign, onClaimed }: { campaign: SignupBonusCampai
 };
 
 
-const BonusHub = ({ depositBonus, dailyBonus, referralTask }: { depositBonus: DepositBonusCampaign | null, dailyBonus: DailyBonusCampaign | null, referralTask: boolean }) => {
+const BonusHub = ({ depositBonus, hasActiveTask }: { depositBonus: DepositBonusCampaign | null, hasActiveTask: boolean }) => {
     
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -83,19 +80,13 @@ const BonusHub = ({ depositBonus, dailyBonus, referralTask }: { depositBonus: De
                     <p className="text-center text-muted-foreground text-sm">No special deposit bonuses right now.</p>
                 </Card>
             )}
-            {dailyBonus ? (
-                <BonusCardShell 
-                    title={dailyBonus.title || "Daily Bonus"}
-                    description="A special bonus is available for you to claim today!"
-                    icon={<Gift className="text-blue-400"/>}
-                    href="/dashboard/bonus-center"
-                    linkText="Claim Now"
-                />
-            ) : (
-                 <Card className="bg-card/50 border-dashed flex items-center justify-center p-6">
-                    <p className="text-center text-muted-foreground text-sm">No daily bonuses available for you today.</p>
-                </Card>
-            )}
+             <BonusCardShell 
+                title="Task & Earn"
+                description="Complete simple tasks to earn extra bonuses and rewards."
+                icon={<ClipboardCheck className="text-blue-400"/>}
+                href="/dashboard/tasks"
+                linkText={hasActiveTask ? "View Your Tasks" : "Browse Tasks"}
+            />
         </div>
     );
 };
@@ -128,7 +119,6 @@ export default function DashboardPage() {
     
     // State for other bonuses
     const [depositBonus, setDepositBonus] = useState<DepositBonusCampaign | null>(null);
-    const [dailyBonus, setDailyBonus] = useState<DailyBonusCampaign | null>(null);
     const [checkingBonuses, setCheckingBonuses] = useState(true);
 
     const USDT_RATE = 310;
@@ -194,36 +184,6 @@ export default function DashboardPage() {
                 setDepositBonus(stillValidCampaign || null);
             } catch (e) { setDepositBonus(null); }
 
-            try {
-                const dailyQuery = query(collection(db, 'daily_bonus_campaigns'), where('isActive', '==', true));
-                const dailySnapshot = await getDocs(dailyQuery);
-                const allActiveCampaigns = dailySnapshot.docs.map(d => ({id: d.id, ...d.data()}) as DailyBonusCampaign);
-                
-                const now = new Date();
-                const futureAndActiveCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
-                
-                let foundBonus: DailyBonusCampaign | null = null;
-                for (const campaign of futureAndActiveCampaigns) {
-                    const startDate = campaign.startDate.toDate();
-                    if (now < startDate) continue;
-                    
-                    let isEligible = false;
-                    if (campaign.eligibility === 'all') isEligible = true;
-                    else if (campaign.eligibility === 'below') isEligible = (userData.balance || 0) <= campaign.balanceThreshold;
-                    else if (campaign.eligibility === 'above') isEligible = (userData.balance || 0) > campaign.balanceThreshold;
-
-                    if (isEligible) {
-                        const claimSnap = await getDoc(doc(db, `users/${user.uid}/daily_bonus_claims`, campaign.id));
-                        if (!claimSnap.exists()) {
-                            foundBonus = campaign;
-                            break; 
-                        }
-                    }
-                }
-                setDailyBonus(foundBonus);
-
-            } catch (e) { setDailyBonus(null); }
-            
             setCheckingBonuses(false);
         };
         
@@ -295,7 +255,7 @@ export default function DashboardPage() {
             {checkingBonuses ? (
                 <Skeleton className="h-44 w-full" />
             ) : (
-                <BonusHub depositBonus={depositBonus} dailyBonus={dailyBonus} referralTask={!!userData?.campaignInfo} />
+                <BonusHub depositBonus={depositBonus} hasActiveTask={!!userData?.campaignInfo} />
             )}
         </div>
       
