@@ -51,10 +51,8 @@ export const onUserCreate = functions.firestore
       );
     }
     
-    // --- Handle Sign-up Bonus ---
-    // The frontend now creates a pending `bonus_claims` document.
-    // The onBonusClaim function below will handle the payout.
-    // This logic is now handled by the onBonusClaim function.
+    // Sign-up bonus logic is now handled by the onBonusClaim function,
+    // which is triggered when the frontend creates a claim document.
     // No action is needed here for sign-up bonuses.
 
     return null;

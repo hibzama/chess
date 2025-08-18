@@ -1,4 +1,5 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -39,28 +40,28 @@ service cloud.firestore {
       allow create: if isAuth() && request.resource.data.createdBy.uid == request.auth.uid;
       allow update: if isAuth(); // Broad permission for game state changes by participants
       allow delete: if isAuth() && (resource.data.createdBy.uid == request.auth.uid || isAdmin());
-      
       match /messages/{messageId} {
-        allow read, create: if isAuth() && request.auth.uid in resource.data.players;
+        allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
       }
     }
 
     // TRANSACTIONS rules
     match /transactions/{transactionId} {
       allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isAuth();
+      allow create: if isAuth(); // Transactions are created by trusted cloud functions or specific user actions
       allow update, delete: if isAdmin();
     }
-
+    
     // BONUS & CAMPAIGN rules (Root Level)
     match /signup_bonus_campaigns/{campaignId} {
       allow read: if isAuth();
       allow write: if isAdmin();
       match /claims/{claimId} {
-        allow read, create: if isUser(claimId) || isAdmin();
+        allow create: if isUser(claimId) || isAdmin();
+        allow read: if isUser(claimId) || isAdmin();
       }
     }
-
+    
     match /daily_bonus_campaigns/{campaignId} {
       allow read: if isAuth();
       allow write: if isAdmin();
@@ -69,25 +70,24 @@ service cloud.firestore {
         allow read: if isAuth(); // Allow any auth user to read to check if claimed
       }
     }
-
+    
     match /deposit_bonus_campaigns/{campaignId} {
-      allow read: if isAuth();
+      allow read: if isAuth(); // Allow any authenticated user to see bonus offers
       allow write: if isAdmin();
       match /claims/{claimId} {
         allow create: if isUser(claimId) || isAdmin();
         allow read: if isAuth();
       }
     }
-    
+
     match /referral_campaigns/{campaignId} {
       allow read: if isAuth();
       allow write: if isAdmin();
     }
     
-    // Root level bonus_claims collection
+    // Root level bonus_claims collection for admin review
     match /bonus_claims/{claimId} {
       allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
-      // Allow users to create their own PENDING claims
       allow create: if isAuth() && request.resource.data.userId == request.auth.uid && request.resource.data.status == 'pending';
       allow update: if isAdmin(); // Only admins can approve/reject
     }
@@ -110,7 +110,7 @@ service cloud.firestore {
       allow read, create: if isAuth();
       allow delete: if isAuth() && (isUser(resource.data.fromId) || isUser(resource.data.toId));
     }
-
+    
     // CHATS rules
     match /chats/{chatId} {
       allow read, update, create: if isAuth() && request.auth.uid in resource.data.userIds;
@@ -118,16 +118,11 @@ service cloud.firestore {
         allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]);
       }
     }
-
+    
     // SETTINGS rules
     match /settings/{settingId} {
       allow read: if isAuth();
       allow write: if isAdmin();
-    }
-    
-    // COLLECTION GROUP rules for admin queries
-    match /{path=**}/bonus_claims/{claimId} {
-        allow read: if isAdmin();
     }
   }
 }
