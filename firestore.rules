@@ -1,122 +1,107 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
     function isAuth() {
       return request.auth != null;
     }
-
     function isUser(userId) {
       return isAuth() && request.auth.uid == userId;
     }
-
     function isAdmin() {
       // Check for the existence of the admin field on the user's document
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // USER rules
     match /users/{userId} {
-      // Allow any authenticated user to read any user's profile.
-      // This is necessary for features like friends list, profile viewing, and for backend functions to look up user data.
+      // ANY authenticated user can read ANY user's profile.
+      // This is necessary for features like friends lists, leaderboards,
+      // and for backend functions to perform transactions.
       allow read: if isAuth();
 
-      // Allow users to create their own document, and admins to create any
-      allow create: if isUser(userId) || isAdmin();
-
-      // Allow users to update their own document, but only specific, non-critical fields.
-      // Admins have full update power.
-      allow update: if isAdmin() || (isUser(userId) && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'photoURL', 'equipment', 'phone', 'address', 'city', 'country', 'gender', 'binancePayId']));
-    
+      // Users can only create their OWN user document.
+      allow create: if isUser(userId);
+      
+      // Users can only update specific, non-critical fields on their own profile.
+      // Admins have full write access.
+      allow write: if isAdmin() || (isUser(userId) && request.resource.data.keys().hasOnly(['firstName', 'lastName', 'photoURL', 'equipment', 'phone', 'address', 'city', 'country', 'gender']));
+      
+      // Subcollections
       match /active_campaigns/{docId} {
         allow read, write: if isUser(userId) || isAdmin();
       }
     }
 
-    // GAME_ROOMS rules
     match /game_rooms/{roomId} {
-      // Allow any authenticated user to read game rooms (for lobbies)
       allow read: if isAuth();
-      // Only authenticated users can create rooms for themselves
       allow create: if isAuth() && request.resource.data.createdBy.uid == request.auth.uid;
-      // Allow any authenticated user to update (for joining, making moves etc.)
-      // The Cloud Function for joining and the client for moves will handle logic.
-      allow update: if isAuth();
-      // Allow the creator or an admin to delete a waiting room
+      allow update: if isAuth(); // Simplified for game state changes by participants
       allow delete: if isAuth() && (resource.data.createdBy.uid == request.auth.uid || isAdmin());
-
+      
       match /messages/{messageId} {
-        // Only players in the game can read/write chat messages.
         allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
       }
     }
-    
-    // TRANSACTIONS rules
+
     match /transactions/{transactionId} {
-      // A user can read their own transactions, admins can read any.
-      allow read: if isAdmin() || (isAuth() && resource.data.userId == request.auth.uid);
-      // A user can only create transactions for themselves.
-      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
-      // Only admins can modify transactions.
+      allow get: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAdmin() || (isAuth() && request.query.where.userId == request.auth.uid);
+      allow create: if isAuth();
       allow update, delete: if isAdmin();
     }
-
-    // CHATS rules
-    match /chats/{chatId} {
-        allow read, update, create: if isAuth() && request.auth.uid in resource.data.userIds;
-        match /messages/{messageId} {
-            allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]);
-        }
-    }
-
-    // FRIEND REQUESTS rules
-     match /friend_requests/{requestId} {
-        allow read, create, delete: if isAuth() && (isUser(resource.data.fromId) || isUser(resource.data.toId) || request.resource.data.fromId == request.auth.uid);
-    }
     
-    // CAMPAIGN & BONUS rules
     match /signup_bonus_campaigns/{campaignId} {
-      allow list, get: if isAuth();
-      allow write: if isAdmin();
-    }
-     match /referral_campaigns/{campaignId} {
-      allow list, get: if isAuth();
-      allow write: if isAdmin();
-    }
-    match /tasks/{taskId} {
-      allow list, get: if isAuth();
+      allow read: if isAuth();
       allow write: if isAdmin();
     }
     match /deposit_bonus_campaigns/{campaignId} {
-      allow list, get: if isAuth();
-      allow write: if isAdmin();
-      match /claims/{claimId} {
-        allow create: if isAuth() && isUser(claimId);
         allow read: if isAuth();
-      }
+        allow write: if isAdmin();
+        match /claims/{claimId} {
+            allow read, create: if isUser(claimId) || isAdmin();
+        }
     }
-
-    // Root bonus_claims collection
+    match /referral_campaigns/{campaignId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    match /tasks/{taskId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
     match /bonus_claims/{claimId} {
-      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
-      allow read, update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isAuth() && (request.query.where.userId == request.auth.uid || isAdmin());
+      allow create: if isAuth();
+      allow update: if isAdmin();
     }
 
-    // MARKETING Applications
     match /marketing_applications/{appId} {
       allow read: if isAdmin();
       allow create: if isAuth();
       allow update: if isAdmin();
     }
-    
-    // NOTIFICATIONS rules
+
     match /notifications/{notificationId} {
-        allow read, update: if isAuth() && resource.data.userId == request.auth.uid;
-        allow create: if isAuth();
+      allow read, update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth();
     }
 
-    // SETTINGS rules
+    match /friend_requests/{requestId} {
+      allow read, create: if isAuth();
+      allow delete: if isAuth() && (isUser(resource.data.fromId) || isUser(resource.data.toId));
+    }
+    
+    match /chats/{chatId} {
+      allow read, update, create: if isAuth() && request.auth.uid in resource.data.userIds;
+      
+      match /messages/{messageId} {
+        allow read, create: if isAuth() && get(/databases/$(database)/documents/chats/$(chatId)).data.userIds.hasAny([request.auth.uid]);
+      }
+    }
+
     match /settings/{settingId} {
       allow read: if isAuth();
       allow write: if isAdmin();
