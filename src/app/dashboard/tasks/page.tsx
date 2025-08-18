@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ClipboardCheck, Loader2, Check, Clock } from 'lucide-react';
-import { Task } from '@/app/admin/tasks/page';
+import { Task, BonusTiers } from '@/app/admin/tasks/page';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,6 +39,16 @@ const CountdownTimer = ({ targetDate, onEnd }: { targetDate: Date, onEnd?: () =>
     return <span className="font-mono">{timeLeft}</span>;
 }
 
+const getBonusForBalance = (tiers: BonusTiers, balance: number): number => {
+    if (balance <= 10) return tiers.tier1;
+    if (balance <= 50) return tiers.tier2;
+    if (balance <= 100) return tiers.tier3;
+    if (balance <= 150) return tiers.tier4;
+    if (balance <= 200) return tiers.tier5;
+    if (balance <= 250) return tiers.tier6;
+    return tiers.tier7;
+};
+
 const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, onClaimed: (taskId: string) => void, alreadyClaimed: boolean, balance: number }) => {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -46,7 +56,7 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, on
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [currentWorkIndex, setCurrentWorkIndex] = useState(0);
 
-    const bonus = balance <= 10 ? task.bonusAmountLow : task.bonusAmountHigh;
+    const bonus = getBonusForBalance(task.bonusTiers, balance);
 
     const handleNextWork = () => {
         if (!answers[task.works[currentWorkIndex].id]?.trim()) {
@@ -236,7 +246,7 @@ export default function TasksPage() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-sm font-semibold text-green-400/70">
-                                        Reward: LKR {task.bonusAmountLow.toFixed(2)} / LKR {task.bonusAmountHigh.toFixed(2)}
+                                        Tiered Bonus
                                     </div>
                                 </CardContent>
                                 <CardFooter>

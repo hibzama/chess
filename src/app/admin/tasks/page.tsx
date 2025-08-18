@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, Loader2, Check, X, ClipboardCheck } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Loader2, Check, X, ClipboardCheck, DollarSign } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,12 +21,21 @@ export interface TaskWork {
     verificationQuestion: string;
 }
 
+export interface BonusTiers {
+    tier1: number; // 0-10
+    tier2: number; // 10-50
+    tier3: number; // 50-100
+    tier4: number; // 100-150
+    tier5: number; // 150-200
+    tier6: number; // 200-250
+    tier7: number; // 250+
+}
+
 export interface Task {
     id: string;
     title: string;
     works: TaskWork[];
-    bonusAmountLow: number; // For users with balance <= 10
-    bonusAmountHigh: number; // For users with balance > 10
+    bonusTiers: BonusTiers;
     startDelayHours: number; // Delay in hours from creation until task is active
     durationHours: number; // Duration in hours task is active
     isActive: boolean;
@@ -47,8 +56,9 @@ export default function TasksPage() {
     const getInitialFormState = () => ({
         title: '',
         works: [{ id: `work_${Date.now()}`, description: '', verificationQuestion: '' }] as TaskWork[],
-        bonusAmountLow: 5,
-        bonusAmountHigh: 2,
+        bonusTiers: {
+            tier1: 5, tier2: 0, tier3: 0, tier4: 0, tier5: 0, tier6: 0, tier7: 0
+        },
         startDelayHours: 0,
         durationHours: 24,
         isActive: true,
@@ -71,6 +81,17 @@ export default function TasksPage() {
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormState(prev => ({ ...prev, [name]: value }));
+    };
+    
+    const handleBonusTierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormState(prev => ({
+            ...prev,
+            bonusTiers: {
+                ...prev.bonusTiers,
+                [name]: Number(value)
+            }
+        }));
     };
 
     const handleWorkChange = (index: number, field: keyof Omit<TaskWork, 'id'>, value: string) => {
@@ -110,8 +131,7 @@ export default function TasksPage() {
         const taskData = {
             title: formState.title,
             works: formState.works,
-            bonusAmountLow: Number(formState.bonusAmountLow),
-            bonusAmountHigh: Number(formState.bonusAmountHigh),
+            bonusTiers: formState.bonusTiers,
             startDelayHours: Number(formState.startDelayHours),
             durationHours: Number(formState.durationHours),
             isActive: formState.isActive,
@@ -142,8 +162,7 @@ export default function TasksPage() {
         setFormState({
             title: task.title,
             works: task.works,
-            bonusAmountLow: task.bonusAmountLow,
-            bonusAmountHigh: task.bonusAmountHigh,
+            bonusTiers: task.bonusTiers,
             startDelayHours: task.startDelayHours,
             durationHours: task.durationHours,
             isActive: task.isActive,
@@ -169,6 +188,16 @@ export default function TasksPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status.' });
         }
     }
+
+    const bonusTierInputs: { key: keyof BonusTiers, label: string }[] = [
+        { key: 'tier1', label: '0 - 10' },
+        { key: 'tier2', label: '10 - 50' },
+        { key: 'tier3', label: '50 - 100' },
+        { key: 'tier4', label: '100 - 150' },
+        { key: 'tier5', label: '150 - 200' },
+        { key: 'tier6', label: '200 - 250' },
+        { key: 'tier7', label: '250+' },
+    ];
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
@@ -197,9 +226,17 @@ export default function TasksPage() {
                             <Button type="button" variant="outline" onClick={addWork}><PlusCircle className="mr-2"/> Add Work</Button>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2"><Label>Bonus (Balance &lt;= 10)</Label><Input name="bonusAmountLow" type="number" value={formState.bonusAmountLow} onChange={handleInputChange}/></div>
-                            <div className="space-y-2"><Label>Bonus (Balance &gt; 10)</Label><Input name="bonusAmountHigh" type="number" value={formState.bonusAmountHigh} onChange={handleInputChange}/></div>
+                        <div className="space-y-4 border p-4 rounded-md">
+                            <h3 className="font-semibold flex items-center gap-2"><DollarSign/> Bonus Tiers</h3>
+                            <p className="text-xs text-muted-foreground">Set bonus amounts based on the user's wallet balance at the time of claim.</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                {bonusTierInputs.map(tier => (
+                                    <div key={tier.key} className="space-y-1">
+                                        <Label className="text-xs">Balance: {tier.label}</Label>
+                                        <Input name={tier.key} type="number" value={formState.bonusTiers[tier.key]} onChange={handleBonusTierChange}/>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -231,8 +268,7 @@ export default function TasksPage() {
                         <CardContent className="text-sm text-muted-foreground grid grid-cols-2 gap-2">
                             <p><strong>Starts:</strong> {t.startDate ? format(t.startDate.toDate(), 'PPp') : 'N/A'}</p>
                             <p><strong>Ends:</strong> {t.endDate ? format(t.endDate.toDate(), 'PPp') : 'N/A'}</p>
-                            <p><strong>Bonus (Low Bal):</strong> LKR {t.bonusAmountLow}</p>
-                            <p><strong>Bonus (High Bal):</strong> LKR {t.bonusAmountHigh}</p>
+                            <p className="col-span-2"><strong>Bonuses:</strong> Tiered based on balance.</p>
                             <p><strong>Claims:</strong> {t.claimsCount || 0}</p>
                         </CardContent>
                         <CardFooter className="gap-2">
