@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState, Suspense } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp, updateDoc, increment, writeBatch } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -159,12 +159,14 @@ function RegisterForm() {
             
             batch.set(userDocRef, userData);
             await batch.commit();
+
+            await signInWithEmailAndPassword(auth, email, password);
             
             toast({
                 title: "Account Created!",
-                description: "You can now log in.",
+                description: "Welcome to Nexbattle! You are now logged in.",
             });
-            router.push(`/login`);
+            router.push(`/dashboard`);
 
         } catch (error: any) {
             console.error("Error signing up:", error);
