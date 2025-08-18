@@ -22,7 +22,7 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
         
         await userRef.set({
             uid: user.uid,
-            email: user.email,
+            email: user.email || '',
             emailVerified: user.emailVerified,
             balance: 0,
             role: 'user',

@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
-import { auth, db, functions } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { doc, setDoc, getDoc, updateDoc, increment } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Ban } from "lucide-react";
@@ -64,8 +65,64 @@ export default function RegisterForm() {
             // 1. Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
+            
+             // 2. The onUserCreate function will trigger and create the basic user document.
+            // Now, we update that document with the form details.
+            const userDocRef = doc(db, 'users', user.uid);
 
-            // 4. Send verification email from the client
+            let ipAddress = 'unknown';
+             try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                ipAddress = data.ip;
+            } catch (ipError) {
+                console.error("Could not fetch IP address:", ipError);
+            }
+
+            const profileData: any = {
+                firstName,
+                lastName,
+                phone,
+                address,
+                city,
+                country,
+                ipAddress,
+            };
+            
+            // Handle referral logic
+            const directReferrerId = mref || ref;
+            if (directReferrerId) {
+                const referrerDoc = await getDoc(doc(db, 'users', directReferrerId));
+                if (referrerDoc.exists()) {
+                    const referrerData = referrerDoc.data();
+                    profileData.referredBy = directReferrerId;
+
+                    if (referrerData.referralChain) {
+                        profileData.referralChain = [...referrerData.referralChain, directReferrerId];
+                    } else if (referrerData.role === 'marketer') {
+                        profileData.referralChain = [directReferrerId];
+                    }
+
+                    if (referrerData.role === 'user') {
+                        await updateDoc(doc(db, 'users', directReferrerId), { l1Count: increment(1) });
+                    }
+                }
+            }
+            
+            // Handle campaign-specific info
+             if (rcid && ref) {
+                profileData.campaignInfo = {
+                    campaignId: rcid,
+                    referrerId: ref,
+                    completedTasks: [],
+                    answers: {},
+                };
+            }
+
+            await updateDoc(userDocRef, profileData);
+
+
+            // 3. Send verification email from the client
             await sendEmailVerification(user);
 
             toast({
@@ -80,8 +137,6 @@ export default function RegisterForm() {
             let errorMessage = "An unknown error occurred.";
             if (error.code === 'auth/email-already-in-use') {
                 errorMessage = "This email address is already in use.";
-            } else if (error.code === 'functions/internal' || error.message.includes('createDbUser')) {
-                errorMessage = "An error occurred creating your user profile. Please contact support.";
             } else if (error.message) {
                 errorMessage = error.message;
             }
@@ -176,4 +231,3 @@ export default function RegisterForm() {
         </Card>
     );
 }
-
