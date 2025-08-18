@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, writeBatch, collection, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, serverTimestamp, addDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
