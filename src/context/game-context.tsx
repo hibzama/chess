@@ -184,15 +184,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const winnerObject: GameRoom['winner'] = { uid: null, method };
     
                 if (resignerDetails) { // Resignation logic
-                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
-                    const opponentPayoutRate = 1.30; // 130% payout for the player who stays.
-                    
-                    let resignerRefundRate = 0.25; // Default 25%
+                    const opponentPayoutRate = 1.30;
+                    let resignerRefundRate = 0.25; // Default for 1-2 pieces
+    
                     if (resignerDetails.pieceCount >= 6) {
                         resignerRefundRate = 0.50; // 50%
                     } else if (resignerDetails.pieceCount >= 3) {
                         resignerRefundRate = 0.35; // 35%
                     }
+                    
+                    const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
     
                     if (isCreatorResigner) {
                         creatorPayout = wager * resignerRefundRate;
@@ -248,7 +249,6 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             return payoutResult;
         } catch (error) {
             console.error("Payout Transaction failed:", error);
-            // This is a fallback to ensure UI updates even if transaction fails due to retries.
             return { myPayout: 0 };
         }
     }, [user, roomId]);
@@ -297,13 +297,13 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const wager = roomData.wager || 0;
                 let myPayout = 0;
 
-                 if (iAmResigner) {
-                    let resignerRefundRate = 0.25; // Default 25%
+                if (iAmResigner) {
                     const resignerPieceCount = roomData.winner?.resignerPieceCount ?? 0;
+                    let resignerRefundRate = 0.25;
                     if (resignerPieceCount >= 6) {
-                        resignerRefundRate = 0.50; // 50%
+                        resignerRefundRate = 0.50;
                     } else if (resignerPieceCount >= 3) {
-                        resignerRefundRate = 0.35; // 35%
+                        resignerRefundRate = 0.35;
                     }
                     myPayout = wager * resignerRefundRate;
                 } else if (roomData.winner?.resignerId) {
@@ -570,3 +570,5 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
+
+    
