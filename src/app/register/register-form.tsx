@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, functions } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -49,10 +50,9 @@ export default function RegisterForm() {
         const city = target.city.value;
         const country = target.country.value;
 
-        // --- referral params (both systems) ---
+        // --- referral params ---
         const ref = searchParams.get('ref');
         const mref = searchParams.get('mref');
-        const aref = searchParams.get('aref');
         const rcid = searchParams.get('rcid');
 
         if (password !== confirmPassword) {
@@ -76,17 +76,7 @@ export default function RegisterForm() {
         }
 
         try {
-            // Fetch IP
-            let ipAddress = 'unknown';
-            try {
-                const response = await fetch('https://api.ipify.org?format=json');
-                const data = await response.json();
-                ipAddress = data.ip;
-            } catch (ipError) {
-                console.error("Could not fetch IP address:", ipError);
-            }
-
-            // Create account
+            // 1. Create user in Firebase Auth
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
@@ -95,41 +85,32 @@ export default function RegisterForm() {
             const svgString = renderToString(React.createElement(randomAvatar));
             const defaultAvatarUri = `data:image/svg+xml;base64,${btoa(svgString)}`;
 
+            // 2. Prepare user data for Cloud Function
             const userData: any = {
                 uid: user.uid,
+                email: user.email,
                 firstName,
                 lastName,
                 phone,
-                email,
                 address,
                 city,
                 country,
                 gender,
-                balance: 0,
-                commissionBalance: 0,
-                marketingBalance: 0,
-                role: 'user',
-                createdAt: serverTimestamp(),
-                l1Count: 0,
                 photoURL: defaultAvatarUri,
-                ipAddress: ipAddress,
-                emailVerified: true,
             };
 
-            // Pass referral IDs to the backend function
             if (ref) userData.standardReferredBy = ref;
             if (mref) userData.marketingReferredBy = mref;
-            if (aref) userData.bonusReferredBy = aref;
             if (rcid && ref) {
                 userData.campaignInfo = {
                     campaignId: rcid,
                     referrerId: ref,
-                    completedTasks: [],
-                    answers: {},
                 };
             }
 
-            await setDoc(doc(db, "users", user.uid), userData);
+            // 3. Call Cloud Function to create user document in Firestore
+            const createDbUser = httpsCallable(functions, 'createDbUser');
+            await createDbUser(userData);
 
             toast({
                 title: "Account Created!",
@@ -142,8 +123,8 @@ export default function RegisterForm() {
             let errorMessage = "An unknown error occurred.";
             if (error.code === 'auth/email-already-in-use') {
                 errorMessage = "This email address is already in use.";
-            } else if (error.code === 'auth/weak-password') {
-                errorMessage = "The password is too weak. Please choose a stronger password.";
+            } else if (error.code === 'functions/internal') {
+                errorMessage = "An error occurred creating your user profile. Please contact support.";
             } else if (error.message) {
                 errorMessage = error.message;
             }
@@ -233,7 +214,8 @@ export default function RegisterForm() {
                         By creating an account, you agree to our{' '}
                         <Link href="/terms" className="underline hover:text-primary">
                             Terms & Conditions
-                        </Link>.
+                        </Link>
+                        .
                     </p>
                     <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? 'Creating Account...' : 'Create an account'}
