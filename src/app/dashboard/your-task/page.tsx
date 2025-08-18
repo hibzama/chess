@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, writeBatch, collection, serverTimestamp, increment, addDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, serverTimestamp, addDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -38,20 +38,20 @@ export default function YourTaskPage() {
 
         const fetchCampaignData = async () => {
             setLoading(true);
-            const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo.campaignId));
+            const campaignDoc = await getDoc(doc(db, 'referral_campaigns', userData.campaignInfo!.campaignId));
             if (campaignDoc.exists()) {
                 const campaignData = { id: campaignDoc.id, ...campaignDoc.data() } as Campaign;
                 setCampaign(campaignData);
 
-                const completedTaskIds = new Set(userData.campaignInfo.completedTasks || []);
+                const completedTaskIds = new Set(userData.campaignInfo!.completedTasks || []);
                 const pending = campaignData.tasks.filter(task => !completedTaskIds.has(task.id));
                 const completed = campaignData.tasks.filter(task => completedTaskIds.has(task.id));
                 
                 setTasks(pending);
                 setCompletedTasks(completed);
 
-                if(pending.length === 0 && completed.length === 0) {
-                     router.push('/dashboard');
+                if(pending.length === 0 && campaignData.tasks.length > 0) { // Check if all tasks are done
+                    // This condition is handled by the redirect logic in the layout
                 }
 
             } else {
@@ -89,7 +89,7 @@ export default function YourTaskPage() {
                 const claimRef = doc(collection(db, 'bonus_claims'));
                 batch.set(claimRef, {
                     userId: user.uid,
-                    refereeId: user.uid, // For referee claims, they are their own referee
+                    refereeId: user.uid,
                     campaignId: campaign.id,
                     type: 'referee',
                     amount: task.refereeBonus,
@@ -104,12 +104,28 @@ export default function YourTaskPage() {
 
             toast({ title: "Task Submitted!", description: `Your bonus claim for LKR ${task.refereeBonus.toFixed(2)} is pending approval.`});
             
-            setUserData(prev => prev ? ({
-                ...prev,
-                campaignInfo: { ...prev.campaignInfo!, completedTasks: newCompletedTasks }
-            }) : null);
+            // Manually update local state to reflect change immediately
+            setUserData(prev => {
+                if (!prev || !prev.campaignInfo) return prev;
+                return {
+                    ...prev,
+                    campaignInfo: {
+                        ...prev.campaignInfo,
+                        completedTasks: newCompletedTasks
+                    }
+                };
+            });
+            setTasks(prevTasks => prevTasks.filter(t => t.id !== task.id));
+            setCompletedTasks(prevCompleted => [...prevCompleted, task]);
+            setAnswers(prevAns => {
+                const newAns = {...prevAns};
+                delete newAns[task.id];
+                return newAns;
+            });
+
 
         } catch (e) {
+            console.error(e);
             toast({ variant: "destructive", title: "Error", description: "Could not submit your task."});
         } finally {
             setIsSubmitting(false);
