@@ -1,7 +1,8 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc, query, where, getCountFromServer, onSnapshot, runTransaction, increment, orderBy, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -167,21 +168,8 @@ export default function BonusSettingsPage() {
         
         try {
             if (newStatus === 'approved') {
-                 await runTransaction(db, async (transaction) => {
-                    const userRef = doc(db, 'users', claim.userId);
-                    const transactionRef = doc(collection(db, 'transactions'));
-                    
-                    transaction.update(claimRef, { status: 'approved' });
-                    transaction.update(userRef, { balance: increment(claim.amount) });
-                    transaction.set(transactionRef, {
-                        userId: claim.userId,
-                        type: 'bonus',
-                        amount: claim.amount,
-                        status: 'completed',
-                        description: `Signup Bonus: ${claim.campaignTitle}`,
-                        createdAt: serverTimestamp(),
-                    });
-                });
+                const approveBonusClaim = httpsCallable(functions, 'approveBonusClaim');
+                await approveBonusClaim({ claimId: claim.id });
                 toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
             } else { // Rejected
                 await updateDoc(claimRef, { status: 'rejected' });
@@ -304,5 +292,8 @@ export default function BonusSettingsPage() {
             </div>
         </div>
     );
+
+    
+}
 
     

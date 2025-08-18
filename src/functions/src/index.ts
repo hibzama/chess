@@ -1,3 +1,4 @@
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -95,8 +96,8 @@ export const onBonusClaim = functions.firestore
         case 'signup':
             campaignCollectionName = 'signup_bonus_campaigns';
             break;
-        case 'task':
-            campaignCollectionName = 'tasks';
+        case 'daily':
+            campaignCollectionName = 'daily_bonus_campaigns';
             break;
         case 'referrer':
         case 'referee':
@@ -123,6 +124,7 @@ export const onBonusClaim = functions.firestore
 
 
 export const approveBonusClaim = functions.https.onCall(async (data, context) => {
+    // Check for admin privileges. The 'admin' custom claim must be set on the user's token.
     if (!context.auth || !context.auth.token.admin) {
         throw new functions.https.HttpsError('permission-denied', 'Must be an administrative user to approve claims.');
     }
@@ -148,6 +150,7 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
                  throw new functions.https.HttpsError('failed-precondition', 'This claim has already been approved.');
             }
 
+            // The function runs with elevated privileges, so it can update any user's balance.
             const userRef = db.doc(`users/${claimData.userId}`);
             transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(claimData.amount) });
             
@@ -174,83 +177,100 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
     }
 });
 
-export const joinGame = functions.https.onCall(async (data, context) => {
+
+export const claimDailyBonus = functions.https.onCall(async (data, context) => {
     if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'You must be logged in to join a game.');
+        throw new functions.https.HttpsError('unauthenticated', 'The function must be called while authenticated.');
     }
 
-    const { roomId } = data;
-    const joinerId = context.auth.uid;
+    const { campaignId } = data;
+    const userId = context.auth.uid;
     const db = admin.firestore();
 
-    if (!roomId) {
-        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a "roomId".');
+    if (!campaignId) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a "campaignId".');
     }
 
-    const roomRef = db.doc(`game_rooms/${roomId}`);
-
     try {
-        await db.runTransaction(async (transaction) => {
-            const roomDoc = await transaction.get(roomRef);
-            if (!roomDoc.exists || roomDoc.data()?.status !== 'waiting') {
-                throw new functions.https.HttpsError('not-found', 'Room not available.');
+        const result = await db.runTransaction(async (transaction) => {
+            const campaignRef = db.doc(`daily_bonus_campaigns/${campaignId}`);
+            const userRef = db.doc(`users/${userId}`);
+            
+            // Check for existing claim in the root collection
+            const claimsQuery = db.collection('bonus_claims')
+                .where('userId', '==', userId)
+                .where('campaignId', '==', campaignId);
+
+            const [campaignDoc, userDoc, existingClaimsSnapshot] = await Promise.all([
+                transaction.get(campaignRef),
+                transaction.get(userRef),
+                transaction.get(claimsQuery)
+            ]);
+
+            if (!campaignDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Bonus campaign not found.');
+            }
+            if (!existingClaimsSnapshot.empty) {
+                 throw new functions.https.HttpsError('already-exists', 'You have already claimed this bonus today.');
+            }
+             if (!userDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'User data not found.');
             }
 
-            const roomData = roomDoc.data()!;
-            const creatorId = roomData.createdBy.uid;
-
-            if (creatorId === joinerId) {
-                throw new functions.https.HttpsError('failed-precondition', 'You cannot join your own game.');
+            const campaign = campaignDoc.data()!;
+            const user = userDoc.data()!;
+            const now = new Date();
+            
+            if (!campaign.isActive || campaign.endDate.toDate() < now) {
+                throw new functions.https.HttpsError('failed-precondition', 'This bonus is no longer active.');
+            }
+            if ((campaign.claimsCount || 0) >= campaign.userLimit) {
+                throw new functions.https.HttpsError('failed-precondition', 'This bonus has reached its claim limit.');
             }
             
-            const joinerRef = db.doc(`users/${joinerId}`);
-            const joinerDoc = await transaction.get(joinerRef);
-
-            if (!joinerDoc.exists()) {
-                throw new functions.https.HttpsError('not-found', 'Your user data could not be found.');
+            const currentBalance = user.balance || 0;
+            if (campaign.eligibility === 'below' && currentBalance > campaign.balanceThreshold) {
+                throw new functions.https.HttpsError('failed-precondition', `Your balance must be below LKR ${campaign.balanceThreshold} to claim.`);
             }
-            const joinerData = joinerDoc.data()!;
-
-            if (joinerData.balance < roomData.wager) {
-                 throw new functions.https.HttpsError('failed-precondition', 'Insufficient funds.');
+            if (campaign.eligibility === 'above' && currentBalance < campaign.balanceThreshold) {
+                throw new functions.https.HttpsError('failed-precondition', `Your balance must be above LKR ${campaign.balanceThreshold} to claim.`);
             }
             
-            const creatorColor = roomData.createdBy.color;
-            const joinerColor = creatorColor === 'w' ? 'b' : 'w';
+            let bonusAmount = 0;
+            if (campaign.bonusType === 'fixed') {
+                bonusAmount = campaign.bonusValue;
+            } else if (campaign.bonusType === 'percentage') {
+                bonusAmount = currentBalance * (campaign.bonusValue / 100);
+            }
 
-            transaction.update(roomRef, {
-                status: 'in-progress',
-                player2: { uid: joinerId, name: `${joinerData.firstName} ${joinerData.lastName}`, color: joinerColor, photoURL: joinerData.photoURL || '' },
-                players: admin.firestore.FieldValue.arrayUnion(joinerId),
-                turnStartTime: admin.firestore.FieldValue.serverTimestamp(),
+            if (bonusAmount <= 0) {
+                 throw new functions.https.HttpsError('failed-precondition', 'Bonus amount must be greater than zero.');
+            }
+
+            // Create a claim document in the top-level collection
+            const newClaimRef = db.collection('bonus_claims').doc();
+            transaction.set(newClaimRef, {
+                userId,
+                campaignId,
+                type: 'daily',
+                amount: bonusAmount,
+                status: 'pending',
+                campaignTitle: `Daily Bonus: ${campaign.title}`,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
             
-            // Handle wagers and commissions for both players
-            const playersToProcess = [
-                { id: creatorId, name: roomData.createdBy.name },
-                { id: joinerId, name: `${joinerData.firstName} ${joinerData.lastName}` }
-            ];
-
-            for (const player of playersToProcess) {
-                const userRef = db.doc(`users/${player.id}`);
-                transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(-roomData.wager) });
-
-                const wagerTransactionRef = db.collection('transactions').doc();
-                transaction.set(wagerTransactionRef, {
-                    userId: player.id, type: 'wager', amount: roomData.wager, status: 'completed',
-                    description: `Wager for ${roomData.gameType} game vs ${player.id === creatorId ? playersToProcess[1].name : playersToProcess[0].name}`,
-                    gameRoomId: roomId, createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-            }
-
+            return { success: true, bonusAmount };
         });
-         return { success: true };
+
+        return result;
+
     } catch (error: any) {
-        functions.logger.error("Error joining game:", error);
+        functions.logger.error("Error claiming daily bonus:", error);
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while joining the game.');
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred. Please try again.');
     }
 });
 
+    
