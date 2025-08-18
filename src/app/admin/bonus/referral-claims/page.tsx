@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
@@ -52,14 +53,14 @@ export default function BonusClaimsPage() {
         
         const q = query(
             collection(db, 'bonus_claims'), 
-            where('type', 'in', ['signup', 'referrer', 'referee']),
             orderBy('createdAt', 'desc'),
             limit(200)
         );
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setAllClaims(claims);
+            const filteredClaims = claims.filter(c => ['signup', 'referrer', 'referee'].includes(c.type));
+            setAllClaims(filteredClaims);
             setLoading(false);
         }, (error) => {
             console.error("Error fetching claims:", error);
