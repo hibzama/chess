@@ -2,7 +2,7 @@
 'use client';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, increment, onSnapshot, writeBatch, collection, serverTimestamp, Timestamp, runTransaction, deleteDoc, DocumentReference, DocumentData } from 'firebase/firestore';
 import { useAuth } from './auth-context';
 import { useParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
@@ -242,23 +242,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             return payoutResult;
         } catch (error) {
             console.error("Payout Transaction failed:", error);
-            // Fallback for when payout is already processed to avoid showing 0
-            if (String(error).includes('Payout already processed')) {
-                const roomDoc = await getDoc(doc(db, 'game_rooms', roomId as string));
-                if (roomDoc.exists()) {
-                   const roomData = roomDoc.data() as GameRoom;
-                   const wager = roomData.wager || 0;
-                   const winnerData = roomData.winner;
-                   const resignerId = winnerData?.resignerId;
-                   const amIWinner = winnerData?.uid === user.uid;
-                   const amIResigner = resignerId === user.uid;
-                   
-                   if(amIResigner) return { myPayout: wager * 0.75 };
-                   if(resignerId) return { myPayout: wager * 1.05 };
-                   if(roomData.draw) return { myPayout: wager * 0.9 };
-                   if(amIWinner) return { myPayout: wager * 1.8 };
-                }
-           }
+            // This is a fallback to ensure UI updates even if transaction fails due to retries.
             return { myPayout: 0 };
         }
     }, [user, roomId]);
