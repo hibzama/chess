@@ -185,8 +185,14 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
     
                 if (resignerDetails) { // Resignation logic
                     const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
-                    const opponentPayoutRate = 1.05; // 105% payout
-                    const resignerRefundRate = 0.75; // 75% refund
+                    const opponentPayoutRate = 1.30; // 130% payout for the player who stays.
+                    
+                    let resignerRefundRate = 0.25; // Default 25%
+                    if (resignerDetails.pieceCount >= 6) {
+                        resignerRefundRate = 0.50; // 50%
+                    } else if (resignerDetails.pieceCount >= 3) {
+                        resignerRefundRate = 0.35; // 35%
+                    }
     
                     if (isCreatorResigner) {
                         creatorPayout = wager * resignerRefundRate;
@@ -292,9 +298,16 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 let myPayout = 0;
 
                  if (iAmResigner) {
-                    myPayout = wager * 0.75;
+                    let resignerRefundRate = 0.25; // Default 25%
+                    const resignerPieceCount = roomData.winner?.resignerPieceCount ?? 0;
+                    if (resignerPieceCount >= 6) {
+                        resignerRefundRate = 0.50; // 50%
+                    } else if (resignerPieceCount >= 3) {
+                        resignerRefundRate = 0.35; // 35%
+                    }
+                    myPayout = wager * resignerRefundRate;
                 } else if (roomData.winner?.resignerId) {
-                    myPayout = wager * 1.05;
+                    myPayout = wager * 1.30;
                 } else if (roomData.draw) {
                     myPayout = wager * 0.9;
                 } else if (winnerIsMe) {
