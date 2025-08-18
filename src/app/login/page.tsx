@@ -35,8 +35,6 @@ export default function LoginPage() {
       
       const userData = userDoc.data();
 
-      // Email verification check is removed
-
       toast({
         title: "Login Successful!",
         description: "Welcome back.",
