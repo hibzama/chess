@@ -141,7 +141,6 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
         const result = await db.runTransaction(async (transaction) => {
             const campaignRef = db.doc(`daily_bonus_campaigns/${campaignId}`);
             const userRef = db.doc(`users/${userId}`);
-            // The claim document is now specific to the user, not the campaign subcollection
             const claimRef = db.doc(`users/${userId}/daily_bonus_claims/${campaignId}`);
             
             const [campaignDoc, userDoc, claimDoc] = await transaction.getAll(campaignRef, userRef, claimRef);
@@ -167,11 +166,12 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
                 throw new functions.https.HttpsError('failed-precondition', 'This bonus has reached its claim limit.');
             }
             
+            const currentBalance = user?.balance || 0;
             // Eligibility Check
-            if (campaign.eligibility === 'below' && user?.balance > campaign.balanceThreshold) {
+            if (campaign.eligibility === 'below' && currentBalance > campaign.balanceThreshold) {
                 throw new functions.https.HttpsError('failed-precondition', `Your balance must be below LKR ${campaign.balanceThreshold} to claim.`);
             }
-            if (campaign.eligibility === 'above' && user?.balance < campaign.balanceThreshold) {
+            if (campaign.eligibility === 'above' && currentBalance < campaign.balanceThreshold) {
                 throw new functions.https.HttpsError('failed-precondition', `Your balance must be above LKR ${campaign.balanceThreshold} to claim.`);
             }
             
@@ -180,7 +180,7 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
             if(campaign.bonusType === 'fixed') {
                 bonusAmount = campaign.bonusValue;
             } else if (campaign.bonusType === 'percentage') {
-                bonusAmount = (user?.balance || 0) * (campaign.bonusValue / 100);
+                bonusAmount = currentBalance * (campaign.bonusValue / 100);
             }
 
             if (bonusAmount <= 0) {
@@ -188,8 +188,10 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
             }
             
             // Perform writes
+            const newBalance = currentBalance + bonusAmount;
+
             transaction.set(claimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp(), campaignId: campaignId });
-            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(bonusAmount) });
+            transaction.update(userRef, { balance: newBalance });
             transaction.update(campaignRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
             
             const transactionRef = db.collection('transactions').doc();
