@@ -12,6 +12,7 @@ import { getFunctions } from "firebase/functions";
 const firebaseConfig = {
   apiKey: "AIzaSyB4fJwImSsfy7bLBUcJnGgqsdzHKDzIpfo",
   authDomain: "nexbattle-ymmmq.firebaseapp.com",
+  databaseURL: "https://nexbattle-ymmmq.firebaseio.com",
   projectId: "nexbattle-ymmmq",
   storageBucket: "nexbattle-ymmmq.appspot.com",
   messagingSenderId: "1022888526676",
