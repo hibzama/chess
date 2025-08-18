@@ -105,7 +105,7 @@ export default function RegisterForm() {
                 city,
                 country,
                 gender,
-                balance: 0, // Initial balance is handled by onUserCreate now
+                balance: 0,
                 commissionBalance: 0,
                 marketingBalance: 0,
                 role: 'user',
