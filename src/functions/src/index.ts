@@ -20,32 +20,126 @@ export const onUserCreate = functions.firestore
   .onCreate(async (snap, context) => {
     const newUser = snap.data();
     const newUserRef = snap.ref;
-    const db = admin.firestore();
     const { userId } = context.params;
 
-    // --- 1. Handle Commission Referral Logic ---
+    // --- Handle Commission Referral Logic ---
     const marketingReferrerId = newUser.marketingReferredBy; // mref
-    const standardReferrerId = newUser.standardReferredBy;   // ref (from campaign)
+    const standardReferrerId = newUser.standardReferredBy; // ref (from campaign)
 
     if (marketingReferrerId) {
-        // Direct referral from a marketer
-        const updates: { [key: string]: any; } = {
-            referralChain: [marketingReferrerId],
-            referredBy: marketingReferrerId
-        };
-        await newUserRef.update(updates);
-        functions.logger.log(`User ${userId} joined marketer ${marketingReferrerId}'s chain as Level 1.`);
+      const marketerDoc = await admin
+        .firestore()
+        .collection("users")
+        .doc(marketingReferrerId)
+        .get();
+      if (marketerDoc.exists && marketerDoc.data()?.role === "marketer") {
+        const referralChain = (marketerDoc.data()?.referralChain || []).concat(
+          marketingReferrerId
+        );
+        await newUserRef.update({
+          referralChain: referralChain,
+          referredBy: marketingReferrerId,
+        });
+        functions.logger.log(
+          `User ${userId} joined marketer ${marketingReferrerId}'s chain.`
+        );
+      }
     } else if (standardReferrerId) {
-        // Referral from a standard user, likely via a campaign link.
-        // We set referredBy, but the referralChain is only added
-        // when the new user becomes a "valid referral".
-        await newUserRef.update({ referredBy: standardReferrerId });
-        functions.logger.log(`User ${userId} was referred by standard user ${standardReferrerId}. Chain will be updated upon validation.`);
+      await newUserRef.update({ referredBy: standardReferrerId });
+      functions.logger.log(
+        `User ${userId} was referred by standard user ${standardReferrerId}.`
+      );
     }
     
-    // --- 2. Handle Sign-up Bonus ---
-    // This logic is now handled by the frontend creating a pending `bonus_claims` document.
-    // The backend logic is removed from here to prevent conflicts and permission errors.
+    // --- Handle Sign-up Bonus ---
+    // The frontend now creates a pending `bonus_claims` document.
+    // The onBonusClaim function below will handle the payout.
+    const bonusQuery = await admin.firestore().collection("signup_bonus_campaigns").where("isActive", "==", true).limit(1).get();
+    if (!bonusQuery.empty) {
+        const campaign = bonusQuery.docs[0];
+        const claimsCollection = admin.firestore().collection(`signup_bonus_campaigns/${campaign.id}/claims`);
+        const claimsSnapshot = await claimsCollection.count().get();
+        if (claimsSnapshot.data().count < (campaign.data().userLimit || 0)) {
+            await claimsCollection.doc(userId).set({
+                userId: userId,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+             functions.logger.log(`Signup bonus claim created for user ${userId} for campaign ${campaign.id}`);
+        }
+    }
+
+    return null;
+  });
+
+// This function triggers whenever a bonus claim is created
+export const onBonusClaim = functions.firestore
+  .document("{campaignCollection}/{campaignId}/claims/{userId}")
+  .onCreate(async (snap, context) => {
+    const { campaignCollection, campaignId, userId } = context.params;
+    const db = admin.firestore();
+
+    // Ensure it's a valid bonus campaign collection
+    const validCollections = ['signup_bonus_campaigns', 'daily_bonus_campaigns', 'deposit_bonus_campaigns'];
+    if (!validCollections.includes(campaignCollection)) {
+      functions.logger.log(`Invalid collection for bonus claim: ${campaignCollection}`);
+      return null;
+    }
+
+    try {
+      await db.runTransaction(async (transaction) => {
+        const campaignRef = db.collection(campaignCollection).doc(campaignId);
+        const userRef = db.collection("users").doc(userId);
+
+        const campaignDoc = await transaction.get(campaignRef);
+        const userDoc = await transaction.get(userRef);
+
+        if (!campaignDoc.exists || !userDoc.exists) {
+          throw new Error("Campaign or User not found");
+        }
+
+        const campaign = campaignDoc.data();
+        const user = userDoc.data();
+        let bonusAmount = 0;
+        let description = '';
+
+        if (campaignCollection === 'signup_bonus_campaigns') {
+            bonusAmount = campaign?.bonusAmount || 0;
+            description = `Sign-up Bonus: ${campaign?.title}`;
+        } else if (campaignCollection === 'daily_bonus_campaigns') {
+            if (campaign?.bonusType === 'fixed') {
+                bonusAmount = campaign.bonusValue;
+            } else if (campaign?.bonusType === 'percentage') {
+                bonusAmount = (user?.balance || 0) * (campaign.bonusValue / 100);
+            }
+            description = `Daily Bonus: ${campaign?.title}`;
+        } else {
+             functions.logger.log("Unsupported campaign type for auto-payout.");
+             return;
+        }
+
+        if (bonusAmount > 0) {
+            // 1. Increment user's balance
+            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(bonusAmount) });
+
+            // 2. Create a transaction record
+            const transactionRef = db.collection("transactions").doc();
+            transaction.set(transactionRef, {
+                userId: userId,
+                type: 'bonus',
+                amount: bonusAmount,
+                status: 'completed',
+                description: description,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+             // 3. Increment the campaign's claimsCount
+            transaction.update(campaignRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
+        }
+      });
+      functions.logger.log(`Successfully processed bonus for user ${userId} from ${campaignCollection}.`);
+    } catch (e) {
+      functions.logger.error("Bonus claim transaction failed: ", e);
+    }
     
     return null;
   });
@@ -65,14 +159,20 @@ export const announceNewGame = functions.firestore
 
     let telegramBotToken;
     try {
+      // Use environment variables for sensitive data
       telegramBotToken = functions.config().telegram.token;
     } catch (error) {
-      functions.logger.error("Could not retrieve telegram.token from Functions config.");
+      functions.logger.error("Could not retrieve telegram.token from Functions config. Make sure it's set by running 'firebase functions:config:set telegram.token=YOUR_TOKEN'");
       return null;
+    }
+    
+    if(!telegramBotToken) {
+        functions.logger.error("Telegram bot token is not configured.");
+        return null;
     }
 
     const chatId = "@nexbattlerooms";
-    const siteUrl = "http://nexbattle.com";
+    const siteUrl = "http://nexbattle.com"; // Consider making this configurable
     const gameType = roomData.gameType ? `${roomData.gameType.charAt(0).toUpperCase()}${roomData.gameType.slice(1)}` : "Game";
     const wager = roomData.wager || 0;
     const createdBy = roomData.createdBy?.name || "A Player";
@@ -102,3 +202,5 @@ export const announceNewGame = functions.firestore
     }
     return null;
   });
+
+    

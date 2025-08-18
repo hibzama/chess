@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Gift, Loader2, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, getCountFromServer, doc, getDoc, writeBatch, serverTimestamp, increment, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, writeBatch, serverTimestamp, increment, addDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +15,7 @@ interface BonusCampaign {
     title: string;
     bonusAmount: number;
     userLimit: number;
-    claimsCount: number;
+    claimsCount?: number;
     isActive: boolean;
 }
 
@@ -49,24 +49,19 @@ export function BonusCard() {
         
         if (!querySnapshot.empty) {
             for (const docRef of querySnapshot.docs) {
-                const campaignData = { id: docRef.id, ...docRef.data() } as Omit<BonusCampaign, 'claimsCount'>;
-                const claimsRef = collection(db, `signup_bonus_campaigns/${docRef.id}/claims`);
+                const campaignData = { id: docRef.id, ...docRef.data() } as BonusCampaign;
                 
-                const [claimsSnapshot, userClaimDoc] = await Promise.all([
-                    getCountFromServer(claimsRef),
-                    getDoc(doc(claimsRef, user.uid))
-                ]);
-
+                // Check if user has already claimed this specific campaign
+                const userClaimDoc = await getDoc(doc(db, `signup_bonus_campaigns/${docRef.id}/claims`, user.uid));
                 if(userClaimDoc.exists()) {
                     setHasClaimed(true);
-                    setActiveCampaign(null);
+                    setActiveCampaign(null); // Ensure we don't show any campaign if one has been claimed.
                     return; // User has claimed this campaign, stop checking
                 }
 
-                const claimsCount = claimsSnapshot.data().count;
-
-                if (claimsCount < campaignData.userLimit) {
-                    setActiveCampaign({ ...campaignData, claimsCount });
+                // Check against the aggregated claimsCount on the document
+                if ((campaignData.claimsCount || 0) < campaignData.userLimit) {
+                    setActiveCampaign(campaignData);
                     setHasClaimed(false);
                     return; // Found an active, available campaign
                 }
@@ -84,27 +79,13 @@ export function BonusCard() {
     setIsClaiming(true);
 
     try {
-        const userRef = doc(db, 'users', user.uid);
-        const campaignRef = doc(db, 'signup_bonus_campaigns', activeCampaign.id);
         const claimRef = doc(collection(db, `signup_bonus_campaigns/${activeCampaign.id}/claims`), user.uid);
-        const transactionRef = doc(collection(db, 'transactions'));
-        
-        const batch = writeBatch(db);
-        
-        batch.update(userRef, { balance: increment(activeCampaign.bonusAmount) });
-        batch.set(claimRef, { userId: user.uid, claimedAt: serverTimestamp() });
-        batch.set(transactionRef, {
+        await addDoc(collection(db, `signup_bonus_campaigns/${activeCampaign.id}/claims`), {
             userId: user.uid,
-            type: 'bonus',
-            amount: activeCampaign.bonusAmount,
-            status: 'completed',
-            description: `Sign-up Bonus: ${activeCampaign.title}`,
-            createdAt: serverTimestamp(),
+            claimedAt: serverTimestamp()
         });
 
-        await batch.commit();
-
-        toast({ title: 'Bonus Claimed!', description: `LKR ${activeCampaign.bonusAmount.toFixed(2)} has been added to your wallet.` });
+        toast({ title: 'Bonus Claimed!', description: `LKR ${activeCampaign.bonusAmount.toFixed(2)} is being added to your wallet.` });
         setHasClaimed(true);
 
     } catch (error) {
@@ -119,7 +100,7 @@ export function BonusCard() {
     return null;
   }
 
-  const spotsLeft = activeCampaign.userLimit - activeCampaign.claimsCount;
+  const spotsLeft = activeCampaign.userLimit - (activeCampaign.claimsCount || 0);
 
   return (
     <Card className="bg-card/50 border-primary/20">
@@ -128,7 +109,7 @@ export function BonusCard() {
           <Gift className="w-6 h-6 text-yellow-300" />
           <span className="text-yellow-300">{activeCampaign.bonusAmount} LKR Registration Bonus!</span>
         </CardTitle>
-        <CardDescription>{activeCampaign.title} - The next {spotsLeft} users to register get a free bonus!</CardDescription>
+        <CardDescription>{activeCampaign.title} - The next {spotsLeft > 0 ? spotsLeft : 0} users to register get a free bonus!</CardDescription>
       </CardHeader>
       <CardFooter>
           <Button className="w-full" onClick={handleClaimBonus} disabled={isClaiming}>
@@ -138,3 +119,5 @@ export function BonusCard() {
     </Card>
   );
 }
+
+    

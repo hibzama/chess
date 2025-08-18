@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, writeBatch, collection, getDocs, query, where, Timestamp, getCountFromServer } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, writeBatch, collection, getDocs, query, where, Timestamp, addDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -59,7 +59,7 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
     useEffect(() => {
         const checkClaimStatus = async () => {
             if (!user) return;
-            const claimRef = doc(db, `users/${user.uid}/daily_bonus_claims`, campaign.id);
+            const claimRef = doc(db, `daily_bonus_campaigns/${campaign.id}/claims/${user.uid}`);
             const claimSnap = await getDoc(claimRef);
             setClaimed(claimSnap.exists());
         };
@@ -76,46 +76,25 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
     }, [user, campaign]);
 
     const handleClaimDailyBonus = async (campaign: DailyBonusCampaign) => {
-        if (!user || !userData) return;
+        if (!user || !userData || (campaign.claimsCount || 0) >= campaign.userLimit) {
+            toast({ variant: 'destructive', title: "Not eligible", description: "This bonus is no longer available." });
+            return;
+        }
         
         setIsClaiming(true);
 
-        const claimsCollectionRef = collection(db, `daily_bonus_campaigns/${campaign.id}/claims`);
-        const snapshot = await getCountFromServer(claimsCollectionRef);
-        if (snapshot.data().count >= campaign.userLimit) {
-            toast({ variant: 'destructive', title: "Limit Reached", description: "This bonus has already been claimed by the maximum number of users." });
-            setIsClaiming(false);
-            return;
-        }
-
-        const userRef = doc(db, 'users', user.uid);
-        const claimRef = doc(db, `users/${user.uid}/daily_bonus_claims`, campaign.id);
-        const adminClaimRef = doc(claimsCollectionRef, user.uid);
-        const transactionRef = doc(collection(db, 'transactions'));
-        
-        let bonusAmount = 0;
-        if(campaign.bonusType === 'fixed') {
-            bonusAmount = campaign.bonusValue;
-        } else {
-            bonusAmount = (userData.balance || 0) * (campaign.bonusValue / 100);
-        }
-
-        const batch = writeBatch(db);
-        batch.update(userRef, { balance: increment(bonusAmount) });
-        batch.set(claimRef, { claimedAt: serverTimestamp(), title: campaign.title, amount: bonusAmount });
-        batch.set(adminClaimRef, { userId: user.uid, claimedAt: serverTimestamp() });
-        batch.set(transactionRef, {
-            userId: user.uid, type: 'bonus', amount: bonusAmount,
-            status: 'completed', description: `Daily Bonus: ${campaign.title}`,
-            createdAt: serverTimestamp(),
-        });
+        const claimRef = doc(db, `daily_bonus_campaigns/${campaign.id}/claims`, user.uid);
         
         try {
-            await batch.commit();
-            toast({ title: "Success!", description: `LKR ${bonusAmount.toFixed(2)} has been added to your main balance.`});
+            await setDoc(claimRef, {
+                userId: user.uid,
+                claimedAt: serverTimestamp(),
+            });
+
+            toast({ title: "Success!", description: `Your bonus is being processed.`});
             setClaimed(true);
         } catch (error) {
-            console.error("Error claiming daily bonus: ", error);
+            console.error("Error creating daily bonus claim: ", error);
             toast({ variant: 'destructive', title: "Error", description: "Could not claim daily bonus." });
         } finally {
             setIsClaiming(false);
@@ -137,7 +116,7 @@ const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
                             <span>Claims Left</span>
                             <span>{claimsLeft > 0 ? claimsLeft : 0} / {campaign.userLimit}</span>
                         </div>
-                        <Progress value={(claimsLeft / campaign.userLimit) * 100} />
+                        <Progress value={(campaign.claimsCount || 0) / campaign.userLimit * 100} />
                     </div>
                 </div>
                 <div className="w-full md:w-auto text-center space-y-2">
@@ -202,21 +181,14 @@ export default function BonusCenterPage() {
             const now = new Date();
             const futureCampaigns = allActiveCampaigns.filter(c => c.endDate.toDate() > now);
 
-            const eligibleCampaignsPromises = futureCampaigns.map(async c => {
-                let isEligible = false;
-                if (c.eligibility === 'all') isEligible = true;
-                else if (c.eligibility === 'below') isEligible = (userData.balance || 0) <= c.balanceThreshold;
-                else if (c.eligibility === 'above') isEligible = (userData.balance || 0) > c.balanceThreshold;
-                
-                if(!isEligible) return null;
-
-                const claimsQuery = query(collection(db, `daily_bonus_campaigns/${c.id}/claims`));
-                const claimsSnapshot = await getCountFromServer(claimsQuery);
-                return { ...c, claimsCount: claimsSnapshot.data().count };
+            const eligibleCampaigns = futureCampaigns.filter(c => {
+                if (c.eligibility === 'all') return true;
+                if (c.eligibility === 'below') return (userData.balance || 0) <= c.balanceThreshold;
+                if (c.eligibility === 'above') return (userData.balance || 0) > c.balanceThreshold;
+                return false;
             });
+            setDailyCampaigns(eligibleCampaigns);
 
-            const eligibleCampaignsWithCounts = (await Promise.all(eligibleCampaignsPromises)).filter(Boolean) as DailyBonusCampaign[];
-            setDailyCampaigns(eligibleCampaignsWithCounts);
 
             // Referral Bonus Settings & Status
             const referralSettingsRef = doc(db, 'settings', 'referralBonusConfig');
@@ -330,3 +302,5 @@ export default function BonusCenterPage() {
         </div>
     )
 }
+
+    
