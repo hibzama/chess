@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Gift, Loader2, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, serverTimestamp, increment, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, serverTimestamp, increment, setDoc } from 'firebase/firestore';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -29,7 +29,6 @@ export function BonusCard() {
 
   useEffect(() => {
     if (!user) {
-        setHasClaimed(true);
         setLoading(false);
         return;
     }
@@ -38,40 +37,41 @@ export function BonusCard() {
     const fetchBonusConfig = async () => {
         try {
             const campaignsRef = collection(db, 'signup_bonus_campaigns');
-            const q = query(campaignsRef, where("isActive", "==", true));
+            const q = query(campaignsRef, where("isActive", "==", true), where("userLimit", ">", 0));
             const querySnapshot = await getDocs(q);
             
             if (!querySnapshot.empty) {
-                for (const docRef of querySnapshot.docs) {
-                    const campaignData = { id: docRef.id, ...docRef.data() } as BonusCampaign;
-                    
-                    const userClaimQuery = query(collection(db, `bonus_claims`), where('userId', '==', user.uid), where('campaignId', '==', campaignData.id));
-                    const userClaimSnapshot = await getDocs(userClaimQuery);
-                    
-                    if(!userClaimSnapshot.empty) {
-                        setHasClaimed(true);
-                        setActiveCampaign(null); 
-                        setLoading(false);
-                        return; 
-                    }
-                    
-                    const claimsCountQuery = query(collection(db, 'bonus_claims'), where('campaignId', '==', campaignData.id));
-                    const claimsCountSnapshot = await getDocs(claimsCountQuery);
+                const campaignDoc = querySnapshot.docs[0];
+                const campaignData = { id: campaignDoc.id, ...campaignDoc.data() } as BonusCampaign;
 
-                    if (claimsCountSnapshot.size < campaignData.userLimit) {
-                        setActiveCampaign({...campaignData, claimsCount: claimsCountSnapshot.size});
-                        setHasClaimed(false);
-                        setLoading(false);
-                        return;
-                    }
+                if ((campaignData.claimsCount || 0) >= campaignData.userLimit) {
+                    setActiveCampaign(null);
+                    setHasClaimed(true);
+                    setLoading(false);
+                    return;
                 }
+
+                const userClaimQuery = query(collection(db, `bonus_claims`), where('userId', '==', user.uid), where('campaignId', '==', campaignData.id));
+                const userClaimSnapshot = await getDocs(userClaimQuery);
+                
+                if(!userClaimSnapshot.empty) {
+                    setHasClaimed(true);
+                    setActiveCampaign(null); 
+                } else {
+                    setActiveCampaign(campaignData);
+                    setHasClaimed(false);
+                }
+            } else {
+                 setActiveCampaign(null);
+                 setHasClaimed(true);
             }
         } catch (error) {
             console.error("Error fetching bonus config:", error);
+            setHasClaimed(true); 
+            setActiveCampaign(null);
+        } finally {
+            setLoading(false);
         }
-        setHasClaimed(true); 
-        setActiveCampaign(null);
-        setLoading(false);
     };
     fetchBonusConfig();
   }, [user]);
@@ -103,8 +103,7 @@ export function BonusCard() {
     }
   }
 
-  // Do not show the card if there is no active campaign, or if the user has already claimed it.
-  if (loading || hasClaimed === null || hasClaimed || !activeCampaign) {
+  if (loading || hasClaimed || !activeCampaign) {
     return null;
   }
 

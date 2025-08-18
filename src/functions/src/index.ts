@@ -125,32 +125,34 @@ export const onBonusClaim = functions.firestore
       return null;
     }
     
-    let campaignRef;
+    let campaignCollectionName: string;
     
     // Determine the collection based on the claim type
     switch(type) {
         case 'signup':
-            campaignRef = admin.firestore().doc(`signup_bonus_campaigns/${campaignId}`);
+            campaignCollectionName = 'signup_bonus_campaigns';
             break;
         case 'daily':
-            campaignRef = admin.firestore().doc(`daily_bonus_campaigns/${campaignId}`);
+            campaignCollectionName = 'daily_bonus_campaigns';
             break;
         case 'referrer':
         case 'referee':
-             campaignRef = admin.firestore().doc(`referral_campaigns/${campaignId}`);
+             campaignCollectionName = 'referral_campaigns';
             break;
         default:
             functions.logger.error(`Unknown claim type: ${type}`);
             return null;
     }
 
+    const campaignRef = admin.firestore().doc(`${campaignCollectionName}/${campaignId}`);
+
     try {
         await campaignRef.update({
             claimsCount: admin.firestore.FieldValue.increment(1)
         });
-        functions.logger.log(`Incremented claimsCount for campaign ${campaignId}`);
+        functions.logger.log(`Incremented claimsCount for campaign ${campaignId} in ${campaignCollectionName}`);
     } catch (error) {
-        functions.logger.error(`Failed to increment claimsCount for campaign ${campaignId}`, error);
+        functions.logger.error(`Failed to increment claimsCount for campaign ${campaignId} in ${campaignCollectionName}`, error);
     }
     
     return null;
