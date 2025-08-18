@@ -20,7 +20,7 @@ interface BonusClaim {
     userName?: string;
     amount: number;
     campaignTitle: string;
-    type: 'referee' | 'referrer';
+    type: 'referee' | 'referrer' | 'signup' | 'daily';
     status: 'pending' | 'approved' | 'rejected';
     createdAt: any;
     refereeId?: string; 
@@ -50,42 +50,20 @@ export default function BonusClaimsPage() {
 
     useEffect(() => {
         setLoading(true);
-        const handleError = (error: Error) => {
-            console.error(`Error fetching referral claims:`, error);
-            toast({ variant: 'destructive', title: `Error fetching claims.`, description: error.message });
-        };
         
-        // Use two separate queries and combine the results client-side
-        const fetchClaims = async () => {
-            try {
-                const refereeQuery = query(collection(db, 'bonus_claims'), where('type', '==', 'referee'));
-                const referrerQuery = query(collection(db, 'bonus_claims'), where('type', '==', 'referrer'));
+        const q = query(collection(db, 'bonus_claims'), orderBy('createdAt', 'desc'), limit(200));
 
-                const [refereeSnapshot, referrerSnapshot] = await Promise.all([
-                    getDocs(refereeQuery),
-                    getDocs(referrerQuery)
-                ]);
+        const unsubscribe = onSnapshot(q, async (snapshot) => {
+            const claims = await enrichClaims(snapshot);
+            setAllClaims(claims);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching claims:", error);
+            toast({ variant: 'destructive', title: "Error", description: "Failed to fetch claims history."});
+            setLoading(false);
+        });
 
-                const refereeClaims = await enrichClaims(refereeSnapshot);
-                const referrerClaims = await enrichClaims(referrerSnapshot);
-                
-                const combinedClaims = [...refereeClaims, ...referrerClaims];
-                combinedClaims.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
-
-                setAllClaims(combinedClaims.slice(0, 200)); // Limit on the client
-            } catch (error) {
-                 handleError(error as Error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchClaims();
-        
-        // Note: Real-time updates with this combined approach are more complex. 
-        // For an admin page, a manual refresh or fetching on mount is often sufficient.
-        // If real-time is strictly needed, two separate onSnapshot listeners would be used.
-
+        return () => unsubscribe();
     }, [toast]);
 
     const pendingClaims = useMemo(() => allClaims.filter(c => c.status === 'pending'), [allClaims]);
@@ -181,8 +159,8 @@ export default function BonusClaimsPage() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Referral Bonus Claims</CardTitle>
-                <CardDescription>Review and manage all bonus claims from referral campaigns (both task and campaign completion).</CardDescription>
+                <CardTitle>Bonus Claims</CardTitle>
+                <CardDescription>Review and manage all types of bonus claims (Signup, Daily, Referral).</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">

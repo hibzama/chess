@@ -68,7 +68,7 @@ const DailyBonusCard = ({ campaign, onClaimSuccess }: { campaign: DailyBonusCamp
             const result: any = await claimDailyBonusFunction({ campaignId: campaign.id });
             
             if (result.data.success) {
-                toast({ title: "Success!", description: `LKR ${result.data.bonusAmount.toFixed(2)} has been added to your wallet.`});
+                toast({ title: "Success!", description: `Your bonus claim of LKR ${result.data.bonusAmount.toFixed(2)} has been submitted for admin approval.`});
                 onClaimSuccess(campaign.id);
             } else {
                  throw new Error(result.data.message || "Claim failed on the server.");
@@ -123,7 +123,7 @@ const DailyBonusCard = ({ campaign, onClaimSuccess }: { campaign: DailyBonusCamp
 
 
 export default function DailyBonusPage() {
-    const { user, userData, setUserData } = useAuth();
+    const { user, userData } = useAuth();
     const [dailyCampaigns, setDailyCampaigns] = useState<DailyBonusCampaign[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -169,13 +169,6 @@ export default function DailyBonusPage() {
     
     const handleClaimSuccess = (claimedCampaignId: string) => {
         setDailyCampaigns(prev => prev.filter(c => c.id !== claimedCampaignId));
-        if(user) {
-            getDoc(doc(db, 'users', user.uid)).then(docSnap => {
-                if (docSnap.exists()) {
-                    setUserData(docSnap.data() as any);
-                }
-            })
-        }
     }
 
     if (loading) {
