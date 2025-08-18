@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
@@ -69,35 +68,33 @@ export default function YourTaskPage() {
         setIsSubmitting(true);
         
         try {
-            const batch = writeBatch(db);
             const userRef = doc(db, 'users', user.uid);
+            
             const newCompletedTasks = [...(userData.campaignInfo.completedTasks || []), task.id];
+            const newAnswers = {
+                ...(userData.campaignInfo.answers || {}),
+                [task.id]: answer
+            };
             
-            // 1. Update the user's document to show they've completed the task.
-            batch.update(userRef, {
+            // This is a secure operation as users are allowed to update their own document.
+            await updateDoc(userRef, {
                 'campaignInfo.completedTasks': newCompletedTasks,
-                'campaignInfo.answers': {
-                    ...(userData.campaignInfo.answers || {}),
-                    [task.id]: answer
-                },
+                'campaignInfo.answers': newAnswers
             });
-            
-            // 2. Create a pending bonus claim for admin review.
+
+            // This creates the pending claim for admin review
             if (task.refereeBonus > 0) {
-                 const claimRef = doc(collection(db, 'bonus_claims'));
-                 batch.set(claimRef, {
+                 await addDoc(collection(db, 'bonus_claims'), {
                     userId: user.uid,
                     type: 'referee',
                     amount: task.refereeBonus,
                     status: 'pending',
                     campaignId: campaign.id,
-                    campaignTitle: `Task Completion: ${task.description}`,
+                    campaignTitle: `Task: ${task.description}`,
                     answer: answer,
                     createdAt: serverTimestamp(),
                 });
             }
-
-            await batch.commit();
 
             toast({ title: "Task Submitted!", description: `Your answer has been submitted for review. Any bonus will be added upon approval.`});
             
@@ -108,7 +105,8 @@ export default function YourTaskPage() {
                     ...prev,
                     campaignInfo: {
                         ...prev.campaignInfo,
-                        completedTasks: newCompletedTasks
+                        completedTasks: newCompletedTasks,
+                        answers: newAnswers
                     }
                 };
             });

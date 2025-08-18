@@ -44,64 +44,9 @@ export const onUserCreate = functions.firestore
     }
     
     // --- 2. Handle Sign-up Bonus ---
-    try {
-        const campaignsQuery = await db.collection('signup_bonus_campaigns')
-                                        .where('isActive', '==', true)
-                                        .get();
-
-        if (!campaignsQuery.empty) {
-            const campaignDoc = campaignsQuery.docs[0];
-            const campaign = campaignDoc.data();
-            
-            const claimsRef = db.collection(`signup_bonus_campaigns/${campaignDoc.id}/claims`);
-            const claimsSnapshot = await claimsRef.count().get();
-            const claimsCount = claimsSnapshot.data().count;
-
-            if (claimsCount < campaign.userLimit) {
-                const batch = db.batch();
-                
-                batch.update(newUserRef, {
-                    balance: admin.firestore.FieldValue.increment(campaign.bonusAmount),
-                });
-                
-                // Creates a claim in the root bonus_claims collection
-                const userClaimRef = db.collection('bonus_claims').doc();
-                batch.set(userClaimRef, {
-                    userId: userId,
-                    campaignId: campaignDoc.id,
-                    title: campaign.title,
-                    amount: campaign.bonusAmount,
-                    type: 'signup',
-                    status: 'approved', // Sign-up bonuses are auto-approved
-                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                const campaignClaimRef = db.doc(`signup_bonus_campaigns/${campaignDoc.id}/claims/${userId}`);
-                batch.set(campaignClaimRef, {
-                    userId: userId,
-                    claimedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-
-                const transactionRef = db.collection('transactions').doc();
-                 batch.set(transactionRef, {
-                    userId: userId,
-                    type: 'bonus',
-                    amount: campaign.bonusAmount,
-                    status: 'completed',
-                    description: `Sign-up Bonus: ${campaign.title}`,
-                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
-                
-                await batch.commit();
-                functions.logger.log(`Awarded sign-up bonus of ${campaign.bonusAmount} to user ${userId} from campaign "${campaign.title}".`);
-            } else {
-                 functions.logger.log(`Sign-up bonus campaign "${campaign.title}" has reached its user limit.`);
-            }
-        }
-    } catch(error) {
-        functions.logger.error(`Error processing sign-up bonus for user ${userId}`, error);
-    }
-
+    // This logic is now handled by the frontend creating a pending `bonus_claims` document.
+    // The backend logic is removed from here to prevent conflicts and permission errors.
+    
     return null;
   });
 

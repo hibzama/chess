@@ -57,15 +57,14 @@ export default function ReferralClaimsPage() {
         };
         
         const q = query(
-            collectionGroup(db, 'bonus_claims'),
+            collection(db, 'bonus_claims'),
+            orderBy('createdAt', 'desc'),
             limit(100) 
         );
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            // Sort claims client-side to avoid index requirement
-            const sortedClaims = claims.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
-            setAllClaims(sortedClaims);
+            setAllClaims(claims);
             setLoading(false);
         }, (err) => handleError(err, 'all'));
         
@@ -94,21 +93,9 @@ export default function ReferralClaimsPage() {
                         description: `Referral Bonus: ${claim.campaignTitle}`,
                         createdAt: serverTimestamp(),
                     });
-
-                    // If it's a referrer bonus, finalize the campaign for the user
-                    if (claim.type === 'referrer') {
-                        const userCampaignRef = doc(db, 'users', claim.userId, 'active_campaigns', 'current');
-                        transaction.delete(userCampaignRef);
-                    }
                 });
                 toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
             } else { // Rejected
-                 // If a referrer claim is rejected, we should allow them to try again.
-                 // We reset their campaign status by setting `completed` to false.
-                 if (claim.type === 'referrer') {
-                     const userCampaignRef = doc(db, 'users', claim.userId, 'active_campaigns', 'current');
-                     await updateDoc(userCampaignRef, { completed: false });
-                 }
                 await updateDoc(claimRef, { status: 'rejected' });
                 toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
             }
@@ -174,8 +161,8 @@ export default function ReferralClaimsPage() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Referral Bonus Claims</CardTitle>
-                <CardDescription>Review and manage all bonus claims from referral campaigns.</CardDescription>
+                <CardTitle>Bonus Claims Management</CardTitle>
+                <CardDescription>Review and manage all bonus claims from sign-ups and referral campaigns.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">
