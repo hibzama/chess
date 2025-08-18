@@ -89,15 +89,6 @@ function RegisterForm() {
             // Send verification email
             await sendEmailVerification(user);
 
-            const usersCollection = collection(db, "users");
-            const snapshot = await getCountFromServer(usersCollection);
-            const userCount = snapshot.data().count;
-            
-            let initialBalance = 0;
-            if (userCount < 250) {
-                initialBalance = 100;
-            }
-
             const avatarCollection = gender === 'male' ? boyAvatars : girlAvatars;
             const randomAvatar = avatarCollection[Math.floor(Math.random() * avatarCollection.length)];
             const svgString = renderToString(React.createElement(randomAvatar));
@@ -114,7 +105,7 @@ function RegisterForm() {
                 country,
                 gender,
                 binancePayId: '',
-                balance: initialBalance,
+                balance: 0,
                 commissionBalance: 0,
                 marketingBalance: 0,
                 role: 'user',
