@@ -53,7 +53,7 @@ const Countdown = ({ targetDate }: { targetDate: Date }) => {
 const DailyBonusCard = ({ campaign }: { campaign: DailyBonusCampaign }) => {
     const { user, userData } = useAuth();
     const { toast } = useToast();
-    const [claimed, setClaimed] = useState(true); // Assume claimed initially
+    const [claimed, setClaimed] = useState(false);
     const [isClaiming, setIsClaiming] = useState(false);
     const [status, setStatus] = useState<'pending' | 'active' | 'expired'>('pending');
     
