@@ -97,8 +97,6 @@ export const onBonusClaim = functions.firestore
             campaignCollectionName = 'signup_bonus_campaigns';
             break;
         case 'daily':
-             // This is now handled by the onCall function, but we keep the case for safety.
-             // No increment needed here as the onCall function does it transactionally.
              return null;
         case 'referrer':
         case 'referee':
@@ -155,19 +153,18 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
                 throw new functions.https.HttpsError('not-found', 'User data not found.');
             }
 
-            const campaign = campaignDoc.data();
-            const user = userDoc.data();
+            const campaign = campaignDoc.data()!;
+            const user = userDoc.data()!;
             const now = new Date();
             
-            if (!campaign?.isActive || campaign.endDate.toDate() < now) {
+            if (!campaign.isActive || campaign.endDate.toDate() < now) {
                 throw new functions.https.HttpsError('failed-precondition', 'This bonus is no longer active.');
             }
             if ((campaign.claimsCount || 0) >= campaign.userLimit) {
                 throw new functions.https.HttpsError('failed-precondition', 'This bonus has reached its claim limit.');
             }
             
-            const currentBalance = user?.balance || 0;
-            // Eligibility Check
+            const currentBalance = user.balance || 0;
             if (campaign.eligibility === 'below' && currentBalance > campaign.balanceThreshold) {
                 throw new functions.https.HttpsError('failed-precondition', `Your balance must be below LKR ${campaign.balanceThreshold} to claim.`);
             }
@@ -175,9 +172,8 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
                 throw new functions.https.HttpsError('failed-precondition', `Your balance must be above LKR ${campaign.balanceThreshold} to claim.`);
             }
             
-            // Calculate Bonus
             let bonusAmount = 0;
-            if(campaign.bonusType === 'fixed') {
+            if (campaign.bonusType === 'fixed') {
                 bonusAmount = campaign.bonusValue;
             } else if (campaign.bonusType === 'percentage') {
                 bonusAmount = currentBalance * (campaign.bonusValue / 100);
@@ -187,11 +183,8 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
                  throw new functions.https.HttpsError('failed-precondition', 'Bonus amount must be greater than zero.');
             }
             
-            // Perform writes
-            const newBalance = currentBalance + bonusAmount;
-
             transaction.set(claimRef, { userId, claimedAt: admin.firestore.FieldValue.serverTimestamp(), campaignId: campaignId });
-            transaction.update(userRef, { balance: newBalance });
+            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(bonusAmount) });
             transaction.update(campaignRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
             
             const transactionRef = db.collection('transactions').doc();
@@ -209,11 +202,11 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
 
         return result;
 
-    } catch (error) {
-        console.error("Error claiming daily bonus:", error);
+    } catch (error: any) {
+        functions.logger.error("Error claiming daily bonus:", error);
         if (error instanceof functions.https.HttpsError) {
             throw error;
         }
-        throw new functions.https.HttpsError('internal', 'An unexpected error occurred.');
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred. Please try again.');
     }
 });
