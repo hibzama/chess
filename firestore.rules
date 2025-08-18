@@ -18,18 +18,19 @@ service cloud.firestore {
 
     // USER rules
     match /users/{userId} {
-      // Allow any authenticated user to read any user profile. Necessary for viewing profiles, friends lists, and for game logic.
       allow read: if isAuth();
 
-      // A user can create their own document, and an admin can create users.
+      // Allow creating own user document, or admin can create any.
       allow create: if isUser(userId) || isAdmin();
 
-      // A user can only update their own document, or an admin can update any.
-      allow update: if isUser(userId) || isAdmin();
-      
-      // Only an admin can delete a user.
-      allow delete: if isAdmin();
-      
+      // Allow user to update their own document, or admin can update any.
+      // Allow any authenticated user to only update the l1Count for referrals.
+      allow update: if (isUser(userId) || isAdmin()) ||
+                       (isAuth() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['l1Count']));
+
+      // Allow user to delete their own account, or admin to delete any.
+      allow delete: if isUser(userId) || isAdmin();
+
       match /{subcollection}/{docId} {
         allow read, write: if isUser(userId) || isAdmin();
       }
@@ -39,9 +40,9 @@ service cloud.firestore {
     match /game_rooms/{roomId} {
       allow read: if isAuth();
       allow create: if isAuth() && request.resource.data.createdBy.uid == request.auth.uid;
-      allow update: if isAuth(); // Allow updates for joining, playing, and ending games.
+      allow update: if isAuth();
       allow delete: if isAuth() && resource.data.createdBy.uid == request.auth.uid;
-      
+
       match /messages/{messageId} {
         allow read, create: if isAuth() && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
       }
@@ -53,25 +54,19 @@ service cloud.firestore {
       allow create: if isAuth();
       allow update, delete: if isAdmin();
     }
-    
-    // TASKS rules
-    match /tasks/{taskId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
-    }
 
     // BONUS & CAMPAIGN rules
     match /signup_bonus_campaigns/{campaignId} {
       allow read: if isAuth();
       allow write: if isAdmin();
-    }
-
-    match /deposit_bonus_campaigns/{campaignId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
-       match /claims/{claimId} {
+      match /claims/{claimId} {
         allow read, write: if isAuth();
       }
+    }
+
+    match /tasks/{taskId} {
+        allow read: if isAuth();
+        allow write: if isAdmin();
     }
 
     match /referral_campaigns/{campaignId} {
@@ -86,18 +81,17 @@ service cloud.firestore {
         allow delete: if isAdmin();
     }
 
-    // FRIEND REQUESTS rules
-    match /friend_requests/{reqId} {
-        allow read: if isAuth() && (resource.data.toId == request.auth.uid || resource.data.fromId == request.auth.uid);
-        allow create: if isAuth() && request.resource.data.fromId == request.auth.uid;
-        allow delete: if isAuth() && (resource.data.toId == request.auth.uid || resource.data.fromId == request.auth.uid);
-    }
-
     // MARKETING rules
     match /marketing_applications/{appId} {
       allow read: if isAdmin();
-      allow create: if isAuth();
+      allow create: if true; // Open for anyone to apply
       allow update: if isAdmin();
+    }
+    
+    match /friend_requests/{reqId} {
+      allow read: if isAuth() && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid);
+      allow create: if isAuth() && request.resource.data.fromId == request.auth.uid;
+      allow delete: if isAuth() && (resource.data.fromId == request.auth.uid || resource.data.toId == request.auth.uid);
     }
 
     // NOTIFICATIONS rules
@@ -121,6 +115,5 @@ service cloud.firestore {
         allow read: if isAuth();
         allow write: if isAdmin();
     }
-
   }
 }
