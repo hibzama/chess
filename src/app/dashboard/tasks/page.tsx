@@ -107,10 +107,13 @@ export default function TasksPage() {
             setLoading(true);
 
             // Fetch active tasks
-            const now = Timestamp.now();
-            const tasksQuery = query(collection(db, 'tasks'), where('isActive', '==', true), where('endDate', '>', now));
+            const now = new Date();
+            const tasksQuery = query(collection(db, 'tasks'), where('isActive', '==', true));
             const tasksSnapshot = await getDocs(tasksQuery);
-            const activeTasks = tasksSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Task));
+            // Client-side filtering for endDate
+            const activeTasks = tasksSnapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Task))
+                .filter(task => task.endDate.toDate() > now);
             
             // Fetch user's claims for these tasks
             const claimsQuery = query(collection(db, 'bonus_claims'), where('userId', '==', user.uid), where('type', '==', 'task'));
