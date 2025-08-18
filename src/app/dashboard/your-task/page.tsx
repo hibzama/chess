@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/auth-context';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, writeBatch, collection, serverTimestamp, addDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -77,6 +77,7 @@ export default function YourTaskPage() {
             const userRef = doc(db, 'users', user.uid);
             const newCompletedTasks = [...(userData.campaignInfo.completedTasks || []), task.id];
             
+            // 1. Update the user's document to show they've completed the task.
             batch.update(userRef, {
                 'campaignInfo.completedTasks': newCompletedTasks,
                 'campaignInfo.answers': {
@@ -85,24 +86,24 @@ export default function YourTaskPage() {
                 },
             });
             
-             if (task.refereeBonus > 0) {
-                const claimRef = doc(collection(db, 'bonus_claims'));
-                batch.set(claimRef, {
+            // 2. Create a submission document for admin review.
+            if (task.refereeBonus > 0) {
+                const submissionRef = doc(collection(db, 'campaign_submissions'));
+                batch.set(submissionRef, {
                     userId: user.uid,
-                    refereeId: user.uid,
                     campaignId: campaign.id,
-                    type: 'referee',
-                    amount: task.refereeBonus,
-                    status: 'pending',
-                    campaignTitle: `Task: ${task.description.substring(0,30)}...`,
+                    taskId: task.id,
+                    taskDescription: task.description,
                     answer: answer,
+                    bonusAmount: task.refereeBonus,
+                    status: 'pending', // Admins will review this
                     createdAt: serverTimestamp(),
                 });
             }
 
             await batch.commit();
 
-            toast({ title: "Task Submitted!", description: `Your bonus claim for LKR ${task.refereeBonus.toFixed(2)} is pending approval.`});
+            toast({ title: "Task Submitted!", description: `Your answer has been submitted for review. Any bonus will be added upon approval.`});
             
             // Manually update local state to reflect change immediately
             setUserData(prev => {
@@ -174,7 +175,7 @@ export default function YourTaskPage() {
                                     <TableCell>{task.description}</TableCell>
                                     <TableCell>LKR {task.refereeBonus.toFixed(2)}</TableCell>
                                     <TableCell>
-                                        <Badge variant="secondary" className="gap-1.5"><Clock className="w-3 h-3"/> Pending</Badge>
+                                        <Badge variant="secondary" className="gap-1.5"><Clock className="w-3 h-3"/> Pending Approval</Badge>
                                     </TableCell>
                                 </TableRow>
                                 ))}
@@ -222,7 +223,7 @@ export default function YourTaskPage() {
                     </CardContent>
                     <CardFooter>
                         <Button onClick={() => handleSubmit(task)} disabled={isSubmitting || !answers[task.id]?.trim()}>
-                            {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit & Claim Bonus"}
+                            {isSubmitting ? <Loader2 className="animate-spin" /> : "Submit Answer"}
                         </Button>
                     </CardFooter>
                 </Card>
