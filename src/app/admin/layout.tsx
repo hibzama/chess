@@ -139,7 +139,7 @@ export default function AdminLayout({
                              <Link href="/admin/referral-campaigns"><SidebarMenuButton tooltip="Referral Campaigns" isActive={isActive('/admin/referral-campaigns')}><Award /><span>Referral Campaigns</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/bonus/referral-claims"><SidebarMenuButton tooltip="Referral Claims" isActive={isActive('/admin/bonus/referral-claims')}><CheckSquare /><span>Referral Claims</span></SidebarMenuButton></Link>
+                             <Link href="/admin/bonus/referral-claims"><SidebarMenuButton tooltip="Bonus Claims" isActive={isActive('/admin/bonus/referral-claims')}><CheckSquare /><span>Bonus Claims</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/mailer"><SidebarMenuButton tooltip="Mailer" isActive={pathname === '/admin/mailer'}><Mail /><span>Mailer</span></SidebarMenuButton></Link>
@@ -183,3 +183,5 @@ export default function AdminLayout({
         </SidebarProvider>
     )
   }
+
+    

@@ -1,7 +1,8 @@
+
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, collectionGroup, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, arrayRemove, orderBy, limit, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, orderBy, limit, deleteDoc, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -42,7 +43,7 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
     return Promise.all(claimsDataPromises);
 }
 
-export default function ReferralClaimsPage() {
+export default function BonusClaimsPage() {
     const [allClaims, setAllClaims] = useState<BonusClaim[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
@@ -57,7 +58,7 @@ export default function ReferralClaimsPage() {
         const q = query(
             collection(db, 'bonus_claims'),
             orderBy('createdAt', 'desc'),
-            limit(100) 
+            limit(200) 
         );
 
         const unsubscribe = onSnapshot(q, async (snapshot) => {
@@ -127,7 +128,7 @@ export default function ReferralClaimsPage() {
                     {claims.map((claim) => (
                         <TableRow key={claim.id}>
                             <TableCell><Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary">{claim.userName}</Link></TableCell>
-                            <TableCell>{claim.amount.toFixed(2)}</TableCell>
+                            <TableCell>LKR {claim.amount.toFixed(2)}</TableCell>
                             <TableCell>
                                 {claim.campaignTitle}
                                 {claim.type === 'referee' && claim.answer && (
@@ -160,7 +161,7 @@ export default function ReferralClaimsPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Bonus Claims Management</CardTitle>
-                <CardDescription>Review and manage all bonus claims from sign-ups and referral campaigns.</CardDescription>
+                <CardDescription>Review and manage all bonus claims from sign-ups, daily bonuses, and referral campaigns.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">
@@ -179,3 +180,5 @@ export default function ReferralClaimsPage() {
         </Card>
     );
 }
+
+    
