@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, orderBy, limit, deleteDoc, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, orderBy, limit, deleteDoc, where, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -55,20 +55,37 @@ export default function BonusClaimsPage() {
             toast({ variant: 'destructive', title: `Error fetching claims.`, description: error.message });
         };
         
-        const q = query(
-            collection(db, 'bonus_claims'),
-            where('type', 'in', ['referee', 'referrer']),
-            orderBy('createdAt', 'desc'),
-            limit(200) 
-        );
+        // Use two separate queries and combine the results client-side
+        const fetchClaims = async () => {
+            try {
+                const refereeQuery = query(collection(db, 'bonus_claims'), where('type', '==', 'referee'));
+                const referrerQuery = query(collection(db, 'bonus_claims'), where('type', '==', 'referrer'));
 
-        const unsubscribe = onSnapshot(q, async (snapshot) => {
-            const claims = await enrichClaims(snapshot);
-            setAllClaims(claims);
-            setLoading(false);
-        }, (err) => handleError(err));
+                const [refereeSnapshot, referrerSnapshot] = await Promise.all([
+                    getDocs(refereeQuery),
+                    getDocs(referrerQuery)
+                ]);
+
+                const refereeClaims = await enrichClaims(refereeSnapshot);
+                const referrerClaims = await enrichClaims(referrerSnapshot);
+                
+                const combinedClaims = [...refereeClaims, ...referrerClaims];
+                combinedClaims.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+
+                setAllClaims(combinedClaims.slice(0, 200)); // Limit on the client
+            } catch (error) {
+                 handleError(error as Error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchClaims();
         
-        return () => unsubscribe();
+        // Note: Real-time updates with this combined approach are more complex. 
+        // For an admin page, a manual refresh or fetching on mount is often sufficient.
+        // If real-time is strictly needed, two separate onSnapshot listeners would be used.
+
     }, [toast]);
 
     const pendingClaims = useMemo(() => allClaims.filter(c => c.status === 'pending'), [allClaims]);
@@ -99,6 +116,9 @@ export default function BonusClaimsPage() {
                 await updateDoc(claimRef, { status: 'rejected' });
                 toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
             }
+            // Manually update local state for immediate UI feedback
+            setAllClaims(prev => prev.map(c => c.id === claim.id ? {...c, status: newStatus} : c));
+
         } catch (error: any) {
             console.error("Error processing claim: ", error);
             toast({ variant: 'destructive', title: "Error", description: error.message });
