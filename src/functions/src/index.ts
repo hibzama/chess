@@ -51,17 +51,6 @@ export const onUserCreate = functions.auth.user().onCreate(async (user) => {
 });
 
 
-// This function triggers whenever a bonus claim is created
-export const onBonusClaim = functions.firestore
-  .document("bonus_claims/{claimId}")
-  .onCreate(async (snap, context) => {
-    // This function is currently empty as per the latest request to move to manual admin approval.
-    // It can be used in the future for any post-claim-creation logic if needed.
-    functions.logger.log(`Bonus claim created: ${context.params.claimId}`);
-    return null;
-  });
-
-
 // This function triggers whenever a new document is created in 'game_rooms'
 export const announceNewGame = functions.firestore
   .document("game_rooms/{roomId}")
@@ -116,5 +105,53 @@ export const announceNewGame = functions.firestore
     } catch (error: any) {
       functions.logger.error("Error sending message to Telegram:", error.response?.data || error.message);
     }
+    return null;
+  });
+
+// This function triggers whenever a bonus claim is created
+export const onBonusClaim = functions.firestore
+  .document("bonus_claims/{claimId}")
+  .onCreate(async (snap, context) => {
+    const claimData = snap.data();
+    if (!claimData) {
+      functions.logger.error("No data in claim document");
+      return null;
+    }
+
+    const { campaignId, type } = claimData;
+
+    if (!campaignId) {
+      functions.logger.error(`Claim ${context.params.claimId} has no campaignId.`);
+      return null;
+    }
+    
+    let campaignRef;
+    
+    // Determine the collection based on the claim type
+    switch(type) {
+        case 'signup':
+            campaignRef = admin.firestore().doc(`signup_bonus_campaigns/${campaignId}`);
+            break;
+        case 'daily':
+            campaignRef = admin.firestore().doc(`daily_bonus_campaigns/${campaignId}`);
+            break;
+        case 'referrer':
+        case 'referee':
+             campaignRef = admin.firestore().doc(`referral_campaigns/${campaignId}`);
+            break;
+        default:
+            functions.logger.error(`Unknown claim type: ${type}`);
+            return null;
+    }
+
+    try {
+        await campaignRef.update({
+            claimsCount: admin.firestore.FieldValue.increment(1)
+        });
+        functions.logger.log(`Incremented claimsCount for campaign ${campaignId}`);
+    } catch (error) {
+        functions.logger.error(`Failed to increment claimsCount for campaign ${campaignId}`, error);
+    }
+    
     return null;
   });

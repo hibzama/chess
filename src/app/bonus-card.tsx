@@ -34,16 +34,6 @@ export function BonusCard() {
         return;
     }
 
-    // Check if the user is new (created within the last 24 hours)
-    const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime) : new Date();
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    if (creationTime < twentyFourHoursAgo) {
-        setHasClaimed(true);
-        setLoading(false);
-        return;
-    }
-
     setLoading(true);
     const fetchBonusConfig = async () => {
         const campaignsRef = collection(db, 'signup_bonus_campaigns');
@@ -64,9 +54,12 @@ export function BonusCard() {
                     setLoading(false);
                     return; 
                 }
+                
+                const claimsCountQuery = query(collection(db, 'bonus_claims'), where('campaignId', '==', campaignData.id));
+                const claimsCountSnapshot = await getDocs(claimsCountQuery);
 
-                if ((campaignData.claimsCount || 0) < campaignData.userLimit) {
-                    setActiveCampaign(campaignData);
+                if (claimsCountSnapshot.size < campaignData.userLimit) {
+                    setActiveCampaign({...campaignData, claimsCount: claimsCountSnapshot.size});
                     setHasClaimed(false);
                     setLoading(false);
                     return;
@@ -94,12 +87,6 @@ export function BonusCard() {
             campaignId: activeCampaign.id,
             campaignTitle: `Signup Bonus: ${activeCampaign.title}`,
             createdAt: serverTimestamp()
-        });
-
-        // Also update the campaign's claim count
-        const campaignRef = doc(db, 'signup_bonus_campaigns', activeCampaign.id);
-        await updateDoc(campaignRef, {
-            claimsCount: increment(1)
         });
 
         toast({ title: 'Bonus Claimed!', description: `Your bonus of LKR ${activeCampaign.bonusAmount.toFixed(2)} is pending admin approval.` });
