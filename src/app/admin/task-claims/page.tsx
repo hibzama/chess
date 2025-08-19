@@ -1,9 +1,9 @@
 
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db, functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { collection, onSnapshot, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, updateDoc, getDoc, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -48,10 +48,10 @@ export default function TaskClaimsPage() {
 
     useEffect(() => {
         setLoading(true);
-        const q = query(collection(db, 'bonus_claims'), where('type', '==', 'task'));
+        const q = query(collection(db, 'bonus_claims'), where('type', '==', 'task'), orderBy('createdAt', 'desc'));
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            setAllClaims(claims.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
+            setAllClaims(claims);
             setLoading(false);
         }, (error) => {
             console.error("Error fetching claims:", error);
@@ -78,8 +78,8 @@ export default function TaskClaimsPage() {
         }
     };
 
-    const pendingClaims = allClaims.filter(c => c.status === 'pending');
-    const historyClaims = allClaims.filter(c => c.status !== 'pending');
+    const pendingClaims = useMemo(() => allClaims.filter(c => c.status === 'pending'), [allClaims]);
+    const historyClaims = useMemo(() => allClaims.filter(c => c.status !== 'pending'), [allClaims]);
 
     const renderTable = (claims: BonusClaim[], type: 'pending' | 'history') => {
         if (loading) {
@@ -142,3 +142,4 @@ export default function TaskClaimsPage() {
         </Card>
     );
 }
+
