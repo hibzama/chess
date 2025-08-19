@@ -86,6 +86,7 @@ async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
 const ClaimsDialog = ({ task, open, onOpenChange }: { task: Task | null; open: boolean; onOpenChange: (open: boolean) => void }) => {
     const [allClaims, setAllClaims] = useState<BonusClaim[]>([]);
     const [loading, setLoading] = useState(true);
+    const [manualBonus, setManualBonus] = useState<Record<string, string>>({});
     const { toast } = useToast();
 
     useEffect(() => {
@@ -102,21 +103,36 @@ const ClaimsDialog = ({ task, open, onOpenChange }: { task: Task | null; open: b
         return () => unsubscribe();
     }, [task, open, toast]);
 
-    const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
+    const handleRejectClaim = async (claimId: string) => {
         try {
-            if (newStatus === 'approved') {
-                const approveClaimFunction = httpsCallable(functions, 'approveBonusClaim');
-                await approveClaimFunction({ claimId: claim.id });
-                toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
-            } else {
-                await updateDoc(doc(db, 'bonus_claims', claim.id), { status: 'rejected' });
-                toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
-            }
+            await updateDoc(doc(db, 'bonus_claims', claimId), { status: 'rejected' });
+            toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
         } catch (error: any) {
-            console.error("Error processing claim: ", error);
+             toast({ variant: 'destructive', title: "Error", description: "Could not reject claim." });
+        }
+    }
+
+    const handleManualBonus = async (claim: BonusClaim) => {
+        const amount = parseFloat(manualBonus[claim.id] || '0');
+        if (amount <= 0) {
+            toast({ variant: 'destructive', title: "Invalid Amount", description: "Please enter a valid bonus amount." });
+            return;
+        }
+
+        try {
+            const addManualBonusFunction = httpsCallable(functions, 'addManualBonus');
+            await addManualBonusFunction({ 
+                claimId: claim.id, 
+                amount: amount, 
+                userId: claim.userId,
+                description: claim.campaignTitle,
+            });
+            toast({ title: "Bonus Added!", description: `LKR ${amount.toFixed(2)} has been added to the user's wallet.` });
+        } catch (error: any) {
+            console.error("Error adding manual bonus: ", error);
             toast({ variant: 'destructive', title: "Error", description: error.message });
         }
-    };
+    }
     
     const pendingClaims = allClaims.filter(c => c.status === 'pending');
     const historyClaims = allClaims.filter(c => c.status !== 'pending');
@@ -135,9 +151,8 @@ const ClaimsDialog = ({ task, open, onOpenChange }: { task: Task | null; open: b
                     <TableRow>
                         <TableHead>User</TableHead>
                         <TableHead>Answers</TableHead>
-                        <TableHead>Amount</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead className="text-right">{type === 'pending' ? 'Actions' : 'Status'}</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -147,13 +162,28 @@ const ClaimsDialog = ({ task, open, onOpenChange }: { task: Task | null; open: b
                             <TableCell>
                                 <Accordion type="single" collapsible className="w-full max-w-xs"><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="py-1 text-xs">View Answers</AccordionTrigger><AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md space-y-1">{claim.answers ? Object.entries(claim.answers).map(([key, value]) => (<p key={key}><strong>Q:</strong> ...{key.slice(-4)} <strong>A:</strong> {value}</p>)) : <p>No answer.</p>}</AccordionContent></AccordionItem></Accordion>
                             </TableCell>
-                            <TableCell>LKR {claim.amount.toFixed(2)}</TableCell>
                             <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                             <TableCell className="text-right">
                                 {type === 'pending' ? (
-                                    <div className="space-x-2"><Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button><Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button></div>
+                                    <div className="flex items-center gap-2 justify-end">
+                                        <Input
+                                            type="number"
+                                            placeholder="LKR"
+                                            className="w-24 h-8"
+                                            value={manualBonus[claim.id] || ''}
+                                            onChange={(e) => setManualBonus(prev => ({...prev, [claim.id]: e.target.value}))}
+                                        />
+                                        <Button size="sm" variant="outline" onClick={() => handleManualBonus(claim)}>Add Balance</Button>
+                                        <Button size="sm" variant="destructive" onClick={() => handleRejectClaim(claim.id)}>Reject</Button>
+                                    </div>
                                 ) : (
-                                    <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">{claim.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}<span className="capitalize">{claim.status}</span></Badge>
+                                    <div className="flex flex-col items-end">
+                                        <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">
+                                            {claim.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                                            <span className="capitalize">{claim.status}</span>
+                                        </Badge>
+                                        {claim.status === 'approved' && <span className="text-xs text-muted-foreground">LKR {claim.amount.toFixed(2)}</span>}
+                                    </div>
                                 )}
                             </TableCell>
                         </TableRow>
@@ -443,5 +473,3 @@ export default function TasksPage() {
         </>
     );
 }
-
-    

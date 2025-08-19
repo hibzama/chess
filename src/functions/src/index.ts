@@ -153,41 +153,19 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
             }
             
             const userRef = db.doc(`users/${claimData.userId}`);
+            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(claimData.amount) });
             
-            // For task claims, the bonus amount depends on the user's balance at the time of approval
-            let finalAmount = claimData.amount;
-            if (claimData.type === 'task') {
-                const userDoc = await transaction.get(userRef);
-                const campaignDoc = await transaction.get(db.doc(`tasks/${claimData.campaignId}`));
-                
-                if (userDoc.exists() && campaignDoc.exists()) {
-                    const balance = userDoc.data()?.balance || 0;
-                    const tiers = campaignDoc.data()?.bonusTiers;
-                    if (balance <= 10) finalAmount = tiers.tier1;
-                    else if (balance <= 50) finalAmount = tiers.tier2;
-                    else if (balance <= 100) finalAmount = tiers.tier3;
-                    else if (balance <= 150) finalAmount = tiers.tier4;
-                    else if (balance <= 200) finalAmount = tiers.tier5;
-                    else if (balance <= 250) finalAmount = tiers.tier6;
-                    else finalAmount = tiers.tier7;
-                }
-            }
-            
-            if (finalAmount > 0) {
-                 transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(finalAmount) });
-            }
-
             const transactionRef = db.collection('transactions').doc();
             transaction.set(transactionRef, {
                 userId: claimData.userId,
                 type: 'bonus',
-                amount: finalAmount,
+                amount: claimData.amount,
                 status: 'completed',
                 description: `${claimData.campaignTitle}`,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            transaction.update(claimRef, { status: 'approved', amount: finalAmount });
+            transaction.update(claimRef, { status: 'approved' });
         });
         
         return { success: true };
@@ -197,6 +175,63 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
             throw error;
         }
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred while approving the claim.');
+    }
+});
+
+
+export const addManualBonus = functions.https.onCall(async (data, context) => {
+    if (!context.auth || !context.auth.token.admin) {
+        throw new functions.https.HttpsError('permission-denied', 'Must be an administrative user to add a bonus.');
+    }
+
+    const { claimId, amount, userId, description } = data;
+    const db = admin.firestore();
+
+    if (!claimId || !amount || !userId || !description) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with "claimId", "amount", "userId", and "description".');
+    }
+    
+    if (typeof amount !== 'number' || amount <= 0) {
+        throw new functions.https.HttpsError('invalid-argument', 'Amount must be a positive number.');
+    }
+
+    const claimRef = db.doc(`bonus_claims/${claimId}`);
+    const userRef = db.doc(`users/${userId}`);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const claimDoc = await transaction.get(claimRef);
+            if (!claimDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Claim document not found.');
+            }
+            const claimData = claimDoc.data()!;
+
+            if (claimData.status !== 'pending') {
+                 throw new functions.https.HttpsError('failed-precondition', 'This claim has already been processed.');
+            }
+            
+            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(amount) });
+            
+            const transactionRef = db.collection('transactions').doc();
+            transaction.set(transactionRef, {
+                userId: userId,
+                type: 'bonus',
+                amount: amount,
+                status: 'completed',
+                description: description,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            transaction.update(claimRef, { status: 'approved', amount: amount });
+        });
+        
+        return { success: true };
+    } catch (error: any) {
+        functions.logger.error("Error adding manual bonus:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while adding the bonus.');
     }
 });
 
@@ -295,5 +330,3 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred. Please try again.');
     }
 });
-
-    
