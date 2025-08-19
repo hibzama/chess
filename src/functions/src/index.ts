@@ -210,6 +210,11 @@ export const addManualBonus = functions.https.onCall(async (data, context) => {
                  throw new functions.https.HttpsError('failed-precondition', 'This claim has already been processed.');
             }
             
+            if (claimData.campaignId) {
+                const taskRef = db.doc(`tasks/${claimData.campaignId}`);
+                transaction.update(taskRef, { claimsCount: admin.firestore.FieldValue.increment(1) });
+            }
+
             transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(amount) });
             
             const transactionRef = db.collection('transactions').doc();
