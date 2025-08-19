@@ -19,6 +19,8 @@ export interface TaskWork {
     id: string;
     description: string;
     verificationQuestion: string;
+    link?: string;
+    buttonText?: string;
 }
 
 export interface BonusTiers {
@@ -55,7 +57,7 @@ export default function TasksPage() {
 
     const getInitialFormState = () => ({
         title: '',
-        works: [{ id: `work_${Date.now()}`, description: '', verificationQuestion: '' }] as TaskWork[],
+        works: [{ id: `work_${Date.now()}`, description: '', verificationQuestion: '', link: '', buttonText: '' }] as TaskWork[],
         bonusTiers: {
             tier1: 5, tier2: 0, tier3: 0, tier4: 0, tier5: 0, tier6: 0, tier7: 0
         },
@@ -103,7 +105,7 @@ export default function TasksPage() {
     const addWork = () => {
         setFormState(prev => ({
             ...prev,
-            works: [...prev.works, { id: `work_${Date.now()}`, description: '', verificationQuestion: '' }]
+            works: [...prev.works, { id: `work_${Date.now()}`, description: '', verificationQuestion: '', link: '', buttonText: '' }]
         }));
     };
 
@@ -161,7 +163,7 @@ export default function TasksPage() {
         setEditingTask(task);
         setFormState({
             title: task.title,
-            works: task.works,
+            works: task.works.map(w => ({ ...w, link: w.link || '', buttonText: w.buttonText || '' })),
             bonusTiers: task.bonusTiers,
             startDelayHours: task.startDelayHours,
             durationHours: task.durationHours,
@@ -219,6 +221,8 @@ export default function TasksPage() {
                                 <div key={work.id} className="p-3 border rounded-lg space-y-3 relative bg-background/50">
                                     <Label>Work #{index + 1}</Label>
                                     <Textarea value={work.description} onChange={e => handleWorkChange(index, 'description', e.target.value)} placeholder={`e.g., Follow our Facebook page.`} required/>
+                                    <Input value={work.link || ''} onChange={e => handleWorkChange(index, 'link', e.target.value)} placeholder={`e.g., https://facebook.com/... (optional)`}/>
+                                    <Input value={work.buttonText || ''} onChange={e => handleWorkChange(index, 'buttonText', e.target.value)} placeholder={`Button text, e.g., "Follow Page" (optional)`}/>
                                     <Input value={work.verificationQuestion} onChange={e => handleWorkChange(index, 'verificationQuestion', e.target.value)} placeholder={`e.g., What is your Facebook profile name?`} required/>
                                     {formState.works.length > 1 && <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => removeWork(index)}><X className="h-4 w-4"/></Button>}
                                 </div>

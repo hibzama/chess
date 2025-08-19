@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ClipboardCheck, Loader2, Check, Clock } from 'lucide-react';
+import { ClipboardCheck, Loader2, Check, Clock, ExternalLink } from 'lucide-react';
 import { Task, BonusTiers } from '@/app/admin/tasks/page';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -128,6 +128,14 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, on
                             <div className="p-4 bg-muted rounded-md space-y-2">
                                 <p className="font-semibold">{task.works[currentWorkIndex].description}</p>
                             </div>
+                            {task.works[currentWorkIndex].link && (
+                                <Button asChild className="w-full">
+                                    <a href={task.works[currentWorkIndex].link} target="_blank" rel="noopener noreferrer">
+                                        <ExternalLink className="mr-2"/>
+                                        {task.works[currentWorkIndex].buttonText || 'Open Link'}
+                                    </a>
+                                </Button>
+                            )}
                             <div className="space-y-1">
                                 <Label htmlFor="answer" className="font-semibold">{task.works[currentWorkIndex].verificationQuestion}</Label>
                                 <Textarea 
