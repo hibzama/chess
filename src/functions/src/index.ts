@@ -103,6 +103,9 @@ export const onBonusClaim = functions.firestore
         case 'referee':
              campaignCollectionName = 'referral_campaigns';
             break;
+        case 'task':
+            campaignCollectionName = 'tasks';
+            break;
         default:
             functions.logger.error(`Unknown claim type: ${type}`);
             return null;
