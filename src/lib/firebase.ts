@@ -9,12 +9,13 @@ import { getFunctions } from "firebase/functions";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyB4fJwImSsfy7bLBUcJnGgqsdzHKDzIpfo",
-  authDomain: "nexbattle-ymmmq.firebaseapp.com",
-  projectId: "nexbattle-ymmmq",
-  storageBucket: "nexbattle-ymmmq.firebasestorage.app",
-  messagingSenderId: "1022888526676",
-  appId: "1:1022888526676:web:2cf620984302526cbe3ec1"
+  apiKey: "AIzaSyDjF4Rtr0wcclS87IbT4W2N8g37WOZZEFA",
+  authDomain: "mainnextbattle.firebaseapp.com",
+  projectId: "mainnextbattle",
+  storageBucket: "mainnextbattle.firebasestorage.app",
+  messagingSenderId: "690186872654",
+  appId: "1:690186872654:web:3fafecf2e45ba773d4a01f",
+  measurementId: "G-D0KGF0X1QH"
 };
 
 // Initialize Firebase
