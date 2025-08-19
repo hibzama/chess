@@ -104,8 +104,8 @@ const ClaimsDialog = ({ task, open, onOpenChange }: { task: Task | null; open: b
 
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
         try {
-            const approveClaimFunction = httpsCallable(functions, 'approveBonusClaim');
             if (newStatus === 'approved') {
+                const approveClaimFunction = httpsCallable(functions, 'approveBonusClaim');
                 await approveClaimFunction({ claimId: claim.id });
                 toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
             } else {
@@ -443,3 +443,5 @@ export default function TasksPage() {
         </>
     );
 }
+
+    
