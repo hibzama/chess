@@ -1,20 +1,28 @@
 
 'use client';
 import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { db, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { collection, addDoc, getDocs, serverTimestamp, deleteDoc, doc, updateDoc, onSnapshot, query, where, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Edit, Loader2, Check, X, ClipboardCheck, DollarSign } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Loader2, Check, X, ClipboardCheck, DollarSign, Eye } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { CheckCircle2, XCircle } from 'lucide-react';
+import Link from 'next/link';
+
 
 export interface TaskWork {
     id: string;
@@ -48,12 +56,143 @@ export interface Task {
     claimsCount?: number;
 }
 
+interface BonusClaim {
+    id: string;
+    userId: string;
+    userName?: string;
+    amount: number;
+    campaignTitle: string;
+    type: 'task';
+    status: 'pending' | 'approved' | 'rejected';
+    createdAt: any;
+    answers?: Record<string, string>;
+}
+
+
+async function enrichClaims(snapshot: any): Promise<BonusClaim[]> {
+    const claimsDataPromises = snapshot.docs.map(async (claimDoc: any) => {
+        const data = claimDoc.data() as BonusClaim;
+        const userDoc = await getDoc(doc(db, 'users', data.userId));
+        
+        return { 
+            ...data, 
+            id: claimDoc.id, 
+            userName: userDoc.exists() ? `${userDoc.data().firstName} ${userDoc.data().lastName}` : 'Unknown User',
+        };
+    });
+    return Promise.all(claimsDataPromises);
+}
+
+const ClaimsDialog = ({ task, open, onOpenChange }: { task: Task | null; open: boolean; onOpenChange: (open: boolean) => void }) => {
+    const [allClaims, setAllClaims] = useState<BonusClaim[]>([]);
+    const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (!task || !open) return;
+        
+        setLoading(true);
+        const q = query(collection(db, 'bonus_claims'), where('campaignId', '==', task.id));
+        const unsubscribe = onSnapshot(q, async (snapshot) => {
+            const claims = await enrichClaims(snapshot);
+            setAllClaims(claims.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [task, open, toast]);
+
+    const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
+        try {
+            const approveClaimFunction = httpsCallable(functions, 'approveBonusClaim');
+            if (newStatus === 'approved') {
+                await approveClaimFunction({ claimId: claim.id });
+                toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
+            } else {
+                await updateDoc(doc(db, 'bonus_claims', claim.id), { status: 'rejected' });
+                toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
+            }
+        } catch (error: any) {
+            console.error("Error processing claim: ", error);
+            toast({ variant: 'destructive', title: "Error", description: error.message });
+        }
+    };
+    
+    const pendingClaims = allClaims.filter(c => c.status === 'pending');
+    const historyClaims = allClaims.filter(c => c.status !== 'pending');
+
+    const renderTable = (claims: BonusClaim[], type: 'pending' | 'history') => {
+        if (loading) {
+            return <div className="flex justify-center items-center h-24"><Loader2 className="animate-spin text-primary" /></div>;
+        }
+        if (claims.length === 0) {
+            return <p className="text-center py-8 text-muted-foreground">No {type} claims found.</p>;
+        }
+        
+        return (
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead>Answers</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead className="text-right">{type === 'pending' ? 'Actions' : 'Status'}</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {claims.map((claim) => (
+                        <TableRow key={claim.id}>
+                            <TableCell><Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary">{claim.userName}</Link></TableCell>
+                            <TableCell>
+                                <Accordion type="single" collapsible className="w-full max-w-xs"><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="py-1 text-xs">View Answers</AccordionTrigger><AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md space-y-1">{claim.answers ? Object.entries(claim.answers).map(([key, value]) => (<p key={key}><strong>Q:</strong> ...{key.slice(-4)} <strong>A:</strong> {value}</p>)) : <p>No answer.</p>}</AccordionContent></AccordionItem></Accordion>
+                            </TableCell>
+                            <TableCell>LKR {claim.amount.toFixed(2)}</TableCell>
+                            <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
+                            <TableCell className="text-right">
+                                {type === 'pending' ? (
+                                    <div className="space-x-2"><Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button><Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button></div>
+                                ) : (
+                                    <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">{claim.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}<span className="capitalize">{claim.status}</span></Badge>
+                                )}
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        )
+    }
+
+    if (!task) return null;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl">
+                 <DialogHeader>
+                    <DialogTitle>Submissions for: {task.title}</DialogTitle>
+                    <DialogDescription>Review and manage all user submissions for this task.</DialogDescription>
+                </DialogHeader>
+                 <Tabs defaultValue="pending">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="pending">Pending ({loading ? '...' : pendingClaims.length})</TabsTrigger>
+                        <TabsTrigger value="history">History ({loading ? '...' : historyClaims.length})</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="pending">{renderTable(pendingClaims, 'pending')}</TabsContent>
+                    <TabsContent value="history">{renderTable(historyClaims, 'history')}</TabsContent>
+                </Tabs>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 
 export default function TasksPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+    const [isClaimsDialogOpen, setIsClaimsDialogOpen] = useState(false);
     const { toast } = useToast();
 
     const getInitialFormState = () => ({
@@ -191,6 +330,11 @@ export default function TasksPage() {
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to update status.' });
         }
     }
+    
+     const handleViewClaims = (task: Task) => {
+        setSelectedTask(task);
+        setIsClaimsDialogOpen(true);
+    };
 
     const bonusTierInputs: { key: keyof BonusTiers, label: string }[] = [
         { key: 'tier1', label: '0 - 10' },
@@ -203,6 +347,7 @@ export default function TasksPage() {
     ];
 
     return (
+        <>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <Card className="lg:col-span-1 sticky top-4">
                 <form onSubmit={handleSubmit}>
@@ -277,6 +422,7 @@ export default function TasksPage() {
                             <p><strong>Claims:</strong> {t.claimsCount || 0}</p>
                         </CardContent>
                         <CardFooter className="gap-2">
+                             <Button size="sm" variant="outline" onClick={() => handleViewClaims(t)}><Eye className="w-4 h-4 mr-2"/> View Claims</Button>
                              <Button size="sm" variant="outline" onClick={() => handleEdit(t)}><Edit className="w-4 h-4 mr-2"/> Edit</Button>
                             <AlertDialog>
                                 <AlertDialogTrigger asChild><Button size="sm" variant="destructive"><Trash2 className="w-4 h-4 mr-2"/> Delete</Button></AlertDialogTrigger>
@@ -293,5 +439,7 @@ export default function TasksPage() {
                 )) : <p className="text-center text-muted-foreground py-8">No tasks created yet.</p>}
             </div>
         </div>
+        <ClaimsDialog task={selectedTask} open={isClaimsDialogOpen} onOpenChange={setIsClaimsDialogOpen} />
+        </>
     );
 }

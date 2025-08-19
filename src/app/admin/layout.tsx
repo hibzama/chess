@@ -139,10 +139,7 @@ export default function AdminLayout({
                              <Link href="/admin/tasks"><SidebarMenuButton tooltip="Task Campaigns" isActive={isActive('/admin/tasks')}><ClipboardCheck /><span>Task Campaigns</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                             <Link href="/admin/bonus/referral-claims"><SidebarMenuButton tooltip="Referral Claims" isActive={isActive('/admin/bonus/referral-claims')}><CheckSquare /><span>Referral Claims</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
-                             <Link href="/admin/task-claims"><SidebarMenuButton tooltip="Task Claims" isActive={isActive('/admin/task-claims')}><CheckSquare /><span>Task Claims</span></SidebarMenuButton></Link>
+                             <Link href="/admin/bonus/referral-claims"><SidebarMenuButton tooltip="Bonus Claims" isActive={isActive('/admin/bonus/referral-claims')}><CheckSquare /><span>Bonus Claims</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/mailer"><SidebarMenuButton tooltip="Mailer" isActive={pathname === '/admin/mailer'}><Mail /><span>Mailer</span></SidebarMenuButton></Link>

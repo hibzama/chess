@@ -127,7 +127,6 @@ export const onBonusClaim = functions.firestore
 
 
 export const approveBonusClaim = functions.https.onCall(async (data, context) => {
-    // Check for admin privileges. The 'admin' custom claim must be set on the user's token.
     if (!context.auth || !context.auth.token.admin) {
         throw new functions.https.HttpsError('permission-denied', 'Must be an administrative user to approve claims.');
     }
@@ -152,22 +151,43 @@ export const approveBonusClaim = functions.https.onCall(async (data, context) =>
             if (claimData.status === 'approved') {
                  throw new functions.https.HttpsError('failed-precondition', 'This claim has already been approved.');
             }
-
-            // The function runs with elevated privileges, so it can update any user's balance.
-            const userRef = db.doc(`users/${claimData.userId}`);
-            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(claimData.amount) });
             
+            const userRef = db.doc(`users/${claimData.userId}`);
+            
+            // For task claims, the bonus amount depends on the user's balance at the time of approval
+            let finalAmount = claimData.amount;
+            if (claimData.type === 'task') {
+                const userDoc = await transaction.get(userRef);
+                const campaignDoc = await transaction.get(db.doc(`tasks/${claimData.campaignId}`));
+                
+                if (userDoc.exists() && campaignDoc.exists()) {
+                    const balance = userDoc.data()?.balance || 0;
+                    const tiers = campaignDoc.data()?.bonusTiers;
+                    if (balance <= 10) finalAmount = tiers.tier1;
+                    else if (balance <= 50) finalAmount = tiers.tier2;
+                    else if (balance <= 100) finalAmount = tiers.tier3;
+                    else if (balance <= 150) finalAmount = tiers.tier4;
+                    else if (balance <= 200) finalAmount = tiers.tier5;
+                    else if (balance <= 250) finalAmount = tiers.tier6;
+                    else finalAmount = tiers.tier7;
+                }
+            }
+            
+            if (finalAmount > 0) {
+                 transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(finalAmount) });
+            }
+
             const transactionRef = db.collection('transactions').doc();
             transaction.set(transactionRef, {
                 userId: claimData.userId,
                 type: 'bonus',
-                amount: claimData.amount,
+                amount: finalAmount,
                 status: 'completed',
                 description: `${claimData.campaignTitle}`,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 
-            transaction.update(claimRef, { status: 'approved' });
+            transaction.update(claimRef, { status: 'approved', amount: finalAmount });
         });
         
         return { success: true };
@@ -275,5 +295,3 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred. Please try again.');
     }
 });
-
-    

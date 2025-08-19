@@ -1,19 +1,19 @@
 
 'use client';
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { db, functions } from '@/lib/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { collection, query, onSnapshot, doc, getDoc, runTransaction, increment, serverTimestamp, updateDoc, orderBy, limit, deleteDoc, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface BonusClaim {
     id: string;
@@ -48,14 +48,10 @@ export default function TaskClaimsPage() {
 
     useEffect(() => {
         setLoading(true);
-        
         const q = query(collection(db, 'bonus_claims'), where('type', '==', 'task'));
-
         const unsubscribe = onSnapshot(q, async (snapshot) => {
             const claims = await enrichClaims(snapshot);
-            // Sort client-side
-            const sortedClaims = claims.sort((a,b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
-            setAllClaims(sortedClaims);
+            setAllClaims(claims.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)));
             setLoading(false);
         }, (error) => {
             console.error("Error fetching claims:", error);
@@ -65,31 +61,26 @@ export default function TaskClaimsPage() {
 
         return () => unsubscribe();
     }, [toast]);
-
-    const pendingClaims = useMemo(() => allClaims.filter(c => c.status === 'pending'), [allClaims]);
-    const historyClaims = useMemo(() => allClaims.filter(c => c.status !== 'pending'), [allClaims]);
     
     const handleClaimAction = async (claim: BonusClaim, newStatus: 'approved' | 'rejected') => {
-        const claimRef = doc(db, 'bonus_claims', claim.id);
-        
         try {
             if (newStatus === 'approved') {
                 const approveClaimFunction = httpsCallable(functions, 'approveBonusClaim');
                 await approveClaimFunction({ claimId: claim.id });
                 toast({ title: "Claim Approved", description: "Bonus has been added to the user's wallet." });
-            } else { // Rejected
-                await updateDoc(claimRef, { status: 'rejected' });
+            } else {
+                await updateDoc(doc(db, 'bonus_claims', claim.id), { status: 'rejected' });
                 toast({ title: "Claim Rejected", description: "The claim has been rejected. No funds were added." });
             }
-            // Manually update local state for immediate UI feedback
-            setAllClaims(prev => prev.map(c => c.id === claim.id ? {...c, status: newStatus} : c));
-
         } catch (error: any) {
             console.error("Error processing claim: ", error);
             toast({ variant: 'destructive', title: "Error", description: error.message });
         }
     };
-    
+
+    const pendingClaims = allClaims.filter(c => c.status === 'pending');
+    const historyClaims = allClaims.filter(c => c.status !== 'pending');
+
     const renderTable = (claims: BonusClaim[], type: 'pending' | 'history') => {
         if (loading) {
             return <div className="flex justify-center items-center h-24"><Loader2 className="animate-spin text-primary" /></div>;
@@ -103,9 +94,8 @@ export default function TaskClaimsPage() {
                 <TableHeader>
                     <TableRow>
                         <TableHead>User</TableHead>
-                        <TableHead>Task</TableHead>
+                        <TableHead>Campaign</TableHead>
                         <TableHead>Answers</TableHead>
-                        <TableHead>Amount</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">{type === 'pending' ? 'Actions' : 'Status'}</TableHead>
                     </TableRow>
@@ -116,30 +106,14 @@ export default function TaskClaimsPage() {
                             <TableCell><Link href={`/admin/users/${claim.userId}`} className="hover:underline text-primary">{claim.userName}</Link></TableCell>
                             <TableCell>{claim.campaignTitle}</TableCell>
                             <TableCell>
-                                <Accordion type="single" collapsible className="w-full max-w-xs">
-                                    <AccordionItem value="item-1" className="border-b-0">
-                                        <AccordionTrigger className="py-1 text-xs">View Answers</AccordionTrigger>
-                                        <AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md space-y-1">
-                                           {claim.answers ? Object.entries(claim.answers).map(([key, value]) => (
-                                               <p key={key}><strong>Q:</strong> ...{key.slice(-4)} <strong>A:</strong> {value}</p>
-                                           )) : <p>No answer submitted.</p>}
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                </Accordion>
+                                <Accordion type="single" collapsible className="w-full max-w-xs"><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="py-1 text-xs">View Answers</AccordionTrigger><AccordionContent className="text-xs pt-2 bg-muted p-2 rounded-md space-y-1">{claim.answers ? Object.entries(claim.answers).map(([key, value]) => (<p key={key}><strong>Q:</strong> ...{key.slice(-4)} <strong>A:</strong> {value}</p>)) : <p>No answer.</p>}</AccordionContent></AccordionItem></Accordion>
                             </TableCell>
-                            <TableCell>LKR {claim.amount.toFixed(2)}</TableCell>
                             <TableCell>{claim.createdAt ? format(new Date(claim.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                             <TableCell className="text-right">
                                 {type === 'pending' ? (
-                                    <div className="space-x-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button>
-                                        <Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button>
-                                    </div>
+                                    <div className="space-x-2"><Button size="sm" variant="outline" onClick={() => handleClaimAction(claim, 'approved')}>Approve</Button><Button size="sm" variant="destructive" onClick={() => handleClaimAction(claim, 'rejected')}>Reject</Button></div>
                                 ) : (
-                                    <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">
-                                        {claim.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                                        <span className="capitalize">{claim.status}</span>
-                                    </Badge>
+                                    <Badge variant={claim.status === 'approved' ? 'default' : 'destructive'} className="flex items-center gap-1.5 w-fit ml-auto">{claim.status === 'approved' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}<span className="capitalize">{claim.status}</span></Badge>
                                 )}
                             </TableCell>
                         </TableRow>
@@ -148,12 +122,12 @@ export default function TaskClaimsPage() {
             </Table>
         )
     }
-    
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Task Claims</CardTitle>
-                <CardDescription>Review and manage all user submissions for tasks.</CardDescription>
+                <CardDescription>Review and manage all user submissions for task campaigns.</CardDescription>
             </CardHeader>
             <CardContent>
                 <Tabs defaultValue="pending">
@@ -161,12 +135,8 @@ export default function TaskClaimsPage() {
                         <TabsTrigger value="pending">Pending ({loading ? '...' : pendingClaims.length})</TabsTrigger>
                         <TabsTrigger value="history">History ({loading ? '...' : historyClaims.length})</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="pending">
-                        {renderTable(pendingClaims, 'pending')}
-                    </TabsContent>
-                    <TabsContent value="history">
-                        {renderTable(historyClaims, 'history')}
-                    </TabsContent>
+                    <TabsContent value="pending">{renderTable(pendingClaims, 'pending')}</TabsContent>
+                    <TabsContent value="history">{renderTable(historyClaims, 'history')}</TabsContent>
                 </Tabs>
             </CardContent>
         </Card>
