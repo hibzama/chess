@@ -103,6 +103,9 @@ export const onBonusClaim = functions.firestore
         case 'referee':
              campaignCollectionName = 'referral_campaigns';
             break;
+        case 'task':
+            campaignCollectionName = 'tasks';
+            break;
         default:
             functions.logger.error(`Unknown claim type: ${type}`);
             return null;
@@ -121,6 +124,61 @@ export const onBonusClaim = functions.firestore
     
     return null;
   });
+
+
+export const approveBonusClaim = functions.https.onCall(async (data, context) => {
+    // Check for admin privileges. The 'admin' custom claim must be set on the user's token.
+    if (!context.auth || !context.auth.token.admin) {
+        throw new functions.https.HttpsError('permission-denied', 'Must be an administrative user to approve claims.');
+    }
+
+    const { claimId } = data;
+    const db = admin.firestore();
+
+    if (!claimId) {
+        throw new functions.https.HttpsError('invalid-argument', 'The function must be called with a "claimId".');
+    }
+
+    const claimRef = db.doc(`bonus_claims/${claimId}`);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const claimDoc = await transaction.get(claimRef);
+            if (!claimDoc.exists) {
+                throw new functions.https.HttpsError('not-found', 'Claim document not found.');
+            }
+            const claimData = claimDoc.data()!;
+
+            if (claimData.status === 'approved') {
+                 throw new functions.https.HttpsError('failed-precondition', 'This claim has already been approved.');
+            }
+
+            // The function runs with elevated privileges, so it can update any user's balance.
+            const userRef = db.doc(`users/${claimData.userId}`);
+            transaction.update(userRef, { balance: admin.firestore.FieldValue.increment(claimData.amount) });
+            
+            const transactionRef = db.collection('transactions').doc();
+            transaction.set(transactionRef, {
+                userId: claimData.userId,
+                type: 'bonus',
+                amount: claimData.amount,
+                status: 'completed',
+                description: `${claimData.campaignTitle}`,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            transaction.update(claimRef, { status: 'approved' });
+        });
+        
+        return { success: true };
+    } catch (error: any) {
+        functions.logger.error("Error approving claim:", error);
+        if (error instanceof functions.https.HttpsError) {
+            throw error;
+        }
+        throw new functions.https.HttpsError('internal', 'An unexpected error occurred while approving the claim.');
+    }
+});
 
 
 export const claimDailyBonus = functions.https.onCall(async (data, context) => {
@@ -217,3 +275,5 @@ export const claimDailyBonus = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'An unexpected error occurred. Please try again.');
     }
 });
+
+    
