@@ -13,6 +13,17 @@ type Winner = 'p1' | 'p2' | 'draw' | null;
 type Piece = { type: string; color: 'w' | 'b' | Player };
 export type GameOverReason = 'checkmate' | 'timeout' | 'resign' | 'draw' | 'piece-capture' | null;
 
+interface GameRules {
+    minimumWager: number;
+    winPayout: number;
+    drawPayout: number;
+    standardLossPayout: number;
+    timeoutWinnerPayout: number;
+    timeoutLoserPayout: number;
+    resignTiers: { fromPieces: number; toPieces: number; resignerRefund: number; opponentPayout: number; }[];
+}
+
+
 interface GameRoom {
     id: string;
     wager: number;
@@ -143,6 +154,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     const [gameState, setGameState] = useState<GameState>(getInitialState());
     const [room, setRoom] = useState<GameRoom | null>(null);
+    const [gameRules, setGameRules] = useState<GameRules | null>(null);
     const [isGameLoading, setIsGameLoading] = useState(true);
     const [isMounted, setIsMounted] = useState(false);
     
@@ -151,7 +163,15 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
     useEffect(() => {
         setIsMounted(true);
-    }, []);
+        const fetchRules = async () => {
+            const rulesRef = doc(db, 'settings', `gameRules_${gameType}`);
+            const rulesSnap = await getDoc(rulesRef);
+            if (rulesSnap.exists()) {
+                setGameRules(rulesSnap.data() as GameRules);
+            }
+        };
+        fetchRules();
+    }, [gameType]);
 
     const updateAndSaveState = useCallback((newState: Partial<GameState>) => {
         setGameState(prevState => {
@@ -165,7 +185,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
 
 
     const handlePayout = useCallback(async (winnerDetails: { winnerId: string | 'draw' | null, method: GameOverReason, resignerDetails?: {id: string, pieceCount: number} | null }) => {
-        if (!roomId || !user) return { myPayout: 0 };
+        if (!roomId || !user || !gameRules) return { myPayout: 0 };
     
         try {
             const payoutResult = await runTransaction(db, async (transaction) => {
@@ -184,14 +204,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const winnerObject: GameRoom['winner'] = { uid: null, method };
     
                 if (resignerDetails) { // Resignation logic
-                    const opponentPayoutRate = 1.30;
-                    let resignerRefundRate = 0.25; // Default for 1-2 pieces
-    
-                    if (resignerDetails.pieceCount >= 6) {
-                        resignerRefundRate = 0.50; // 50%
-                    } else if (resignerDetails.pieceCount >= 3) {
-                        resignerRefundRate = 0.35; // 35%
-                    }
+                    const tier = gameRules.resignTiers.find(t => resignerDetails.pieceCount >= t.fromPieces && resignerDetails.pieceCount <= t.toPieces);
+                    const opponentPayoutRate = tier ? tier.opponentPayout / 100 : 1.30;
+                    const resignerRefundRate = tier ? tier.resignerRefund / 100 : 0.25;
                     
                     const isCreatorResigner = resignerDetails.id === roomData.createdBy.uid;
     
@@ -211,13 +226,19 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     winnerObject.resignerPieceCount = resignerDetails.pieceCount;
 
                 } else if (winnerId === 'draw') { // Draw logic
-                    creatorPayout = joinerPayout = wager * 0.9;
+                    creatorPayout = joinerPayout = wager * (gameRules.drawPayout / 100);
                     creatorDesc = `Draw refund vs ${roomData.player2.name}`;
                     joinerDesc = `Draw refund vs ${roomData.createdBy.name}`;
                 } else if (winnerId) { // Win/loss logic
                     const isCreatorWinner = winnerId === roomData.createdBy.uid;
-                    creatorPayout = isCreatorWinner ? wager * 1.8 : 0;
-                    joinerPayout = !isCreatorWinner ? wager * 1.8 : 0;
+                    if(method === 'timeout') {
+                        creatorPayout = isCreatorWinner ? wager * (gameRules.timeoutWinnerPayout / 100) : wager * (gameRules.timeoutLoserPayout / 100);
+                        joinerPayout = !isCreatorWinner ? wager * (gameRules.timeoutWinnerPayout / 100) : wager * (gameRules.timeoutLoserPayout / 100);
+                    } else { // Standard win
+                        creatorPayout = isCreatorWinner ? wager * (gameRules.winPayout / 100) : wager * (gameRules.standardLossPayout / 100);
+                        joinerPayout = !isCreatorWinner ? wager * (gameRules.winPayout / 100) : wager * (gameRules.standardLossPayout / 100);
+                    }
+                    
                     const reason = method === 'checkmate' ? 'Win by checkmate' : (method === 'timeout' ? 'Win on time' : 'Win by capture');
                     creatorDesc = isCreatorWinner ? `${reason} vs ${roomData.player2.name}` : `Loss vs ${roomData.player2.name}`;
                     joinerDesc = !isCreatorWinner ? `${reason} vs ${roomData.createdBy.name}` : `Loss vs ${roomData.createdBy.name}`;
@@ -251,7 +272,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             console.error("Payout Transaction failed:", error);
             return { myPayout: 0 };
         }
-    }, [user, roomId]);
+    }, [user, roomId, gameRules]);
 
     const setWinner = useCallback((winnerId: string | 'draw' | null, boardState?: any, method: GameOverReason = 'checkmate', resignerDetails: {id: string, pieceCount: number} | null = null) => {
         if (gameOverHandledRef.current) return;
@@ -297,21 +318,30 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                 const wager = roomData.wager || 0;
                 let myPayout = 0;
 
-                if (iAmResigner) {
+                if (iAmResigner && gameRules) {
                     const resignerPieceCount = roomData.winner?.resignerPieceCount ?? 0;
-                    let resignerRefundRate = 0.25;
-                    if (resignerPieceCount >= 6) {
-                        resignerRefundRate = 0.50;
-                    } else if (resignerPieceCount >= 3) {
-                        resignerRefundRate = 0.35;
-                    }
+                    const tier = gameRules.resignTiers.find(t => resignerPieceCount >= t.fromPieces && resignerPieceCount <= t.toPieces);
+                    const resignerRefundRate = tier ? tier.resignerRefund / 100 : 0.25;
                     myPayout = wager * resignerRefundRate;
-                } else if (roomData.winner?.resignerId) {
-                    myPayout = wager * 1.30;
-                } else if (roomData.draw) {
-                    myPayout = wager * 0.9;
-                } else if (winnerIsMe) {
-                    myPayout = wager * 1.8;
+                } else if (roomData.winner?.resignerId && gameRules) {
+                    const opponentPieceCount = roomData.winner?.resignerPieceCount ?? 0;
+                    const tier = gameRules.resignTiers.find(t => opponentPieceCount >= t.fromPieces && opponentPieceCount <= t.toPieces);
+                    const opponentPayoutRate = tier ? tier.opponentPayout / 100 : 1.30;
+                    myPayout = wager * opponentPayoutRate;
+                } else if (roomData.draw && gameRules) {
+                    myPayout = wager * (gameRules.drawPayout / 100);
+                } else if (winnerIsMe && gameRules) {
+                    if (roomData.winner?.method === 'timeout') {
+                        myPayout = wager * (gameRules.timeoutWinnerPayout / 100);
+                    } else {
+                        myPayout = wager * (gameRules.winPayout / 100);
+                    }
+                } else if (gameRules) { // I lost
+                     if (roomData.winner?.method === 'timeout') {
+                        myPayout = wager * (gameRules.timeoutLoserPayout / 100);
+                    } else {
+                        myPayout = wager * (gameRules.standardLossPayout / 100);
+                    }
                 }
                 
                 setGameState(prevState => ({
@@ -362,12 +392,12 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         });
 
         return () => unsubscribe();
-    }, [isMultiplayer, roomId, user, router, gameType, isGameLoading]);
+    }, [isMultiplayer, roomId, user, router, gameType, isGameLoading, gameRules]);
 
      // Real-time Timer Logic
     useEffect(() => {
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-        if (gameState.gameOver || !isMounted || !room || room.status !== 'in-progress') return;
+        if (gameState.gameOver || !isMounted || !room || room.status !== 'in-progress' || !gameRules) return;
 
         timerIntervalRef.current = setInterval(() => {
             if (gameOverHandledRef.current) {
@@ -403,7 +433,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
         return () => {
             if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
         };
-    }, [isMounted, gameState.gameOver, room, user, updateAndSaveState, setWinner]);
+    }, [isMounted, gameState.gameOver, room, user, updateAndSaveState, setWinner, gameRules]);
 
     const switchTurn = useCallback(async (boardState: any, move?: string, capturedPiece?: Piece) => {
         if (gameState.gameOver || gameState.isEnding) return;
@@ -570,5 +600,3 @@ export const useGame = () => {
     if (!context) { throw new Error('useGame must be used within a GameProvider'); }
     return context;
 };
-
-    

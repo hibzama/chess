@@ -23,6 +23,7 @@ interface GameRules {
     minimumWager: number;
     winPayout: number;
     drawPayout: number;
+    standardLossPayout: number;
     timeoutWinnerPayout: number;
     timeoutLoserPayout: number;
     resignTiers: ResignTier[];
@@ -32,6 +33,7 @@ const defaultRules: GameRules = {
     minimumWager: 10,
     winPayout: 180,
     drawPayout: 90,
+    standardLossPayout: 0,
     timeoutWinnerPayout: 180,
     timeoutLoserPayout: 0,
     resignTiers: [
@@ -71,8 +73,9 @@ const GameRulesForm = ({ gameType, rules, setRules }: { gameType: 'chess' | 'che
             </Card>
             <Card>
                 <CardHeader><CardTitle>Payout Percentages (%)</CardTitle></CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-6">
+                <CardContent className="grid md:grid-cols-3 gap-6">
                     <div className="space-y-2"><Label>Standard Win (Checkmate/Capture)</Label><Input type="number" value={rules.winPayout} onChange={(e) => setRules(p => ({...p, winPayout: Number(e.target.value)}))} /></div>
+                    <div className="space-y-2"><Label>Standard Loss %</Label><Input type="number" value={rules.standardLossPayout} onChange={(e) => setRules(p => ({...p, standardLossPayout: Number(e.target.value)}))} /></div>
                     <div className="space-y-2"><Label>Draw</Label><Input type="number" value={rules.drawPayout} onChange={(e) => setRules(p => ({...p, drawPayout: Number(e.target.value)}))} /></div>
                     <div className="space-y-2"><Label>Timeout Winner</Label><Input type="number" value={rules.timeoutWinnerPayout} onChange={(e) => setRules(p => ({...p, timeoutWinnerPayout: Number(e.target.value)}))} /></div>
                     <div className="space-y-2"><Label>Timeout Loser</Label><Input type="number" value={rules.timeoutLoserPayout} onChange={(e) => setRules(p => ({...p, timeoutLoserPayout: Number(e.target.value)}))} /></div>
