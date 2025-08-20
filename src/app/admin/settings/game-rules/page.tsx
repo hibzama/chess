@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Rule, Loader2, Plus, X, BrainCircuit, Layers } from 'lucide-react';
+import { Ruler, Loader2, Plus, X, BrainCircuit, Layers } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 interface ResignTier {
@@ -148,7 +148,7 @@ export default function GameRulesSettingsPage() {
         <>
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Rule /> Game Rules & Payouts</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Ruler /> Game Rules & Payouts</CardTitle>
                 <CardDescription>Define the core financial rules for multiplayer games.</CardDescription>
             </CardHeader>
         </Card>
