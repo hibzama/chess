@@ -67,18 +67,18 @@ const GameRulesForm = ({ gameType, rules, setRules }: { gameType: 'chess' | 'che
                 <CardContent className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <Label>Minimum Wager</Label>
-                        <Input type="number" value={rules.minimumWager} onChange={(e) => setRules(p => ({...p, minimumWager: Number(e.target.value)}))} />
+                        <Input type="number" value={rules.minimumWager || 0} onChange={(e) => setRules(p => ({...p, minimumWager: Number(e.target.value)}))} />
                     </div>
                 </CardContent>
             </Card>
             <Card>
                 <CardHeader><CardTitle>Payout Percentages (%)</CardTitle></CardHeader>
                 <CardContent className="grid md:grid-cols-3 gap-6">
-                    <div className="space-y-2"><Label>Standard Win (Checkmate/Capture)</Label><Input type="number" value={rules.winPayout} onChange={(e) => setRules(p => ({...p, winPayout: Number(e.target.value)}))} /></div>
-                    <div className="space-y-2"><Label>Standard Loss %</Label><Input type="number" value={rules.standardLossPayout} onChange={(e) => setRules(p => ({...p, standardLossPayout: Number(e.target.value)}))} /></div>
-                    <div className="space-y-2"><Label>Draw</Label><Input type="number" value={rules.drawPayout} onChange={(e) => setRules(p => ({...p, drawPayout: Number(e.target.value)}))} /></div>
-                    <div className="space-y-2"><Label>Timeout Winner</Label><Input type="number" value={rules.timeoutWinnerPayout} onChange={(e) => setRules(p => ({...p, timeoutWinnerPayout: Number(e.target.value)}))} /></div>
-                    <div className="space-y-2"><Label>Timeout Loser</Label><Input type="number" value={rules.timeoutLoserPayout} onChange={(e) => setRules(p => ({...p, timeoutLoserPayout: Number(e.target.value)}))} /></div>
+                    <div className="space-y-2"><Label>Standard Win (Checkmate/Capture)</Label><Input type="number" value={rules.winPayout || 0} onChange={(e) => setRules(p => ({...p, winPayout: Number(e.target.value)}))} /></div>
+                    <div className="space-y-2"><Label>Standard Loss %</Label><Input type="number" value={rules.standardLossPayout || 0} onChange={(e) => setRules(p => ({...p, standardLossPayout: Number(e.target.value)}))} /></div>
+                    <div className="space-y-2"><Label>Draw</Label><Input type="number" value={rules.drawPayout || 0} onChange={(e) => setRules(p => ({...p, drawPayout: Number(e.target.value)}))} /></div>
+                    <div className="space-y-2"><Label>Timeout Winner</Label><Input type="number" value={rules.timeoutWinnerPayout || 0} onChange={(e) => setRules(p => ({...p, timeoutWinnerPayout: Number(e.target.value)}))} /></div>
+                    <div className="space-y-2"><Label>Timeout Loser</Label><Input type="number" value={rules.timeoutLoserPayout || 0} onChange={(e) => setRules(p => ({...p, timeoutLoserPayout: Number(e.target.value)}))} /></div>
                 </CardContent>
             </Card>
              <Card>
@@ -90,10 +90,10 @@ const GameRulesForm = ({ gameType, rules, setRules }: { gameType: 'chess' | 'che
                      {rules.resignTiers.map((tier, index) => (
                         <div key={index} className="flex items-end gap-4 p-4 border rounded-md">
                             <div className="flex-1 grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="space-y-2"><Label>From Pieces</Label><Input type="number" value={tier.fromPieces} onChange={(e) => handleTierChange(index, 'fromPieces', e.target.value)}/></div>
-                                <div className="space-y-2"><Label>To Pieces</Label><Input type="number" value={tier.toPieces} onChange={(e) => handleTierChange(index, 'toPieces', e.target.value)}/></div>
-                                <div className="space-y-2"><Label>Resigner Refund %</Label><Input type="number" value={tier.resignerRefund} onChange={(e) => handleTierChange(index, 'resignerRefund', e.target.value)}/></div>
-                                <div className="space-y-2"><Label>Opponent Payout %</Label><Input type="number" value={tier.opponentPayout} onChange={(e) => handleTierChange(index, 'opponentPayout', e.target.value)}/></div>
+                                <div className="space-y-2"><Label>From Pieces</Label><Input type="number" value={tier.fromPieces || 0} onChange={(e) => handleTierChange(index, 'fromPieces', e.target.value)}/></div>
+                                <div className="space-y-2"><Label>To Pieces</Label><Input type="number" value={tier.toPieces || 0} onChange={(e) => handleTierChange(index, 'toPieces', e.target.value)}/></div>
+                                <div className="space-y-2"><Label>Resigner Refund %</Label><Input type="number" value={tier.resignerRefund || 0} onChange={(e) => handleTierChange(index, 'resignerRefund', e.target.value)}/></div>
+                                <div className="space-y-2"><Label>Opponent Payout %</Label><Input type="number" value={tier.opponentPayout || 0} onChange={(e) => handleTierChange(index, 'opponentPayout', e.target.value)}/></div>
                             </div>
                             <Button variant="destructive" size="icon" onClick={() => removeTier(index)}><X className="w-4 h-4" /></Button>
                         </div>
