@@ -22,9 +22,13 @@ type GameRoom = {
     status: 'waiting' | 'in-progress' | 'completed';
 };
 
-const USDT_RATE = 310;
+type PublicGamesProps = {
+    gameType: string;
+    currencySymbol: string;
+    usdtRate: number;
+}
 
-export default function PublicGames({ gameType }: { gameType: string }) {
+export default function PublicGames({ gameType, currencySymbol, usdtRate }: PublicGamesProps) {
     const [allWaitingRooms, setAllWaitingRooms] = useState<GameRoom[]>([]);
     const [displayedRooms, setDisplayedRooms] = useState<GameRoom[]>([]);
     const [loading, setLoading] = useState(true);
@@ -103,8 +107,8 @@ export default function PublicGames({ gameType }: { gameType: string }) {
                             <TableRow key={room.id}>
                                 <TableCell className="font-medium">{room.createdBy.name}</TableCell>
                                 <TableCell>
-                                    <div className="font-bold">LKR {room.wager.toFixed(2)}</div>
-                                    <div className="text-xs text-muted-foreground">~{(room.wager / USDT_RATE).toFixed(2)} USDT</div>
+                                    <div className="font-bold">{currencySymbol} {room.wager.toFixed(2)}</div>
+                                    <div className="text-xs text-muted-foreground">~{(room.wager / usdtRate).toFixed(2)} USDT</div>
                                 </TableCell>
                                 <TableCell>{room.timeControl / 60} min</TableCell>
                                 <TableCell>{formatDistanceToNowStrict(room.createdAt.toDate(), { addSuffix: true })}</TableCell>

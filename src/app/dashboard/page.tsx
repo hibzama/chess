@@ -1,3 +1,4 @@
+
 'use client'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ interface SignupBonusCampaign {
 }
 
 // #region Bonus Components
-const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string}) => (
+const BonusCardShell = ({ title, description, icon, href, linkText, reward, currencySymbol }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string, currencySymbol: string}) => (
     <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 flex flex-col">
         <CardHeader className="flex-grow">
             <CardTitle className="flex items-center gap-2 text-lg">{icon} {title}</CardTitle>
@@ -38,14 +39,14 @@ const BonusCardShell = ({ title, description, icon, href, linkText, reward }: {t
     </Card>
 )
 
-const SignupBonusAlert = ({ campaign, onClaimed }: { campaign: SignupBonusCampaign, onClaimed: () => void }) => {
+const SignupBonusAlert = ({ campaign, onClaimed, currencySymbol }: { campaign: SignupBonusCampaign, onClaimed: () => void, currencySymbol: string }) => {
     return (
         <Alert className="border-primary/50 bg-primary/10 text-primary-foreground">
             <Gift className="h-4 w-4 !text-primary" />
             <AlertTitle className="text-primary">Welcome Bonus Available!</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
                 <div>
-                   You're eligible for the "{campaign.title}" campaign. Claim your LKR {campaign.bonusAmount.toFixed(2)} bonus now!
+                   You're eligible for the "{campaign.title}" campaign. Claim your {currencySymbol} {campaign.bonusAmount.toFixed(2)} bonus now!
                 </div>
                 <Button asChild>
                     <Link href="/dashboard/wallet">Go to Wallet to Claim</Link>
@@ -56,7 +57,7 @@ const SignupBonusAlert = ({ campaign, onClaimed }: { campaign: SignupBonusCampai
 };
 
 
-const BonusHub = ({ depositBonus, hasActiveTask }: { depositBonus: DepositBonusCampaign | null, hasActiveTask: boolean }) => {
+const BonusHub = ({ depositBonus, hasActiveTask, currencySymbol }: { depositBonus: DepositBonusCampaign | null, hasActiveTask: boolean, currencySymbol: string }) => {
     
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -66,14 +67,16 @@ const BonusHub = ({ depositBonus, hasActiveTask }: { depositBonus: DepositBonusC
                 icon={<Award className="text-purple-400"/>}
                 href="/dashboard/referral-campaigns"
                 linkText="View Campaigns"
+                currencySymbol={currencySymbol}
             />
             {depositBonus ? (
                 <BonusCardShell 
                     title={depositBonus.title || "Deposit Bonus"}
-                    description={`Get a ${depositBonus.percentage}% bonus on deposits from LKR ${depositBonus.minDeposit} to LKR ${depositBonus.maxDeposit}!`}
+                    description={`Get a ${depositBonus.percentage}% bonus on deposits from ${currencySymbol} ${depositBonus.minDeposit} to ${currencySymbol} ${depositBonus.maxDeposit}!`}
                     icon={<Banknote className="text-green-400"/>}
                     href="/dashboard/wallet"
                     linkText="Make a Deposit"
+                    currencySymbol={currencySymbol}
                 />
             ) : (
                  <Card className="bg-card/50 border-dashed flex items-center justify-center p-6">
@@ -86,6 +89,7 @@ const BonusHub = ({ depositBonus, hasActiveTask }: { depositBonus: DepositBonusC
                 icon={<ClipboardCheck className="text-blue-400"/>}
                 href="/dashboard/tasks"
                 linkText={hasActiveTask ? "View Your Tasks" : "Browse Tasks"}
+                currencySymbol={currencySymbol}
             />
         </div>
     );
@@ -110,7 +114,7 @@ const StatCard = ({ title, value, description, isLoading, colorClass }: { title:
 )
 
 export default function DashboardPage() {
-    const { user, userData, loading } = useAuth();
+    const { user, userData, loading, currencyConfig } = useAuth();
     const [transactions, setTransactions] = useState<any[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
     
@@ -120,8 +124,6 @@ export default function DashboardPage() {
     // State for other bonuses
     const [depositBonus, setDepositBonus] = useState<DepositBonusCampaign | null>(null);
     const [checkingBonuses, setCheckingBonuses] = useState(true);
-
-    const USDT_RATE = 310;
     
     useEffect(() => {
         if (!user || !userData) {
@@ -249,41 +251,41 @@ export default function DashboardPage() {
         </p>
       </div>
 
-       {!hasClaimedSignup && signupBonus && <SignupBonusAlert campaign={signupBonus} onClaimed={() => setHasClaimedSignup(true)} />}
+       {!hasClaimedSignup && signupBonus && <SignupBonusAlert campaign={signupBonus} onClaimed={() => setHasClaimedSignup(true)} currencySymbol={currencyConfig.symbol} />}
 
        <div className="space-y-4">
             {checkingBonuses ? (
                 <Skeleton className="h-44 w-full" />
             ) : (
-                <BonusHub depositBonus={depositBonus} hasActiveTask={!!userData?.campaignInfo} />
+                <BonusHub depositBonus={depositBonus} hasActiveTask={!!userData?.campaignInfo} currencySymbol={currencyConfig.symbol} />
             )}
         </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
             title="Wallet Balance"
-            value={`LKR ${(userData?.balance ?? 0).toFixed(2)}`}
-            description={`~${((userData?.balance ?? 0) / USDT_RATE).toFixed(2)} USDT`}
+            value={`${currencyConfig.symbol} ${(userData?.balance ?? 0).toFixed(2)}`}
+            description={`~${((userData?.balance ?? 0) / currencyConfig.usdtRate).toFixed(2)} USDT`}
             isLoading={loading}
             colorClass="text-stat-balance"
         />
          <StatCard 
             title="Total Deposit"
-            value={`LKR ${financialStats.totalDeposit.toFixed(2)}`}
+            value={`${currencyConfig.symbol} ${financialStats.totalDeposit.toFixed(2)}`}
             description="All funds you've added."
             isLoading={statsLoading}
             colorClass="text-stat-deposit"
         />
          <StatCard 
             title="Total Withdrawals"
-            value={`LKR ${financialStats.totalWithdrawal.toFixed(2)}`}
+            value={`${currencyConfig.symbol} ${financialStats.totalWithdrawal.toFixed(2)}`}
             description="All funds you've taken out."
             isLoading={statsLoading}
             colorClass="text-stat-withdrawal"
         />
          <StatCard 
             title="Total Earnings"
-            value={`LKR ${financialStats.totalEarning.toFixed(2)}`}
+            value={`${currencyConfig.symbol} ${financialStats.totalEarning.toFixed(2)}`}
             description="Your net profit from games."
             isLoading={statsLoading}
             colorClass={financialStats.totalEarning < 0 ? "text-yellow-400" : "text-stat-earnings"}

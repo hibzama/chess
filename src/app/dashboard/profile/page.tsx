@@ -73,7 +73,7 @@ const StatCard = ({ icon, label, value }: { icon: React.ReactNode, label: string
 );
 
 export default function ProfilePage() {
-    const { user, userData, loading: authLoading, setUserData } = useAuth();
+    const { user, userData, loading: authLoading, setUserData, currencyConfig } = useAuth();
     const { toast } = useToast();
     const [gameHistory, setGameHistory] = useState<Game[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
@@ -92,8 +92,6 @@ export default function ProfilePage() {
             setLastName(userData.lastName);
         }
     }, [userData]);
-
-    const USDT_RATE = 310;
 
     const getInitials = () => {
         if (userData) {
@@ -396,8 +394,8 @@ export default function ProfilePage() {
                                                 <TableCell>{opponent?.name || 'Unknown'}</TableCell>
                                                 <TableCell><Badge variant={result.text === 'Win' ? 'default' : result.text === 'Loss' ? 'destructive' : 'secondary'}>{result.text}</Badge></TableCell>
                                                 <TableCell className={cn("font-semibold", result.net > 0 ? "text-green-400" : "text-red-400")}>
-                                                    <div>LKR {result.net.toFixed(2)}</div>
-                                                    <div className="text-xs font-normal text-muted-foreground">~{(result.net / USDT_RATE).toFixed(2)} USDT</div>
+                                                    <div>{currencyConfig.symbol} {result.net.toFixed(2)}</div>
+                                                    <div className="text-xs font-normal text-muted-foreground">~{(result.net / currencyConfig.usdtRate).toFixed(2)} USDT</div>
                                                 </TableCell>
                                                 <TableCell>{game.createdAt ? format(game.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
                                             </TableRow>

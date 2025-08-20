@@ -23,7 +23,7 @@ export default function CreateGamePage() {
     const params = useParams();
     const router = useRouter();
     const { toast } = useToast();
-    const { user, userData } = useAuth();
+    const { user, userData, currencyConfig } = useAuth();
     const { gameType } = params;
     const gameName = typeof gameType === 'string' ? gameType.charAt(0).toUpperCase() + gameType.slice(1) : 'Game';
 
@@ -33,8 +33,7 @@ export default function CreateGamePage() {
     const [roomPrivacy, setRoomPrivacy] = useState<'public' | 'private'>('public');
     const [isCreating, setIsCreating] = useState(false);
 
-    const USDT_RATE = 310;
-    const usdtAmount = (parseFloat(investmentAmount) / USDT_RATE || 0).toFixed(2);
+    const usdtAmount = (parseFloat(investmentAmount) / currencyConfig.usdtRate || 0).toFixed(2);
     
     const handleCreateRoom = async () => {
         if (!user || !userData) {
@@ -44,7 +43,7 @@ export default function CreateGamePage() {
 
         const wagerAmount = parseInt(investmentAmount);
         if (isNaN(wagerAmount) || wagerAmount < 10) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Minimum investment amount is LKR 10.' });
+            toast({ variant: 'destructive', title: 'Error', description: `Minimum investment amount is ${currencyConfig.symbol} 10.` });
             return;
         }
 
@@ -117,7 +116,7 @@ export default function CreateGamePage() {
                         </Alert>
 
                         <div className="space-y-2">
-                            <Label htmlFor="investment">Investment Amount (LKR)</Label>
+                            <Label htmlFor="investment">Investment Amount ({currencyConfig.symbol})</Label>
                             <Input id="investment" type="number" value={investmentAmount} onChange={e => setInvestmentAmount(e.target.value)} min="10"/>
                             <p className="text-xs text-muted-foreground">Approximately ${usdtAmount} USDT</p>
                         </div>

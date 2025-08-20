@@ -45,9 +45,6 @@ interface SignupBonusCampaign {
     isActive: boolean;
 }
 
-
-const USDT_RATE = 310;
-
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
         <path d="M22 2L11 13" />
@@ -56,7 +53,7 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 )
 
 const SignupBonusClaimCard = () => {
-    const { user } = useAuth();
+    const { user, currencyConfig } = useAuth();
     const { toast } = useToast();
     const [campaign, setCampaign] = useState<SignupBonusCampaign | null>(null);
     const [hasClaimed, setHasClaimed] = useState(true);
@@ -132,7 +129,7 @@ const SignupBonusClaimCard = () => {
                 <CardDescription>A special welcome bonus is available for you!</CardDescription>
             </CardHeader>
             <CardContent>
-                <p>Claim your <span className="font-bold text-primary">LKR {campaign.bonusAmount.toFixed(2)}</span> bonus now. It will be added to your wallet after admin approval.</p>
+                <p>Claim your <span className="font-bold text-primary">{currencyConfig.symbol} {campaign.bonusAmount.toFixed(2)}</span> bonus now. It will be added to your wallet after admin approval.</p>
             </CardContent>
             <CardFooter>
                 <Button className="w-full" onClick={handleClaim} disabled={isClaiming}>
@@ -145,7 +142,7 @@ const SignupBonusClaimCard = () => {
 
 
 export default function WalletPage() {
-  const { user, userData, loading: authLoading } = useAuth();
+  const { user, userData, loading: authLoading, currencyConfig } = useAuth();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,7 +162,7 @@ export default function WalletPage() {
   
   const [depositBonus, setDepositBonus] = useState<DepositBonusCampaign | null>(null);
   
-  const usdtAmount = (parseFloat(depositAmount) / USDT_RATE || 0).toFixed(2);
+  const usdtAmount = (parseFloat(depositAmount) / currencyConfig.usdtRate || 0).toFixed(2);
   
   const copyToClipboard = (text: string, name: string) => {
     navigator.clipboard.writeText(text);
@@ -270,7 +267,7 @@ export default function WalletPage() {
         return;
     }
     if (parseFloat(depositAmount) < 100) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Minimum deposit amount is LKR 100.' });
+        toast({ variant: 'destructive', title: 'Error', description: `Minimum deposit amount is ${currencyConfig.symbol} 100.` });
         return;
     }
     setIsConfirmRemarkOpen(true);
@@ -297,7 +294,7 @@ export default function WalletPage() {
     const requestedAmount = parseFloat(withdrawalAmount);
 
     if (requestedAmount < 500) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Minimum withdrawal amount is LKR 500.' });
+        toast({ variant: 'destructive', title: 'Error', description: `Minimum withdrawal amount is ${currencyConfig.symbol} 500.` });
         return;
     }
 
@@ -394,8 +391,8 @@ export default function WalletPage() {
                 </div>
             ) : (
                 <div>
-                    <p className="text-4xl font-bold">LKR {userData.balance.toFixed(2)}</p>
-                    <p className="text-muted-foreground">~{(userData.balance / USDT_RATE).toFixed(2)} USDT</p>
+                    <p className="text-4xl font-bold">{currencyConfig.symbol} {userData.balance.toFixed(2)}</p>
+                    <p className="text-muted-foreground">~{(userData.balance / currencyConfig.usdtRate).toFixed(2)} USDT</p>
                 </div>
             )}
         </CardContent>
@@ -420,7 +417,7 @@ export default function WalletPage() {
                                 <Gift className="h-4 w-4 !text-green-400" />
                                 <AlertTitle className="text-green-400">{depositBonus.title}</AlertTitle>
                                 <AlertDescription>
-                                    Active Bonus: Get a {depositBonus.percentage}% bonus on deposits from LKR {depositBonus.minDeposit} to LKR {depositBonus.maxDeposit}!
+                                    Active Bonus: Get a {depositBonus.percentage}% bonus on deposits from {currencyConfig.symbol} {depositBonus.minDeposit} to {currencyConfig.symbol} {depositBonus.maxDeposit}!
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -441,9 +438,9 @@ export default function WalletPage() {
                                     </div>
                                 </div>
                                 <div>
-                                    <Label htmlFor="deposit-amount">Amount (LKR)</Label>
+                                    <Label htmlFor="deposit-amount">Amount ({currencyConfig.symbol})</Label>
                                     <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
-                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: 100 LKR</p>
+                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: {currencyConfig.symbol} 100</p>
                                 </div>
                                 <div>
                                     <Label>Amount (USDT)</Label>
@@ -462,9 +459,9 @@ export default function WalletPage() {
                                 <p className="text-sm font-semibold">Name: Jd Aththanayaka</p>
                                 <p className="text-sm font-semibold">Account: 81793729</p>
                                 <div className="space-y-2">
-                                    <Label htmlFor="deposit-amount-bank">Amount (LKR)</Label>
+                                    <Label htmlFor="deposit-amount-bank">Amount ({currencyConfig.symbol})</Label>
                                     <Input id="deposit-amount-bank" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
-                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: 100 LKR</p>
+                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: {currencyConfig.symbol} 100</p>
                                 </div>
                              </Card>
                         )}
@@ -500,9 +497,9 @@ export default function WalletPage() {
                         </Tabs>
 
                         <div className="space-y-2">
-                            <Label htmlFor="withdrawal-amount">Amount to Withdraw (LKR)</Label>
+                            <Label htmlFor="withdrawal-amount">Amount to Withdraw ({currencyConfig.symbol})</Label>
                             <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 1550" required />
-                             <p className="text-xs text-muted-foreground pt-1">Minimum withdrawal amount: 500 LKR</p>
+                             <p className="text-xs text-muted-foreground pt-1">Minimum withdrawal amount: {currencyConfig.symbol} 500</p>
                         </div>
                          
                         <Alert variant="destructive">
@@ -516,14 +513,14 @@ export default function WalletPage() {
                         <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground space-y-2">
                             <div className="flex justify-between">
                                 <span>Fee ({withdrawalFeePercentage}%):</span>
-                                <span className="font-medium text-foreground">- LKR {withdrawalFee.toFixed(2)}</span>
+                                <span className="font-medium text-foreground">- {currencyConfig.symbol} {withdrawalFee.toFixed(2)}</span>
                             </div>
                             <Separator/>
                              <div className="flex justify-between font-bold">
                                 <span>You will receive:</span>
                                 <div className="text-right">
-                                    <p className="text-foreground">LKR {finalWithdrawalAmount.toFixed(2)}</p>
-                                    {withdrawalMethod === 'binance' && <p className="text-xs font-normal text-muted-foreground">~{(finalWithdrawalAmount / USDT_RATE).toFixed(2)} USDT</p>}
+                                    <p className="text-foreground">{currencyConfig.symbol} {finalWithdrawalAmount.toFixed(2)}</p>
+                                    {withdrawalMethod === 'binance' && <p className="text-xs font-normal text-muted-foreground">~{(finalWithdrawalAmount / currencyConfig.usdtRate).toFixed(2)} USDT</p>}
                                 </div>
                             </div>
                         </div>
@@ -596,8 +593,8 @@ export default function WalletPage() {
                                             </div>
                                         </div>
                                         <div>
-                                            <div className="font-medium">LKR {tx.amount.toFixed(2)}</div>
-                                            <div className="text-xs text-muted-foreground">~{(tx.amount / USDT_RATE).toFixed(2)} USDT</div>
+                                            <div className="font-medium">{currencyConfig.symbol} {tx.amount.toFixed(2)}</div>
+                                            <div className="text-xs text-muted-foreground">~{(tx.amount / currencyConfig.usdtRate).toFixed(2)} USDT</div>
                                         </div>
                                         <div className="text-muted-foreground text-sm">{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</div>
                                         <div>

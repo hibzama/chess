@@ -14,12 +14,14 @@ import { useToast } from '@/hooks/use-toast';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import PublicGames from '@/components/lobby/public-games';
+import { useAuth } from '@/context/auth-context';
 
 export default function GameLobbyPage() {
     const params = useParams();
     const router = useRouter();
     const { toast } = useToast();
     const { gameType } = params;
+    const { currencyConfig } = useAuth();
     const gameName = typeof gameType === 'string' ? gameType.charAt(0).toUpperCase() + gameType.slice(1) : 'Game';
 
     const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
@@ -108,7 +110,7 @@ export default function GameLobbyPage() {
             </div>
 
             <div className="w-full max-w-5xl mt-12">
-                <PublicGames gameType={gameType as string} />
+                <PublicGames gameType={gameType as string} currencySymbol={currencyConfig.symbol} usdtRate={currencyConfig.usdtRate} />
             </div>
         </div>
 

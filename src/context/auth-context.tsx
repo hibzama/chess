@@ -7,9 +7,15 @@ import { auth, db, rtdb } from '@/lib/firebase';
 import { doc, onSnapshot, serverTimestamp, updateDoc, getDoc } from 'firebase/firestore';
 import { ref, onValue, off, set, onDisconnect, serverTimestamp as rtdbServerTimestamp } from "firebase/database";
 
+interface CurrencyConfig {
+    symbol: string;
+    usdtRate: number;
+}
+
 interface AuthContextType {
   user: User | null;
   userData: UserData | null;
+  currencyConfig: CurrencyConfig;
   loading: boolean;
   logout: () => Promise<void>;
   setUserData: React.Dispatch<React.SetStateAction<UserData | null>>;
@@ -64,6 +70,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [currencyConfig, setCurrencyConfig] = useState<CurrencyConfig>({ symbol: 'LKR', usdtRate: 310 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,7 +81,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       }
     });
-    return () => unsubscribeAuth();
+
+    const configRef = doc(db, 'settings', 'currencyConfig');
+    const unsubscribeConfig = onSnapshot(configRef, (docSnap) => {
+        if (docSnap.exists()) {
+            setCurrencyConfig(docSnap.data() as CurrencyConfig);
+        }
+    });
+
+    return () => {
+        unsubscribeAuth();
+        unsubscribeConfig();
+    };
   }, []);
 
   useEffect(() => {
@@ -162,7 +180,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, logout, setUserData }}>
+    <AuthContext.Provider value={{ user, userData, loading, logout, setUserData, currencyConfig }}>
       {children}
     </AuthContext.Provider>
   );

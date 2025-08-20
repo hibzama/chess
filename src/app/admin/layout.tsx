@@ -3,7 +3,7 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle, CalendarClock, Award, CheckSquare, ClipboardCheck } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle, CalendarClock, Award, CheckSquare, ClipboardCheck, Coins } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -142,12 +142,6 @@ export default function AdminLayout({
                              <Link href="/admin/bonus/referral-claims"><SidebarMenuButton tooltip="Bonus Claims" isActive={isActive('/admin/bonus/referral-claims')}><CheckSquare /><span>Bonus Claims</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
-                             <Link href="/admin/mailer"><SidebarMenuButton tooltip="Mailer" isActive={pathname === '/admin/mailer'}><Mail /><span>Mailer</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                         <SidebarMenuItem>
-                             <Link href="/admin/mailer/settings"><SidebarMenuButton tooltip="Mailer Settings" isActive={isActive('/admin/mailer/settings')}><Settings /><span>Mailer Settings</span></SidebarMenuButton></Link>
-                        </SidebarMenuItem>
-                        <SidebarMenuItem>
                              <Link href="/admin/marketing/applications"><SidebarMenuButton tooltip="Marketing Applications" isActive={isActive('/admin/marketing/applications')}><Megaphone /><span>Marketing Apps</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                          <SidebarMenuItem>
@@ -155,6 +149,12 @@ export default function AdminLayout({
                         </SidebarMenuItem>
                          <SidebarMenuItem>
                              <Link href="/admin/marketing/withdrawals/history"><SidebarMenuButton tooltip="Marketing Withdrawals History" isActive={isActive('/admin/marketing/withdrawals/history')}><History /><span>M. Withdraw History</span></SidebarMenuButton></Link>
+                        </SidebarMenuItem>
+                        
+                         <SidebarMenuItem>
+                            <p className="px-3 py-2 text-xs font-semibold text-muted-foreground">Settings</p>
+                            <Link href="/admin/settings/currency"><SidebarMenuButton tooltip="Currency Settings" isActive={isActive('/admin/settings/currency')}><Coins /><span>Currency</span></SidebarMenuButton></Link>
+                             <Link href="/admin/mailer/settings"><SidebarMenuButton tooltip="Mailer Settings" isActive={isActive('/admin/mailer/settings')}><Settings /><span>Mailer</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarContent>
@@ -183,5 +183,3 @@ export default function AdminLayout({
         </SidebarProvider>
     )
   }
-
-    
