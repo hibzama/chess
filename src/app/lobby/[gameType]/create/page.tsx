@@ -118,7 +118,7 @@ export default function CreateGamePage() {
                         <div className="space-y-2">
                             <Label htmlFor="investment">Investment Amount ({currencyConfig.symbol})</Label>
                             <Input id="investment" type="number" value={investmentAmount} onChange={e => setInvestmentAmount(e.target.value)} min="10"/>
-                            <p className="text-xs text-muted-foreground">Approximately ${usdtAmount} USDT</p>
+                            <p className="text-xs text-muted-foreground">Approximately {usdtAmount} USDT</p>
                         </div>
 
                          <div className="space-y-3">

@@ -27,10 +27,8 @@ type Transaction = {
     description?: string;
 };
 
-const USDT_RATE = 310;
-
 export default function MarketingWalletPage() {
-  const { user, userData, loading: authLoading } = useAuth();
+  const { user, userData, loading: authLoading, currencyConfig } = useAuth();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +68,7 @@ export default function MarketingWalletPage() {
     const amountInLKR = parseFloat(withdrawalAmount);
 
     if (amountInLKR < 100) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Minimum withdrawal amount is LKR 100.' });
+        toast({ variant: 'destructive', title: 'Error', description: `Minimum withdrawal amount is ${currencyConfig.symbol} 100.` });
         return;
     }
 
@@ -144,8 +142,8 @@ export default function MarketingWalletPage() {
                 </div>
             ) : (
                 <div>
-                    <p className="text-4xl font-bold">LKR {(userData.marketingBalance || 0).toFixed(2)}</p>
-                    <p className="text-muted-foreground">~{((userData.marketingBalance || 0) / USDT_RATE).toFixed(2)} USDT</p>
+                    <p className="text-4xl font-bold">{currencyConfig.symbol} {(userData.marketingBalance || 0).toFixed(2)}</p>
+                    <p className="text-muted-foreground">~{((userData.marketingBalance || 0) / currencyConfig.usdtRate).toFixed(2)} USDT</p>
                 </div>
             )}
         </CardContent>
@@ -165,9 +163,9 @@ export default function MarketingWalletPage() {
                 <form onSubmit={handleWithdrawalSubmit}>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="withdrawal-amount">Amount (LKR)</Label>
+                            <Label htmlFor="withdrawal-amount">Amount ({currencyConfig.symbol})</Label>
                             <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 1550" required />
-                             <p className="text-xs text-muted-foreground pt-1">Minimum withdrawal amount: 100 LKR</p>
+                             <p className="text-xs text-muted-foreground pt-1">Minimum withdrawal amount: 100 {currencyConfig.symbol}</p>
                         </div>
                         <Separator />
                         <p className="font-medium text-sm">Bank Details</p>
@@ -225,8 +223,8 @@ export default function MarketingWalletPage() {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="font-medium">LKR {tx.amount.toFixed(2)}</div>
-                                        <div className="text-xs text-muted-foreground">~{(tx.amount / USDT_RATE).toFixed(2)} USDT</div>
+                                        <div className="font-medium">{currencyConfig.symbol} {tx.amount.toFixed(2)}</div>
+                                        <div className="text-xs text-muted-foreground">~{(tx.amount / currencyConfig.usdtRate).toFixed(2)} USDT</div>
                                     </TableCell>
                                     <TableCell>{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</TableCell>
                                     <TableCell>
