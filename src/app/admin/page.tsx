@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/context/auth-context';
 
 export default function AdminDashboardPage() {
   const [totalUsers, setTotalUsers] = useState(0);
@@ -17,6 +18,7 @@ export default function AdminDashboardPage() {
   const [allTimeWagers, setAllTimeWagers] = useState(0);
   const [allTimeReturns, setAllTimeReturns] = useState(0);
   const [loading, setLoading] = useState(true);
+  const { currencyConfig } = useAuth();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -140,15 +142,15 @@ export default function AdminDashboardPage() {
             />
             <StatCard 
                 title="Wagers (24h)" 
-                value={`LKR ${wagersLast24h.toFixed(2)}`}
-                description="Total LKR wagered."
+                value={`${currencyConfig.symbol} ${wagersLast24h.toFixed(2)}`}
+                description="Total wagered."
                 icon={<DollarSign className="w-8 h-8 text-primary mb-2" />}
                 isLoading={loading}
             />
              <StatCard 
                 title="Returns (24h)" 
-                value={`LKR ${returnsLast24h.toFixed(2)}`}
-                description="Total LKR returned to players."
+                value={`${currencyConfig.symbol} ${returnsLast24h.toFixed(2)}`}
+                description="Total returned to players."
                 icon={<TrendingUp className="w-8 h-8 text-primary mb-2" />}
                 isLoading={loading}
             />
@@ -167,15 +169,15 @@ export default function AdminDashboardPage() {
             />
              <StatCard 
                 title="Total Wagers" 
-                value={`LKR ${allTimeWagers.toFixed(2)}`}
-                description="All-time LKR wagered."
+                value={`${currencyConfig.symbol} ${allTimeWagers.toFixed(2)}`}
+                description="All-time wagered."
                 icon={<DollarSign className="w-8 h-8 text-primary mb-2" />}
                 isLoading={loading}
             />
              <StatCard 
                 title="Total Returns" 
-                value={`LKR ${allTimeReturns.toFixed(2)}`}
-                description="All-time LKR returned."
+                value={`${currencyConfig.symbol} ${allTimeReturns.toFixed(2)}`}
+                description="All-time returned."
                 icon={<TrendingUp className="w-8 h-8 text-primary mb-2" />}
                 isLoading={loading}
             />

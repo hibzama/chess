@@ -1,3 +1,4 @@
+
 'use client'
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -128,7 +129,7 @@ export default function MainLayout({
   }: {
     children: React.ReactNode,
   }) {
-    const { logout, userData, loading } = useAuth();
+    const { logout, userData, loading, currencyConfig } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [isMounted, setIsMounted] = React.useState(false);
@@ -149,7 +150,6 @@ export default function MainLayout({
         return '..';
     }
 
-    const USDT_RATE = 310;
     const isMarketer = userData?.role === 'marketer';
     const hasPendingTasks = userData?.campaignInfo && userData.campaignInfo.completedTasks.length < (userData.campaignInfo as any).totalTasks;
 
@@ -241,8 +241,8 @@ export default function MainLayout({
                                                   </div>
                                                   ) : (
                                                   <>
-                                                      <p className="text-sm font-bold text-primary">LKR {(isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0).toFixed(2)}</p>
-                                                      <p className="text-xs text-muted-foreground">~{((isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0) / USDT_RATE).toFixed(2)} USDT</p>
+                                                      <p className="text-sm font-bold text-primary">{currencyConfig.symbol} {(isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0).toFixed(2)}</p>
+                                                      <p className="text-xs text-muted-foreground">~{((isMarketer ? userData.marketingBalance ?? 0 : userData.balance ?? 0) / currencyConfig.usdtRate).toFixed(2)} USDT</p>
                                                   </>
                                               )}
                                               </div>
