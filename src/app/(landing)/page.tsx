@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -25,7 +24,15 @@ const HeroIcon = () => (
 
 export default function LandingPage() {
     const { user, loading } = useAuth();
-    const t = useTranslation;
+    const tPartner = useTranslation('BECOME TODAY A NEXBATTLE PARTNER');
+    const tSkill = useTranslation('Your Skill is Your Investment');
+    const tEarnings = useTranslation('Your earnings are unlimited and have no restrictions. Promote Nexbattle and start increasing your earnings today!');
+    const tConversion = useTranslation('High Conversion');
+    const tCommission = useTranslation('Profitable Commission');
+    const tStats = useTranslation('Real-Time Statistics');
+    const tSupport = useTranslation('Marketing Support');
+    const tRegister = useTranslation('Register & Play');
+    const tDownload = useTranslation('Download APK');
  
     if (loading) {
         return null; // Or a loading spinner
@@ -40,25 +47,25 @@ export default function LandingPage() {
       <main className="flex-1 flex items-center justify-center p-4">
         <section className="container mx-auto grid grid-cols-1 md:grid-cols-2 items-center gap-12">
             <div className="hero-text text-center md:text-left">
-                <p className="font-bold text-primary mb-2">{t('BECOME TODAY A NEXBATTLE PARTNER')}</p>
+                <p className="font-bold text-primary mb-2">{tPartner}</p>
                 <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
-                    {t('Your Skill is Your Investment')}
+                    {tSkill}
                 </h1>
                 <p className="my-6 text-lg text-muted-foreground">
-                   {t('Your earnings are unlimited and have no restrictions. Promote Nexbattle and start increasing your earnings today!')}
+                   {tEarnings}
                 </p>
                 <ul className="grid grid-cols-2 gap-4 text-left mb-8">
-                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {t('High Conversion')}</li>
-                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {t('Profitable Commission')}</li>
-                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {t('Real-Time Statistics')}</li>
-                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {t('Marketing Support')}</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {tConversion}</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {tCommission}</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {tStats}</li>
+                    <li className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {tSupport}</li>
                 </ul>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                     <Button asChild size="lg">
-                        <Link href="/register">{t('Register & Play')}</Link>
+                        <Link href="/register">{tRegister}</Link>
                     </Button>
                      <Button asChild size="lg" variant="outline">
-                        <Link href="https://jani20001212.itch.io/nebattle" target="_blank" rel="noopener noreferrer"><Download className="mr-2"/> {t('Download APK')}</Link>
+                        <Link href="https://jani20001212.itch.io/nebattle" target="_blank" rel="noopener noreferrer"><Download className="mr-2"/> {tDownload}</Link>
                     </Button>
                 </div>
                  <div className="mt-8">
