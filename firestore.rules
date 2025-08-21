@@ -2,84 +2,79 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Users can read their own data, and admins can read anyone's data.
+
+    match /languages/{languageId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth.token.admin == true;
+    }
+
     match /users/{userId} {
-      allow read: if request.auth.uid == userId || request.auth.token.admin == true;
-      allow write: if request.auth.token.admin == true; // Only admins can write to user docs
-      allow create: if request.auth.uid == userId;
-    }
-    
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth.uid == userId || request.auth.token.admin == true;
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null;
     }
 
-    // Admins can manage settings documents
-    match /settings/{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
-    }
-
-    // Admins can manage campaign documents
-    match /signup_bonus_campaigns/{campaignId} {
-        allow read, write, delete: if request.auth.token.admin == true;
-    }
-     match /deposit_bonus_campaigns/{campaignId} {
-        allow read, write, delete: if request.auth.token.admin == true;
-    }
-     match /referral_campaigns/{campaignId} {
-        allow read, write, delete: if request.auth.token.admin == true;
-    }
-    match /tasks/{campaignId} {
-        allow read, write, delete: if request.auth.token.admin == true;
+    match /users/{userId}/active_campaigns/{campaignId} {
+      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
     }
     
-     // Admins can read all bonus claims, users can read their own
-    match /bonus_claims/{claimId} {
-        allow read: if request.auth.token.admin == true || request.auth.uid == resource.data.userId;
-        allow write: if request.auth.token.admin == true; // For status updates
-        allow create: if request.auth.uid != null; // Any authenticated user can create a claim
+    match /transactions/{transactionId} {
+      allow read, create: if request.auth != null;
+      allow update: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    match /game_rooms/{roomId} {
+      allow read, create;
+      allow update, delete: if request.auth != null;
+    }
+
+    match /game_rooms/{roomId}/messages/{messageId} {
+      allow read, create: if request.auth != null;
+    }
+
+    match /friend_requests/{requestId} {
+        allow read, create, delete: if request.auth != null;
+    }
+    
+    match /notifications/{notificationId} {
+        allow read, create, update: if request.auth != null;
     }
     
     match /marketing_applications/{appId} {
-        allow create: if request.auth.uid == null; // Allow unauthenticated applications
-        allow read, write: if request.auth.token.admin == true;
+        allow create;
+        allow read, update: if request.auth != null && request.auth.token.admin == true;
     }
     
-    match /game_rooms/{roomId} {
-        allow read: if true;
-        allow create: if request.auth.uid != null;
-        allow update, delete: if request.auth.uid == resource.data.createdBy.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    match /signup_bonus_campaigns/{campaignId} {
+        allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    match /deposit_bonus_campaigns/{campaignId} {
+        allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+     match /deposit_bonus_campaigns/{campaignId}/claims/{claimId} {
+        allow read, write: if request.auth != null;
+    }
+
+    match /daily_bonus_campaigns/{campaignId} {
+        allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    match /referral_campaigns/{campaignId} {
+        allow read, write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    match /tasks/{taskId} {
+         allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
     
-    match /game_rooms/{roomId}/{document=**} {
-        allow read, write: if request.auth.uid in resource.data.players;
+    match /bonus_claims/{claimId} {
+        allow read, write: if request.auth != null;
     }
 
-    // Allow logged-in users to read from the languages collection
-    // Allow admins to write to the languages collection
-    match /languages/{document=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+    match /settings/{settingId} {
+       allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    // Allow all users to read from transactions, but only admins to write
-    match /transactions/{transactionId} {
-        allow read, create: if request.auth != null;
-        allow write: if request.auth.token.admin == true;
-    }
-
-    // Notifications can be created by anyone, but only read/updated by the user or an admin
-    match /notifications/{notificationId} {
-        allow create: if true;
-        allow read, update: if request.auth.uid == resource.data.userId || request.auth.token.admin == true;
-    }
-
-    // Allow users to create chats
-    match /chats/{chatId} {
-        allow read, write: if request.auth.uid in resource.data.userIds;
-    }
-     match /chats/{chatId}/{document=**} {
-        allow read, write: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-    }
   }
 }
