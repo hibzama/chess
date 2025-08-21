@@ -14,18 +14,18 @@ import { cn } from "@/lib/utils";
 
 const LanguageSwitcher = () => {
     const { languages, currentLang, changeLanguage, loading } = useTranslationSystem();
+    const currentLanguageName = languages.find(l => l.code === currentLang)?.name || 'Language';
     const t = useTranslation;
+    const translatedLanguageName = t(currentLanguageName);
 
     if (loading || languages.length <= 1) return null;
-
-    const currentLanguageName = languages.find(l => l.code === currentLang)?.name || 'Language';
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                     <Languages className="w-4 h-4" />
-                    <span className="hidden md:inline">{t(currentLanguageName)}</span>
+                    <span className="hidden md:inline">{translatedLanguageName}</span>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -295,5 +295,3 @@ export default function LandingLayout({
         </div>
     );
   }
-
-    
