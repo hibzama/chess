@@ -1,51 +1,39 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Users can read/write their own document
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Admins can read/write any user document
+  
+    // Admins have full access to all data for management purposes
+    match /{document=**} {
       allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    // Admins can read/write any document in these collections
-    match /(settings|marketing_applications|signup_bonus_campaigns|deposit_bonus_campaigns|referral_campaigns|tasks)/{docId} {
-       allow read, write: if request.auth != null && request.auth.token.admin == true;
-    }
-
-    // Any authenticated user can read languages, only admins can write
+    // Users can read the list of languages for the dropdown
     match /languages/{languageId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.token.admin == true;
     }
     
-    // Any authenticated user can read public game rooms
-    match /game_rooms/{roomId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
-        // Only players in the game can update/delete it
-        allow update, delete: if request.auth != null && resource.data.players.hasAny([request.auth.uid]);
-    }
-    
-    // Allow admins to manage all bonus claims
-    match /bonus_claims/{claimId} {
-        allow read, write: if request.auth != null && request.auth.token.admin == true;
-        // Users can create their own claims
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-    }
-    
-     // Allow admins to manage deposit bonus claims
-    match /deposit_bonus_campaigns/{campaignId}/claims/{userId} {
-        allow read, write: if request.auth != null && request.auth.token.admin == true;
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    // Users can manage their own user document
+    match /users/{userId} {
+      allow read, update: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Transactions can be created by users, but only read by them or admins.
+    // Game rooms can be read and written by any authenticated user
+    // (More specific game logic rules would go here in a production app)
+    match /game_rooms/{roomId} {
+        allow read, write: if request.auth != null;
+    }
+    
+    // Allow users to create transactions for themselves (deposits, withdrawals, etc.)
     match /transactions/{transactionId} {
         allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-        allow read: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
-        allow update: if request.auth != null && request.auth.token.admin == true; // Only admins can approve/reject
+        allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+    // Allow users to submit bonus claims
+    match /bonus_claims/{claimId} {
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        allow read: if request.auth != null && request.auth.uid == resource.data.userId;
     }
 
   }
