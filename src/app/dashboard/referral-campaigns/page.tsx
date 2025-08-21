@@ -23,7 +23,6 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { useTranslation } from '@/hooks/use-translation';
 
 interface UserCampaign {
     campaignId: string;
@@ -55,100 +54,48 @@ interface ClaimHistory {
 }
 
 const CampaignIntroduction = () => {
-    const [language, setLanguage] = useState('en');
-    const t = useTranslation;
-
-    const pageTitle = t('How Referral Campaigns Work');
-    const introText = t('Referral Campaigns are a powerful way to earn significant rewards by helping grow the Nexbattle community. Here\'s how it works:');
-    const step1Title = t('Start a Campaign:');
-    const step1Desc = t('Choose an available campaign from the list below to begin.');
-    const step2Title = t('Share Your Link:');
-    const step2Desc = t('You will get a unique referral link for your active campaign. Share this with friends who are not yet on Nexbattle.');
-    const step3Title = t('Friends Complete Tasks:');
-    const step3Desc = t('When a new user signs up using your link, they will be given a set of simple tasks to complete (like joining a social media group). For each task they complete, they earn a small bonus.');
-    const step4Title = t('Become a Valid Referral:');
-    const step4Desc = t('Once your referred friend completes ALL their assigned tasks, they become a "valid referral" for your campaign.');
-    const step5Title = t('Claim Your Reward:');
-    const step5Desc = t('After you collect enough valid referrals to meet your campaign\'s goal, you can claim your large reward bonus! Your claim will be reviewed and approved by an admin.');
-    
-    const pageTitleSi = t('ප්‍රවර්ධනයක් ආරම්භ කරන්න:');
-    const introTextSi = t('Nexbattle ප්‍රජාව වර්ධනය කිරීමට උදවු වීමෙන් සැලකිය යුතු ත්‍යාග උපයා ගැනීමට Referral Campaigns යනු потужний спосіб වේ. එය ක්‍රියාත්මක වන ආකාරය මෙසේය:');
-    const step1TitleSi = t('ප්‍රවර්ධනයක් ආරම්භ කරන්න:');
-    const step1DescSi = t('ආරම්භ කිරීමට පහත ලැයිස්තුවෙන් පවතින ප්‍රවර්ධනයක් තෝරන්න.');
-    const step2TitleSi = t('ඔබේ සබැඳිය බෙදා ගන්න:');
-    const step2DescSi = t('ඔබේ සක්‍රිය ප්‍රවර්ධනය සඳහා ඔබට අනන්‍ය වූ හඳුන්වාදීමේ සබැඳියක් ලැබෙනු ඇත. එය Nexbattle හි තවමත් නැති මිතුරන් සමඟ බෙදා ගන්න.');
-    const step3TitleSi = t('මිතුරන් කාර්යයන් සම්පූර්ණ කරයි:');
-    const step3DescSi = t('නව පරිශීලකයෙකු ඔබේ සබැඳිය භාවිතයෙන් ලියාපදිංචි වූ විට, ඔවුන්ට සම්පූර්ණ කිරීමට සරල කාර්යයන් මාලාවක් ලබා දෙනු ඇත (සමාජ මාධ්‍ය කණ්ඩායමකට සම්බන්ධ වීම වැනි). ඔවුන් සම්පූර්ණ කරන සෑම කාර්යයක් සඳහාම, ඔවුන්ට කුඩා ප්‍රසාද දීමනාවක් ලැබේ.');
-    const step4TitleSi = t('වලංගු හඳුන්වාදීමක් වන්න:');
-    const step4DescSi = t('ඔබ හඳුන්වා දුන් මිතුරා ඔවුන්ට පවරා ඇති සියලුම කාර්යයන් සම්පූර්ණ කළ පසු, ඔවුන් ඔබේ ප්‍රවර්ධනය සඳහා "වලංගු හඳුන්වාදීමක්" බවට පත්වේ.');
-    const step5TitleSi = t('ඔබේ ත්‍යාගය ලබා ගන්න:');
-    const step5DescSi = t('ඔබේ ප්‍රවර්ධන ඉලක්කය සපුරාලීමට තරම් වලංගු හඳුන්වාදීම් එකතු කළ පසු, ඔබට ඔබේ විශාල ත්‍යාග ප්‍රසාද දීමනාව ලබා ගත හැකිය! ඔබේ ඉල්ලීම පරිපාලකයෙකු විසින් සමාලෝචනය කර අනුමත කරනු ලැබේ.');
-
     return (
         <Card className="mb-8">
             <CardHeader>
                 <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center gap-2">
                         <Info className="w-5 h-5"/>
-                        {pageTitle}
+                        How Referral Campaigns Work
                     </CardTitle>
-                    <div className="flex items-center gap-2">
-                         <Languages className="w-4 h-4 text-muted-foreground"/>
-                        <button onClick={() => setLanguage('en')} className={cn("text-xs font-semibold", language === 'en' ? 'text-primary' : 'text-muted-foreground')}>EN</button>
-                        <span className="text-muted-foreground">|</span>
-                        <button onClick={() => setLanguage('si')} className={cn("text-xs font-semibold", language === 'si' ? 'text-primary' : 'text-muted-foreground')}>සිං</button>
-                    </div>
                 </div>
             </CardHeader>
             <CardContent className="text-sm space-y-4">
-                {language === 'en' ? (
-                    <>
-                        <p>{introText}</p>
-                        <ol className="list-decimal list-inside space-y-2">
-                            <li><strong>{step1Title}</strong> {step1Desc}</li>
-                            <li><strong>{step2Title}</strong> {step2Desc}</li>
-                            <li><strong>{step3Title}</strong> {step3Desc}</li>
-                            <li><strong>{step4Title}</strong> {step4Desc}</li>
-                            <li><strong>{step5Title}</strong> {step5Desc}</li>
-                        </ol>
-                    </>
-                ) : (
-                    <>
-                        <p>{introTextSi}</p>
-                        <ol className="list-decimal list-inside space-y-2">
-                            <li><strong>{step1TitleSi}</strong> {step1DescSi}</li>
-                            <li><strong>{step2TitleSi}</strong> {step2DescSi}</li>
-                            <li><strong>{step3TitleSi}</strong> {step3DescSi}</li>
-                            <li><strong>{step4TitleSi}</strong> {step4DescSi}</li>
-                            <li><strong>{step5TitleSi}</strong> {step5DescSi}</li>
-                        </ol>
-                    </>
-                )}
+                <p>Referral Campaigns are a powerful way to earn significant rewards by helping grow the Nexbattle community. Here's how it works:</p>
+                <ol className="list-decimal list-inside space-y-2">
+                    <li><strong>Start a Campaign:</strong> Choose an available campaign from the list below to begin.</li>
+                    <li><strong>Share Your Link:</strong> You will get a unique referral link for your active campaign. Share this with friends who are not yet on Nexbattle.</li>
+                    <li><strong>Friends Complete Tasks:</strong> When a new user signs up using your link, they will be given a set of simple tasks to complete (like joining a social media group). For each task they complete, they earn a small bonus.</li>
+                    <li><strong>Become a Valid Referral:</strong> Once your referred friend completes ALL their assigned tasks, they become a "valid referral" for your campaign.</li>
+                    <li><strong>Claim Your Reward:</strong> After you collect enough valid referrals to meet your campaign's goal, you can claim your large reward bonus! Your claim will be reviewed and approved by an admin.</li>
+                </ol>
             </CardContent>
         </Card>
     );
 };
 
-
 const MarketingIntro = () => {
-    const t = useTranslation;
     return (
         <div className="space-y-8 mt-12">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3"><Megaphone/> {t('Referral Program')}</h1>
-                <p className="text-muted-foreground">{t('Learn how to maximize your earnings by growing the Nexbattle community.')}</p>
+                <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3"><Megaphone/> Referral Program</h1>
+                <p className="text-muted-foreground">Learn how to maximize your earnings by growing the Nexbattle community.</p>
             </div>
 
             <Card className="bg-primary/5 border-primary/20">
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><ShieldCheck/> {t('Become a Marketing Partner')}</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><ShieldCheck/> Become a Marketing Partner</CardTitle>
                     <CardDescription>
-                        {t('Ready to take your earnings to the next level? Our Marketing Partner program is designed for dedicated community builders. Unlock a deep referral network and earn significant commissions.')}
+                        Ready to take your earnings to the next level? Our Marketing Partner program is designed for dedicated community builders. Unlock a deep referral network and earn significant commissions.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Button asChild>
-                        <Link href="/marketing/register">{t('Apply to Join the Marketing Team')}</Link>
+                        <Link href="/marketing/register">Apply to Join the Marketing Team</Link>
                     </Button>
                 </CardContent>
             </Card>
@@ -156,25 +103,25 @@ const MarketingIntro = () => {
             <div className="grid md:grid-cols-2 gap-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('The Marketing System')}</CardTitle>
-                        <CardDescription>{t('How our powerful 20-level system works.')}</CardDescription>
+                        <CardTitle>The Marketing System</CardTitle>
+                        <CardDescription>How our powerful 20-level system works.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-start gap-4">
                             <Users className="w-8 h-8 text-primary mt-1"/>
                             <div>
-                                <h3 className="font-semibold">{t('Level 1: Direct Referrals')}</h3>
+                                <h3 className="font-semibold">Level 1: Direct Referrals</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    {t('When you become a marketer, you get a unique')} <span className="font-semibold text-primary">`mref`</span> {t('link. Anyone who signs up with this link becomes your direct Level 1 referral.')}
+                                    When you become a marketer, you get a unique <span className="font-semibold text-primary">`mref`</span> link. Anyone who signs up with this link becomes your direct Level 1 referral.
                                 </p>
                             </div>
                         </div>
                          <div className="flex items-start gap-4">
                             <Layers className="w-8 h-8 text-primary mt-1"/>
                             <div>
-                                <h3 className="font-semibold">{t('Levels 2-20: Building Your Network')}</h3>
+                                <h3 className="font-semibold">Levels 2-20: Building Your Network</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    {t('Your network grows when anyone in your chain refers new players using their bonus referral links (')} <span className="font-semibold text-primary">`aref`</span>{t('). These new players are added to your network, up to 20 levels deep.')}
+                                    Your network grows when anyone in your chain refers new players using their bonus referral links (<span className="font-semibold text-primary">`aref`</span>). These new players are added to your network, up to 20 levels deep.
                                 </p>
                             </div>
                         </div>
@@ -182,25 +129,25 @@ const MarketingIntro = () => {
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle>{t('Commission Structure')}</CardTitle>
-                        <CardDescription>{t('Simple and profitable commissions.')}</CardDescription>
+                        <CardTitle>Commission Structure</CardTitle>
+                        <CardDescription>Simple and profitable commissions.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                          <div className="flex items-start gap-4">
                             <DollarSign className="w-8 h-8 text-primary mt-1"/>
                             <div>
-                                <h3 className="font-semibold">{t('3% Commission')}</h3>
+                                <h3 className="font-semibold">3% Commission</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    {t('You earn a 3% commission from the wager of')} <span className="font-bold">{t('every player')}</span> {t('in your 20-level network, every time they play a game.')}
+                                    You earn a 3% commission from the wager of <span className="font-bold">every player</span> in your 20-level network, every time they play a game.
                                 </p>
                             </div>
                         </div>
                         <div className="flex items-start gap-4">
                             <CheckCircle className="w-8 h-8 text-primary mt-1"/>
                             <div>
-                                <h3 className="font-semibold">{t('Double Commission')}</h3>
+                                <h3 className="font-semibold">Double Commission</h3>
                                 <p className="text-sm text-muted-foreground">
-                                    {t('If two players from your own network play against each other, you earn commission from')} <span className="font-bold">{t('both')}</span> {t('players, totaling 6% for that single game.')}
+                                    If two players from your own network play against each other, you earn commission from <span className="font-bold">both</span> players, totaling 6% for that single game.
                                 </p>
                             </div>
                         </div>
@@ -212,15 +159,14 @@ const MarketingIntro = () => {
 }
 
 const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], campaign: Campaign | null }) => {
-    const t = useTranslation;
     return (
         <ScrollArea className="h-72">
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>{t('User')}</TableHead>
-                        <TableHead>{t('Contact')}</TableHead>
-                        <TableHead>{t('Task Progress')}</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Task Progress</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -235,21 +181,21 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
                                 <TableCell>
                                     {pendingTasks.length > 0 ? (
                                         <div className="text-xs text-muted-foreground space-y-1">
-                                            <span>{t('Pending:')}</span>
+                                            <span>Pending:</span>
                                             <ul className="list-disc pl-4">
-                                                {pendingTasks.map(task => <li key={task.id}>{t(task.description)}</li>)}
+                                                {pendingTasks.map(task => <li key={task.id}>{task.description}</li>)}
                                             </ul>
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-2 text-green-400 text-xs font-semibold">
-                                            <Check className="w-4 h-4" /> {t('All tasks complete')}
+                                            <Check className="w-4 h-4" /> All tasks complete
                                         </div>
                                     )}
                                 </TableCell>
                             </TableRow>
                         )
                     }) : (
-                        <TableRow><TableCell colSpan={3} className="h-24 text-center">{t('No referrals in this list.')}</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={3} className="h-24 text-center">No referrals in this list.</TableCell></TableRow>
                     )}
                 </TableBody>
             </Table>
@@ -409,22 +355,21 @@ export default function UserCampaignsPage() {
         toast({ title: "Copied!", description: "Referral link copied to clipboard." });
     };
 
-    const t = useTranslation;
-    const claimSubmittedText = t("Claim Submitted / Pending");
-    const claimRewardText = t("Claim Reward:");
-    const goalNotMetText = t("Goal Not Met");
-    const yourGoalText = t("Your Goal");
-    const referralsGoalText = t("Referrals' Goal");
-    const yourUniqueLinkText = t("Your Unique Campaign Link");
-    const progressText = t("Progress:");
-    const validReferralsText = t("Valid Referrals");
-    const abandonCampaignText = t("Abandon Campaign");
+    const getClaimButtonText = () => {
+        if (activeUserCampaign?.completed || hasPendingClaimForActiveCampaign) {
+            return "Claim Submitted / Pending";
+        }
+        if (isCampaignGoalMet) {
+            return `Claim Reward: LKR ${campaignDetails?.referrerBonus}`;
+        }
+        return "Goal Not Met";
+    };
     
     const pageIntro = (
         <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">{t('Referral Campaigns')}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Referral Campaigns</h1>
             <p className="text-muted-foreground">
-                {t('Participate in referral campaigns to earn rewards. Start a campaign, share your unique link, and guide new users to complete tasks.')}
+                Participate in referral campaigns to earn rewards. Start a campaign, share your unique link, and guide new users to complete tasks.
             </p>
         </div>
     );
@@ -445,65 +390,65 @@ export default function UserCampaignsPage() {
                 <CampaignIntroduction/>
                 <Tabs defaultValue="campaigns">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="campaigns">{t('Available Campaigns')}</TabsTrigger>
-                        <TabsTrigger value="history">{t('Completed Campaigns')}</TabsTrigger>
+                        <TabsTrigger value="campaigns">Available Campaigns</TabsTrigger>
+                        <TabsTrigger value="history">Completed Campaigns</TabsTrigger>
                     </TabsList>
                     <TabsContent value="campaigns">
                         <Card>
                             <CardHeader>
-                                <CardTitle>{t('Start a Referral Campaign')}</CardTitle>
-                                <CardDescription>{t('Choose a campaign to start earning rewards.')}</CardDescription>
+                                <CardTitle>Start a Referral Campaign</CardTitle>
+                                <CardDescription>Choose a campaign to start earning rewards.</CardDescription>
                             </CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {availableCampaigns.length > 0 ? availableCampaigns.map(c => (
                                     <Card key={c.id} className="bg-card/50 flex flex-col">
                                         <CardHeader>
-                                            <CardTitle>{t(c.title)}</CardTitle>
+                                            <CardTitle>{c.title}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="flex-grow space-y-4">
                                             <div className="flex justify-around text-center">
                                                 <div>
-                                                    <p className="text-sm text-muted-foreground">{t('Goal')}</p>
+                                                    <p className="text-sm text-muted-foreground">Goal</p>
                                                     <p className="text-2xl font-bold flex items-center gap-2"><Target/> {c.referralGoal}</p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm text-muted-foreground">{t('Reward')}</p>
+                                                    <p className="text-sm text-muted-foreground">Reward</p>
                                                     <p className="text-2xl font-bold text-primary">LKR {c.referrerBonus}</p>
                                                 </div>
                                             </div>
                                             <Separator />
                                             <div>
-                                                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><ClipboardCheck/> {t('Referee Tasks')}</h4>
+                                                <h4 className="text-sm font-semibold mb-2 flex items-center gap-2"><ClipboardCheck/> Referee Tasks</h4>
                                                 <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
                                                     {c.tasks.map((task, i) => (
-                                                        <li key={i}>{t(task.description)} (+ LKR {task.refereeBonus})</li>
+                                                        <li key={i}>{task.description} (+ LKR {task.refereeBonus})</li>
                                                     ))}
                                                 </ul>
                                             </div>
                                         </CardContent>
                                         <CardFooter>
-                                            <Button className="w-full" onClick={() => handleStartCampaign(c.id)}>{t('Start Campaign')}</Button>
+                                            <Button className="w-full" onClick={() => handleStartCampaign(c.id)}>Start Campaign</Button>
                                         </CardFooter>
                                     </Card>
-                                )) : <p className="text-muted-foreground text-center col-span-full">{t('No new campaigns available right now.')}</p>}
+                                )) : <p className="text-muted-foreground text-center col-span-full">No new campaigns available right now.</p>}
                             </CardContent>
                         </Card>
                     </TabsContent>
                     <TabsContent value="history">
                         <Card>
-                            <CardHeader><CardTitle>{t('Bonus History')}</CardTitle><CardDescription>{t('Your bonus claims from completed referral campaigns.')}</CardDescription></CardHeader>
+                            <CardHeader><CardTitle>Bonus History</CardTitle><CardDescription>Your bonus claims from completed referral campaigns.</CardDescription></CardHeader>
                             <CardContent>
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>{t('Campaign')}</TableHead><TableHead>{t('Amount')}</TableHead><TableHead>{t('Date')}</TableHead><TableHead>{t('Status')}</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Amount</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                     <TableBody>
                                         {claimHistory.length > 0 ? claimHistory.map(claim => (
                                             <TableRow key={claim.id}>
-                                                <TableCell>{t(claim.campaignTitle || 'Referral Campaign')}</TableCell>
+                                                <TableCell>{claim.campaignTitle || 'Referral Campaign'}</TableCell>
                                                 <TableCell className="font-semibold">LKR {claim.amount.toFixed(2)}</TableCell>
                                                 <TableCell>{claim.createdAt ? format(claim.createdAt.toDate(), 'PPp') : 'N/A'}</TableCell>
-                                                <TableCell><Badge variant={claim.status === 'approved' ? 'default' : claim.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{t(claim.status)}</Badge></TableCell>
+                                                <TableCell><Badge variant={claim.status === 'approved' ? 'default' : claim.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{claim.status}</Badge></TableCell>
                                             </TableRow>
-                                        )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">{t('No history found.')}</TableCell></TableRow>}
+                                        )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No history found.</TableCell></TableRow>}
                                     </TableBody>
                                 </Table>
                             </CardContent>
@@ -521,65 +466,55 @@ export default function UserCampaignsPage() {
     const hasPendingClaimForActiveCampaign = activeUserCampaign && claimHistory.some(c => c.campaignId === activeUserCampaign.campaignId && c.status === 'pending');
     const isClaimButtonDisabled = !isCampaignGoalMet || activeUserCampaign?.completed || hasPendingClaimForActiveCampaign;
 
-    const getClaimButtonText = () => {
-        if (activeUserCampaign?.completed || hasPendingClaimForActiveCampaign) {
-            return claimSubmittedText;
-        }
-        if (isCampaignGoalMet) {
-            return `${claimRewardText} LKR ${campaignDetails?.referrerBonus}`;
-        }
-        return goalNotMetText;
-    };
-
     return (
         <div className="space-y-8">
             <CampaignIntroduction />
             <Card className="border-primary bg-primary/5">
                 <CardHeader>
                     <CardTitle className="flex justify-between items-start">
-                        <span className="flex-1">{t('Your Active Campaign:')} {t(campaignDetails.title)}</span>
+                        <span className="flex-1">Your Active Campaign: {campaignDetails.title}</span>
                          <Button onClick={handleClaimReward} disabled={isClaimButtonDisabled} className="bg-yellow-400 hover:bg-yellow-500 text-black shadow-lg animate-pulse disabled:animate-none">
                             <Award className="mr-2"/> {getClaimButtonText()}
                         </Button>
                     </CardTitle>
-                    <CardDescription>{t('Share your link and track your progress below.')}</CardDescription>
+                    <CardDescription>Share your link and track your progress below.</CardDescription>
                 </CardHeader>
                  <CardContent className="space-y-6">
                      <div className="grid md:grid-cols-2 gap-4 text-sm">
                         <div className="p-4 bg-background/50 rounded-lg space-y-2">
-                             <h4 className="font-semibold text-primary flex items-center gap-2"><Award/> {yourGoalText}</h4>
-                             <p>{t('Get')} <span className="font-bold">{campaignDetails.referralGoal}</span> {t('people to sign up and complete all their tasks.')}</p>
+                             <h4 className="font-semibold text-primary flex items-center gap-2"><Award/> Your Goal</h4>
+                             <p>Get <span className="font-bold">{campaignDetails.referralGoal}</span> people to sign up and complete all their tasks.</p>
                         </div>
                          <div className="p-4 bg-background/50 rounded-lg space-y-2">
-                            <h4 className="font-semibold text-primary flex items-center gap-2"><Users/> {referralsGoalText}</h4>
-                            <p className="text-muted-foreground">{t('Each new user must complete all tasks to become a valid referral.')}</p>
+                            <h4 className="font-semibold text-primary flex items-center gap-2"><Users/> Referrals' Goal</h4>
+                            <p className="text-muted-foreground">Each new user must complete all tasks to become a valid referral.</p>
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label>{yourUniqueLinkText}</Label>
+                        <Label>Your Unique Campaign Link</Label>
                         <div className="flex gap-2">
                             <Input readOnly value={referralLink} />
                             <Button variant="ghost" size="icon" onClick={() => copyLink(referralLink)}><Copy /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => navigator.share({ url: referralLink, title: `${t('Join my Nexbattle campaign:')} ${t(campaignDetails.title)}`})}><Share/></Button>
+                            <Button variant="ghost" size="icon" onClick={() => navigator.share({ url: referralLink, title: `Join my Nexbattle campaign: ${campaignDetails.title}`})}><Share/></Button>
                         </div>
                     </div>
                     <div>
-                        <p className="text-sm font-semibold mb-2">{progressText} {validReferrals.length} / {campaignDetails.referralGoal} {validReferralsText}</p>
+                        <p className="text-sm font-semibold mb-2">Progress: {validReferrals.length} / {campaignDetails.referralGoal} Valid Referrals</p>
                         <Progress value={progress} />
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button variant="destructive" onClick={handleAbandonCampaign}>{abandonCampaignText}</Button>
+                    <Button variant="destructive" onClick={handleAbandonCampaign}>Abandon Campaign</Button>
                 </CardFooter>
             </Card>
 
             <Card>
-                <CardHeader><CardTitle>{t('Your Referrals')}</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Your Referrals</CardTitle></CardHeader>
                 <CardContent>
                     <Tabs defaultValue="pending">
                         <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="pending">{t('Pending')} ({referrals.length - validReferrals.length})</TabsTrigger>
-                            <TabsTrigger value="valid">{t('Valid')} ({validReferrals.length})</TabsTrigger>
+                            <TabsTrigger value="pending">Pending ({referrals.length - validReferrals.length})</TabsTrigger>
+                            <TabsTrigger value="valid">Valid ({validReferrals.length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="pending">
                             <ReferralList referrals={referrals.filter(r => !campaignDetails || r.campaignInfo.completedTasks.length < campaignDetails.tasks.length)} campaign={campaignDetails} />
