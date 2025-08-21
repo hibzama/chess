@@ -185,6 +185,52 @@ const MarketingIntro = () => {
     );
 }
 
+const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], campaign: Campaign | null }) => {
+    const t = useTranslation;
+    return (
+        <ScrollArea className="h-72">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>{t('User')}</TableHead>
+                        <TableHead>{t('Contact')}</TableHead>
+                        <TableHead>{t('Task Progress')}</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {referrals.length > 0 ? referrals.map(ref => {
+                        const completedTaskIds = new Set(ref.campaignInfo.completedTasks || []);
+                        const pendingTasks = campaign?.tasks.filter(task => !completedTaskIds.has(task.id)) || [];
+
+                        return (
+                            <TableRow key={ref.id}>
+                                <TableCell>{ref.firstName} {ref.lastName}</TableCell>
+                                <TableCell><a href={`tel:${ref.phone}`} className="flex items-center gap-1 hover:underline"><Phone className="w-3 h-3"/> {ref.phone}</a></TableCell>
+                                <TableCell>
+                                    {pendingTasks.length > 0 ? (
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <span>{t('Pending:')}</span>
+                                            <ul className="list-disc pl-4">
+                                                {pendingTasks.map(task => <li key={task.id}>{t(task.description)}</li>)}
+                                            </ul>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 text-green-400 text-xs font-semibold">
+                                            <Check className="w-4 h-4" /> {t('All tasks complete')}
+                                        </div>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        )
+                    }) : (
+                        <TableRow><TableCell colSpan={3} className="h-24 text-center">{t('No referrals in this list.')}</TableCell></TableRow>
+                    )}
+                </TableBody>
+            </Table>
+        </ScrollArea>
+    );
+}
+
 export default function UserCampaignsPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
@@ -523,50 +569,4 @@ export default function UserCampaignsPage() {
              <MarketingIntro />
         </div>
     )
-}
-
-const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], campaign: Campaign | null }) => {
-    const t = useTranslation;
-    return (
-        <ScrollArea className="h-72">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>{t('User')}</TableHead>
-                        <TableHead>{t('Contact')}</TableHead>
-                        <TableHead>{t('Task Progress')}</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {referrals.length > 0 ? referrals.map(ref => {
-                        const completedTaskIds = new Set(ref.campaignInfo.completedTasks || []);
-                        const pendingTasks = campaign?.tasks.filter(task => !completedTaskIds.has(task.id)) || [];
-
-                        return (
-                            <TableRow key={ref.id}>
-                                <TableCell>{ref.firstName} {ref.lastName}</TableCell>
-                                <TableCell><a href={`tel:${ref.phone}`} className="flex items-center gap-1 hover:underline"><Phone className="w-3 h-3"/> {ref.phone}</a></TableCell>
-                                <TableCell>
-                                    {pendingTasks.length > 0 ? (
-                                        <div className="text-xs text-muted-foreground space-y-1">
-                                            <span>{t('Pending:')}</span>
-                                            <ul className="list-disc pl-4">
-                                                {pendingTasks.map(task => <li key={task.id}>{t(task.description)}</li>)}
-                                            </ul>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2 text-green-400 text-xs font-semibold">
-                                            <Check className="w-4 h-4" /> {t('All tasks complete')}
-                                        </div>
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                        )
-                    }) : (
-                        <TableRow><TableCell colSpan={3} className="h-24 text-center">{t('No referrals in this list.')}</TableCell></TableRow>
-                    )}
-                </TableBody>
-            </Table>
-        </ScrollArea>
-    );
 }
