@@ -60,7 +60,6 @@ const SignupBonusClaimCard = () => {
     const [hasClaimed, setHasClaimed] = useState(true);
     const [isClaiming, setIsClaiming] = useState(false);
     const [loading, setLoading] = useState(true);
-
     const t = useTranslation;
 
     useEffect(() => {
@@ -694,5 +693,3 @@ export default function WalletPage() {
     </>
   );
 }
-
-    
