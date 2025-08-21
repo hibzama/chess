@@ -20,7 +20,7 @@ const HeroIcon = () => (
             data-ai-hint="neon gamepad"
         />
     </div>
-)
+);
 
 
 export default function LandingPage() {
