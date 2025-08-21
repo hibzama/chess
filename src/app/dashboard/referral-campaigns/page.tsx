@@ -58,13 +58,39 @@ const CampaignIntroduction = () => {
     const [language, setLanguage] = useState('en');
     const t = useTranslation;
 
+    const pageTitle = t('How Referral Campaigns Work');
+    const introText = t('Referral Campaigns are a powerful way to earn significant rewards by helping grow the Nexbattle community. Here\'s how it works:');
+    const step1Title = t('Start a Campaign:');
+    const step1Desc = t('Choose an available campaign from the list below to begin.');
+    const step2Title = t('Share Your Link:');
+    const step2Desc = t('You will get a unique referral link for your active campaign. Share this with friends who are not yet on Nexbattle.');
+    const step3Title = t('Friends Complete Tasks:');
+    const step3Desc = t('When a new user signs up using your link, they will be given a set of simple tasks to complete (like joining a social media group). For each task they complete, they earn a small bonus.');
+    const step4Title = t('Become a Valid Referral:');
+    const step4Desc = t('Once your referred friend completes ALL their assigned tasks, they become a "valid referral" for your campaign.');
+    const step5Title = t('Claim Your Reward:');
+    const step5Desc = t('After you collect enough valid referrals to meet your campaign\'s goal, you can claim your large reward bonus! Your claim will be reviewed and approved by an admin.');
+    
+    const pageTitleSi = t('ප්‍රවර්ධනයක් ආරම්භ කරන්න:');
+    const introTextSi = t('Nexbattle ප්‍රජාව වර්ධනය කිරීමට උදවු වීමෙන් සැලකිය යුතු ත්‍යාග උපයා ගැනීමට Referral Campaigns යනු потужний спосіб වේ. එය ක්‍රියාත්මක වන ආකාරය මෙසේය:');
+    const step1TitleSi = t('ප්‍රවර්ධනයක් ආරම්භ කරන්න:');
+    const step1DescSi = t('ආරම්භ කිරීමට පහත ලැයිස්තුවෙන් පවතින ප්‍රවර්ධනයක් තෝරන්න.');
+    const step2TitleSi = t('ඔබේ සබැඳිය බෙදා ගන්න:');
+    const step2DescSi = t('ඔබේ සක්‍රිය ප්‍රවර්ධනය සඳහා ඔබට අනන්‍ය වූ හඳුන්වාදීමේ සබැඳියක් ලැබෙනු ඇත. එය Nexbattle හි තවමත් නැති මිතුරන් සමඟ බෙදා ගන්න.');
+    const step3TitleSi = t('මිතුරන් කාර්යයන් සම්පූර්ණ කරයි:');
+    const step3DescSi = t('නව පරිශීලකයෙකු ඔබේ සබැඳිය භාවිතයෙන් ලියාපදිංචි වූ විට, ඔවුන්ට සම්පූර්ණ කිරීමට සරල කාර්යයන් මාලාවක් ලබා දෙනු ඇත (සමාජ මාධ්‍ය කණ්ඩායමකට සම්බන්ධ වීම වැනි). ඔවුන් සම්පූර්ණ කරන සෑම කාර්යයක් සඳහාම, ඔවුන්ට කුඩා ප්‍රසාද දීමනාවක් ලැබේ.');
+    const step4TitleSi = t('වලංගු හඳුන්වාදීමක් වන්න:');
+    const step4DescSi = t('ඔබ හඳුන්වා දුන් මිතුරා ඔවුන්ට පවරා ඇති සියලුම කාර්යයන් සම්පූර්ණ කළ පසු, ඔවුන් ඔබේ ප්‍රවර්ධනය සඳහා "වලංගු හඳුන්වාදීමක්" බවට පත්වේ.');
+    const step5TitleSi = t('ඔබේ ත්‍යාගය ලබා ගන්න:');
+    const step5DescSi = t('ඔබේ ප්‍රවර්ධන ඉලක්කය සපුරාලීමට තරම් වලංගු හඳුන්වාදීම් එකතු කළ පසු, ඔබට ඔබේ විශාල ත්‍යාග ප්‍රසාද දීමනාව ලබා ගත හැකිය! ඔබේ ඉල්ලීම පරිපාලකයෙකු විසින් සමාලෝචනය කර අනුමත කරනු ලැබේ.');
+
     return (
         <Card className="mb-8">
             <CardHeader>
                 <div className="flex justify-between items-center">
                     <CardTitle className="flex items-center gap-2">
                         <Info className="w-5 h-5"/>
-                        {t('How Referral Campaigns Work')}
+                        {pageTitle}
                     </CardTitle>
                     <div className="flex items-center gap-2">
                          <Languages className="w-4 h-4 text-muted-foreground"/>
@@ -77,24 +103,24 @@ const CampaignIntroduction = () => {
             <CardContent className="text-sm space-y-4">
                 {language === 'en' ? (
                     <>
-                        <p>{t('Referral Campaigns are a powerful way to earn significant rewards by helping grow the Nexbattle community. Here\'s how it works:')}</p>
+                        <p>{introText}</p>
                         <ol className="list-decimal list-inside space-y-2">
-                            <li><strong>{t('Start a Campaign:')}</strong> {t('Choose an available campaign from the list below to begin.')}</li>
-                            <li><strong>{t('Share Your Link:')}</strong> {t('You will get a unique referral link for your active campaign. Share this with friends who are not yet on Nexbattle.')}</li>
-                            <li><strong>{t('Friends Complete Tasks:')}</strong> {t('When a new user signs up using your link, they will be given a set of simple tasks to complete (like joining a social media group). For each task they complete, they earn a small bonus.')}</li>
-                            <li><strong>{t('Become a Valid Referral:')}</strong> {t('Once your referred friend completes ALL their assigned tasks, they become a "valid referral" for your campaign.')}</li>
-                            <li><strong>{t('Claim Your Reward:')}</strong> {t('After you collect enough valid referrals to meet your campaign\'s goal, you can claim your large reward bonus! Your claim will be reviewed and approved by an admin.')}</li>
+                            <li><strong>{step1Title}</strong> {step1Desc}</li>
+                            <li><strong>{step2Title}</strong> {step2Desc}</li>
+                            <li><strong>{step3Title}</strong> {step3Desc}</li>
+                            <li><strong>{step4Title}</strong> {step4Desc}</li>
+                            <li><strong>{step5Title}</strong> {step5Desc}</li>
                         </ol>
                     </>
                 ) : (
                     <>
-                        <p>{t('Nexbattle ප්‍රජාව වර්ධනය කිරීමට උදවු වීමෙන් සැලකිය යුතු ත්‍යාග උපයා ගැනීමට Referral Campaigns යනු потужний спосіб වේ. එය ක්‍රියාත්මක වන ආකාරය මෙසේය:')}</p>
+                        <p>{introTextSi}</p>
                         <ol className="list-decimal list-inside space-y-2">
-                            <li><strong>{t('ප්‍රවර්ධනයක් ආරම්භ කරන්න:')}</strong> {t('ආරම්භ කිරීමට පහත ලැයිස්තුවෙන් පවතින ප්‍රවර්ධනයක් තෝරන්න.')}</li>
-                            <li><strong>{t('ඔබේ සබැඳිය බෙදා ගන්න:')}</strong> {t('ඔබේ සක්‍රිය ප්‍රවර්ධනය සඳහා ඔබට අනන්‍ය වූ හඳුන්වාදීමේ සබැඳියක් ලැබෙනු ඇත. එය Nexbattle හි තවමත් නැති මිතුරන් සමඟ බෙදා ගන්න.')}</li>
-                            <li><strong>{t('මිතුරන් කාර්යයන් සම්පූර්ණ කරයි:')}</strong> {t('නව පරිශීලකයෙකු ඔබේ සබැඳිය භාවිතයෙන් ලියාපදිංචි වූ විට, ඔවුන්ට සම්පූර්ණ කිරීමට සරල කාර්යයන් මාලාවක් ලබා දෙනු ඇත (සමාජ මාධ්‍ය කණ්ඩායමකට සම්බන්ධ වීම වැනි). ඔවුන් සම්පූර්ණ කරන සෑම කාර්යයක් සඳහාම, ඔවුන්ට කුඩා ප්‍රසාද දීමනාවක් ලැබේ.')}</li>
-                            <li><strong>{t('වලංගු හඳුන්වාදීමක් වන්න:')}</strong> {t('ඔබ හඳුන්වා දුන් මිතුරා ඔවුන්ට පවරා ඇති සියලුම කාර්යයන් සම්පූර්ණ කළ පසු, ඔවුන් ඔබේ ප්‍රවර්ධනය සඳහා "වලංගු හඳුන්වාදීමක්" බවට පත්වේ.')}</li>
-                            <li><strong>{t('ඔබේ ත්‍යාගය ලබා ගන්න:')}</strong> {t('ඔබේ ප්‍රවර්ධන ඉලක්කය සපුරාලීමට තරම් වලංගු හඳුන්වාදීම් එකතු කළ පසු, ඔබට ඔබේ විශාල ත්‍යාග ප්‍රසාද දීමනාව ලබා ගත හැකිය! ඔබේ ඉල්ලීම පරිපාලකයෙකු විසින් සමාලෝචනය කර අනුමත කරනු ලැබේ.')}</li>
+                            <li><strong>{step1TitleSi}</strong> {step1DescSi}</li>
+                            <li><strong>{step2TitleSi}</strong> {step2DescSi}</li>
+                            <li><strong>{step3TitleSi}</strong> {step3DescSi}</li>
+                            <li><strong>{step4TitleSi}</strong> {step4DescSi}</li>
+                            <li><strong>{step5TitleSi}</strong> {step5DescSi}</li>
                         </ol>
                     </>
                 )}
@@ -234,7 +260,6 @@ const ReferralList = ({ referrals, campaign }: { referrals: CampaignReferral[], 
 export default function UserCampaignsPage() {
     const { user, userData } = useAuth();
     const { toast } = useToast();
-    const t = useTranslation;
     const [allCampaigns, setAllCampaigns] = useState<Campaign[]>([]);
     const [claimHistory, setClaimHistory] = useState<ClaimHistory[]>([]);
     const [activeUserCampaign, setActiveUserCampaign] = useState<UserCampaign | null>(null);
@@ -331,9 +356,9 @@ export default function UserCampaignsPage() {
                 completed: false,
                 claimed: false,
             });
-            toast({ title: t("Campaign Started!"), description: t("You can now share your unique referral link.") });
+            toast({ title: "Campaign Started!", description: "You can now share your unique referral link." });
         } catch (error) {
-            toast({ variant: 'destructive', title: t("Error"), description: t("Could not start campaign.") });
+            toast({ variant: 'destructive', title: "Error", description: "Could not start campaign." });
         } finally {
             setLoading(false);
         }
@@ -344,9 +369,9 @@ export default function UserCampaignsPage() {
         const userCampaignRef = doc(db, 'users', user.uid, 'active_campaigns', 'current');
         try {
             await deleteDoc(userCampaignRef);
-            toast({ title: t("Campaign Abandoned"), description: t("You can now start a new campaign.") });
+            toast({ title: "Campaign Abandoned", description: "You can now start a new campaign." });
         } catch (e) {
-            toast({ variant: 'destructive', title: t("Error"), description: t("Could not abandon campaign.") });
+            toast({ variant: 'destructive', title: "Error", description: "Could not abandon campaign." });
         }
     }
 
@@ -373,25 +398,18 @@ export default function UserCampaignsPage() {
                 transaction.update(userCampaignRef, { completed: true });
             });
             
-            toast({ title: t("Reward Claim Submitted!"), description: t(`Your claim for LKR ${campaignDetails.referrerBonus} is pending admin approval.`) });
+            toast({ title: "Reward Claim Submitted!", description: `Your claim for LKR ${campaignDetails.referrerBonus} is pending admin approval.` });
         } catch (error: any) {
-            toast({ variant: "destructive", title: t("Claim Failed"), description: error.message });
+            toast({ variant: "destructive", title: "Claim Failed", description: error.message });
         }
     }
     
     const copyLink = (link: string) => {
         navigator.clipboard.writeText(link);
-        toast({ title: t("Copied!"), description: t("Referral link copied to clipboard.") });
+        toast({ title: "Copied!", description: "Referral link copied to clipboard." });
     };
-    
-    const validReferrals = referrals.filter(r => campaignDetails && r.campaignInfo.completedTasks.length === campaignDetails.tasks.length);
-    const progress = campaignDetails ? (validReferrals.length / campaignDetails.referralGoal) * 100 : 0;
-    const isCampaignGoalMet = campaignDetails && validReferrals.length >= campaignDetails.referralGoal;
-    
-    const hasPendingClaimForActiveCampaign = activeUserCampaign && claimHistory.some(c => c.campaignId === activeUserCampaign.campaignId && c.status === 'pending');
-    const isClaimButtonDisabled = !isCampaignGoalMet || activeUserCampaign?.completed || hasPendingClaimForActiveCampaign;
-    
-    // Translated text at top level
+
+    const t = useTranslation;
     const claimSubmittedText = t("Claim Submitted / Pending");
     const claimRewardText = t("Claim Reward:");
     const goalNotMetText = t("Goal Not Met");
@@ -401,16 +419,6 @@ export default function UserCampaignsPage() {
     const progressText = t("Progress:");
     const validReferralsText = t("Valid Referrals");
     const abandonCampaignText = t("Abandon Campaign");
-
-    const getClaimButtonText = () => {
-        if (activeUserCampaign?.completed || hasPendingClaimForActiveCampaign) {
-            return claimSubmittedText;
-        }
-        if (isCampaignGoalMet) {
-            return `${claimRewardText} LKR ${campaignDetails?.referrerBonus}`;
-        }
-        return goalNotMetText;
-    }
     
     const pageIntro = (
         <div className="space-y-2">
@@ -420,7 +428,7 @@ export default function UserCampaignsPage() {
             </p>
         </div>
     );
-
+    
     if (loading) {
         return (
             <div className="space-y-8">
@@ -507,6 +515,22 @@ export default function UserCampaignsPage() {
         );
     }
     
+    const validReferrals = referrals.filter(r => campaignDetails && r.campaignInfo.completedTasks.length === campaignDetails.tasks.length);
+    const progress = campaignDetails ? (validReferrals.length / campaignDetails.referralGoal) * 100 : 0;
+    const isCampaignGoalMet = campaignDetails && validReferrals.length >= campaignDetails.referralGoal;
+    const hasPendingClaimForActiveCampaign = activeUserCampaign && claimHistory.some(c => c.campaignId === activeUserCampaign.campaignId && c.status === 'pending');
+    const isClaimButtonDisabled = !isCampaignGoalMet || activeUserCampaign?.completed || hasPendingClaimForActiveCampaign;
+
+    const getClaimButtonText = () => {
+        if (activeUserCampaign?.completed || hasPendingClaimForActiveCampaign) {
+            return claimSubmittedText;
+        }
+        if (isCampaignGoalMet) {
+            return `${claimRewardText} LKR ${campaignDetails?.referrerBonus}`;
+        }
+        return goalNotMetText;
+    };
+
     return (
         <div className="space-y-8">
             <CampaignIntroduction />
