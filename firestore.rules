@@ -1,40 +1,32 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Admins have full access to all data for management purposes
+    
+    // Function to check if the user is an admin
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // Admins can read/write any document in any collection
     match /{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.admin == true;
+      allow read, write: if isAdmin();
+    }
+    
+    // Users can only read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Users can read the list of languages for the dropdown
+    // Any authenticated user can read the list of languages
     match /languages/{languageId} {
       allow read: if request.auth != null;
     }
     
-    // Users can manage their own user document
-    match /users/{userId} {
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Game rooms can be read and written by any authenticated user
-    // (More specific game logic rules would go here in a production app)
-    match /game_rooms/{roomId} {
-        allow read, write: if request.auth != null;
-    }
-    
-    // Allow users to create transactions for themselves (deposits, withdrawals, etc.)
-    match /transactions/{transactionId} {
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-        allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-    
-    // Allow users to submit bonus claims
-    match /bonus_claims/{claimId} {
-        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-        allow read: if request.auth != null && request.auth.uid == resource.data.userId;
-    }
-
+    // Other collections can be added here with specific rules
+    // Example for game rooms if needed later:
+    // match /game_rooms/{roomId} {
+    //   allow read: if request.auth != null;
+    //   allow write: if request.auth != null; // Or more specific logic
+    // }
   }
 }
