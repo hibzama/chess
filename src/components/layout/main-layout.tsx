@@ -11,7 +11,7 @@ import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import MobileBottomNav from "./mobile-bottom-nav";
 import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -57,6 +57,7 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 const LanguageSwitcher = () => {
     const { languages, currentLang, changeLanguage, loading } = useTranslationSystem();
+    const t = useTranslation;
 
     if (loading || languages.length <= 1) return null;
 
@@ -67,7 +68,7 @@ const LanguageSwitcher = () => {
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                     <Languages className="w-4 h-4" />
-                    <span className="hidden md:inline">{currentLanguageName}</span>
+                    <span className="hidden md:inline">{t(currentLanguageName)}</span>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -80,6 +81,22 @@ const LanguageSwitcher = () => {
         </DropdownMenu>
     )
 }
+
+const TranslatedNotification = ({ notification, onClick }: { notification: Notification, onClick: (n: Notification) => void }) => {
+    const title = useTranslation(notification.title);
+    const description = useTranslation(notification.description);
+    
+    return (
+        <DropdownMenuItem onClick={() => onClick(notification)} className={cn("flex items-start gap-3 cursor-pointer", !notification.read && "bg-primary/10")}>
+            {!notification.read && <Circle className="w-2 h-2 mt-1.5 text-primary fill-current" />}
+            <div className={cn("flex-1 space-y-1", notification.read && "pl-5")}>
+                <p className="font-semibold">{title}</p>
+                <p className="text-xs text-muted-foreground">{description}</p>
+                <p className="text-xs text-muted-foreground">{notification.createdAt ? formatDistanceToNowStrict(notification.createdAt.toDate(), { addSuffix: true }) : ''}</p>
+            </div>
+        </DropdownMenuItem>
+    );
+};
 
 const NotificationBell = () => {
     const { user } = useAuth();
@@ -100,7 +117,6 @@ const NotificationBell = () => {
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const notifsData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Notification));
-            // Sort client-side
             notifsData.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
             setNotifications(notifsData);
             setUnreadCount(notifsData.filter(n => !n.read).length);
@@ -118,6 +134,9 @@ const NotificationBell = () => {
         }
     }
 
+    const notificationsLabel = useTranslation('Notifications');
+    const noNotificationsLabel = useTranslation('No new notifications');
+
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -131,21 +150,14 @@ const NotificationBell = () => {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel>{t('Notifications')}</DropdownMenuLabel>
+                <DropdownMenuLabel>{notificationsLabel}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {notifications.length > 0 ? (
                     notifications.map(n => (
-                        <DropdownMenuItem key={n.id} onClick={() => handleNotificationClick(n)} className={cn("flex items-start gap-3 cursor-pointer", !n.read && "bg-primary/10")}>
-                           {!n.read && <Circle className="w-2 h-2 mt-1.5 text-primary fill-current" />}
-                            <div className={cn("flex-1 space-y-1", n.read && "pl-5")}>
-                                <p className="font-semibold">{t(n.title)}</p>
-                                <p className="text-xs text-muted-foreground">{t(n.description)}</p>
-                                <p className="text-xs text-muted-foreground">{n.createdAt ? formatDistanceToNowStrict(n.createdAt.toDate(), { addSuffix: true }) : ''}</p>
-                            </div>
-                        </DropdownMenuItem>
+                       <TranslatedNotification key={n.id} notification={n} onClick={handleNotificationClick} />
                     ))
                 ) : (
-                    <DropdownMenuItem disabled>{t('No new notifications')}</DropdownMenuItem>
+                    <DropdownMenuItem disabled>{noNotificationsLabel}</DropdownMenuItem>
                 )}
             </DropdownMenuContent>
         </DropdownMenu>
@@ -338,3 +350,5 @@ export default function MainLayout({
         </Dialog>
     )
   }
+
+    
