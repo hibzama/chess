@@ -345,14 +345,25 @@ export default function UserCampaignsPage() {
     const hasPendingClaimForActiveCampaign = activeUserCampaign && claimHistory.some(c => c.campaignId === activeUserCampaign.campaignId && c.status === 'pending');
     const isClaimButtonDisabled = !isCampaignGoalMet || activeUserCampaign?.completed || hasPendingClaimForActiveCampaign;
     
+    // Translated text at top level
+    const claimSubmittedText = t("Claim Submitted / Pending");
+    const claimRewardText = t("Claim Reward:");
+    const goalNotMetText = t("Goal Not Met");
+    const yourGoalText = t("Your Goal");
+    const referralsGoalText = t("Referrals' Goal");
+    const yourUniqueLinkText = t("Your Unique Campaign Link");
+    const progressText = t("Progress:");
+    const validReferralsText = t("Valid Referrals");
+    const abandonCampaignText = t("Abandon Campaign");
+
     const getClaimButtonText = () => {
         if (activeUserCampaign?.completed || hasPendingClaimForActiveCampaign) {
-            return t("Claim Submitted / Pending");
+            return claimSubmittedText;
         }
         if (isCampaignGoalMet) {
-            return `${t('Claim Reward:')} LKR ${campaignDetails?.referrerBonus}`;
+            return `${claimRewardText} LKR ${campaignDetails?.referrerBonus}`;
         }
-        return t("Goal Not Met");
+        return goalNotMetText;
     }
     
     const pageIntro = (
@@ -466,16 +477,16 @@ export default function UserCampaignsPage() {
                  <CardContent className="space-y-6">
                      <div className="grid md:grid-cols-2 gap-4 text-sm">
                         <div className="p-4 bg-background/50 rounded-lg space-y-2">
-                             <h4 className="font-semibold text-primary flex items-center gap-2"><Award/> {t('Your Goal')}</h4>
+                             <h4 className="font-semibold text-primary flex items-center gap-2"><Award/> {yourGoalText}</h4>
                              <p>{t('Get')} <span className="font-bold">{campaignDetails.referralGoal}</span> {t('people to sign up and complete all their tasks.')}</p>
                         </div>
                          <div className="p-4 bg-background/50 rounded-lg space-y-2">
-                            <h4 className="font-semibold text-primary flex items-center gap-2"><Users/> {t("Referrals' Goal")}</h4>
+                            <h4 className="font-semibold text-primary flex items-center gap-2"><Users/> {referralsGoalText}</h4>
                             <p className="text-muted-foreground">{t('Each new user must complete all tasks to become a valid referral.')}</p>
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <Label>{t('Your Unique Campaign Link')}</Label>
+                        <Label>{yourUniqueLinkText}</Label>
                         <div className="flex gap-2">
                             <Input readOnly value={referralLink} />
                             <Button variant="ghost" size="icon" onClick={() => copyLink(referralLink)}><Copy /></Button>
@@ -483,12 +494,12 @@ export default function UserCampaignsPage() {
                         </div>
                     </div>
                     <div>
-                        <p className="text-sm font-semibold mb-2">{t('Progress:')} {validReferrals.length} / {campaignDetails.referralGoal} {t('Valid Referrals')}</p>
+                        <p className="text-sm font-semibold mb-2">{progressText} {validReferrals.length} / {campaignDetails.referralGoal} {validReferralsText}</p>
                         <Progress value={progress} />
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button variant="destructive" onClick={handleAbandonCampaign}>{t('Abandon Campaign')}</Button>
+                    <Button variant="destructive" onClick={handleAbandonCampaign}>{abandonCampaignText}</Button>
                 </CardFooter>
             </Card>
 
