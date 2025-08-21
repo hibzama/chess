@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Check, Crown, Sword } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Chess, Square } from 'chess.js';
+import { useTranslation } from '@/hooks/use-translation';
 
 type GameType = 'chess' | 'checkers';
 
@@ -85,6 +86,7 @@ const ChessPiecePreview = () => {
 export default function EquipmentPage() {
     const { user, userData, loading: authLoading } = useAuth();
     const { toast } = useToast();
+    const t = useTranslation;
     const [activeTab, setActiveTab] = useState<GameType>('chess');
 
     // Chess state
@@ -108,7 +110,7 @@ export default function EquipmentPage() {
 
     const handleSave = async () => {
         if (!user) {
-            toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to save.' });
+            toast({ variant: 'destructive', title: t('Error'), description: t('You must be logged in to save.') });
             return;
         }
         setSaving(true);
@@ -127,10 +129,10 @@ export default function EquipmentPage() {
                 }
             }, { merge: true });
 
-            toast({ title: 'Success!', description: 'Your equipment has been saved.' });
+            toast({ title: t('Success!'), description: t('Your equipment has been saved.') });
         } catch (error) {
             console.error('Failed to save equipment:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not save your preferences.' });
+            toast({ variant: 'destructive', title: t('Error'), description: t('Could not save your preferences.') });
         } finally {
             setSaving(false);
         }
@@ -142,14 +144,14 @@ export default function EquipmentPage() {
     return (
         <div className="space-y-8">
              <div>
-                <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3"><Sword/> Equipment</h1>
-                <p className="text-muted-foreground">Customize your in-game look for both Chess and Checkers.</p>
+                <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3"><Sword/> {t('Equipment')}</h1>
+                <p className="text-muted-foreground">{t('Customize your in-game look for both Chess and Checkers.')}</p>
             </div>
             
             <Tabs value={activeTab} onValueChange={(val) => setActiveTab(val as GameType)} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="chess">Chess</TabsTrigger>
-                    <TabsTrigger value="checkers">Checkers</TabsTrigger>
+                    <TabsTrigger value="chess">{t('Chess')}</TabsTrigger>
+                    <TabsTrigger value="checkers">{t('Checkers')}</TabsTrigger>
                 </TabsList>
                 
                 <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -157,8 +159,8 @@ export default function EquipmentPage() {
                         {/* Piece Styles */}
                         <Card>
                             <CardHeader>
-                                <CardTitle>Piece Styles</CardTitle>
-                                <CardDescription>Select your preferred color set for chess pieces.</CardDescription>
+                                <CardTitle>{t('Piece Styles')}</CardTitle>
+                                <CardDescription>{t('Select your preferred color set for chess pieces.')}</CardDescription>
                             </CardHeader>
                             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {chessPieceStyles.map(style => (
@@ -166,7 +168,7 @@ export default function EquipmentPage() {
                                         <div className="flex items-center gap-4">
                                             <div className="w-8 h-8 rounded-full" style={{backgroundColor: style.colors[0]}}></div>
                                             <div className="w-8 h-8 rounded-full" style={{backgroundColor: style.colors[1]}}></div>
-                                            <span className="font-semibold">{style.name}</span>
+                                            <span className="font-semibold">{t(style.name)}</span>
                                         </div>
                                          {(activeTab === 'chess' ? chessPieceStyle : checkersPieceStyle) === style.id && <div className="absolute top-2 right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center"><Check className="w-4 h-4" /></div>}
                                     </button>
@@ -177,8 +179,8 @@ export default function EquipmentPage() {
                         {/* Board Themes */}
                         <Card>
                              <CardHeader>
-                                <CardTitle>Board Themes</CardTitle>
-                                <CardDescription>Select your preferred style for the chessboard.</CardDescription>
+                                <CardTitle>{t('Board Themes')}</CardTitle>
+                                <CardDescription>{t('Select your preferred style for the chessboard.')}</CardDescription>
                             </CardHeader>
                              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                  {boardThemes.map(theme => (
@@ -188,7 +190,7 @@ export default function EquipmentPage() {
                                                 {[...Array(16)].map((_, i) => <div key={i} style={{backgroundColor: (Math.floor(i/4) + i) % 2 === 0 ? theme.colors[0] : theme.colors[1]}}></div>)}
                                              </div>
                                          </div>
-                                         <p className="font-semibold text-center mt-2">{theme.name}</p>
+                                         <p className="font-semibold text-center mt-2">{t(theme.name)}</p>
                                          {(activeTab === 'chess' ? chessBoardTheme : checkersBoardTheme) === theme.id && <div className="absolute top-2 right-2 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center"><Check className="w-4 h-4" /></div>}
                                      </button>
                                  ))}
@@ -200,8 +202,8 @@ export default function EquipmentPage() {
                      <div className="lg:col-span-1">
                          <Card className="sticky top-20">
                              <CardHeader>
-                                <CardTitle>Live Preview</CardTitle>
-                                <CardDescription>This is how your selections will look in-game.</CardDescription>
+                                <CardTitle>{t('Live Preview')}</CardTitle>
+                                <CardDescription>{t('This is how your selections will look in-game.')}</CardDescription>
                             </CardHeader>
                              <CardContent
                                 style={{
@@ -230,7 +232,7 @@ export default function EquipmentPage() {
                 </div>
             </Tabs>
             
-            <Button size="lg" className="w-full mt-8" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save All Equipment"}</Button>
+            <Button size="lg" className="w-full mt-8" onClick={handleSave} disabled={saving}>{saving ? t("Saving...") : t("Save All Equipment")}</Button>
         </div>
     )
 }

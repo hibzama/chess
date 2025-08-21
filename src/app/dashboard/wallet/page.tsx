@@ -22,6 +22,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
+import { useTranslation } from '@/hooks/use-translation';
 
 
 type Transaction = {
@@ -55,6 +56,7 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 const SignupBonusClaimCard = () => {
     const { user, currencyConfig } = useAuth();
     const { toast } = useToast();
+    const t = useTranslation;
     const [campaign, setCampaign] = useState<SignupBonusCampaign | null>(null);
     const [hasClaimed, setHasClaimed] = useState(true);
     const [isClaiming, setIsClaiming] = useState(false);
@@ -109,10 +111,10 @@ const SignupBonusClaimCard = () => {
                 createdAt: serverTimestamp()
             });
 
-            toast({ title: "Bonus Claimed!", description: `Your bonus is pending admin approval.` });
+            toast({ title: t("Bonus Claimed!"), description: t(`Your bonus is pending admin approval.`) });
             setHasClaimed(true); // Hide card after claiming
         } catch (error) {
-            toast({ variant: 'destructive', title: "Error", description: "Could not claim bonus." });
+            toast({ variant: 'destructive', title: t("Error"), description: t("Could not claim bonus.") });
         } finally {
             setIsClaiming(false);
         }
@@ -125,15 +127,15 @@ const SignupBonusClaimCard = () => {
     return (
         <Card className="bg-primary/10 border-primary/20">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Gift /> {campaign.title}</CardTitle>
-                <CardDescription>A special welcome bonus is available for you!</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Gift /> {t(campaign.title)}</CardTitle>
+                <CardDescription>{t('A special welcome bonus is available for you!')}</CardDescription>
             </CardHeader>
             <CardContent>
-                <p>Claim your <span className="font-bold text-primary">{currencyConfig.symbol} {campaign.bonusAmount.toFixed(2)}</span> bonus now. It will be added to your wallet after admin approval.</p>
+                <p>{t('Claim your')} <span className="font-bold text-primary">{currencyConfig.symbol} {campaign.bonusAmount.toFixed(2)}</span> {t('bonus now. It will be added to your wallet after admin approval.')}</p>
             </CardContent>
             <CardFooter>
                 <Button className="w-full" onClick={handleClaim} disabled={isClaiming}>
-                    {isClaiming ? 'Claiming...' : 'Claim Welcome Bonus'}
+                    {isClaiming ? t('Claiming...') : t('Claim Welcome Bonus')}
                 </Button>
             </CardFooter>
         </Card>
@@ -144,6 +146,7 @@ const SignupBonusClaimCard = () => {
 export default function WalletPage() {
   const { user, userData, loading: authLoading, currencyConfig } = useAuth();
   const { toast } = useToast();
+  const t = useTranslation;
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -166,7 +169,7 @@ export default function WalletPage() {
   
   const copyToClipboard = (text: string, name: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: 'Copied!', description: `${name} copied to clipboard.`});
+    toast({ title: t('Copied!'), description: `${t(name)} ${t('copied to clipboard.')}`});
   }
 
   const withdrawalFeePercentage = 5;
@@ -203,7 +206,7 @@ export default function WalletPage() {
       setLoading(false);
     }, (error) => {
       console.error("Error fetching transactions:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch transaction history.' });
+      toast({ variant: 'destructive', title: t('Error'), description: t('Could not fetch transaction history.') });
       setLoading(false);
     });
 
@@ -228,7 +231,7 @@ export default function WalletPage() {
 
   const handleDepositSubmit = async () => {
     if (!user || !depositAmount) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a deposit amount.' });
+      toast({ variant: 'destructive', title: t('Error'), description: t('Please enter a deposit amount.') });
       return;
     }
     setSubmittingDeposit(true);
@@ -247,13 +250,13 @@ export default function WalletPage() {
             createdAt: serverTimestamp()
         });
       
-        toast({ title: 'Success', description: 'Deposit request submitted for review.' });
+        toast({ title: t('Success'), description: t('Deposit request submitted for review.') });
         setDepositAmount('');
         setIsPostSubmitInfoOpen(true);
 
     } catch (error) {
         console.error("Error submitting deposit:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit deposit request. Please try again.' });
+        toast({ variant: 'destructive', title: t('Error'), description: t('Failed to submit deposit request. Please try again.') });
     } finally {
         setSubmittingDeposit(false);
     }
@@ -263,11 +266,11 @@ export default function WalletPage() {
   const handleInitiateDeposit = (e: React.FormEvent) => {
     e.preventDefault();
      if (!depositAmount) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Please enter an amount.' });
+        toast({ variant: 'destructive', title: t('Error'), description: t('Please enter an amount.') });
         return;
     }
     if (parseFloat(depositAmount) < 100) {
-        toast({ variant: 'destructive', title: 'Error', description: `Minimum deposit amount is ${currencyConfig.symbol} 100.` });
+        toast({ variant: 'destructive', title: t('Error'), description: `${t('Minimum deposit amount is')} ${currencyConfig.symbol} 100.` });
         return;
     }
     setIsConfirmRemarkOpen(true);
@@ -277,29 +280,29 @@ export default function WalletPage() {
     e.preventDefault();
 
     if (!user || !userData || !withdrawalAmount) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all required fields.' });
+      toast({ variant: 'destructive', title: t('Error'), description: t('Please fill all required fields.') });
       return;
     }
 
     if (withdrawalMethod === 'bank' && (withdrawalDetails.branch === '' || withdrawalDetails.accountNumber === '' || withdrawalDetails.accountName === '')) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all bank details.' });
+      toast({ variant: 'destructive', title: t('Error'), description: t('Please fill all bank details.') });
       return;
     }
     
     if (withdrawalMethod === 'binance' && !binancePayId) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Please enter your Binance PayID.' });
+        toast({ variant: 'destructive', title: t('Error'), description: t('Please enter your Binance PayID.') });
         return;
     }
 
     const requestedAmount = parseFloat(withdrawalAmount);
 
     if (requestedAmount < 500) {
-        toast({ variant: 'destructive', title: 'Error', description: `Minimum withdrawal amount is ${currencyConfig.symbol} 500.` });
+        toast({ variant: 'destructive', title: t('Error'), description: `${t('Minimum withdrawal amount is')} ${currencyConfig.symbol} 500.` });
         return;
     }
 
     if(userData && userData.balance < requestedAmount) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Insufficient balance.' });
+        toast({ variant: 'destructive', title: t('Error'), description: t('Insufficient balance.') });
         return;
     }
 
@@ -322,7 +325,7 @@ export default function WalletPage() {
         createdAt: serverTimestamp()
       });
 
-      toast({ title: 'Success', description: 'Withdrawal request submitted.' });
+      toast({ title: t('Success'), description: t('Withdrawal request submitted.') });
       setWithdrawalAmount('');
       setBinancePayId('');
       if (withdrawalMethod === 'bank') {
@@ -331,7 +334,7 @@ export default function WalletPage() {
 
     } catch (error: any) {
         console.error("Error submitting withdrawal:", error);
-        toast({ variant: 'destructive', title: 'Error', description: `Failed to submit withdrawal request: ${error.message}` });
+        toast({ variant: 'destructive', title: t('Error'), description: `${t('Failed to submit withdrawal request:')} ${error.message}` });
         
         // Revert balance deduction if firestore update fails
         const userRef = doc(db, 'users', user.uid);
@@ -372,16 +375,16 @@ export default function WalletPage() {
     <>
     <div className="space-y-8">
        <div>
-        <h1 className="text-4xl font-bold tracking-tight text-center">Your Wallet</h1>
-        <p className="text-muted-foreground text-center">Manage your funds for the games ahead.</p>
+        <h1 className="text-4xl font-bold tracking-tight text-center">{t('Your Wallet')}</h1>
+        <p className="text-muted-foreground text-center">{t('Manage your funds for the games ahead.')}</p>
       </div>
 
       <SignupBonusClaimCard />
 
       <Card>
         <CardHeader>
-        <CardTitle className="flex items-center gap-2"><DollarSign /> Main Balance</CardTitle>
-        <CardDescription>All your funds in one place. Deposit, withdraw, and play.</CardDescription>
+        <CardTitle className="flex items-center gap-2"><DollarSign /> {t('Main Balance')}</CardTitle>
+        <CardDescription>{t('All your funds in one place. Deposit, withdraw, and play.')}</CardDescription>
         </CardHeader>
         <CardContent>
             {authLoading || !userData || typeof userData.balance === 'undefined' ? (
@@ -400,75 +403,75 @@ export default function WalletPage() {
       
       <Tabs defaultValue="deposit" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="deposit"><ArrowUpCircle /> Deposit</TabsTrigger>
-          <TabsTrigger value="withdraw"><ArrowDownCircle /> Withdraw</TabsTrigger>
-          <TabsTrigger value="history"><History /> History</TabsTrigger>
+          <TabsTrigger value="deposit"><ArrowUpCircle /> {t('Deposit')}</TabsTrigger>
+          <TabsTrigger value="withdraw"><ArrowDownCircle /> {t('Withdraw')}</TabsTrigger>
+          <TabsTrigger value="history"><History /> {t('History')}</TabsTrigger>
         </TabsList>
         <TabsContent value="deposit">
             <Card>
                 <CardHeader>
-                    <CardTitle>Manual Deposit</CardTitle>
-                    <CardDescription>Your deposit will be marked as pending until approved by an admin.</CardDescription>
+                    <CardTitle>{t('Manual Deposit')}</CardTitle>
+                    <CardDescription>{t('Your deposit will be marked as pending until approved by an admin.')}</CardDescription>
                 </CardHeader>
                 <form onSubmit={handleInitiateDeposit}>
                     <CardContent className="space-y-6">
                         {depositBonus && (
                             <Alert className="border-green-500/50 bg-green-500/10 text-green-400">
                                 <Gift className="h-4 w-4 !text-green-400" />
-                                <AlertTitle className="text-green-400">{depositBonus.title}</AlertTitle>
+                                <AlertTitle className="text-green-400">{t(depositBonus.title || "Deposit Bonus")}</AlertTitle>
                                 <AlertDescription>
-                                    Active Bonus: Get a {depositBonus.percentage}% bonus on deposits from {currencyConfig.symbol} {depositBonus.minDeposit} to {currencyConfig.symbol} {depositBonus.maxDeposit}!
+                                    {t('Active Bonus: Get a ')} {depositBonus.percentage}% {t('bonus on deposits from')} {currencyConfig.symbol} {depositBonus.minDeposit} to {currencyConfig.symbol} {depositBonus.maxDeposit}!
                                 </AlertDescription>
                             </Alert>
                         )}
                         <Tabs value={depositMethod} onValueChange={(v) => setDepositMethod(v as any)} className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="binance">Binance Pay</TabsTrigger>
-                            <TabsTrigger value="bank">Bank Deposit</TabsTrigger>
+                            <TabsTrigger value="binance">{t('Binance Pay')}</TabsTrigger>
+                            <TabsTrigger value="bank">{t('Bank Deposit')}</TabsTrigger>
                             </TabsList>
                         </Tabs>
 
                         {depositMethod === 'binance' && (
                              <Card className="p-4 bg-card/50 space-y-4">
                                 <div>
-                                    <Label>Binance PayID</Label>
+                                    <Label>{t('Binance PayID')}</Label>
                                     <div className="flex items-center gap-2">
                                         <Input readOnly value="38881724" />
                                         <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard('38881724', 'PayID')}><Copy/></Button>
                                     </div>
                                 </div>
                                 <div>
-                                    <Label htmlFor="deposit-amount">Amount ({currencyConfig.symbol})</Label>
+                                    <Label htmlFor="deposit-amount">{t('Amount')} ({currencyConfig.symbol})</Label>
                                     <Input id="deposit-amount" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
-                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: {currencyConfig.symbol} 100</p>
+                                    <p className="text-xs text-muted-foreground pt-1">{t('Minimum deposit amount:')} {currencyConfig.symbol} 100</p>
                                 </div>
                                 <div>
-                                    <Label>Amount (USDT)</Label>
+                                    <Label>{t('Amount')} (USDT)</Label>
                                      <div className="flex items-center gap-2">
                                         <Input readOnly value={usdtAmount} />
                                         <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard(usdtAmount, 'USDT Amount')}><Copy/></Button>
                                     </div>
-                                    <p className="text-xs text-muted-foreground pt-1">Please send this exact USDT amount.</p>
+                                    <p className="text-xs text-muted-foreground pt-1">{t('Please send this exact USDT amount.')}</p>
                                 </div>
                              </Card>
                         )}
                         {depositMethod === 'bank' && (
                              <Card className="p-4 bg-card/50 space-y-4">
-                                <p className="text-sm font-semibold">Bank: BOC</p>
-                                <p className="text-sm font-semibold">Branch: Galenbidunuwewa</p>
-                                <p className="text-sm font-semibold">Name: Jd Aththanayaka</p>
-                                <p className="text-sm font-semibold">Account: 81793729</p>
+                                <p className="text-sm font-semibold">{t('Bank:')} BOC</p>
+                                <p className="text-sm font-semibold">{t('Branch:')} Galenbidunuwewa</p>
+                                <p className="text-sm font-semibold">{t('Name:')} Jd Aththanayaka</p>
+                                <p className="text-sm font-semibold">{t('Account:')} 81793729</p>
                                 <div className="space-y-2">
-                                    <Label htmlFor="deposit-amount-bank">Amount ({currencyConfig.symbol})</Label>
+                                    <Label htmlFor="deposit-amount-bank">{t('Amount')} ({currencyConfig.symbol})</Label>
                                     <Input id="deposit-amount-bank" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
-                                    <p className="text-xs text-muted-foreground pt-1">Minimum deposit amount: {currencyConfig.symbol} 100</p>
+                                    <p className="text-xs text-muted-foreground pt-1">{t('Minimum deposit amount:')} {currencyConfig.symbol} 100</p>
                                 </div>
                              </Card>
                         )}
                         
                         <Card className="p-4 bg-card/50 space-y-2">
-                            <div className="flex items-center gap-2 font-semibold"><User/> Important: Use Your Username</div>
-                            <p className="text-sm text-muted-foreground">Please use your username as the payment reference or remark. This helps us verify your deposit faster.</p>
+                            <div className="flex items-center gap-2 font-semibold"><User/> {t('Important: Use Your Username')}</div>
+                            <p className="text-sm text-muted-foreground">{t('Please use your username as the payment reference or remark. This helps us verify your deposit faster.')}</p>
                             <div className="flex items-center gap-2">
                                 <Input readOnly value={username} />
                                 <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard(username, 'Username')}><Copy/></Button>
@@ -476,7 +479,7 @@ export default function WalletPage() {
                         </Card>
                     </CardContent>
                     <CardFooter>
-                    <Button type="submit" className="w-full" disabled={submittingDeposit}>{submittingDeposit ? "Submitting..." : "Submit Deposit"}</Button>
+                    <Button type="submit" className="w-full" disabled={submittingDeposit}>{submittingDeposit ? t("Submitting...") : t("Submit Deposit")}</Button>
                     </CardFooter>
                 </form>
             </Card>
@@ -484,40 +487,40 @@ export default function WalletPage() {
         <TabsContent value="withdraw">
              <Card>
                 <CardHeader>
-                    <CardTitle>Withdraw Funds</CardTitle>
-                    <CardDescription>Request a withdrawal. Funds will be transferred to your account by an admin.</CardDescription>
+                    <CardTitle>{t('Withdraw Funds')}</CardTitle>
+                    <CardDescription>{t('Request a withdrawal. Funds will be transferred to your account by an admin.')}</CardDescription>
                 </CardHeader>
                 <form onSubmit={handleWithdrawalSubmit}>
                     <CardContent className="space-y-4">
                         <Tabs value={withdrawalMethod} onValueChange={(v) => setWithdrawalMethod(v as any)} className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="bank">Bank Transfer</TabsTrigger>
-                                <TabsTrigger value="binance">Binance Pay</TabsTrigger>
+                                <TabsTrigger value="bank">{t('Bank Transfer')}</TabsTrigger>
+                                <TabsTrigger value="binance">{t('Binance Pay')}</TabsTrigger>
                             </TabsList>
                         </Tabs>
 
                         <div className="space-y-2">
-                            <Label htmlFor="withdrawal-amount">Amount to Withdraw ({currencyConfig.symbol})</Label>
+                            <Label htmlFor="withdrawal-amount">{t('Amount to Withdraw')} ({currencyConfig.symbol})</Label>
                             <Input id="withdrawal-amount" type="number" value={withdrawalAmount} onChange={e => setWithdrawalAmount(e.target.value)} placeholder="e.g., 1550" required />
-                             <p className="text-xs text-muted-foreground pt-1">Minimum withdrawal amount: {currencyConfig.symbol} 500</p>
+                             <p className="text-xs text-muted-foreground pt-1">{t('Minimum withdrawal amount:')} {currencyConfig.symbol} 500</p>
                         </div>
                          
                         <Alert variant="destructive">
                              <Info className="h-4 w-4" />
-                            <AlertTitle>Withdrawal Fee</AlertTitle>
+                            <AlertTitle>{t('Withdrawal Fee')}</AlertTitle>
                             <AlertDescription>
-                                A {withdrawalFeePercentage}% fee is applied to all withdrawals.
+                                {t(`A ${withdrawalFeePercentage}% fee is applied to all withdrawals.`)}
                             </AlertDescription>
                         </Alert>
                          
                         <div className="p-3 bg-secondary rounded-md text-sm text-muted-foreground space-y-2">
                             <div className="flex justify-between">
-                                <span>Fee ({withdrawalFeePercentage}%):</span>
+                                <span>{t('Fee')} ({withdrawalFeePercentage}%):</span>
                                 <span className="font-medium text-foreground">- {currencyConfig.symbol} {withdrawalFee.toFixed(2)}</span>
                             </div>
                             <Separator/>
                              <div className="flex justify-between font-bold">
-                                <span>You will receive:</span>
+                                <span>{t('You will receive:')}</span>
                                 <div className="text-right">
                                     <p className="text-foreground">{currencyConfig.symbol} {finalWithdrawalAmount.toFixed(2)}</p>
                                     {withdrawalMethod === 'binance' && <p className="text-xs font-normal text-muted-foreground">~{(finalWithdrawalAmount / currencyConfig.usdtRate).toFixed(2)} USDT</p>}
@@ -530,44 +533,44 @@ export default function WalletPage() {
                             <Separator />
                             <Alert>
                                 <Info className="h-4 w-4" />
-                                <AlertTitle>Bank Withdrawals</AlertTitle>
+                                <AlertTitle>{t('Bank Withdrawals')}</AlertTitle>
                                 <AlertDescription>
-                                    Please note that bank withdrawals are only processed for <strong>Bank of Ceylon (BOC)</strong> accounts at this time.
+                                    {t('Please note that bank withdrawals are only processed for')} <strong>{t('Bank of Ceylon (BOC)')}</strong> {t('accounts at this time.')}
                                 </AlertDescription>
                             </Alert>
                             <div className="space-y-2">
-                                <Label htmlFor="bank-name">Bank Name</Label>
-                                <Input id="bank-name" value={withdrawalDetails.bankName} readOnly disabled />
+                                <Label htmlFor="bank-name">{t('Bank Name')}</Label>
+                                <Input id="bank-name" value={t(withdrawalDetails.bankName)} readOnly disabled />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="branch">Branch</Label>
+                                <Label htmlFor="branch">{t('Branch')}</Label>
                                 <Input id="branch" value={withdrawalDetails.branch} onChange={e => setWithdrawalDetails({...withdrawalDetails, branch: e.target.value})} required={withdrawalMethod === 'bank'} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="account-number">Account Number</Label>
+                                <Label htmlFor="account-number">{t('Account Number')}</Label>
                                 <Input id="account-number" value={withdrawalDetails.accountNumber} onChange={e => setWithdrawalDetails({...withdrawalDetails, accountNumber: e.target.value})} required={withdrawalMethod === 'bank'} />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="account-name">Account Holder Name</Label>
+                                <Label htmlFor="account-name">{t('Account Holder Name')}</Label>
                                 <Input id="account-name" value={withdrawalDetails.accountName} onChange={e => setWithdrawalDetails({...withdrawalDetails, accountName: e.target.value})} required={withdrawalMethod === 'bank'} />
                             </div>
                         </>
                         )}
                         {withdrawalMethod === 'binance' && (
                              <Card className="p-4 bg-card/50 space-y-2">
-                                <Label htmlFor="binance-pay-id">Your Binance PayID</Label>
+                                <Label htmlFor="binance-pay-id">{t('Your Binance PayID')}</Label>
                                 <Input 
                                     id="binance-pay-id"
                                     value={binancePayId} 
                                     onChange={(e) => setBinancePayId(e.target.value)}
-                                    placeholder="Enter your Binance PayID"
+                                    placeholder={t('Enter your Binance PayID')}
                                     required={withdrawalMethod === 'binance'}
                                 />
                              </Card>
                         )}
                     </CardContent>
                     <CardFooter>
-                    <Button type="submit" disabled={submittingWithdrawal}>{submittingWithdrawal ? "Requesting..." : "Request Withdrawal"}</Button>
+                    <Button type="submit" disabled={submittingWithdrawal}>{submittingWithdrawal ? t("Requesting...") : t("Request Withdrawal")}</Button>
                     </CardFooter>
                 </form>
             </Card>
@@ -575,13 +578,13 @@ export default function WalletPage() {
         <TabsContent value="history">
               <Card>
                 <CardHeader>
-                <CardTitle>Transaction History</CardTitle>
+                <CardTitle>{t('Transaction History')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[400px]">
                         <div className="space-y-4">
                             {loading ? (
-                                <p className="text-center">Loading history...</p>
+                                <p className="text-center">{t('Loading history...')}</p>
                             ) : transactions.length > 0 ? (
                                 transactions.map(tx => (
                                 <Card key={tx.id} className="p-4">
@@ -589,7 +592,7 @@ export default function WalletPage() {
                                         <div className="flex items-center gap-2">
                                             {getTransactionIcon(tx.type)}
                                             <div>
-                                                <span className="capitalize font-medium">{tx.description || tx.type.replace('_', ' ')}</span>
+                                                <span className="capitalize font-medium">{t(tx.description || tx.type.replace('_', ' '))}</span>
                                             </div>
                                         </div>
                                         <div>
@@ -600,7 +603,7 @@ export default function WalletPage() {
                                         <div>
                                             <Badge variant={tx.status === 'approved' || tx.status === 'completed' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">
                                                 {getStatusIcon(tx.status)}
-                                                <span className="capitalize">{tx.status}</span>
+                                                <span className="capitalize">{t(tx.status)}</span>
                                             </Badge>
                                         </div>
                                     </div>
@@ -608,7 +611,7 @@ export default function WalletPage() {
                                         <div className="mt-4 p-3 rounded-md bg-secondary space-y-3">
                                             <div className="flex items-center gap-2">
                                                 <Info className="w-4 h-4 text-primary" />
-                                                <p className="text-sm font-semibold">For faster approval, send a screenshot to support.</p>
+                                                <p className="text-sm font-semibold">{t('For faster approval, send a screenshot to support.')}</p>
                                             </div>
                                             <div className="flex gap-2">
                                                 <Button size="sm" asChild className="w-full bg-green-600 hover:bg-green-700">
@@ -627,7 +630,7 @@ export default function WalletPage() {
                                 </Card>
                                 ))
                             ) : (
-                                <p className="text-center h-24 flex items-center justify-center text-muted-foreground">No transactions yet.</p>
+                                <p className="text-center h-24 flex items-center justify-center text-muted-foreground">{t('No transactions yet.')}</p>
                             )}
                         </div>
                     </ScrollArea>
@@ -640,15 +643,15 @@ export default function WalletPage() {
     <AlertDialog open={isConfirmRemarkOpen} onOpenChange={setIsConfirmRemarkOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Deposit</AlertDialogTitle>
+            <AlertDialogTitle>{t('Confirm Deposit')}</AlertDialogTitle>
             <AlertDialogDescription>
-                Have you added your username (<span className="font-bold text-primary">{username}</span>) as the payment remark/reference? This is crucial for us to verify your transaction.
+                {t('Have you added your username (')} <span className="font-bold text-primary">{username}</span>{t(') as the payment remark/reference? This is crucial for us to verify your transaction.')}
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-            <AlertDialogCancel>No, I'll add it</AlertDialogCancel>
+            <AlertDialogCancel>{t("No, I'll add it")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleDepositSubmit} disabled={submittingDeposit}>
-                {submittingDeposit ? "Submitting..." : "Yes, I have"}
+                {submittingDeposit ? t("Submitting...") : t("Yes, I have")}
             </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
@@ -657,23 +660,23 @@ export default function WalletPage() {
     <AlertDialog open={isPostSubmitInfoOpen} onOpenChange={setIsPostSubmitInfoOpen}>
         <AlertDialogContent>
             <AlertDialogHeader>
-            <AlertDialogTitle>Deposit Submitted!</AlertDialogTitle>
+            <AlertDialogTitle>{t('Deposit Submitted!')}</AlertDialogTitle>
             <AlertDialogDescription>
-                For faster approval, or if you forgot to add your username as a remark, please send your payment slip/screenshot to our support team on WhatsApp or Telegram.
+                {t('For faster approval, or if you forgot to add your username as a remark, please send your payment slip/screenshot to our support team on WhatsApp or Telegram.')}
             </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-col sm:space-x-0 gap-2">
                 <Button asChild className="w-full bg-green-600 hover:bg-green-700">
                     <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
-                        <MessageCircle className="mr-2 h-4 w-4" /> Send to WhatsApp
+                        <MessageCircle className="mr-2 h-4 w-4" /> {t('Send to WhatsApp')}
                     </a>
                 </Button>
                 <Button asChild className="w-full bg-blue-500 hover:bg-blue-600">
                      <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">
-                        <TelegramIcon className="mr-2 h-4 w-4" /> Send to Telegram
+                        <TelegramIcon className="mr-2 h-4 w-4" /> {t('Send to Telegram')}
                     </a>
                 </Button>
-                 <AlertDialogCancel className="m-0" onClick={() => setIsPostSubmitInfoOpen(false)}>Close</AlertDialogCancel>
+                 <AlertDialogCancel className="m-0" onClick={() => setIsPostSubmitInfoOpen(false)}>{t('Close')}</AlertDialogCancel>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
