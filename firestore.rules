@@ -1,44 +1,52 @@
-
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 1. Admins have full access to everything
-    match /{document=**} {
+
+    // Users can read/write their own document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Admins can read/write any user document
       allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    // 2. Specific rules for non-admins
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    // Admins can read/write any document in these collections
+    match /(settings|marketing_applications|signup_bonus_campaigns|deposit_bonus_campaigns|referral_campaigns|tasks)/{docId} {
+       allow read, write: if request.auth != null && request.auth.token.admin == true;
     }
 
-    match /game_rooms/{roomId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.createdBy.uid == request.auth.uid;
-      allow update, delete: if request.auth != null && (request.resource.data.createdBy.uid == request.auth.uid || (resource.data.player2 != null && request.auth.uid == resource.data.player2.uid));
-    }
-    
+    // Any authenticated user can read languages, only admins can write
     match /languages/{languageId} {
-      // Any authenticated user can read the list of languages
       allow read: if request.auth != null;
-      // Only admins can add/edit/delete languages
       allow write: if request.auth != null && request.auth.token.admin == true;
     }
-
-    // Rule for bonus claims
+    
+    // Any authenticated user can read public game rooms
+    match /game_rooms/{roomId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        // Only players in the game can update/delete it
+        allow update, delete: if request.auth != null && resource.data.players.hasAny([request.auth.uid]);
+    }
+    
+    // Allow admins to manage all bonus claims
     match /bonus_claims/{claimId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
-        allow update: if request.auth != null && request.auth.token.admin == true;
+        allow read, write: if request.auth != null && request.auth.token.admin == true;
+        // Users can create their own claims
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+    
+     // Allow admins to manage deposit bonus claims
+    match /deposit_bonus_campaigns/{campaignId}/claims/{userId} {
+        allow read, write: if request.auth != null && request.auth.token.admin == true;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
 
-    // Rule for transactions
+    // Transactions can be created by users, but only read by them or admins.
     match /transactions/{transactionId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
+        allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+        allow read: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
+        allow update: if request.auth != null && request.auth.token.admin == true; // Only admins can approve/reject
     }
+
   }
 }
