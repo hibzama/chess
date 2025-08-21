@@ -1,8 +1,12 @@
+
+'use client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from '@/hooks/use-translation';
 import { DollarSign, Network, Megaphone, Sword, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AboutPage() {
+    const t = useTranslation;
 
     const sections = [
         {
@@ -37,8 +41,8 @@ export default function AboutPage() {
     return (
         <div className="space-y-12">
              <div className="text-center">
-                <h1 className="text-4xl font-bold tracking-tight">About Nexbattle</h1>
-                <p className="text-muted-foreground mt-2">The ultimate platform where skill meets investment.</p>
+                <h1 className="text-4xl font-bold tracking-tight">{t('About Nexbattle')}</h1>
+                <p className="text-muted-foreground mt-2">{t('The ultimate platform where skill meets investment.')}</p>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -49,14 +53,14 @@ export default function AboutPage() {
                                 <section.icon className="w-6 h-6 text-primary"/>
                             </div>
                             <div>
-                                <CardTitle>{section.title}</CardTitle>
+                                <CardTitle>{t(section.title)}</CardTitle>
                             </div>
                         </CardHeader>
                         <CardContent>
-                           <p className="text-muted-foreground">{section.content}</p>
+                           <p className="text-muted-foreground">{t(section.content)}</p>
                            {section.link && (
                                <Link href={section.link} className="text-primary font-semibold hover:underline mt-4 inline-block">
-                                    {section.linkText} &rarr;
+                                    {t(section.linkText as string)} &rarr;
                                </Link>
                            )}
                         </CardContent>

@@ -9,6 +9,7 @@ import { collection, query, where, getDocs, doc, getDoc, serverTimestamp, increm
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/use-translation';
 
 interface BonusCampaign {
     id: string;
@@ -26,6 +27,7 @@ export function BonusCard() {
   const [hasClaimed, setHasClaimed] = useState<boolean | null>(null);
   const [isClaiming, setIsClaiming] = useState(false);
   const [loading, setLoading] = useState(true);
+  const t = useTranslation;
 
   useEffect(() => {
     if (!user) {
@@ -89,12 +91,12 @@ export function BonusCard() {
             createdAt: serverTimestamp()
         });
         
-        toast({ title: 'Bonus Claimed!', description: `Your bonus of LKR ${activeCampaign.bonusAmount.toFixed(2)} is pending admin approval.` });
+        toast({ title: t('Bonus Claimed!'), description: t(`Your bonus of LKR ${activeCampaign.bonusAmount.toFixed(2)} is pending admin approval.`) });
         setHasClaimed(true);
 
     } catch (error) {
         console.error("Error claiming bonus:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not claim bonus. Please try again.' });
+        toast({ variant: 'destructive', title: t('Error'), description: t('Could not claim bonus. Please try again.') });
     } finally {
         setIsClaiming(false);
     }
@@ -111,13 +113,13 @@ export function BonusCard() {
       <CardHeader className="text-center">
         <CardTitle className="text-lg flex items-center justify-center gap-2">
           <Gift className="w-6 h-6 text-yellow-300" />
-          <span className="text-yellow-300">{activeCampaign.bonusAmount} LKR Registration Bonus!</span>
+          <span className="text-yellow-300">{t(`${activeCampaign.bonusAmount} LKR Registration Bonus!`)}</span>
         </CardTitle>
-        <CardDescription>{activeCampaign.title} - The next {spotsLeft > 0 ? spotsLeft : 0} users to register get a free bonus!</CardDescription>
+        <CardDescription>{t(activeCampaign.title)} - {t(`The next ${spotsLeft > 0 ? spotsLeft : 0} users to register get a free bonus!`)}</CardDescription>
       </CardHeader>
       <CardFooter>
           <Button className="w-full" onClick={handleClaimBonus} disabled={isClaiming}>
-            {isClaiming ? <Loader2 className="animate-spin" /> : 'Claim Bonus'}
+            {isClaiming ? <Loader2 className="animate-spin" /> : t('Claim Bonus')}
           </Button>
       </CardFooter>
     </Card>

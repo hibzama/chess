@@ -5,8 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { User, Sword, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useTranslation } from "@/hooks/use-translation";
 
 export default function SettingsPage() {
+    const t = useTranslation;
 
     const settingsOptions = [
         {
@@ -26,8 +28,8 @@ export default function SettingsPage() {
     return (
         <div className="space-y-8">
             <div>
-                <h1 className="text-4xl font-bold tracking-tight">Settings</h1>
-                <p className="text-muted-foreground">Manage your account and game preferences.</p>
+                <h1 className="text-4xl font-bold tracking-tight">{t('Settings')}</h1>
+                <p className="text-muted-foreground">{t('Manage your account and game preferences.')}</p>
             </div>
 
             <div className="space-y-6 max-w-2xl">
@@ -38,8 +40,8 @@ export default function SettingsPage() {
                                 <option.icon className="w-6 h-6 text-primary"/>
                             </div>
                             <div className="flex-1">
-                                <CardTitle>{option.title}</CardTitle>
-                                <CardDescription>{option.description}</CardDescription>
+                                <CardTitle>{t(option.title)}</CardTitle>
+                                <CardDescription>{t(option.description)}</CardDescription>
                             </div>
                             <Button asChild variant="ghost" size="icon">
                                 <Link href={option.href}>
@@ -53,4 +55,3 @@ export default function SettingsPage() {
         </div>
     )
 }
-

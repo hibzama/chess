@@ -5,10 +5,12 @@ import { usePathname } from 'next/navigation';
 import { Home, Users, DollarSign, MessageSquare, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/auth-context';
+import { useTranslation } from '@/hooks/use-translation';
 
 export default function MobileBottomNav() {
     const pathname = usePathname();
     const { userData } = useAuth();
+    const t = useTranslation;
     
     const navItems = [
         { href: '/dashboard', icon: Home, label: 'Dashboard' },
@@ -40,7 +42,7 @@ export default function MobileBottomNav() {
                     return (
                         <Link key={item.href} href={item.href} className="inline-flex flex-col items-center justify-center px-5 hover:bg-muted group">
                              <item.icon className={cn("w-6 h-6 mb-1 text-muted-foreground group-hover:text-primary", isActive && "text-primary")}/>
-                             <span className={cn("text-xs text-muted-foreground group-hover:text-primary", isActive && "text-primary")}>{item.label}</span>
+                             <span className={cn("text-xs text-muted-foreground group-hover:text-primary", isActive && "text-primary")}>{t(item.label)}</span>
                         </Link>
                     )
                 })}

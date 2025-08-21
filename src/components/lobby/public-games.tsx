@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Skeleton } from '../ui/skeleton';
+import { useTranslation } from '@/hooks/use-translation';
 
 type GameRoom = {
     id: string;
@@ -33,6 +34,7 @@ export default function PublicGames({ gameType, currencySymbol, usdtRate }: Publ
     const [displayedRooms, setDisplayedRooms] = useState<GameRoom[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
+    const t = useTranslation;
 
     useEffect(() => {
         const q = query(
@@ -77,19 +79,19 @@ export default function PublicGames({ gameType, currencySymbol, usdtRate }: Publ
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <Swords />
-                    Find a Public Game
+                    {t('Find a Public Game')}
                 </CardTitle>
-                <CardDescription>Join a game created by another player from the public lobby.</CardDescription>
+                <CardDescription>{t('Join a game created by another player from the public lobby.')}</CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead><User className="inline-block mr-1"/> Player</TableHead>
-                            <TableHead><BarChart2 className="inline-block mr-1"/> Stakes</TableHead>
-                            <TableHead><Watch className="inline-block mr-1"/> Timer</TableHead>
-                            <TableHead><Clock className="inline-block mr-1"/> Created</TableHead>
-                            <TableHead className="text-right">Action</TableHead>
+                            <TableHead><User className="inline-block mr-1"/> {t('Player')}</TableHead>
+                            <TableHead><BarChart2 className="inline-block mr-1"/> {t('Stakes')}</TableHead>
+                            <TableHead><Watch className="inline-block mr-1"/> {t('Timer')}</TableHead>
+                            <TableHead><Clock className="inline-block mr-1"/> {t('Created')}</TableHead>
+                            <TableHead className="text-right">{t('Action')}</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -113,13 +115,13 @@ export default function PublicGames({ gameType, currencySymbol, usdtRate }: Publ
                                 <TableCell>{room.timeControl / 60} min</TableCell>
                                 <TableCell>{formatDistanceToNowStrict(room.createdAt.toDate(), { addSuffix: true })}</TableCell>
                                 <TableCell className="text-right">
-                                    <Button size="sm" onClick={() => handleJoin(room.id)}>Join Game</Button>
+                                    <Button size="sm" onClick={() => handleJoin(room.id)}>{t('Join Game')}</Button>
                                 </TableCell>
                             </TableRow>
                         )) : (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
-                                    No open public games found. <Link href={`/lobby/${gameType}/create`} className="text-primary underline">Create one!</Link>
+                                    {t('No open public games found.')} <Link href={`/lobby/${gameType}/create`} className="text-primary underline">{t('Create one!')}</Link>
                                 </TableCell>
                             </TableRow>
                         )}
