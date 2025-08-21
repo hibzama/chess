@@ -56,11 +56,12 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 const SignupBonusClaimCard = () => {
     const { user, currencyConfig } = useAuth();
     const { toast } = useToast();
-    const t = useTranslation;
     const [campaign, setCampaign] = useState<SignupBonusCampaign | null>(null);
     const [hasClaimed, setHasClaimed] = useState(true);
     const [isClaiming, setIsClaiming] = useState(false);
     const [loading, setLoading] = useState(true);
+
+    const t = useTranslation;
 
     useEffect(() => {
         if (!user) {
@@ -142,11 +143,81 @@ const SignupBonusClaimCard = () => {
     );
 };
 
+const getStatusIcon = (status: Transaction['status']) => {
+    switch (status) {
+        case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
+        case 'approved': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
+        case 'rejected': return <XCircle className="w-4 h-4 text-red-500" />;
+        case 'completed': return <CheckCircle2 className="w-4 h-4 text-blue-500" />;
+    }
+};
+
+const getTransactionIcon = (type: Transaction['type']) => {
+    switch(type) {
+        case 'deposit': return <ArrowUpCircle className="w-5 h-5 text-green-500" />;
+        case 'withdrawal': return <ArrowDownCircle className="w-5 h-5 text-red-500" />;
+        case 'wager': return <Swords className="w-5 h-5 text-orange-500" />;
+        case 'payout': return <Trophy className="w-5 h-5 text-yellow-500" />;
+        case 'commission_transfer': return <DollarSign className="w-5 h-5 text-blue-500" />;
+        case 'bonus': return <Gift className="w-5 h-5 text-pink-500" />;
+        default: return <DollarSign className="w-5 h-5 text-gray-500" />;
+    }
+}
+
+const TransactionItem = ({ tx, currencyConfig }: { tx: Transaction, currencyConfig: CurrencyConfig }) => {
+    const t = useTranslation;
+    const translatedDescription = t(tx.description || tx.type.replace('_', ' '));
+    const translatedStatus = t(tx.status);
+    const translatedFasterApproval = t('For faster approval, send a screenshot to support.');
+
+    return (
+        <Card key={tx.id} className="p-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
+                <div className="flex items-center gap-2">
+                    {getTransactionIcon(tx.type)}
+                    <div>
+                        <span className="capitalize font-medium">{translatedDescription}</span>
+                    </div>
+                </div>
+                <div>
+                    <div className="font-medium">{currencyConfig.symbol} {tx.amount.toFixed(2)}</div>
+                    <div className="text-xs text-muted-foreground">~{(tx.amount / currencyConfig.usdtRate).toFixed(2)} USDT</div>
+                </div>
+                <div className="text-muted-foreground text-sm">{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</div>
+                <div>
+                    <Badge variant={tx.status === 'approved' || tx.status === 'completed' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">
+                        {getStatusIcon(tx.status)}
+                        <span className="capitalize">{translatedStatus}</span>
+                    </Badge>
+                </div>
+            </div>
+            {(tx.type === 'deposit' || tx.type === 'bonus') && tx.status === 'pending' && (
+                <div className="mt-4 p-3 rounded-md bg-secondary space-y-3">
+                    <div className="flex items-center gap-2">
+                        <Info className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-semibold">{translatedFasterApproval}</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button size="sm" asChild className="w-full bg-green-600 hover:bg-green-700">
+                            <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
+                                <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+                            </a>
+                        </Button>
+                        <Button size="sm" asChild className="w-full bg-blue-500 hover:bg-blue-600">
+                            <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">
+                                <TelegramIcon className="mr-2 h-4 w-4" /> Telegram
+                            </a>
+                        </Button>
+                    </div>
+                </div>
+            )}
+        </Card>
+    )
+}
 
 export default function WalletPage() {
   const { user, userData, loading: authLoading, currencyConfig } = useAuth();
   const { toast } = useToast();
-  const t = useTranslation;
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -167,11 +238,6 @@ export default function WalletPage() {
   
   const usdtAmount = (parseFloat(depositAmount) / currencyConfig.usdtRate || 0).toFixed(2);
   
-  const copyToClipboard = (text: string, name: string) => {
-    navigator.clipboard.writeText(text);
-    toast({ title: t('Copied!'), description: `${t(name)} ${t('copied to clipboard.')}`});
-  }
-
   const withdrawalFeePercentage = 5;
   const withdrawalFee = useMemo(() => {
       const amount = parseFloat(withdrawalAmount);
@@ -185,6 +251,7 @@ export default function WalletPage() {
       return amount - withdrawalFee;
   }, [withdrawalAmount, withdrawalFee]);
 
+  const t = useTranslation;
 
   useEffect(() => {
     if (!user) {
@@ -346,29 +413,13 @@ export default function WalletPage() {
       setSubmittingWithdrawal(false);
     }
   };
-
-  const getStatusIcon = (status: Transaction['status']) => {
-    switch (status) {
-      case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
-      case 'approved': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      case 'rejected': return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'completed': return <CheckCircle2 className="w-4 h-4 text-blue-500" />;
-    }
-  };
-
-  const getTransactionIcon = (type: Transaction['type']) => {
-    switch(type) {
-        case 'deposit': return <ArrowUpCircle className="w-5 h-5 text-green-500" />;
-        case 'withdrawal': return <ArrowDownCircle className="w-5 h-5 text-red-500" />;
-        case 'wager': return <Swords className="w-5 h-5 text-orange-500" />;
-        case 'payout': return <Trophy className="w-5 h-5 text-yellow-500" />;
-        case 'commission_transfer': return <DollarSign className="w-5 h-5 text-blue-500" />;
-        case 'bonus': return <Gift className="w-5 h-5 text-pink-500" />;
-        default: return <DollarSign className="w-5 h-5 text-gray-500" />;
-    }
-  }
   
   const username = userData ? `${userData.firstName}${userData.lastName}`.toLowerCase() : '...';
+
+  const copyToClipboard = (text: string, name: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: t('Copied!'), description: `${t(name)} ${t('copied to clipboard.')}`});
+  }
 
 
   return (
@@ -587,47 +638,7 @@ export default function WalletPage() {
                                 <p className="text-center">{t('Loading history...')}</p>
                             ) : transactions.length > 0 ? (
                                 transactions.map(tx => (
-                                <Card key={tx.id} className="p-4">
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
-                                        <div className="flex items-center gap-2">
-                                            {getTransactionIcon(tx.type)}
-                                            <div>
-                                                <span className="capitalize font-medium">{t(tx.description || tx.type.replace('_', ' '))}</span>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div className="font-medium">{currencyConfig.symbol} {tx.amount.toFixed(2)}</div>
-                                            <div className="text-xs text-muted-foreground">~{(tx.amount / currencyConfig.usdtRate).toFixed(2)} USDT</div>
-                                        </div>
-                                        <div className="text-muted-foreground text-sm">{tx.createdAt ? format(new Date(tx.createdAt.seconds * 1000), 'PPp') : 'N/A'}</div>
-                                        <div>
-                                            <Badge variant={tx.status === 'approved' || tx.status === 'completed' ? 'default' : tx.status === 'rejected' ? 'destructive' : 'secondary'} className="flex items-center gap-1.5 w-fit">
-                                                {getStatusIcon(tx.status)}
-                                                <span className="capitalize">{t(tx.status)}</span>
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                    {(tx.type === 'deposit' || tx.type === 'bonus') && tx.status === 'pending' && (
-                                        <div className="mt-4 p-3 rounded-md bg-secondary space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <Info className="w-4 h-4 text-primary" />
-                                                <p className="text-sm font-semibold">{t('For faster approval, send a screenshot to support.')}</p>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button size="sm" asChild className="w-full bg-green-600 hover:bg-green-700">
-                                                    <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
-                                                        <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
-                                                    </a>
-                                                </Button>
-                                                <Button size="sm" asChild className="w-full bg-blue-500 hover:bg-blue-600">
-                                                    <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">
-                                                        <TelegramIcon className="mr-2 h-4 w-4" /> Telegram
-                                                    </a>
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </Card>
+                                    <TransactionItem key={tx.id} tx={tx} currencyConfig={currencyConfig} />
                                 ))
                             ) : (
                                 <p className="text-center h-24 flex items-center justify-center text-muted-foreground">{t('No transactions yet.')}</p>
@@ -683,3 +694,5 @@ export default function WalletPage() {
     </>
   );
 }
+
+    
