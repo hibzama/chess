@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Award, ClipboardCheck } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Award, ClipboardCheck, Languages } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -18,6 +18,8 @@ import { db } from '@/lib/firebase';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from "@/lib/utils";
 import Image from 'next/image';
+import { useTranslationSystem } from '@/context/translation-context';
+import { useTranslation } from '@/hooks/use-translation';
 
 
 const Logo = () => (
@@ -53,12 +55,39 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 )
 
+const LanguageSwitcher = () => {
+    const { languages, currentLang, changeLanguage, loading } = useTranslationSystem();
+
+    if (loading || languages.length <= 1) return null;
+
+    const currentLanguageName = languages.find(l => l.code === currentLang)?.name || 'Language';
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="gap-2">
+                    <Languages className="w-4 h-4" />
+                    <span className="hidden md:inline">{currentLanguageName}</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+                {languages.map(lang => (
+                    <DropdownMenuItem key={lang.code} onSelect={() => changeLanguage(lang.code)}>
+                        {lang.name}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
+}
+
 const NotificationBell = () => {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const router = useRouter();
     const [isMounted, setIsMounted] = useState(false);
+    const t = useTranslation;
 
     useEffect(() => {
         setIsMounted(true);
@@ -102,21 +131,21 @@ const NotificationBell = () => {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                <DropdownMenuLabel>{t('Notifications')}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {notifications.length > 0 ? (
                     notifications.map(n => (
                         <DropdownMenuItem key={n.id} onClick={() => handleNotificationClick(n)} className={cn("flex items-start gap-3 cursor-pointer", !n.read && "bg-primary/10")}>
                            {!n.read && <Circle className="w-2 h-2 mt-1.5 text-primary fill-current" />}
                             <div className={cn("flex-1 space-y-1", n.read && "pl-5")}>
-                                <p className="font-semibold">{n.title}</p>
-                                <p className="text-xs text-muted-foreground">{n.description}</p>
+                                <p className="font-semibold">{t(n.title)}</p>
+                                <p className="text-xs text-muted-foreground">{t(n.description)}</p>
                                 <p className="text-xs text-muted-foreground">{n.createdAt ? formatDistanceToNowStrict(n.createdAt.toDate(), { addSuffix: true }) : ''}</p>
                             </div>
                         </DropdownMenuItem>
                     ))
                 ) : (
-                    <DropdownMenuItem disabled>No new notifications</DropdownMenuItem>
+                    <DropdownMenuItem disabled>{t('No new notifications')}</DropdownMenuItem>
                 )}
             </DropdownMenuContent>
         </DropdownMenu>
@@ -133,6 +162,7 @@ export default function MainLayout({
     const router = useRouter();
     const pathname = usePathname();
     const [isMounted, setIsMounted] = React.useState(false);
+    const t = useTranslation;
     
     React.useEffect(() => {
         setIsMounted(true);
@@ -151,8 +181,7 @@ export default function MainLayout({
     }
 
     const isMarketer = userData?.role === 'marketer';
-    const hasPendingTasks = userData?.campaignInfo && userData.campaignInfo.completedTasks.length < (userData.campaignInfo as any).totalTasks;
-
+    
     const sidebarItems = isMarketer ? [
         { href: '/marketing/dashboard', icon: LayoutGrid, label: 'Dashboard' },
         { href: '/marketing/dashboard/wallet', icon: Wallet, label: 'Commission Wallet' },
@@ -187,9 +216,9 @@ export default function MainLayout({
                         {sidebarItems.filter(item => item.condition !== false).map(item => (
                              <SidebarMenuItem key={item.href}>
                                 <Link href={item.href}>
-                                    <SidebarMenuButton tooltip={item.label} isActive={isMounted && pathname.startsWith(item.href)}>
+                                    <SidebarMenuButton tooltip={t(item.label)} isActive={isMounted && pathname.startsWith(item.href)}>
                                         <item.icon />
-                                        <span>{item.label}</span>
+                                        <span>{t(item.label)}</span>
                                     </SidebarMenuButton>
                                 </Link>
                             </SidebarMenuItem>
@@ -199,15 +228,15 @@ export default function MainLayout({
                 <SidebarFooter>
                     <SidebarMenu>
                         <SidebarMenuItem>
-                            <Link href="/dashboard/settings"><SidebarMenuButton tooltip="Settings" isActive={isMounted && pathname === '/dashboard/settings'}><Settings /><span>Settings</span></SidebarMenuButton></Link>
+                            <Link href="/dashboard/settings"><SidebarMenuButton tooltip={t("Settings")} isActive={isMounted && pathname === '/dashboard/settings'}><Settings /><span>{t('Settings')}</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
                            <DialogTrigger asChild>
-                                <SidebarMenuButton tooltip="Support"><LifeBuoy /><span>Support</span></SidebarMenuButton>
+                                <SidebarMenuButton tooltip={t("Support")}><LifeBuoy /><span>{t('Support')}</span></SidebarMenuButton>
                            </DialogTrigger>
                         </SidebarMenuItem>
                         <SidebarMenuItem>
-                            <SidebarMenuButton tooltip="Logout" onClick={handleLogout}><LogOut /><span>Logout</span></SidebarMenuButton>
+                            <SidebarMenuButton tooltip={t("Logout")} onClick={handleLogout}><LogOut /><span>{t('Logout')}</span></SidebarMenuButton>
                         </SidebarMenuItem>
                     </SidebarMenu>
                 </SidebarFooter>
@@ -251,6 +280,7 @@ export default function MainLayout({
                                   </Link>
                                </div>
                            )}
+                            <LanguageSwitcher />
                             <NotificationBell />
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -267,11 +297,11 @@ export default function MainLayout({
                                         <p className="text-xs text-muted-foreground font-normal">{userData?.email}</p>
                                     </DropdownMenuLabel>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem asChild><Link href="/dashboard/profile"><User className="mr-2"/> Profile</Link></DropdownMenuItem>
-                                    <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2"/> Settings</Link></DropdownMenuItem>
-                                    <DropdownMenuItem asChild><Link href="/dashboard/wallet"><Wallet className="mr-2"/> Wallet</Link></DropdownMenuItem>
+                                    <DropdownMenuItem asChild><Link href="/dashboard/profile"><User className="mr-2"/> {t('Profile')}</Link></DropdownMenuItem>
+                                    <DropdownMenuItem asChild><Link href="/dashboard/settings"><Settings className="mr-2"/> {t('Settings')}</Link></DropdownMenuItem>
+                                    <DropdownMenuItem asChild><Link href="/dashboard/wallet"><Wallet className="mr-2"/> {t('Wallet')}</Link></DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2"/> Log out</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleLogout}><LogOut className="mr-2"/> {t('Log out')}</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
@@ -285,9 +315,9 @@ export default function MainLayout({
         </SidebarProvider>
          <DialogContent>
             <DialogHeader>
-                <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
+                <DialogTitle className="flex items-center gap-2"><LifeBuoy/> {t('Contact Support')}</DialogTitle>
                 <DialogDescription>
-                    Have an issue? Reach out to us through any of the channels below.
+                    {t('Have an issue? Reach out to us through any of the channels below.')}
                 </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">

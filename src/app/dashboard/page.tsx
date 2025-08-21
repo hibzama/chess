@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, ClipboardCheck, Banknote, Megaphone } from 'lucide-react';
+import { Users, Sword, DollarSign, List, Wallet, MessageSquare, BarChart3, Gamepad2, ArrowRight, Clock, Handshake, PercentCircle, TrendingUp, BrainCircuit, User, Gift, Award, ClipboardCheck, Banknote, Megaphone, Languages } from 'lucide-react';
 import { redirect } from 'next/navigation';
 import { useAuth } from '@/context/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +13,7 @@ import { db } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { DepositBonusCampaign } from '@/app/admin/bonus/deposit-bonus/page';
+import { useTranslation } from '@/hooks/use-translation';
 
 interface SignupBonusCampaign {
     id: string;
@@ -24,32 +25,36 @@ interface SignupBonusCampaign {
 }
 
 // #region Bonus Components
-const BonusCardShell = ({ title, description, icon, href, linkText, reward, currencySymbol }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string, currencySymbol: string}) => (
-    <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 flex flex-col">
-        <CardHeader className="flex-grow">
-            <CardTitle className="flex items-center gap-2 text-lg">{icon} {title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
-        </CardHeader>
-        <CardContent>
-            {reward && <div className="mb-4 text-center p-2 bg-yellow-400/10 border border-yellow-400/20 rounded-md text-yellow-300 font-bold text-sm">{reward}</div>}
-            <Button variant="outline" asChild className="w-full">
-                <Link href={href}>{linkText}</Link>
-            </Button>
-        </CardContent>
-    </Card>
-)
+const BonusCardShell = ({ title, description, icon, href, linkText, reward, currencySymbol }: {title: string, description: string, icon: React.ReactNode, href: string, linkText: string, reward?: string, currencySymbol: string}) => {
+    const t = useTranslation;
+    return (
+        <Card className="bg-gradient-to-br from-primary/10 to-secondary/10 border-primary/20 flex flex-col">
+            <CardHeader className="flex-grow">
+                <CardTitle className="flex items-center gap-2 text-lg">{icon} {t(title)}</CardTitle>
+                <CardDescription>{t(description)}</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {reward && <div className="mb-4 text-center p-2 bg-yellow-400/10 border border-yellow-400/20 rounded-md text-yellow-300 font-bold text-sm">{t(reward)}</div>}
+                <Button variant="outline" asChild className="w-full">
+                    <Link href={href}>{t(linkText)}</Link>
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
 
 const SignupBonusAlert = ({ campaign, onClaimed, currencySymbol }: { campaign: SignupBonusCampaign, onClaimed: () => void, currencySymbol: string }) => {
+    const t = useTranslation;
     return (
         <Alert className="border-primary/50 bg-primary/10 text-primary-foreground">
             <Gift className="h-4 w-4 !text-primary" />
-            <AlertTitle className="text-primary">Welcome Bonus Available!</AlertTitle>
+            <AlertTitle className="text-primary">{t('Welcome Bonus Available!')}</AlertTitle>
             <AlertDescription className="flex items-center justify-between">
                 <div>
-                   You're eligible for the "{campaign.title}" campaign. Claim your {currencySymbol} {campaign.bonusAmount.toFixed(2)} bonus now!
+                   {t(`You're eligible for the "${campaign.title}" campaign. Claim your ${currencySymbol} ${campaign.bonusAmount.toFixed(2)} bonus now!`)}
                 </div>
                 <Button asChild>
-                    <Link href="/dashboard/wallet">Go to Wallet to Claim</Link>
+                    <Link href="/dashboard/wallet">{t('Go to Wallet to Claim')}</Link>
                 </Button>
             </AlertDescription>
         </Alert>
@@ -80,7 +85,7 @@ const BonusHub = ({ depositBonus, hasActiveTask, currencySymbol }: { depositBonu
                 />
             ) : (
                  <Card className="bg-card/50 border-dashed flex items-center justify-center p-6">
-                    <p className="text-center text-muted-foreground text-sm">No special deposit bonuses right now.</p>
+                    <p className="text-center text-muted-foreground text-sm">{useTranslation('No special deposit bonuses right now.')}</p>
                 </Card>
             )}
              <BonusCardShell 
@@ -97,26 +102,30 @@ const BonusHub = ({ depositBonus, hasActiveTask, currencySymbol }: { depositBonu
 // #endregion
 
 
-const StatCard = ({ title, value, description, isLoading, colorClass }: { title: string, value: string | number, description?: string, isLoading: boolean, colorClass?: string}) => (
-    <Card className="bg-card/80 backdrop-blur-sm">
-        <CardHeader>
-            <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        </CardHeader>
-        <CardContent>
-            {isLoading ? (
-                <Skeleton className="h-8 w-1/2" />
-            ) : (
-                <p className={cn("text-3xl font-bold", colorClass)}>{value}</p>
-            )}
-            {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
-        </CardContent>
-    </Card>
-)
+const StatCard = ({ title, value, description, isLoading, colorClass }: { title: string, value: string | number, description?: string, isLoading: boolean, colorClass?: string}) => {
+    const t = useTranslation;
+    return (
+        <Card className="bg-card/80 backdrop-blur-sm">
+            <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t(title)}</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {isLoading ? (
+                    <Skeleton className="h-8 w-1/2" />
+                ) : (
+                    <p className={cn("text-3xl font-bold", colorClass)}>{value}</p>
+                )}
+                {description && <p className="text-xs text-muted-foreground mt-1">{t(description)}</p>}
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function DashboardPage() {
     const { user, userData, loading, currencyConfig } = useAuth();
     const [transactions, setTransactions] = useState<any[]>([]);
     const [statsLoading, setStatsLoading] = useState(true);
+    const t = useTranslation;
     
     const [signupBonus, setSignupBonus] = useState<SignupBonusCampaign | null>(null);
     const [hasClaimedSignup, setHasClaimedSignup] = useState(true);
@@ -245,9 +254,9 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">Welcome, {userData?.firstName}!</h1>
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-2">{t('Welcome')}, {userData?.firstName}!</h1>
         <p className="text-muted-foreground md:text-lg">
-          Your journey to becoming a grandmaster starts now. Choose your game and make your move.
+          {t('Your journey to becoming a grandmaster starts now. Choose your game and make your move.')}
         </p>
       </div>
 
@@ -300,8 +309,8 @@ export default function DashboardPage() {
                   <div className="w-fit mb-4">
                       <action.icon className="w-6 h-6 text-primary" />
                   </div>
-                  <p className="font-semibold text-lg">{action.title}</p>
-                  <p className="text-sm text-muted-foreground">{action.description}</p>
+                  <p className="font-semibold text-lg">{t(action.title)}</p>
+                  <p className="text-sm text-muted-foreground">{t(action.description)}</p>
                 </div>
             </Card>
           </Link>
@@ -315,7 +324,7 @@ export default function DashboardPage() {
               <div className="w-fit mb-4">
                   <action.icon className="w-6 h-6 text-primary" />
               </div>
-              <p className="font-semibold text-sm">{action.title}</p>
+              <p className="font-semibold text-sm">{t(action.title)}</p>
             </Card>
           </Link>
         ))}
