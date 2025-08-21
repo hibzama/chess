@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Loader2, Languages } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, Languages, HelpCircle } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import Link from 'next/link';
 
 export interface Language {
     id: string;
@@ -58,7 +59,7 @@ export default function LanguageSettingsPage() {
             fetchLanguages();
         } catch (error) {
             console.error("Error adding language:", error);
-            toast({ variant: "destructive", title: "Error", description: "Failed to add language." });
+            toast({ variant: "destructive", title: "Error", description: "Failed to add language. Check Firestore rules." });
         } finally {
             setIsSubmitting(false);
         }
@@ -76,7 +77,7 @@ export default function LanguageSettingsPage() {
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-4">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><PlusCircle /> Add New Language</CardTitle>
@@ -100,6 +101,19 @@ export default function LanguageSettingsPage() {
                         </CardFooter>
                     </form>
                 </Card>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><HelpCircle /> Need Help?</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CardDescription>
+                            Not sure which language code to use? Check our list of supported languages for easy reference.
+                        </CardDescription>
+                        <Button asChild variant="outline" className="w-full mt-4">
+                             <Link href="/admin/settings/languages/supported">View Supported Languages</Link>
+                        </Button>
+                    </CardContent>
+                 </Card>
             </div>
             <div className="lg:col-span-2">
                 <Card>
