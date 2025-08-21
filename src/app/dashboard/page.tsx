@@ -133,6 +133,24 @@ export default function DashboardPage() {
     // State for other bonuses
     const [depositBonus, setDepositBonus] = useState<DepositBonusCampaign | null>(null);
     const [checkingBonuses, setCheckingBonuses] = useState(true);
+
+    if (loading) {
+        return (
+            <div className="flex flex-col">
+              <div className="mb-12">
+                <Skeleton className="h-12 w-3/4 mb-2" />
+                <Skeleton className="h-6 w-1/2" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
+                  {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-28"/>)}
+              </div>
+            </div>
+          );
+    }
+  
+    if (!user) {
+      redirect('/login');
+    }
     
     useEffect(() => {
         if (!user || !userData) {
@@ -217,24 +235,6 @@ export default function DashboardPage() {
         return { totalDeposit, totalWithdrawal, totalEarning };
     }, [transactions]);
     
-    if (loading) {
-        return (
-            <div className="flex flex-col">
-              <div className="mb-12">
-                <Skeleton className="h-12 w-3/4 mb-2" />
-                <Skeleton className="h-6 w-1/2" />
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
-                  {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-28"/>)}
-              </div>
-            </div>
-          );
-    }
-  
-    if (!user) {
-      redirect('/login');
-    }
-
     const mainActions = [
         { title: "Practice Games", description: "Play for free against the bot", icon: Sword, href: "/practice" },
         { title: "Start Earning", description: "Play against others to win", icon: DollarSign, href: "/lobby" },
@@ -332,3 +332,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+
