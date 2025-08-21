@@ -60,7 +60,18 @@ const SignupBonusClaimCard = () => {
     const [hasClaimed, setHasClaimed] = useState(true);
     const [isClaiming, setIsClaiming] = useState(false);
     const [loading, setLoading] = useState(true);
-    const t = useTranslation;
+    
+    const tCampaignTitle = useTranslation(campaign?.title);
+    const tClaimed = useTranslation('Bonus Claimed!');
+    const tPendingApproval = useTranslation(`Your bonus is pending admin approval.`);
+    const tError = useTranslation('Error');
+    const tErrorClaim = useTranslation('Could not claim bonus.');
+    const tClaiming = useTranslation('Claiming...');
+    const tClaimButton = useTranslation('Claim Welcome Bonus');
+    const tSpecialBonus = useTranslation('A special welcome bonus is available for you!');
+    const tClaimYour = useTranslation('Claim your');
+    const tBonusNow = useTranslation('bonus now. It will be added to your wallet after admin approval.');
+
 
     useEffect(() => {
         if (!user) {
@@ -111,10 +122,10 @@ const SignupBonusClaimCard = () => {
                 createdAt: serverTimestamp()
             });
 
-            toast({ title: t("Bonus Claimed!"), description: t(`Your bonus is pending admin approval.`) });
+            toast({ title: tClaimed, description: tPendingApproval });
             setHasClaimed(true); // Hide card after claiming
         } catch (error) {
-            toast({ variant: 'destructive', title: t("Error"), description: t("Could not claim bonus.") });
+            toast({ variant: 'destructive', title: tError, description: tErrorClaim });
         } finally {
             setIsClaiming(false);
         }
@@ -127,15 +138,15 @@ const SignupBonusClaimCard = () => {
     return (
         <Card className="bg-primary/10 border-primary/20">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Gift /> {t(campaign.title)}</CardTitle>
-                <CardDescription>{t('A special welcome bonus is available for you!')}</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Gift /> {tCampaignTitle}</CardTitle>
+                <CardDescription>{tSpecialBonus}</CardDescription>
             </CardHeader>
             <CardContent>
-                <p>{t('Claim your')} <span className="font-bold text-primary">{currencyConfig.symbol} {campaign.bonusAmount.toFixed(2)}</span> {t('bonus now. It will be added to your wallet after admin approval.')}</p>
+                <p>{tClaimYour} <span className="font-bold text-primary">{currencyConfig.symbol} {campaign.bonusAmount.toFixed(2)}</span> {tBonusNow}</p>
             </CardContent>
             <CardFooter>
                 <Button className="w-full" onClick={handleClaim} disabled={isClaiming}>
-                    {isClaiming ? t('Claiming...') : t('Claim Welcome Bonus')}
+                    {isClaiming ? tClaiming : tClaimButton}
                 </Button>
             </CardFooter>
         </Card>
@@ -164,10 +175,9 @@ const getTransactionIcon = (type: Transaction['type']) => {
 }
 
 const TransactionItem = ({ tx, currencyConfig }: { tx: Transaction, currencyConfig: CurrencyConfig }) => {
-    const t = useTranslation;
-    const translatedDescription = t(tx.description || tx.type.replace('_', ' '));
-    const translatedStatus = t(tx.status);
-    const translatedFasterApproval = t('For faster approval, send a screenshot to support.');
+    const translatedDescription = useTranslation(tx.description || tx.type.replace('_', ' '));
+    const translatedStatus = useTranslation(tx.status);
+    const translatedFasterApproval = useTranslation('For faster approval, send a screenshot to support.');
 
     return (
         <Card key={tx.id} className="p-4">
@@ -272,7 +282,7 @@ export default function WalletPage() {
       setLoading(false);
     }, (error) => {
       console.error("Error fetching transactions:", error);
-      toast({ variant: 'destructive', title: t('Error'), description: t('Could not fetch transaction history.') });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch transaction history.' });
       setLoading(false);
     });
 
@@ -297,7 +307,7 @@ export default function WalletPage() {
 
   const handleDepositSubmit = async () => {
     if (!user || !depositAmount) {
-      toast({ variant: 'destructive', title: t('Error'), description: t('Please enter a deposit amount.') });
+      toast({ variant: 'destructive', title: 'Error', description: 'Please enter a deposit amount.' });
       return;
     }
     setSubmittingDeposit(true);
@@ -316,13 +326,13 @@ export default function WalletPage() {
             createdAt: serverTimestamp()
         });
       
-        toast({ title: t('Success'), description: t('Deposit request submitted for review.') });
+        toast({ title: 'Success', description: 'Deposit request submitted for review.' });
         setDepositAmount('');
         setIsPostSubmitInfoOpen(true);
 
     } catch (error) {
         console.error("Error submitting deposit:", error);
-        toast({ variant: 'destructive', title: t('Error'), description: t('Failed to submit deposit request. Please try again.') });
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit deposit request. Please try again.' });
     } finally {
         setSubmittingDeposit(false);
     }
@@ -332,11 +342,11 @@ export default function WalletPage() {
   const handleInitiateDeposit = (e: React.FormEvent) => {
     e.preventDefault();
      if (!depositAmount) {
-        toast({ variant: 'destructive', title: t('Error'), description: t('Please enter an amount.') });
+        toast({ variant: 'destructive', title: 'Error', description: 'Please enter an amount.' });
         return;
     }
     if (parseFloat(depositAmount) < 100) {
-        toast({ variant: 'destructive', title: t('Error'), description: `${t('Minimum deposit amount is')} ${currencyConfig.symbol} 100.` });
+        toast({ variant: 'destructive', title: 'Error', description: `Minimum deposit amount is ${currencyConfig.symbol} 100.` });
         return;
     }
     setIsConfirmRemarkOpen(true);
@@ -346,29 +356,29 @@ export default function WalletPage() {
     e.preventDefault();
 
     if (!user || !userData || !withdrawalAmount) {
-      toast({ variant: 'destructive', title: t('Error'), description: t('Please fill all required fields.') });
+      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all required fields.' });
       return;
     }
 
     if (withdrawalMethod === 'bank' && (withdrawalDetails.branch === '' || withdrawalDetails.accountNumber === '' || withdrawalDetails.accountName === '')) {
-      toast({ variant: 'destructive', title: t('Error'), description: t('Please fill all bank details.') });
+      toast({ variant: 'destructive', title: 'Error', description: 'Please fill all bank details.' });
       return;
     }
     
     if (withdrawalMethod === 'binance' && !binancePayId) {
-        toast({ variant: 'destructive', title: t('Error'), description: t('Please enter your Binance PayID.') });
+        toast({ variant: 'destructive', title: 'Error', description: 'Please enter your Binance PayID.' });
         return;
     }
 
     const requestedAmount = parseFloat(withdrawalAmount);
 
     if (requestedAmount < 500) {
-        toast({ variant: 'destructive', title: t('Error'), description: `${t('Minimum withdrawal amount is')} ${currencyConfig.symbol} 500.` });
+        toast({ variant: 'destructive', title: 'Error', description: `Minimum withdrawal amount is ${currencyConfig.symbol} 500.` });
         return;
     }
 
     if(userData && userData.balance < requestedAmount) {
-        toast({ variant: 'destructive', title: t('Error'), description: t('Insufficient balance.') });
+        toast({ variant: 'destructive', title: 'Error', description: 'Insufficient balance.' });
         return;
     }
 
@@ -391,7 +401,7 @@ export default function WalletPage() {
         createdAt: serverTimestamp()
       });
 
-      toast({ title: t('Success'), description: t('Withdrawal request submitted.') });
+      toast({ title: 'Success', description: 'Withdrawal request submitted.' });
       setWithdrawalAmount('');
       setBinancePayId('');
       if (withdrawalMethod === 'bank') {
@@ -400,7 +410,7 @@ export default function WalletPage() {
 
     } catch (error: any) {
         console.error("Error submitting withdrawal:", error);
-        toast({ variant: 'destructive', title: t('Error'), description: `${t('Failed to submit withdrawal request:')} ${error.message}` });
+        toast({ variant: 'destructive', title: 'Error', description: `Failed to submit withdrawal request: ${error.message}` });
         
         // Revert balance deduction if firestore update fails
         const userRef = doc(db, 'users', user.uid);
@@ -417,7 +427,7 @@ export default function WalletPage() {
 
   const copyToClipboard = (text: string, name: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: t('Copied!'), description: `${t(name)} ${t('copied to clipboard.')}`});
+    toast({ title: 'Copied!', description: `${name} copied to clipboard.`});
   }
 
 
@@ -585,7 +595,7 @@ export default function WalletPage() {
                                 <Info className="h-4 w-4" />
                                 <AlertTitle>{t('Bank Withdrawals')}</AlertTitle>
                                 <AlertDescription>
-                                    {t('Please note that bank withdrawals are only processed for')} <strong>{t('Bank of Ceylon (BOC)')}</strong> {t('accounts at this time.')}
+                                    {t('Please note that bank withdrawals are only processed for')} <strong>{t('Bank of Ceylon (Boc)')}</strong> {t('accounts at this time.')}
                                 </AlertDescription>
                             </Alert>
                             <div className="space-y-2">
@@ -693,3 +703,5 @@ export default function WalletPage() {
     </>
   );
 }
+
+    
