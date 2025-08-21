@@ -2,88 +2,90 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
     
+    function isUser(userId) {
+        return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-      
-      match /active_campaigns/{campaignId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-    }
-
-    match /game_rooms/{roomId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.createdBy.uid == request.auth.uid;
-      allow update: if request.auth != null && request.auth.uid in resource.data.players;
-      allow delete: if request.auth != null && resource.data.createdBy.uid == request.auth.uid;
-      
-      match /messages/{messageId} {
-        allow read, write: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/game_rooms/$(roomId)).data.players;
-      }
-    }
-    
-    match /chats/{chatId} {
-        allow read, update: if request.auth.uid in resource.data.userIds;
-        
-        match /messages/{messageId} {
-            allow read, create: if request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
-        }
-    }
-    
-    match /notifications/{notificationId} {
-        allow read, update: if request.auth.uid == resource.data.userId;
-        allow create: if request.auth != null;
-    }
-
-    match /marketing_applications/{appId} {
-        allow create: if request.auth == null; // Public can apply
-        allow read, update: if request.auth.token.admin == true;
-    }
-    
-    match /transactions/{transactionId} {
-        allow read, create: if request.auth != null;
-        allow update: if request.auth.token.admin == true; // Only admins can approve/reject
+      allow read, write: if isUser(userId) || isAdmin();
     }
 
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if request.auth.token.admin == true;
+      allow write: if isAdmin();
     }
     
-    match /signup_bonus_campaigns/{campaignId} {
-      allow read: if true;
-      allow write: if request.auth.token.admin == true;
-    }
-    
-     match /deposit_bonus_campaigns/{campaignId} {
-      allow read: if true;
-      allow write: if request.auth.token.admin == true;
-      
-       match /claims/{claimId} {
-          allow read, write: if request.auth != null;
-       }
-    }
-    
-    match /referral_campaigns/{campaignId} {
-      allow read: if true;
-      allow write: if request.auth.token.admin == true;
-    }
-    
-    match /tasks/{taskId} {
-      allow read: if true;
-      allow write: if request.auth.token.admin == true;
-    }
-    
-    match /bonus_claims/{claimId} {
-        allow read: if request.auth != null;
+    match /game_rooms/{roomId} {
+        allow read: if true;
         allow create: if request.auth != null;
-        allow update: if request.auth.token.admin == true;
+        allow update, delete: if request.auth != null && (request.auth.uid == resource.data.createdBy.uid || isAdmin());
     }
-  }
-  
-  match /languages/{document=**} {
-    allow read: if true;
-    allow write: if request.auth.token.admin == true;
+
+    match /marketing_applications/{appId} {
+        allow create: if true;
+        allow read, write: if isAdmin();
+    }
+    
+    match /transactions/{txId} {
+        allow read: if isAdmin() || (request.auth != null && request.auth.uid == resource.data.userId);
+        allow create: if request.auth != null;
+        allow update: if isAdmin();
+    }
+
+    match /signup_bonus_campaigns/{campaignId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+
+    match /deposit_bonus_campaigns/{campaignId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+    
+     match /deposit_bonus_campaigns/{campaignId}/claims/{claimId} {
+        allow create, read: if request.auth != null;
+        allow write: if isAdmin();
+    }
+
+     match /referral_campaigns/{campaignId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+
+     match /tasks/{taskId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+
+    match /bonus_claims/{claimId} {
+        allow create, read: if request.auth != null;
+        allow write: if isAdmin();
+    }
+    
+     match /notifications/{notificationId} {
+        allow read, write, create: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+    
+     match /chats/{chatId} {
+        allow read, write: if request.auth != null && request.auth.uid in resource.data.userIds;
+        match /messages/{messageId} {
+             allow read, write: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.userIds;
+        }
+    }
+    
+    match /languages/{languageId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
   }
 }
