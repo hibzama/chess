@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowLeft, BrainCircuit, Layers, DollarSign, Users, MessageSquare } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useTranslation } from '@/hooks/use-translation';
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -19,7 +18,6 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export default function EarningHomePage() {
     const router = useRouter();
-    const t = useTranslation;
 
     const handleStartEarning = (game: 'chess' | 'checkers') => {
         router.push(`/lobby/${game}`);
@@ -46,13 +44,13 @@ export default function EarningHomePage() {
                 <div className="w-full max-w-4xl mb-8">
                     <Link href="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                         <ArrowLeft className="w-4 h-4" />
-                        <span>{t('Back to Dashboard')}</span>
+                        <span>Back to Dashboard</span>
                     </Link>
                 </div>
 
                 <div className="text-center mb-12">
-                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">{t('Earning on Nexbattle')}</h1>
-                    <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">{t('Turn your strategic skills into real rewards. Choose your game to get started.')}</p>
+                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">Earning on Nexbattle</h1>
+                    <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">Turn your strategic skills into real rewards. Choose your game to get started.</p>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
@@ -62,16 +60,16 @@ export default function EarningHomePage() {
                                 <div className="p-3 bg-primary/10 rounded-full mb-4">
                                     {option.icon}
                                 </div>
-                                <CardTitle>{t(option.name)}</CardTitle>
-                                <CardDescription>{t(option.description)}</CardDescription>
+                                <CardTitle>{option.name}</CardTitle>
+                                <CardDescription>{option.description}</CardDescription>
                             </CardHeader>
                             <CardContent className="w-full px-6">
                                 <DialogTrigger asChild>
-                                    <Button variant="outline" className="w-full">{t('How to Earn')}</Button>
+                                    <Button variant="outline" className="w-full">How to Earn</Button>
                                 </DialogTrigger>
                             </CardContent>
                             <CardFooter className="px-6 pb-6">
-                                <Button className="w-full" onClick={option.action}>{t('Start Earning')}</Button>
+                                <Button className="w-full" onClick={option.action}>Start Earning</Button>
                             </CardFooter>
                         </Card>
                     ))}
@@ -79,14 +77,14 @@ export default function EarningHomePage() {
 
                 <Card className="w-full max-w-4xl mt-8 bg-card/50">
                     <CardHeader className="items-center text-center">
-                        <CardTitle className="flex items-center gap-2"><TelegramIcon/> {t('Public Rooms Group')}</CardTitle>
-                        <CardDescription>{t('Join our Telegram channel to see all new public games as they are created!')}</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><TelegramIcon/> Public Rooms Group</CardTitle>
+                        <CardDescription>Join our Telegram channel to see all new public games as they are created!</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
                             <a href="https://t.me/nexbattlerooms" target="_blank" rel="noopener noreferrer">
                                 <TelegramIcon className="mr-2 h-5 w-5" />
-                                {t('Join @nexbattlerooms')}
+                                Join @nexbattlerooms
                             </a>
                         </Button>
                     </CardContent>
@@ -94,20 +92,20 @@ export default function EarningHomePage() {
 
                  <Card className="w-full max-w-4xl mt-8 bg-card/50">
                     <CardHeader className="items-center text-center">
-                        <CardTitle className="flex items-center gap-2"><Users/> {t('Find Players to Challenge')}</CardTitle>
-                        <CardDescription>{t('Chat in our community groups to find opponents easily.')}</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Users/> Find Players to Challenge</CardTitle>
+                        <CardDescription>Chat in our community groups to find opponents easily.</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Button asChild size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white">
                             <a href="https://chat.whatsapp.com/EJFHx4y9n9EDstQ971Bvf5?mode=ac_t" target="_blank" rel="noopener noreferrer">
                                 <MessageSquare className="mr-2 h-5 w-5" />
-                                {t('Join WhatsApp Group')}
+                                Join WhatsApp Group
                             </a>
                         </Button>
                          <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
                             <a href="https://t.me/nexbattlechat" target="_blank" rel="noopener noreferrer">
                                 <TelegramIcon className="mr-2 h-5 w-5" />
-                                {t('Join Telegram Group')}
+                                Join Telegram Group
                             </a>
                         </Button>
                     </CardContent>
@@ -116,51 +114,51 @@ export default function EarningHomePage() {
 
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-2xl flex items-center gap-2"><DollarSign/> {t('How Earning Works')}</DialogTitle>
+                    <DialogTitle className="text-2xl flex items-center gap-2"><DollarSign/> How Earning Works</DialogTitle>
                     <DialogDescription>
-                        {t('Understand the multiplayer rules and financial system before you play.')}
+                        Understand the multiplayer rules and financial system before you play.
                     </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="h-[60vh] p-4">
                     <div className="space-y-6 text-sm">
-                        <h3 className="font-bold text-lg text-primary">{t('The Multiplayer Mode')}</h3>
+                        <h3 className="font-bold text-lg text-primary">The Multiplayer Mode</h3>
                         <p>
-                            {t('The Multiplayer mode is the competitive heart of Nexbattle. It allows you to play against real opponents from around the world for real rewards. Instead of playing for free like in Practice Mode, you invest a small amount from your wallet into each match. This investment becomes the "stakes" of the game. Winning not only proves your skill but also earns you a significant profit.')}
+                            The Multiplayer mode is the competitive heart of Nexbattle. It allows you to play against real opponents from around the world for real rewards. Instead of playing for free like in Practice Mode, you invest a small amount from your wallet into each match. This investment becomes the "stakes" of the game. Winning not only proves your skill but also earns you a significant profit.
                         </p>
 
-                        <h3 className="font-bold text-lg text-primary">{t('Ways to Play')}</h3>
+                        <h3 className="font-bold text-lg text-primary">Ways to Play</h3>
                         <div className="space-y-4 pl-4 border-l-2 border-primary">
                             <div>
-                                <h4 className="font-semibold">{t('1. Create a Room')}</h4>
-                                <p className="text-muted-foreground">{t('This option lets you be the host. You define the rules of the match, choosing the investment amount and game timer. You can make it a')} <span className="font-semibold text-foreground">{t('Public Room')}</span>, {t('visible to everyone, or a')} <span className="font-semibold text-foreground">{t('Private Room')}</span> {t('by sharing a unique Game ID with a friend.')}</p>
+                                <h4 className="font-semibold">1. Create a Room</h4>
+                                <p className="text-muted-foreground">This option lets you be the host. You define the rules of the match, choosing the investment amount and game timer. You can make it a <span className="font-semibold text-foreground">Public Room</span>, visible to everyone, or a <span className="font-semibold text-foreground">Private Room</span> by sharing a unique Game ID with a friend.</p>
                             </div>
                             <div>
-                                <h4 className="font-semibold">{t('2. Find a Room')}</h4>
-                                <p className="text-muted-foreground">{t('This is the public lobby where you can instantly join a game someone else has created. It displays a list of all available public games with their details. Simply find one you like and click "Join" to start immediately.')}</p>
+                                <h4 className="font-semibold">2. Find a Room</h4>
+                                <p className="text-muted-foreground">This is the public lobby where you can instantly join a game someone else has created. It displays a list of all available public games with their details. Simply find one you like and click "Join" to start immediately.</p>
                             </div>
                             <div>
-                                <h4 className="font-semibold">{t('3. Join a Room')}</h4>
-                                <p className="text-muted-foreground">{t('This option is for private matches. If a friend sends you a unique Game ID, you can enter it here to join their specific game directly.')}</p>
+                                <h4 className="font-semibold">3. Join a Room</h4>
+                                <p className="text-muted-foreground">This option is for private matches. If a friend sends you a unique Game ID, you can enter it here to join their specific game directly.</p>
                             </div>
                              <div>
-                                <h4 className="font-semibold">{t('4. My Rooms')}</h4>
-                                <p className="text-muted-foreground">{t('Your personal hub for all your ongoing games. You can cancel rooms you\'ve created that are waiting for an opponent, or rejoin an active match if you get disconnected.')}</p>
+                                <h4 className="font-semibold">4. My Rooms</h4>
+                                <p className="text-muted-foreground">Your personal hub for all your ongoing games. You can cancel rooms you've created that are waiting for an opponent, or rejoin an active match if you get disconnected.</p>
                             </div>
                         </div>
 
-                         <h3 className="font-bold text-lg text-primary">{t('Payout & Forfeit Rules')}</h3>
+                         <h3 className="font-bold text-lg text-primary">Payout & Forfeit Rules</h3>
                          <div className="space-y-4 pl-4 border-l-2 border-accent">
                             <div>
-                                <h4 className="font-semibold">{t('Standard Win: 180% Payout')}</h4>
-                                <p className="text-muted-foreground">{t('If you win by checkmate, capturing all pieces, or if your opponent runs out of time, you receive 180% of your initial stake back. For example, a LKR 100 stake returns LKR 180.')}</p>
+                                <h4 className="font-semibold">Standard Win: 180% Payout</h4>
+                                <p className="text-muted-foreground">If you win by checkmate, capturing all pieces, or if your opponent runs out of time, you receive 180% of your initial stake back. For example, a LKR 100 stake returns LKR 180.</p>
                             </div>
                              <div>
-                                <h4 className="font-semibold">{t('Draws: 90% Refund')}</h4>
-                                <p className="text-muted-foreground">{t('If a game ends in a draw (e.g., by stalemate or agreement), both players receive 90% of their investment back. In a LKR 100 game, you get LKR 90 refunded.')}</p>
+                                <h4 className="font-semibold">Draws: 90% Refund</h4>
+                                <p className="text-muted-foreground">If a game ends in a draw (e.g., by stalemate or agreement), both players receive 90% of their investment back. In a LKR 100 game, you get LKR 90 refunded.</p>
                             </div>
                              <div>
-                                <h4 className="font-semibold">{t('Resignation & Abandonment (Fair Play Payouts)')}</h4>
-                                <p className="text-muted-foreground">{t('To ensure fair play and discourage leaving mid-game, we have a specific payout system for forfeits. If a player resigns or abandons a match (e.g., by closing the app or disconnecting), the player who')} <span className="text-foreground font-semibold">{t('did not leave')}</span> {t('receives a')} <span className="text-green-400 font-semibold">{t('105% payout')}</span>. {t('The player who')} <span className="text-foreground font-semibold">{t('did leave')}</span> {t('still gets a')} <span className="text-yellow-400 font-semibold">{t('75% refund')}</span>. {t('This policy discourages abandonment while protecting players from total losses due to unforeseen disconnections.')}</p>
+                                <h4 className="font-semibold">Resignation & Abandonment (Fair Play Payouts)</h4>
+                                <p className="text-muted-foreground">To ensure fair play and discourage leaving mid-game, we have a specific payout system for forfeits. If a player resigns or abandons a match (e.g., by closing the app or disconnecting), the player who <span className="text-foreground font-semibold">did not leave</span> receives a <span className="text-green-400 font-semibold">105% payout</span>. The player who <span className="text-foreground font-semibold">did leave</span> still gets a <span className="text-yellow-400 font-semibold">75% refund</span>. This policy discourages abandonment while protecting players from total losses due to unforeseen disconnections.</p>
                             </div>
                         </div>
 
@@ -170,3 +168,5 @@ export default function EarningHomePage() {
         </Dialog>
     );
 }
+
+    

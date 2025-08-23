@@ -7,37 +7,6 @@ import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu, DollarSign
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useTranslation } from "@/hooks/use-translation";
-import { useTranslationSystem } from "@/context/translation-context";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { cn } from "@/lib/utils";
-
-const LanguageSwitcher = () => {
-    const { languages, currentLang, changeLanguage, loading } = useTranslationSystem();
-    const currentLanguageName = languages.find(l => l.code === currentLang)?.name || 'Language';
-    const t = useTranslation;
-    const translatedLanguageName = t(currentLanguageName);
-
-    if (loading || languages.length <= 1) return null;
-
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="gap-2">
-                    <Languages className="w-4 h-4" />
-                    <span className="hidden md:inline">{translatedLanguageName}</span>
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-                {languages.map(lang => (
-                    <DropdownMenuItem key={lang.code} onSelect={() => changeLanguage(lang.code)}>
-                        {lang.name}
-                    </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    )
-}
 
 const Logo = () => (
     <div className="flex items-center gap-2 text-2xl font-bold">
@@ -71,7 +40,6 @@ export default function LandingLayout({
   }: {
     children: React.ReactNode
   }) {
-    const t = useTranslation;
 
     const aboutSections = [
         {
@@ -123,11 +91,11 @@ export default function LandingLayout({
                 </Link>
                  <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
                     <Dialog>
-                        <DialogTrigger asChild><button className="hover:text-primary">{t('About Us')}</button></DialogTrigger>
+                        <DialogTrigger asChild><button className="hover:text-primary">About Us</button></DialogTrigger>
                          <DialogContent className="max-w-2xl">
                             <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2"><Info/> {t('About Nexbattle')}</DialogTitle>
-                                <DialogDescription>{t('The ultimate platform where skill meets investment.')}</DialogDescription>
+                                <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
+                                <DialogDescription>The ultimate platform where skill meets investment.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-[60vh] p-4">
                                 <div className="space-y-6">
@@ -135,12 +103,12 @@ export default function LandingLayout({
                                     <div key={section.title}>
                                         <h3 className="font-semibold text-lg flex items-center gap-3 mb-2 text-primary">
                                             <section.icon className="w-5 h-5"/>
-                                            {t(section.title)}
+                                            {section.title}
                                         </h3>
-                                        <p className="text-sm text-muted-foreground">{t(section.content)}</p>
+                                        <p className="text-sm text-muted-foreground">{section.content}</p>
                                         {section.link && (
                                             <Link href={section.link} className="text-primary font-semibold hover:underline mt-2 inline-block text-sm">
-                                                {t(section.linkText as string)} &rarr;
+                                                {section.linkText as string} &rarr;
                                             </Link>
                                         )}
                                     </div>
@@ -150,12 +118,12 @@ export default function LandingLayout({
                         </DialogContent>
                     </Dialog>
                      <Dialog>
-                        <DialogTrigger asChild><button className="hover:text-primary">{t('Support')}</button></DialogTrigger>
+                        <DialogTrigger asChild><button className="hover:text-primary">Support</button></DialogTrigger>
                          <DialogContent>
                             <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2"><LifeBuoy/> {t('Contact Support')}</DialogTitle>
+                                <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
                                 <DialogDescription>
-                                    {t('Have an issue? Reach out to us through any of the channels below.')}
+                                    Have an issue? Reach out to us through any of the channels below.
                                 </DialogDescription>
                             </DialogHeader>
                              <div className="space-y-4 py-4">
@@ -175,20 +143,20 @@ export default function LandingLayout({
                         </DialogContent>
                     </Dialog>
                      <Dialog>
-                        <DialogTrigger asChild><button className="hover:text-primary">{t('Join Marketing Team')}</button></DialogTrigger>
+                        <DialogTrigger asChild><button className="hover:text-primary">Join Marketing Team</button></DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2"><Trophy/> {t('Join the Marketing Team')}</DialogTitle>
+                                <DialogTitle className="flex items-center gap-2"><Trophy/> Join the Marketing Team</DialogTitle>
                                 <DialogDescription>
-                                    {t('Supercharge your earnings by joining our official Marketing Partner program.')}
+                                    Supercharge your earnings by joining our official Marketing Partner program.
                                 </DialogDescription>
                             </DialogHeader>
                             <Card className="bg-primary/5 border-primary/20 mt-4">
                                 <CardContent className="p-6 text-sm space-y-4">
-                                    <p>{t('Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.')}</p>
-                                    <p className="text-muted-foreground">{t('If you are a community builder with a vision for growth, we want you on our team. Apply now to get started.')}</p>
+                                    <p>Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.</p>
+                                    <p className="text-muted-foreground">If you are a community builder with a vision for growth, we want you on our team. Apply now to get started.</p>
                                      <Button asChild className="w-full">
-                                        <Link href="/marketing/register">{t('Apply to be a Marketer')}</Link>
+                                        <Link href="/marketing/register">Apply to be a Marketer</Link>
                                     </Button>
                                 </CardContent>
                             </Card>
@@ -196,12 +164,11 @@ export default function LandingLayout({
                     </Dialog>
                 </nav>
                 <div className="flex items-center gap-2">
-                     <LanguageSwitcher />
                      <Button variant="outline" asChild>
-                        <Link href="/login">{t('Sign In')}</Link>
+                        <Link href="/login">Sign In</Link>
                     </Button>
                     <Button asChild>
-                        <Link href="/register">{t('Sign Up')}</Link>
+                        <Link href="/register">Sign Up</Link>
                     </Button>
                      <Sheet>
                         <SheetTrigger asChild>
@@ -213,11 +180,11 @@ export default function LandingLayout({
                         <SheetContent side="left">
                              <nav className="grid gap-6 text-lg font-medium mt-12">
                                 <Dialog>
-                                    <DialogTrigger asChild><button className="hover:text-primary text-left">{t('About Us')}</button></DialogTrigger>
+                                    <DialogTrigger asChild><button className="hover:text-primary text-left">About Us</button></DialogTrigger>
                                      <DialogContent className="max-w-2xl">
                                         <DialogHeader>
-                                            <DialogTitle className="flex items-center gap-2"><Info/> {t('About Nexbattle')}</DialogTitle>
-                                            <DialogDescription>{t('The ultimate platform where skill meets investment.')}</DialogDescription>
+                                            <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
+                                            <DialogDescription>The ultimate platform where skill meets investment.</DialogDescription>
                                         </DialogHeader>
                                         <ScrollArea className="h-[60vh] p-4">
                                             <div className="space-y-6">
@@ -225,12 +192,12 @@ export default function LandingLayout({
                                                 <div key={section.title}>
                                                     <h3 className="font-semibold text-lg flex items-center gap-3 mb-2 text-primary">
                                                         <section.icon className="w-5 h-5"/>
-                                                        {t(section.title)}
+                                                        {section.title}
                                                     </h3>
-                                                    <p className="text-sm text-muted-foreground">{t(section.content)}</p>
+                                                    <p className="text-sm text-muted-foreground">{section.content}</p>
                                                     {section.link && (
                                                         <Link href={section.link} className="text-primary font-semibold hover:underline mt-2 inline-block text-sm">
-                                                            {t(section.linkText as string)} &rarr;
+                                                            {section.linkText as string} &rarr;
                                                         </Link>
                                                     )}
                                                 </div>
@@ -240,12 +207,12 @@ export default function LandingLayout({
                                     </DialogContent>
                                 </Dialog>
                                 <Dialog>
-                                    <DialogTrigger asChild><button className="hover:text-primary text-left">{t('Support')}</button></DialogTrigger>
+                                    <DialogTrigger asChild><button className="hover:text-primary text-left">Support</button></DialogTrigger>
                                      <DialogContent>
                                         <DialogHeader>
-                                            <DialogTitle className="flex items-center gap-2"><LifeBuoy/> {t('Contact Support')}</DialogTitle>
+                                            <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
                                             <DialogDescription>
-                                                {t('Have an issue? Reach out to us through any of the channels below.')}
+                                                Have an issue? Reach out to us through any of the channels below.
                                             </DialogDescription>
                                         </DialogHeader>
                                         <div className="space-y-4 py-4">
@@ -265,20 +232,20 @@ export default function LandingLayout({
                                     </DialogContent>
                                 </Dialog>
                                 <Dialog>
-                                    <DialogTrigger asChild><button className="hover:text-primary text-left">{t('Join Marketing Team')}</button></DialogTrigger>
+                                    <DialogTrigger asChild><button className="hover:text-primary text-left">Join Marketing Team</button></DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>
-                                            <DialogTitle className="flex items-center gap-2"><Trophy/> {t('Join the Marketing Team')}</DialogTitle>
+                                            <DialogTitle className="flex items-center gap-2"><Trophy/> Join the Marketing Team</DialogTitle>
                                             <DialogDescription>
-                                                {t('Supercharge your earnings by joining our official Marketing Partner program.')}
+                                                Supercharge your earnings by joining our official Marketing Partner program.
                                             </DialogDescription>
                                         </DialogHeader>
                                         <Card className="bg-primary/5 border-primary/20 mt-4">
                                             <CardContent className="p-6 text-sm space-y-4">
-                                                <p>{t('Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.')}</p>
-                                                <p className="text-muted-foreground">{t('If you are a community builder with a vision for growth, we want you on our team. Apply now to get started.')}</p>
+                                                <p>Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.</p>
+                                                <p className="text-muted-foreground">If you are a community builder with a vision for growth, we want you on our team. Apply now to get started.</p>
                                                  <Button asChild className="w-full">
-                                                    <Link href="/marketing/register">{t('Apply to be a Marketer')}</Link>
+                                                    <Link href="/marketing/register">Apply to be a Marketer</Link>
                                                 </Button>
                                             </CardContent>
                                         </Card>
@@ -295,3 +262,5 @@ export default function LandingLayout({
         </div>
     );
   }
+
+    

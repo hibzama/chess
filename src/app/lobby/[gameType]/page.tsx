@@ -15,7 +15,6 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import PublicGames from '@/components/lobby/public-games';
 import { useAuth } from '@/context/auth-context';
-import { useTranslation } from '@/hooks/use-translation';
 
 export default function GameLobbyPage() {
     const params = useParams();
@@ -23,7 +22,6 @@ export default function GameLobbyPage() {
     const { toast } = useToast();
     const { gameType } = params;
     const { currencyConfig } = useAuth();
-    const t = useTranslation;
     const gameName = typeof gameType === 'string' ? gameType.charAt(0).toUpperCase() + gameType.slice(1) : 'Game';
 
     const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
@@ -33,7 +31,7 @@ export default function GameLobbyPage() {
 
     const handleFindAndJoinRoom = async () => {
         if (!roomIdToJoin.trim()) {
-            toast({ variant: 'destructive', title: t('Error'), description: t('Please enter a Room ID.') });
+            toast({ variant: 'destructive', title: 'Error', description: 'Please enter a Room ID.' });
             return;
         }
         setIsFindingRoom(true);
@@ -44,11 +42,11 @@ export default function GameLobbyPage() {
             if (roomSnap.exists() && roomSnap.data().status === 'waiting') {
                 router.push(`/game/multiplayer/${roomSnap.id}`);
             } else {
-                toast({ variant: 'destructive', title: t('Room Not Found'), description: t('Could not find an open game with that ID. Please check the ID and try again.') });
+                toast({ variant: 'destructive', title: 'Room Not Found', description: 'Could not find an open game with that ID. Please check the ID and try again.' });
             }
 
         } catch (error) {
-             toast({ variant: 'destructive', title: t('Error'), description: t('An error occurred while trying to find the room.') });
+             toast({ variant: 'destructive', title: 'Error', description: 'An error occurred while trying to find the room.' });
         } finally {
             setIsFindingRoom(false);
             setIsJoinDialogOpen(false);
@@ -83,13 +81,13 @@ export default function GameLobbyPage() {
              <div className="w-full max-w-5xl mb-8">
                 <Link href="/lobby" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                     <ArrowLeft className="w-4 h-4" />
-                    <span>{t('Back to Game Selection')}</span>
+                    <span>Back to Game Selection</span>
                 </Link>
             </div>
 
             <div className="text-center mb-12">
-                <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">{t(gameName)} {t('Lobby')}</h1>
-                <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">{t('Ready your strategy. The next battle awaits.')}</p>
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">{gameName} Lobby</h1>
+                <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">Ready your strategy. The next battle awaits.</p>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
@@ -99,13 +97,13 @@ export default function GameLobbyPage() {
                              <div className="p-3 bg-primary/10 rounded-full mb-4">
                                 <option.icon className="w-8 h-8 text-primary" />
                             </div>
-                            <CardTitle>{t(option.title)}</CardTitle>
+                            <CardTitle>{option.title}</CardTitle>
                         </CardHeader>
                         <CardContent className="flex-grow">
-                             <CardDescription>{t(option.description)}</CardDescription>
+                             <CardDescription>{option.description}</CardDescription>
                         </CardContent>
                         <div className="p-6 pt-0">
-                            <Button className="w-full" onClick={option.action}>{t('Select')}</Button>
+                            <Button className="w-full" onClick={option.action}>Select</Button>
                         </div>
                     </Card>
                 ))}
@@ -119,27 +117,29 @@ export default function GameLobbyPage() {
         <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{t('Join a Private Room')}</DialogTitle>
+                    <DialogTitle>Join a Private Room</DialogTitle>
                     <DialogDescription>
-                        {t('Enter the Room ID you received from your friend to join their game.')}
+                        Enter the Room ID you received from your friend to join their game.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="room-id">{t('Room ID')}</Label>
+                        <Label htmlFor="room-id">Room ID</Label>
                         <Input 
                             id="room-id" 
                             value={roomIdToJoin} 
                             onChange={(e) => setRoomIdToJoin(e.target.value)} 
-                            placeholder={t('Paste Room ID here')}
+                            placeholder="Paste Room ID here"
                         />
                     </div>
                 </div>
                 <Button onClick={handleFindAndJoinRoom} disabled={isFindingRoom}>
-                    {isFindingRoom ? <><Loader2 className="animate-spin mr-2"/> {t('Finding...')}</> : t('Find & Join Game')}
+                    {isFindingRoom ? <><Loader2 className="animate-spin mr-2"/> Finding...</> : 'Find & Join Game'}
                 </Button>
             </DialogContent>
         </Dialog>
         </>
     );
 }
+
+    
