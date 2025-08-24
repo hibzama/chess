@@ -27,6 +27,8 @@ interface Theme {
         apkUrl?: string;
         features?: string[];
         landingSections?: LandingSection[];
+        playingNow?: string;
+        gamesToday?: string;
     };
     aboutContent: string;
     supportDetails: {
@@ -61,6 +63,8 @@ const defaultThemeData: Theme = {
             "Marketing Support"
         ],
         landingSections: [],
+        playingNow: '0',
+        gamesToday: '0',
     },
     aboutContent: `## Our Mission\nNexbattle is the ultimate online arena where strategy, skill, and stakes collide. We provide a secure and engaging platform for Chess and Checkers enthusiasts to compete for real rewards, fostering a global community of strategic thinkers.\n\n## Multiplayer Rules & Payouts\nIn Multiplayer Mode, your wager is your investment. A standard win earns you a 180% return. A draw results in a 90% refund. If you resign, you get a 75% refund, while your opponent gets a 105% payout.`,
     supportDetails: {
@@ -93,6 +97,8 @@ const initializeThemes = async () => {
                 heroImageUrl: 'https://i.postimg.cc/d3F9zdbb/index-illustration-9d2cb1c3-2x.png',
                 heroTitle: 'Play chess.\nImprove your game.\nHave fun!',
                 heroSubtitle: '', // Not used
+                playingNow: '168,623',
+                gamesToday: '19,057,572',
                 landingSections: [
                     { title: "Play vs customizable training bots from total beginner to master.", buttonText: "Play vs Computer", image: "https://placehold.co/400x250.png", aiHint: "chess computer" },
                     { title: "Play online with over 100 million members from around the world.", buttonText: "Play Online", image: "https://placehold.co/400x250.png", aiHint: "chess world" },

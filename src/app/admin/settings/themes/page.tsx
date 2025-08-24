@@ -1,4 +1,3 @@
-
 'use client'
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
@@ -39,6 +38,8 @@ interface Theme {
         apkUrl?: string;
         features?: string[];
         landingSections?: LandingSection[];
+        playingNow?: string;
+        gamesToday?: string;
     };
     aboutContent: string;
     supportDetails: {
@@ -181,6 +182,8 @@ export default function ThemeSettingsPage() {
                  apkUrl: '#',
                 features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4'],
                 landingSections: [],
+                playingNow: '0',
+                gamesToday: '0',
             },
             aboutContent: 'About content for the new theme.',
             supportDetails: {
@@ -292,6 +295,17 @@ export default function ThemeSettingsPage() {
                             <CardContent className="space-y-4">
                                 {editingTheme.id === 'chess_king' ? (
                                     <>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label>Playing Now Count</Label>
+                                                <Input value={editingTheme.landingPage.playingNow || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'playingNow', e.target.value)} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Games Today Count</Label>
+                                                <Input value={editingTheme.landingPage.gamesToday || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'gamesToday', e.target.value)} />
+                                            </div>
+                                        </div>
+                                        <Separator />
                                         <div className="space-y-2">
                                             <Label>Banner Image URL (Illustration)</Label>
                                             <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />

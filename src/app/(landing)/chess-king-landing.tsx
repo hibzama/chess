@@ -68,7 +68,9 @@ export default function ChessKingLanding() {
         return <Skeleton className="h-screen w-full" />;
     }
     
-    const { heroTitle, heroImageUrl, landingSections = [], aboutContent, supportDetails, marketingContent } = theme;
+    const { heroTitle, heroImageUrl, landingPage, landingSections = [], aboutContent, supportDetails, marketingContent } = theme;
+    const { playingNow, gamesToday } = landingPage;
+
 
      const aboutSections = aboutContent.split('## ').slice(1).map(section => {
         const [title, ...contentParts] = section.split('\n');
@@ -163,10 +165,17 @@ export default function ChessKingLanding() {
             </aside>
 
             {/* Scrollable Main Content */}
-            <main className="flex-1 overflow-y-auto">
-                <div className="h-96 flex items-center justify-center p-4">
+            <main className="flex-1 overflow-y-auto flex flex-col">
+                <header className="py-4 px-8 text-center">
+                     <div className="flex justify-center items-center gap-8 text-sm">
+                        <p><span className="font-bold">{playingNow}</span> PLAYING NOW</p>
+                        <p><span className="font-bold">{gamesToday}</span> GAMES TODAY</p>
+                    </div>
+                </header>
+
+                <div className="flex-1 flex items-center justify-center p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-8 container mx-auto">
-                        <div className="relative w-full h-full min-h-[300px]">
+                        <div className="relative w-full h-full min-h-[300px] md:min-h-[400px]">
                            {heroImageUrl && <Image src={heroImageUrl} alt="Chess pieces" fill className="object-contain" data-ai-hint="chess pieces illustration" />}
                         </div>
                         <div className="text-center md:text-left">
@@ -178,7 +187,7 @@ export default function ChessKingLanding() {
                     </div>
                 </div>
 
-                <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12">
+                <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12 bg-[#262421]/50">
                     {landingSections.map((section, index) => (
                         <div key={index} className="text-center">
                             <div className="relative aspect-video mb-4 rounded-md overflow-hidden">
