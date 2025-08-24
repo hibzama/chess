@@ -57,18 +57,17 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 const LanguageSwitcher = () => {
     const { languages, currentLang, changeLanguage, loading } = useTranslationSystem();
-    const t = useTranslation;
+    const currentLanguageName = languages.find(l => l.code === currentLang)?.name || 'Language';
+    const translatedLanguageName = useTranslation(currentLanguageName);
 
     if (loading || languages.length <= 1) return null;
-
-    const currentLanguageName = languages.find(l => l.code === currentLang)?.name || 'Language';
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                     <Languages className="w-4 h-4" />
-                    <span className="hidden md:inline">{t(currentLanguageName)}</span>
+                    <span className="hidden md:inline">{translatedLanguageName}</span>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -104,7 +103,8 @@ const NotificationBell = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const router = useRouter();
     const [isMounted, setIsMounted] = useState(false);
-    const t = useTranslation;
+    const notificationsLabel = useTranslation('Notifications');
+    const noNotificationsLabel = useTranslation('No new notifications');
 
     useEffect(() => {
         setIsMounted(true);
@@ -133,9 +133,6 @@ const NotificationBell = () => {
             router.push(notification.href);
         }
     }
-
-    const notificationsLabel = useTranslation('Notifications');
-    const noNotificationsLabel = useTranslation('No new notifications');
 
     return (
         <DropdownMenu>
@@ -350,5 +347,3 @@ export default function MainLayout({
         </Dialog>
     )
   }
-
-    
