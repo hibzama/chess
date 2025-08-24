@@ -84,6 +84,13 @@ export default function ChessKingLanding() {
         };
         return { title, content, icon: icons[title.trim()] || Info };
     });
+    
+    const getLinkForSection = (buttonText: string) => {
+        if (buttonText.toLowerCase().includes('computer')) {
+            return '/practice';
+        }
+        return '/register';
+    }
 
     return (
         <div className="flex h-screen bg-[#302e2c] text-white">
@@ -191,11 +198,11 @@ export default function ChessKingLanding() {
                     {landingSections.map((section, index) => (
                         <div key={index} className="text-center">
                             <div className="relative aspect-video mb-4 rounded-md overflow-hidden">
-                                <Image src={section.image || 'https://placehold.co/400x250.png'} alt={section.title} fill className="object-cover" data-ai-hint={section.aiHint} />
+                                <Image src={section.image || 'https://placehold.co/400x250.png'} alt={section.title} fill className="object-cover" data-ai-hint={section.aiHint || 'abstract'} />
                             </div>
                             <h2 className="text-xl font-semibold text-gray-200">{section.title}</h2>
                             <Button asChild variant="link" className="text-primary text-lg mt-2">
-                                <Link href="/register">{section.buttonText}</Link>
+                                <Link href={getLinkForSection(section.buttonText)}>{section.buttonText}</Link>
                             </Button>
                         </div>
                     ))}

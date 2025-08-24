@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -10,7 +9,7 @@ import { useAuth } from '@/context/auth-context';
 
 export default function PracticeArenaPage() {
     const router = useRouter();
-    const { gameAvailability } = useAuth();
+    const { gameAvailability, user } = useAuth();
 
     const handleStartGame = (game: 'chess' | 'checkers' | 'omi') => {
         if(game === 'chess' || game === 'checkers') {
@@ -47,9 +46,9 @@ export default function PracticeArenaPage() {
     return (
         <div className="flex flex-col items-center w-full p-4 min-h-screen">
             <div className="w-full max-w-5xl mb-8">
-                <Link href="/dashboard" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                 <Link href={user ? "/dashboard" : "/"} className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                     <ArrowLeft className="w-4 h-4" />
-                    <span>Back to Dashboard</span>
+                    <span>Back to {user ? 'Dashboard' : 'Home'}</span>
                 </Link>
             </div>
 
