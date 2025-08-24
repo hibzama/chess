@@ -36,6 +36,7 @@ interface Theme {
         heroImageUrl: string;
         heroTitle: string;
         heroSubtitle: string;
+        heroTitleAlign?: 'left' | 'center' | 'right';
         apkUrl?: string;
         features?: string[];
         landingSections?: LandingSection[];
@@ -297,6 +298,17 @@ export default function ThemeSettingsPage() {
                                         <Separator />
                                         <div className="space-y-2"><Label>Banner Image URL</Label><Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} /></div>
                                         <div className="space-y-2"><Label>Banner Title (use `\n` for new lines)</Label><Textarea value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} /></div>
+                                        <div className="space-y-2">
+                                            <Label>Banner Title Alignment</Label>
+                                            <Select value={editingTheme.landingPage.heroTitleAlign || 'left'} onValueChange={(v) => handleUpdateNestedThemeValue('landingPage', 'heroTitleAlign', v)}>
+                                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="left">Left</SelectItem>
+                                                    <SelectItem value="center">Center</SelectItem>
+                                                    <SelectItem value="right">Right</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
                                         
                                         <div className="space-y-4 border-t pt-4">
                                             <h3 className="text-lg font-semibold">Feature Sections</h3>

@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslationSystem } from "@/context/translation-context";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import React from "react";
+import { cn } from "@/lib/utils";
 
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -70,7 +71,7 @@ export default function ChessKingLanding() {
     }
     
     const { landingPage, aboutContent, supportDetails, marketingContent } = theme;
-    const { heroTitle, heroImageUrl, landingSections = [], playingNow, gamesToday } = landingPage || {};
+    const { heroTitle, heroImageUrl, landingSections = [], playingNow, gamesToday, heroTitleAlign } = landingPage || {};
 
 
      const aboutSections = (aboutContent || '').split('## ').slice(1).map(section => {
@@ -92,6 +93,12 @@ export default function ChessKingLanding() {
         }
         return '/register';
     }
+
+    const textAlignClass = {
+        left: 'text-left',
+        center: 'text-center',
+        right: 'text-right',
+    }[heroTitleAlign || 'left'];
 
     return (
         <div className="flex h-screen bg-[#302e2c] text-white">
@@ -188,7 +195,7 @@ export default function ChessKingLanding() {
                         <div className="relative w-full h-full min-h-[300px] md:min-h-[400px]">
                            {heroImageUrl && <Image src={heroImageUrl} alt="Chess pieces" fill className="object-contain" data-ai-hint="chess pieces illustration" />}
                         </div>
-                        <div className="text-center md:text-left">
+                        <div className={cn("md:text-left", textAlignClass)}>
                             <h1 className="text-4xl md:text-5xl font-bold leading-tight whitespace-pre-line">{heroTitle}</h1>
                             <Button asChild size="lg" className="mt-6">
                                 <Link href="/register">Get Started</Link>

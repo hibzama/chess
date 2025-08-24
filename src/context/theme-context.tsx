@@ -25,6 +25,7 @@ interface Theme {
         heroImageUrl: string;
         heroTitle: string;
         heroSubtitle: string;
+        heroTitleAlign?: 'left' | 'center' | 'right';
         apkUrl?: string;
         features?: string[];
         landingSections?: LandingSection[];
@@ -97,6 +98,7 @@ const initializeThemes = async () => {
                 bgImageUrl: '', // Not used in the same way
                 heroImageUrl: 'https://i.postimg.cc/d3F9zdbb/index-illustration-9d2cb1c3-2x.png',
                 heroTitle: 'Play chess.\nImprove your game.\nHave fun!',
+                heroTitleAlign: 'left',
                 heroSubtitle: '', // Not used
                 playingNow: '168,623',
                 gamesToday: '19,057,572',
