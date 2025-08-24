@@ -22,7 +22,6 @@ function ThemedLayout({ children }: { children: React.ReactNode }) {
             root.style.setProperty('--primary', theme.colors.primary);
             root.style.setProperty('--background', theme.colors.background);
             root.style.setProperty('--accent', theme.colors.accent);
-            // You can add more CSS variables here if needed
         }
     }, [theme, loading]);
     

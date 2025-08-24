@@ -84,7 +84,7 @@ export default function ChessKingLanding() {
     });
 
     return (
-        <div className="flex h-screen bg-background text-white">
+        <div className="flex h-screen bg-[#302e2c] text-white">
             {/* Fixed Sidebar */}
             <aside className="w-64 bg-[#262421] p-4 flex-col justify-between hidden md:flex">
                 <div>
@@ -153,7 +153,7 @@ export default function ChessKingLanding() {
                 </div>
                  <div>
                     <div className="space-y-2">
-                        <Button asChild className="w-full bg-green-600 hover:bg-green-700"><Link href="/register">Sign Up</Link></Button>
+                        <Button asChild className="w-full"><Link href="/register">Sign Up</Link></Button>
                         <Button asChild variant="secondary" className="w-full"><Link href="/login">Log In</Link></Button>
                     </div>
                     <div className="mt-4 border-t border-gray-700 pt-4">
@@ -164,28 +164,28 @@ export default function ChessKingLanding() {
 
             {/* Scrollable Main Content */}
             <main className="flex-1 overflow-y-auto">
-                <div className="h-96 flex items-center justify-center p-4 bg-[#302e2c]">
+                <div className="h-96 flex items-center justify-center p-4">
                      <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-8 container mx-auto">
                         <div className="relative w-full h-48">
                            {heroImageUrl && <Image src={heroImageUrl} alt="Chess pieces" fill className="object-contain" data-ai-hint="chess pieces illustration" />}
                         </div>
                         <div className="text-center md:text-left">
                             <h1 className="text-4xl md:text-5xl font-bold leading-tight whitespace-pre-line">{heroTitle}</h1>
-                            <Button asChild size="lg" className="mt-6 bg-green-600 hover:bg-green-700">
+                            <Button asChild size="lg" className="mt-6">
                                 <Link href="/register">Get Started</Link>
                             </Button>
                         </div>
                     </div>
                 </div>
 
-                <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12 bg-[#302e2c]">
+                <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12">
                     {landingSections.map((section, index) => (
                         <div key={index} className="text-center">
                             <div className="relative aspect-video mb-4 rounded-md overflow-hidden">
                                 <Image src={section.image || 'https://placehold.co/400x250.png'} alt={section.title} fill className="object-cover" data-ai-hint={section.aiHint} />
                             </div>
                             <h2 className="text-xl font-semibold text-gray-200">{section.title}</h2>
-                            <Button asChild variant="link" className="text-green-500 text-lg mt-2">
+                            <Button asChild variant="link" className="text-primary text-lg mt-2">
                                 <Link href="/register">{section.buttonText}</Link>
                             </Button>
                         </div>

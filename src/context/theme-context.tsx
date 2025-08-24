@@ -99,9 +99,9 @@ const initializeThemes = async () => {
                 ]
             },
             colors: {
-                primary: '45 100% 50%',
-                background: '240 10% 3.9%',
-                accent: '45 100% 50%',
+                primary: '95 38% 54%',
+                background: '30 3% 18%',
+                accent: '95 38% 54%',
             },
         }
     };
