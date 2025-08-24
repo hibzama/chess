@@ -196,7 +196,7 @@ export default function ChessKingLanding() {
                         <div className="relative w-full h-full min-h-[300px] md:min-h-[400px]">
                            {heroImageUrl && <Image src={heroImageUrl} alt="Chess pieces" fill className="object-contain" data-ai-hint="chess pieces illustration" />}
                         </div>
-                        <div className={cn("md:text-left", textAlignClass)}>
+                        <div className={cn(textAlignClass)}>
                             <h1 className="text-4xl md:text-5xl font-bold leading-tight whitespace-pre-line">{heroTitle}</h1>
                             <Button asChild size="lg" className="mt-6">
                                 <Link href="/register">Get Started</Link>
