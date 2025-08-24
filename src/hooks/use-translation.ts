@@ -23,7 +23,6 @@ export function useTranslation(text: string | null | undefined): string {
         }
 
         try {
-            setTranslatedText('...'); // Loading indicator
             const result = await translateText({ text, targetLang: currentLang });
             translationsCache[cacheKey] = result;
             setTranslatedText(result);
@@ -36,6 +35,6 @@ export function useTranslation(text: string | null | undefined): string {
     useEffect(() => {
         translate();
     }, [translate]);
-
+    
     return translatedText;
 }

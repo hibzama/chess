@@ -16,7 +16,11 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
 
 
-const T = ({ children }: { children: string }) => <>{useTranslation(children)}</>;
+const T = ({ children }: { children: string }) => {
+    const translatedText = useTranslation(children);
+    const { textDirection } = useTranslationSystem();
+    return <span dir={textDirection}>{translatedText}</span>;
+};
 
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (

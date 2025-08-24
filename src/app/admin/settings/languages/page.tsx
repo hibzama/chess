@@ -16,11 +16,13 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 
+export type LanguageDirection = 'ltr' | 'rtl-full' | 'rtl-text';
+
 export interface Language {
     id: string;
     code: string;
     name: string;
-    direction: 'ltr' | 'rtl';
+    direction: LanguageDirection;
 }
 
 export default function LanguageSettingsPage() {
@@ -29,7 +31,7 @@ export default function LanguageSettingsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newLangCode, setNewLangCode] = useState('');
     const [newLangName, setNewLangName] = useState('');
-    const [newLangDirection, setNewLangDirection] = useState<'ltr' | 'rtl'>('ltr');
+    const [newLangDirection, setNewLangDirection] = useState<LanguageDirection>('ltr');
     const { toast } = useToast();
 
     const fetchLanguages = async () => {
@@ -81,6 +83,14 @@ export default function LanguageSettingsPage() {
         }
     };
 
+    const getDirectionLabel = (direction: LanguageDirection) => {
+        switch (direction) {
+            case 'rtl-full': return 'RTL (Full)';
+            case 'rtl-text': return 'RTL (Text)';
+            default: return 'LTR';
+        }
+    }
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-1 space-y-4">
@@ -101,13 +111,14 @@ export default function LanguageSettingsPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="lang-direction">Text Direction</Label>
-                                <Select value={newLangDirection} onValueChange={(value: 'ltr' | 'rtl') => setNewLangDirection(value)}>
+                                <Select value={newLangDirection} onValueChange={(value: LanguageDirection) => setNewLangDirection(value)}>
                                     <SelectTrigger id="lang-direction">
                                         <SelectValue placeholder="Select direction" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="ltr">Left-to-Right (LTR)</SelectItem>
-                                        <SelectItem value="rtl">Right-to-Left (RTL)</SelectItem>
+                                        <SelectItem value="rtl-full">Right-to-Left (Full Layout)</SelectItem>
+                                        <SelectItem value="rtl-text">Right-to-Left (Text Only)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -160,7 +171,7 @@ export default function LanguageSettingsPage() {
                                         <TableRow key={lang.id}>
                                             <TableCell className="font-medium">{lang.name}</TableCell>
                                             <TableCell>{lang.code}</TableCell>
-                                            <TableCell><Badge variant="secondary">{lang.direction?.toUpperCase() || 'LTR'}</Badge></TableCell>
+                                            <TableCell><Badge variant="secondary">{getDirectionLabel(lang.direction)}</Badge></TableCell>
                                             <TableCell className="text-right">
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>

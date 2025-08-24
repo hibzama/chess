@@ -12,8 +12,13 @@ import { useTheme } from '@/context/theme-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import ChessKingLanding from './chess-king-landing';
 import { useTranslation } from '@/hooks/use-translation';
+import { useTranslationSystem } from '@/context/translation-context';
 
-const T = ({ children }: { children: string }) => <>{useTranslation(children)}</>;
+const T = ({ children }: { children: string }) => {
+    const translatedText = useTranslation(children);
+    const { textDirection } = useTranslationSystem();
+    return <span dir={textDirection}>{translatedText}</span>;
+};
 
 const DefaultLanding = ({ theme }) => {
     if (!theme) return null;

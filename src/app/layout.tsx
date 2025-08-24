@@ -16,7 +16,7 @@ const fontSans = FontSans({
 
 function ThemedLayout({ children }: { children: React.ReactNode }) {
     const { theme, loading: themeLoading } = useTheme();
-    const { currentDirection, loading: langLoading } = useTranslationSystem();
+    const { layoutDirection, loading: langLoading } = useTranslationSystem();
 
     useEffect(() => {
         if (!themeLoading && theme?.colors) {
@@ -29,9 +29,9 @@ function ThemedLayout({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (!langLoading) {
-            document.documentElement.dir = currentDirection;
+            document.documentElement.dir = layoutDirection;
         }
-    }, [currentDirection, langLoading]);
+    }, [layoutDirection, langLoading]);
     
     return (
         <html lang="en" className="dark" suppressHydrationWarning>
