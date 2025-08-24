@@ -98,7 +98,9 @@ export default function ChessKingLanding() {
             {/* Fixed Sidebar */}
             <aside className="w-64 bg-[#262421] p-4 flex-col justify-between hidden md:flex">
                 <div>
-                    <ChessKingLogo />
+                    <div className="mb-4">
+                        <ChessKingLogo />
+                    </div>
                     <nav className="mt-8 space-y-2">
                          <Dialog>
                             <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Info/> About Us</Button></DialogTrigger>
