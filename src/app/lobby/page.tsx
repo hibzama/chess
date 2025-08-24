@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ArrowLeft, BrainCircuit, Layers, DollarSign, Users, MessageSquare } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/context/auth-context';
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -18,6 +19,7 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export default function EarningHomePage() {
     const router = useRouter();
+    const { gameAvailability } = useAuth();
 
     const handleStartEarning = (game: 'chess' | 'checkers') => {
         router.push(`/lobby/${game}`);
@@ -29,14 +31,16 @@ export default function EarningHomePage() {
             description: 'The classic game of kings. Outwit your opponent to claim victory and rewards.',
             icon: <BrainCircuit className="w-12 h-12 text-primary" />,
             action: () => handleStartEarning('chess'),
+            enabled: gameAvailability.multiplayerChess,
         },
         {
             name: 'Checkers',
             description: 'A fast-paced game of jumps and strategy. Capture all pieces to win.',
             icon: <Layers className="w-12 h-12 text-primary" />,
             action: () => handleStartEarning('checkers'),
+            enabled: gameAvailability.multiplayerCheckers,
         }
-    ]
+    ].filter(option => option.enabled);
 
     return (
         <Dialog>
@@ -54,7 +58,7 @@ export default function EarningHomePage() {
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
-                    {earningOptions.map((option) => (
+                    {earningOptions.length > 0 ? earningOptions.map((option) => (
                          <Card key={option.name} className="bg-card/50 hover:border-primary/50 transition-all flex flex-col">
                             <CardHeader className="items-center text-center">
                                 <div className="p-3 bg-primary/10 rounded-full mb-4">
@@ -72,7 +76,12 @@ export default function EarningHomePage() {
                                 <Button className="w-full" onClick={option.action}>Start Earning</Button>
                             </CardFooter>
                         </Card>
-                    ))}
+                    )) : (
+                        <Card className="md:col-span-2 text-center p-8 bg-card/50">
+                            <CardTitle>Multiplayer is Currently Disabled</CardTitle>
+                            <CardDescription>The admin has temporarily disabled multiplayer games. Please check back later.</CardDescription>
+                        </Card>
+                    )}
                 </div>
 
                 <Card className="w-full max-w-4xl mt-8 bg-card/50">
@@ -168,5 +177,3 @@ export default function EarningHomePage() {
         </Dialog>
     );
 }
-
-    

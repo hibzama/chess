@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Bot, BrainCircuit, Layers, Spade } from 'lucide-react';
+import { useAuth } from '@/context/auth-context';
 
 export default function PracticeArenaPage() {
     const router = useRouter();
+    const { gameAvailability } = useAuth();
 
     const handleStartGame = (game: 'chess' | 'checkers' | 'omi') => {
         if(game === 'chess' || game === 'checkers') {
@@ -24,20 +26,23 @@ export default function PracticeArenaPage() {
             description: 'The classic game of strategy.',
             icon: <BrainCircuit className="w-12 h-12 text-primary" />,
             action: () => handleStartGame('chess'),
+            enabled: gameAvailability.practiceChess,
         },
         {
             name: 'Practice Checkers',
             description: 'A fun, strategic game of jumps.',
             icon: <Layers className="w-12 h-12 text-primary" />,
             action: () => handleStartGame('checkers'),
+            enabled: gameAvailability.practiceCheckers,
         },
         {
             name: 'Practice Omi',
             description: 'The classic Sri Lankan card game.',
             icon: <Spade className="w-12 h-12 text-primary" />,
             action: () => handleStartGame('omi'),
+            enabled: gameAvailability.practiceOmi,
         }
-    ]
+    ].filter(option => option.enabled);
 
     return (
         <div className="flex flex-col items-center w-full p-4 min-h-screen">
@@ -59,7 +64,7 @@ export default function PracticeArenaPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
-                {practiceOptions.map((option) => (
+                {practiceOptions.length > 0 ? practiceOptions.map((option) => (
                      <Card key={option.name} className="bg-card/50 hover:border-primary/50 transition-all flex flex-col">
                         <CardHeader className="items-center text-center">
                             <div className="p-3 bg-primary/10 rounded-full mb-4">
@@ -72,7 +77,12 @@ export default function PracticeArenaPage() {
                             <Button className="w-full" onClick={option.action}>Start Practice</Button>
                         </CardFooter>
                     </Card>
-                ))}
+                )) : (
+                     <Card className="md:col-span-3 text-center p-8 bg-card/50">
+                        <CardTitle>Practice Mode is Currently Disabled</CardTitle>
+                        <CardDescription>The admin has temporarily disabled practice games. Please check back later.</CardDescription>
+                    </Card>
+                )}
             </div>
         </div>
     );

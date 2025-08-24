@@ -12,10 +12,19 @@ interface CurrencyConfig {
     usdtRate: number;
 }
 
+export interface GameAvailability {
+    practiceChess: boolean;
+    multiplayerChess: boolean;
+    practiceCheckers: boolean;
+    multiplayerCheckers: boolean;
+    practiceOmi: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   userData: UserData | null;
   currencyConfig: CurrencyConfig;
+  gameAvailability: GameAvailability;
   loading: boolean;
   logout: () => Promise<void>;
   setUserData: React.Dispatch<React.SetStateAction<UserData | null>>;
@@ -71,6 +80,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
   const [currencyConfig, setCurrencyConfig] = useState<CurrencyConfig>({ symbol: 'LKR', usdtRate: 310 });
+  const [gameAvailability, setGameAvailability] = useState<GameAvailability>({
+    practiceChess: true,
+    multiplayerChess: true,
+    practiceCheckers: true,
+    multiplayerCheckers: true,
+    practiceOmi: true,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -89,9 +105,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
     });
 
+    const availabilityRef = doc(db, 'settings', 'gameAvailability');
+    const unsubscribeAvailability = onSnapshot(availabilityRef, (docSnap) => {
+        if (docSnap.exists()) {
+            setGameAvailability(docSnap.data() as GameAvailability);
+        }
+    });
+
     return () => {
         unsubscribeAuth();
         unsubscribeConfig();
+        unsubscribeAvailability();
     };
   }, []);
 
@@ -180,7 +204,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, logout, setUserData, currencyConfig }}>
+    <AuthContext.Provider value={{ user, userData, loading, logout, setUserData, currencyConfig, gameAvailability }}>
       {children}
     </AuthContext.Provider>
   );
