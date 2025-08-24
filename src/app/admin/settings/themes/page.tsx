@@ -20,6 +20,10 @@ interface LandingSection {
     buttonText: string;
     image: string;
     aiHint?: string;
+    overlayText?: string;
+    borderColor?: string;
+    buttonStyle?: 'link' | 'box';
+    buttonTextColor?: string;
 }
 
 interface Theme {
@@ -114,7 +118,7 @@ export default function ThemeSettingsPage() {
         handleUpdateNestedThemeValue('landingPage', 'features', newFeatures);
     }
     
-    const handleUpdateLandingSection = (index: number, field: keyof LandingSection, value: string) => {
+    const handleUpdateLandingSection = (index: number, field: keyof LandingSection, value: any) => {
         if (!editingTheme) return;
         const newSections = [...(editingTheme.landingPage.landingSections || [])];
         newSections[index] = { ...newSections[index], [field]: value };
@@ -123,7 +127,16 @@ export default function ThemeSettingsPage() {
     
     const handleAddLandingSection = () => {
         if (!editingTheme) return;
-        const newSections = [...(editingTheme.landingPage.landingSections || []), { title: 'New Section', buttonText: 'Learn More', image: 'https://placehold.co/400x250.png', aiHint: '' }];
+        const newSections = [...(editingTheme.landingPage.landingSections || []), { 
+            title: 'New Section', 
+            buttonText: 'Learn More', 
+            image: 'https://placehold.co/400x250.png', 
+            aiHint: '',
+            overlayText: 'Overlay Text',
+            borderColor: '#333',
+            buttonStyle: 'link',
+            buttonTextColor: '#FFFFFF'
+        }];
         handleUpdateNestedThemeValue('landingPage', 'landingSections', newSections);
     };
 
@@ -318,8 +331,23 @@ export default function ThemeSettingsPage() {
                                                     <div className="space-y-2">
                                                         <Label>Title</Label><Input value={section.title || ''} onChange={e => handleUpdateLandingSection(index, 'title', e.target.value)} />
                                                         <Label>Image URL</Label><Input value={section.image || ''} onChange={e => handleUpdateLandingSection(index, 'image', e.target.value)} />
-                                                        <Label>Button Text</Label><Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
+                                                        <Label>Overlay Text</Label><Input value={section.overlayText || ''} onChange={e => handleUpdateLandingSection(index, 'overlayText', e.target.value)} />
                                                         <Label>AI Image Hint</Label><Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
+                                                        <Label>Button Text</Label><Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div><Label>Border Color</Label><Input type="color" value={section.borderColor || '#333333'} onChange={e => handleUpdateLandingSection(index, 'borderColor', e.target.value)} /></div>
+                                                            <div><Label>Button Text Color</Label><Input type="color" value={section.buttonTextColor || '#FFFFFF'} onChange={e => handleUpdateLandingSection(index, 'buttonTextColor', e.target.value)} /></div>
+                                                        </div>
+                                                        <div>
+                                                            <Label>Button Style</Label>
+                                                            <Select value={section.buttonStyle || 'link'} onValueChange={(v) => handleUpdateLandingSection(index, 'buttonStyle', v)}>
+                                                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="link">Link</SelectItem>
+                                                                    <SelectItem value="box">Box</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
                                                     </div>
                                                 </Card>
                                             ))}

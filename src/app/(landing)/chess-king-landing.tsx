@@ -207,12 +207,22 @@ export default function ChessKingLanding() {
 
                 <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12 bg-[#262421]/50">
                     {landingSections.map((section, index) => (
-                        <div key={index} className="text-center">
-                            <div className="relative aspect-video mb-4 rounded-md overflow-hidden">
+                        <div key={index} className="text-center p-4 rounded-lg" style={{ borderColor: section.borderColor || 'transparent', borderWidth: 2 }}>
+                            <div className="relative aspect-video mb-4 rounded-md overflow-hidden group">
                                 <Image src={section.image || 'https://placehold.co/400x250.png'} alt={section.title} fill className="object-cover" data-ai-hint={section.aiHint || 'abstract'} />
+                                 {section.overlayText && (
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <p className="text-white text-center font-semibold">{section.overlayText}</p>
+                                    </div>
+                                )}
                             </div>
                             <h2 className="text-xl font-semibold text-gray-200">{section.title}</h2>
-                            <Button asChild variant="link" className="text-primary text-lg mt-2">
+                            <Button 
+                                asChild 
+                                variant={section.buttonStyle === 'box' ? 'outline' : 'link'} 
+                                className="text-lg mt-2"
+                                style={{ color: section.buttonTextColor || '' }}
+                            >
                                 <Link href={getLinkForSection(section.buttonText)}>{section.buttonText}</Link>
                             </Button>
                         </div>
