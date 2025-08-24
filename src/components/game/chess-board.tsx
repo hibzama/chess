@@ -11,7 +11,7 @@ type BoardTheme = { id: string; name: string; colors: string[] };
 type PieceStyle = { id: string; name: string; colors: string[] };
 
 const pieceStyles: PieceStyle[] = [
-    { id: 'red_black', name: 'Red & Black', colors: ['#dc2626', '#18181b'] },
+    { id: 'red_black', name: 'Red & Black', colors: ['#dc2626', '#1818b'] },
     { id: 'orange_gold', name: 'Orange & Gold', colors: ['#f97316', '#ca8a04'] },
     { id: 'pink_royal_blue', name: 'Pink & Royal Blue', colors: ['#ec4899', '#3b82f6'] },
     { id: 'natural_purple', name: 'Natural & Purple', colors: ['#e2e8f0', '#8b5cf6'] },
@@ -30,12 +30,73 @@ type ChessBoardProps = {
     pieceStyle?: string;
 }
 
+const pieceValues: { [key: string]: number } = {
+  'p': 10, 'n': 30, 'b': 30, 'r': 50, 'q': 90, 'k': 900
+};
+
+const evaluateBoard = (board: (Piece | null)[][]) => {
+  let totalEvaluation = 0;
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      const piece = board[i][j];
+      if (piece) {
+        totalEvaluation += pieceValues[piece.type] * (piece.color === 'w' ? 1 : -1);
+      }
+    }
+  }
+  return totalEvaluation;
+};
+
+const minimax = (game: Chess, depth: number, alpha: number, beta: number, isMaximizingPlayer: boolean): [number, string | null] => {
+  if (depth === 0 || game.isGameOver()) {
+    return [evaluateBoard(game.board()), null];
+  }
+
+  const moves = game.moves({ verbose: true });
+  let bestMove: string | null = null;
+
+  if (isMaximizingPlayer) {
+    let maxEval = -Infinity;
+    for (const move of moves) {
+      game.move(move.san);
+      const [evaluation] = minimax(game, depth - 1, alpha, beta, false);
+      game.undo();
+      if (evaluation > maxEval) {
+        maxEval = evaluation;
+        bestMove = move.san;
+      }
+      alpha = Math.max(alpha, evaluation);
+      if (beta <= alpha) {
+        break;
+      }
+    }
+    return [maxEval, bestMove];
+  } else {
+    let minEval = Infinity;
+    for (const move of moves) {
+      game.move(move.san);
+      const [evaluation] = minimax(game, depth - 1, alpha, beta, true);
+      game.undo();
+      if (evaluation < minEval) {
+        minEval = evaluation;
+        bestMove = move.san;
+      }
+      beta = Math.min(beta, evaluation);
+      if (beta <= alpha) {
+        break;
+      }
+    }
+    return [minEval, bestMove];
+  }
+};
+
+
 export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_white' }: ChessBoardProps) {
   const [game, setGame] = useState(new Chess());
   const [selectedPiece, setSelectedPiece] = useState<Square | null>(null);
   const [legalMoves, setLegalMoves] = useState<string[]>([]);
   const { toast } = useToast();
-  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, room } = useGame();
+  const { switchTurn, playerColor, setWinner, gameOver, currentPlayer, boardState, loadGameState, isMounted, isMultiplayer, user, room, difficulty } = useGame();
 
   const theme = boardThemes.find(t => t.id === boardTheme) || boardThemes[2];
   const styles = pieceStyles.find(s => s.id === pieceStyle) || pieceStyles[4];
@@ -63,17 +124,25 @@ export default function ChessBoard({ boardTheme = 'ocean', pieceStyle = 'black_w
       const timer = setTimeout(() => {
         const moves = game.moves();
         if (moves.length > 0) {
-          const move = moves[Math.floor(Math.random() * moves.length)];
+          let move;
+          if (difficulty === 'easy') {
+             move = moves[Math.floor(Math.random() * moves.length)];
+          } else {
+            const depth = difficulty === 'hard' ? 3 : 2;
+            const isMaximizing = game.turn() === 'w';
+            const [, bestMoveSan] = minimax(new Chess(game.fen()), depth, -Infinity, Infinity, isMaximizing);
+            move = bestMoveSan || moves[Math.floor(Math.random() * moves.length)];
+          }
           const result = game.move(move);
           if (result) {
             const captured = result.captured ? { type: result.captured, color: result.color === 'w' ? 'b' : 'w' } as Piece : undefined;
             switchTurn(game.fen(), result.san, captured);
           }
         }
-      }, 1000); // 1-second delay for bot move
+      }, 500); // Shorter delay for bot
       return () => clearTimeout(timer);
     }
-  }, [currentPlayer, game, gameOver, playerColor, switchTurn, isMounted, isMultiplayer]);
+  }, [currentPlayer, game, gameOver, playerColor, switchTurn, isMounted, isMultiplayer, difficulty]);
 
 
   const getSquareFromIndices = (row: number, col: number): Square => {

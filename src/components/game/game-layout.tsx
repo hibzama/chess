@@ -31,7 +31,7 @@ type GameLayoutProps = {
 
 const GameOverDisplay = () => {
     const { user } = useAuth();
-    const { winner, gameOverReason, isMultiplayer, payoutAmount, room } = useGame();
+    const { winner, gameOverReason, isMultiplayer, payoutAmount, room, playerColor } = useGame();
     const router = useRouter();
     const USDT_RATE = 310;
 
@@ -44,8 +44,40 @@ const GameOverDisplay = () => {
         let description = "The game has concluded.";
         let icon = <Crown className="w-12 h-12 text-primary" />;
 
-        const isWinner = (winner === 'p1' && !isMultiplayer) || (isMultiplayer && user?.uid === room?.winner?.uid);
-        const isLoser = (winner === 'p2' && !isMultiplayer) || (isMultiplayer && user?.uid !== room?.winner?.uid && !room?.draw);
+        const isWinner = (winner === 'p1' && playerColor === 'w') || (winner === 'p2' && playerColor === 'b');
+        const isLoser = (winner === 'p1' && playerColor === 'b') || (winner === 'p2' && playerColor === 'w');
+        
+        if (!isMultiplayer) {
+            if (winner === 'p1') {
+                title = "Congratulations, You Win!";
+                icon = <Trophy className="w-12 h-12 text-yellow-400" />;
+                 switch (gameOverReason) {
+                    case 'checkmate': description = "You won by checkmate. Well played!"; break;
+                    case 'timeout': description = "You won on time as the bot ran out."; break;
+                    case 'piece-capture': description = "You captured all the bot's pieces!"; break;
+                    default: description = "You have won the game!";
+                }
+            } else if (winner === 'p2') {
+                 title = "Bad Luck, You Lost";
+                 icon = <Frown className="w-12 h-12 text-destructive" />;
+                 switch (gameOverReason) {
+                    case 'checkmate': description = "The bot has checkmated you."; break;
+                    case 'timeout': description = "You lost because you ran out of time."; break;
+                    case 'piece-capture': description = "The bot captured all your pieces."; break;
+                     case 'resign': description = "You chose to resign the match."; break;
+                    default: description = "You have lost the game.";
+                }
+            } else if (winner === 'draw') {
+                 title = "It's a Draw!";
+                 description = "The game has ended in a draw.";
+                 icon = <Handshake className="w-12 h-12 text-yellow-400" />;
+            }
+            return { title, description, icon };
+        }
+
+        // Multiplayer logic remains largely the same
+        const multiplayerIsWinner = (isMultiplayer && user?.uid === room?.winner?.uid);
+        const multiplayerIsLoser = (isMultiplayer && user?.uid !== room?.winner?.uid && !room?.draw);
 
         if (gameOverReason === 'resign') {
              const wasITheResigner = user?.uid === room?.winner?.resignerId;
@@ -58,7 +90,7 @@ const GameOverDisplay = () => {
                 description = "Your opponent has resigned the game.";
                 icon = <Trophy className="w-12 h-12 text-yellow-400" />;
              }
-        } else if (isWinner) {
+        } else if (multiplayerIsWinner) {
             title = "Congratulations, You Win!";
             icon = <Trophy className="w-12 h-12 text-yellow-400" />;
             switch (gameOverReason) {
@@ -67,7 +99,7 @@ const GameOverDisplay = () => {
                 case 'piece-capture': description = "You captured all your opponent's pieces!"; break;
                 default: description = "You have won the game!";
             }
-        } else if (isLoser) {
+        } else if (multiplayerIsLoser) {
             title = "Bad Luck, You Lost";
             icon = <Frown className="w-12 h-12 text-destructive" />;
             switch (gameOverReason) {
@@ -153,7 +185,7 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
     resign();
   }
 
-  const isP1Turn = isMounted && ((playerColor === 'w' && currentPlayer === 'w') || (playerColor === 'b' && currentPlayer === 'b'));
+  const isP1Turn = isMounted && (playerColor === currentPlayer);
   const turnText = isP1Turn ? 'Your Turn' : "Opponent's Turn";
   
   const opponentData = isMultiplayer ? (room?.createdBy.uid === user?.uid ? room.player2 : room?.createdBy) : null;
@@ -212,16 +244,14 @@ export default function GameLayout({ children, gameType, headerContent }: GameLa
             <div className="lg:hidden w-full space-y-4 mt-4">
                 <GameInfo />
                 <CapturedPieces pieceStyle={equipment?.pieceStyle} />
-                {isMultiplayer && (
-                    <Card>
-                        <CardContent className="p-4">
-                            <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
-                                <Flag className="w-4 h-4 mr-2" />
-                                Resign
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
+                 <Card>
+                    <CardContent className="p-4">
+                        <Button variant="destructive" className="w-full" onClick={() => setIsResignConfirmOpen(true)} disabled={gameOver}>
+                            <Flag className="w-4 h-4 mr-2" />
+                            Resign
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
         </div>
 

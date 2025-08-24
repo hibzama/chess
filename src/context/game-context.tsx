@@ -287,9 +287,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
                     gameOverReason: method, payoutAmount: myPayout,
                 });
             });
-        } else {
+        } else { // Practice mode
             gameOverHandledRef.current = true;
-            const winner = winnerId === 'bot' ? 'p2' : (winnerId ? 'p1' : 'draw');
+            const winner = winnerId === 'bot' ? 'p2' : (winnerId === user?.uid ? 'p1' : 'draw');
             updateAndSaveState({ winner: winner as Winner, gameOver: true, gameOverReason: method, boardState });
         }
     }, [updateAndSaveState, isMultiplayer, roomId, user, handlePayout]);
@@ -481,7 +481,9 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const game = new Chess(boardState);
             if (game.isCheckmate()) {
                 const winnerColor = gameState.currentPlayer;
-                const winnerUid = room?.createdBy.color === winnerColor ? room?.createdBy.uid : room?.player2?.uid;
+                const winnerUid = isMultiplayer 
+                    ? (room?.createdBy.color === winnerColor ? room?.createdBy.uid : room?.player2?.uid)
+                    : user?.uid;
                 setWinner(winnerUid!, boardState, 'checkmate');
                 return;
             } else if (game.isDraw()) {
@@ -500,11 +502,11 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             }));
             
             if (whitePieces === 0) {
-                 const winnerUid = room?.createdBy.color === 'b' ? room?.createdBy.uid : room?.player2?.uid;
+                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'b' ? room?.createdBy.uid : room?.player2?.uid) : 'bot';
                 setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             } else if (blackPieces === 0) {
-                 const winnerUid = room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.player2?.uid;
+                 const winnerUid = isMultiplayer ? (room?.createdBy.color === 'w' ? room?.createdBy.uid : room?.player2?.uid) : user?.uid;
                  setWinner(winnerUid!, boardState, 'piece-capture');
                 return;
             }
@@ -573,8 +575,7 @@ export const GameProvider = ({ children, gameType }: { children: React.ReactNode
             const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
             setWinner(winnerId, gameState.boardState, 'resign', resignerDetails); 
         } else { 
-            const resignerDetails = {id: user.uid, pieceCount: gameState.playerPieceCount};
-            setWinner('bot', gameState.boardState, 'resign', resignerDetails); 
+            setWinner('bot', gameState.boardState, 'resign'); 
         } 
     }, [gameState, user, room, isMultiplayer, setWinner]);
     
