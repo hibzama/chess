@@ -3,7 +3,7 @@
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarFooter } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle, CalendarClock, Award, CheckSquare, ClipboardCheck, Coins, Ruler, Languages, Palette, Gamepad2 } from "lucide-react";
+import { LayoutGrid, Users, LogOut, Clock, History, DollarSign, ArrowUpCircle, ArrowDownCircle, Megaphone, Wallet, Swords, Fingerprint, ShieldAlert, Mail, Settings, Gift, PercentCircle, CalendarClock, Award, CheckSquare, ClipboardCheck, Coins, Ruler, Languages, Palette, Gamepad2, CreditCard } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -157,6 +157,7 @@ export default function AdminLayout({
                             <Link href="/admin/settings/game-rules"><SidebarMenuButton tooltip="Game Rules" isActive={isActive('/admin/settings/game-rules')}><Ruler /><span>Game Rules</span></SidebarMenuButton></Link>
                             <Link href="/admin/settings/game-availability"><SidebarMenuButton tooltip="Game Availability" isActive={isActive('/admin/settings/game-availability')}><Gamepad2 /><span>Game Availability</span></SidebarMenuButton></Link>
                             <Link href="/admin/settings/currency"><SidebarMenuButton tooltip="Currency Settings" isActive={isActive('/admin/settings/currency')}><Coins /><span>Currency</span></SidebarMenuButton></Link>
+                            <Link href="/admin/settings/payment-gateways"><SidebarMenuButton tooltip="Payment Gateways" isActive={isActive('/admin/settings/payment-gateways')}><CreditCard /><span>Payment Gateways</span></SidebarMenuButton></Link>
                             <Link href="/admin/settings/languages"><SidebarMenuButton tooltip="Language Settings" isActive={isActive('/admin/settings/languages')}><Languages /><span>Languages</span></SidebarMenuButton></Link>
                              <Link href="/admin/mailer/settings"><SidebarMenuButton tooltip="Mailer Settings" isActive={isActive('/admin/mailer/settings')}><Settings /><span>Mailer</span></SidebarMenuButton></Link>
                         </SidebarMenuItem>

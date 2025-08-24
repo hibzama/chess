@@ -21,11 +21,25 @@ export interface GameAvailability {
     puzzles: boolean;
 }
 
+interface PaymentConfig {
+    bankDepositEnabled: boolean;
+    bankName: string;
+    bankBranch: string;
+    bankAccountName: string;
+    bankAccountNumber: string;
+    binancePayEnabled: boolean;
+    binancePayId: string;
+    withdrawalFeePercentage: number;
+    supportWhatsapp: string;
+    supportTelegram: string;
+}
+
 interface AuthContextType {
   user: User | null;
   userData: UserData | null;
   currencyConfig: CurrencyConfig;
   gameAvailability: GameAvailability;
+  paymentConfig: PaymentConfig;
   loading: boolean;
   logout: () => Promise<void>;
   setUserData: React.Dispatch<React.SetStateAction<UserData | null>>;
@@ -89,6 +103,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     practiceOmi: true,
     puzzles: true,
   });
+   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig>({
+        bankDepositEnabled: true,
+        bankName: 'Bank of Ceylon (Boc)',
+        bankBranch: 'Galenbidunuwewa',
+        bankAccountName: 'Jd Aththanayaka',
+        bankAccountNumber: '81793729',
+        binancePayEnabled: true,
+        binancePayId: '38881724',
+        withdrawalFeePercentage: 5,
+        supportWhatsapp: '94704894587',
+        supportTelegram: 'nexbattle_help',
+    });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -100,24 +126,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     });
 
-    const configRef = doc(db, 'settings', 'currencyConfig');
-    const unsubscribeConfig = onSnapshot(configRef, (docSnap) => {
-        if (docSnap.exists()) {
-            setCurrencyConfig(docSnap.data() as CurrencyConfig);
-        }
+    const unsubCurrency = onSnapshot(doc(db, 'settings', 'currencyConfig'), (docSnap) => {
+        if (docSnap.exists()) setCurrencyConfig(docSnap.data() as CurrencyConfig);
     });
 
-    const availabilityRef = doc(db, 'settings', 'gameAvailability');
-    const unsubscribeAvailability = onSnapshot(availabilityRef, (docSnap) => {
-        if (docSnap.exists()) {
-            setGameAvailability(docSnap.data() as GameAvailability);
-        }
+    const unsubAvailability = onSnapshot(doc(db, 'settings', 'gameAvailability'), (docSnap) => {
+        if (docSnap.exists()) setGameAvailability(docSnap.data() as GameAvailability);
+    });
+
+    const unsubPayment = onSnapshot(doc(db, 'settings', 'paymentConfig'), (docSnap) => {
+        if (docSnap.exists()) setPaymentConfig(docSnap.data() as PaymentConfig);
     });
 
     return () => {
         unsubscribeAuth();
-        unsubscribeConfig();
-        unsubscribeAvailability();
+        unsubCurrency();
+        unsubAvailability();
+        unsubPayment();
     };
   }, []);
 
@@ -206,7 +231,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, logout, setUserData, currencyConfig, gameAvailability }}>
+    <AuthContext.Provider value={{ user, userData, loading, logout, setUserData, currencyConfig, gameAvailability, paymentConfig }}>
       {children}
     </AuthContext.Provider>
   );

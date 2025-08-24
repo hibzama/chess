@@ -161,7 +161,7 @@ const getTransactionIcon = (type: Transaction['type']) => {
     }
 }
 
-const TransactionItem = ({ tx, currencyConfig }: { tx: Transaction, currencyConfig: CurrencyConfig }) => {
+const TransactionItem = ({ tx, currencyConfig, paymentConfig }: { tx: Transaction, currencyConfig: CurrencyConfig, paymentConfig: any }) => {
     return (
         <Card key={tx.id} className="p-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-center">
@@ -191,12 +191,12 @@ const TransactionItem = ({ tx, currencyConfig }: { tx: Transaction, currencyConf
                     </div>
                     <div className="flex gap-2">
                         <Button size="sm" asChild className="w-full bg-green-600 hover:bg-green-700">
-                            <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
+                            <a href={`https://wa.me/${paymentConfig.supportWhatsapp}`} target="_blank" rel="noopener noreferrer">
                                 <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
                             </a>
                         </Button>
                         <Button size="sm" asChild className="w-full bg-blue-500 hover:bg-blue-600">
-                            <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">
+                            <a href={`https://t.me/${paymentConfig.supportTelegram}`} target="_blank" rel="noopener noreferrer">
                                 <TelegramIcon className="mr-2 h-4 w-4" /> Telegram
                             </a>
                         </Button>
@@ -208,7 +208,7 @@ const TransactionItem = ({ tx, currencyConfig }: { tx: Transaction, currencyConf
 }
 
 export default function WalletPage() {
-  const { user, userData, loading: authLoading, currencyConfig } = useAuth();
+  const { user, userData, loading: authLoading, currencyConfig, paymentConfig } = useAuth();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -222,7 +222,7 @@ export default function WalletPage() {
 
   const [withdrawalAmount, setWithdrawalAmount] = useState('');
   const [withdrawalMethod, setWithdrawalMethod] = useState<'bank' | 'binance'>('bank');
-  const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: 'Bank of Ceylon (Boc)', branch: '', accountNumber: '', accountName: '' });
+  const [withdrawalDetails, setWithdrawalDetails] = useState({ bankName: paymentConfig.bankName || '', branch: '', accountNumber: '', accountName: '' });
   const [binancePayId, setBinancePayId] = useState('');
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   
@@ -230,12 +230,12 @@ export default function WalletPage() {
   
   const usdtAmount = (parseFloat(depositAmount) / currencyConfig.usdtRate || 0).toFixed(2);
   
-  const withdrawalFeePercentage = 5;
+  const withdrawalFeePercentage = paymentConfig.withdrawalFeePercentage || 5;
   const withdrawalFee = useMemo(() => {
       const amount = parseFloat(withdrawalAmount);
       if (isNaN(amount) || amount <= 0) return 0;
       return amount * (withdrawalFeePercentage / 100);
-  }, [withdrawalAmount]);
+  }, [withdrawalAmount, withdrawalFeePercentage]);
 
   const finalWithdrawalAmount = useMemo(() => {
       const amount = parseFloat(withdrawalAmount);
@@ -386,7 +386,7 @@ export default function WalletPage() {
       setWithdrawalAmount('');
       setBinancePayId('');
       if (withdrawalMethod === 'bank') {
-        setWithdrawalDetails({ bankName: 'Bank of Ceylon (Boc)', branch: '', accountNumber: '', accountName: '' });
+        setWithdrawalDetails({ bankName: paymentConfig.bankName || '', branch: '', accountNumber: '', accountName: '' });
       }
 
     } catch (error: any) {
@@ -467,18 +467,18 @@ export default function WalletPage() {
                         )}
                         <Tabs value={depositMethod} onValueChange={(v) => setDepositMethod(v as any)} className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="binance">Binance Pay</TabsTrigger>
-                            <TabsTrigger value="bank">Bank Deposit</TabsTrigger>
+                               {paymentConfig.binancePayEnabled && <TabsTrigger value="binance">Binance Pay</TabsTrigger>}
+                               {paymentConfig.bankDepositEnabled && <TabsTrigger value="bank">Bank Deposit</TabsTrigger>}
                             </TabsList>
                         </Tabs>
 
-                        {depositMethod === 'binance' && (
+                        {depositMethod === 'binance' && paymentConfig.binancePayEnabled && (
                              <Card className="p-4 bg-card/50 space-y-4">
                                 <div>
                                     <Label>Binance PayID</Label>
                                     <div className="flex items-center gap-2">
-                                        <Input readOnly value="38881724" />
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard('38881724', 'PayID')}><Copy/></Button>
+                                        <Input readOnly value={paymentConfig.binancePayId} />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => copyToClipboard(paymentConfig.binancePayId, 'PayID')}><Copy/></Button>
                                     </div>
                                 </div>
                                 <div>
@@ -496,12 +496,12 @@ export default function WalletPage() {
                                 </div>
                              </Card>
                         )}
-                        {depositMethod === 'bank' && (
+                        {depositMethod === 'bank' && paymentConfig.bankDepositEnabled && (
                              <Card className="p-4 bg-card/50 space-y-4">
-                                <p className="text-sm font-semibold">Bank: BOC</p>
-                                <p className="text-sm font-semibold">Branch: Galenbidunuwewa</p>
-                                <p className="text-sm font-semibold">Name: Jd Aththanayaka</p>
-                                <p className="text-sm font-semibold">Account: 81793729</p>
+                                <p className="text-sm font-semibold">Bank: {paymentConfig.bankName}</p>
+                                <p className="text-sm font-semibold">Branch: {paymentConfig.bankBranch}</p>
+                                <p className="text-sm font-semibold">Name: {paymentConfig.bankAccountName}</p>
+                                <p className="text-sm font-semibold">Account: {paymentConfig.bankAccountNumber}</p>
                                 <div className="space-y-2">
                                     <Label htmlFor="deposit-amount-bank">Amount ({currencyConfig.symbol})</Label>
                                     <Input id="deposit-amount-bank" type="number" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder="e.g., 3100" required />
@@ -576,12 +576,12 @@ export default function WalletPage() {
                                 <Info className="h-4 w-4" />
                                 <AlertTitle>Bank Withdrawals</AlertTitle>
                                 <AlertDescription>
-                                    Please note that bank withdrawals are only processed for <strong>Bank of Ceylon (Boc)</strong> accounts at this time.
+                                    Please note that bank withdrawals are only processed for <strong>{paymentConfig.bankName}</strong> accounts at this time.
                                 </AlertDescription>
                             </Alert>
                             <div className="space-y-2">
                                 <Label htmlFor="bank-name">Bank Name</Label>
-                                <Input id="bank-name" value={withdrawalDetails.bankName} readOnly disabled />
+                                <Input id="bank-name" value={withdrawalDetails.bankName} onChange={e => setWithdrawalDetails({...withdrawalDetails, bankName: e.target.value})} required={withdrawalMethod === 'bank'} />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="branch">Branch</Label>
@@ -628,7 +628,7 @@ export default function WalletPage() {
                                 <p className="text-center">Loading history...</p>
                             ) : transactions.length > 0 ? (
                                 transactions.map(tx => (
-                                    <TransactionItem key={tx.id} tx={tx} currencyConfig={currencyConfig} />
+                                    <TransactionItem key={tx.id} tx={tx} currencyConfig={currencyConfig} paymentConfig={paymentConfig}/>
                                 ))
                             ) : (
                                 <p className="text-center h-24 flex items-center justify-center text-muted-foreground">No transactions yet.</p>
@@ -668,12 +668,12 @@ export default function WalletPage() {
             </AlertDialogHeader>
             <AlertDialogFooter className="flex-col sm:flex-col sm:space-x-0 gap-2">
                 <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-                    <a href="https://wa.me/94704894587" target="_blank" rel="noopener noreferrer">
+                    <a href={`https://wa.me/${paymentConfig.supportWhatsapp}`} target="_blank" rel="noopener noreferrer">
                         <MessageCircle className="mr-2 h-4 w-4" /> Send to WhatsApp
                     </a>
                 </Button>
                 <Button asChild className="w-full bg-blue-500 hover:bg-blue-600">
-                     <a href="https://t.me/nexbattle_help" target="_blank" rel="noopener noreferrer">
+                     <a href={`https://t.me/${paymentConfig.supportTelegram}`} target="_blank" rel="noopener noreferrer">
                         <TelegramIcon className="mr-2 h-4 w-4" /> Send to Telegram
                     </a>
                 </Button>
@@ -684,4 +684,3 @@ export default function WalletPage() {
     </>
   );
 }
-
