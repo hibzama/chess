@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
@@ -293,19 +294,19 @@ export default function ThemeSettingsPage() {
                         <Card>
                             <CardHeader><CardTitle>Landing Page</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Playing Now Count</Label>
+                                        <Input value={editingTheme.landingPage.playingNow || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'playingNow', e.target.value)} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Games Today Count</Label>
+                                        <Input value={editingTheme.landingPage.gamesToday || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'gamesToday', e.target.value)} />
+                                    </div>
+                                </div>
+                                <Separator />
                                 {editingTheme.id === 'chess_king' ? (
                                     <>
-                                        <div className="grid md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label>Playing Now Count</Label>
-                                                <Input value={editingTheme.landingPage.playingNow || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'playingNow', e.target.value)} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label>Games Today Count</Label>
-                                                <Input value={editingTheme.landingPage.gamesToday || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'gamesToday', e.target.value)} />
-                                            </div>
-                                        </div>
-                                        <Separator />
                                         <div className="space-y-2">
                                             <Label>Banner Image URL (Illustration)</Label>
                                             <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
@@ -356,30 +357,28 @@ export default function ThemeSettingsPage() {
                                 </div>
                                 </>
                                 )}
-                                {editingTheme.id === 'chess_king' && (
-                                    <div className="space-y-4 border-t pt-4">
-                                        <h3 className="text-lg font-semibold">Feature Sections</h3>
-                                        {(editingTheme.landingPage.landingSections || []).map((section, index) => (
-                                            <Card key={index} className="p-4 bg-muted/50">
-                                                <div className="flex justify-between items-center mb-2">
-                                                    <h4 className="font-semibold">Section {index + 1}</h4>
-                                                    <Button variant="destructive" size="icon" onClick={() => handleRemoveLandingSection(index)}><Trash2 className="w-4 h-4" /></Button>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Title</Label>
-                                                    <Input value={section.title || ''} onChange={e => handleUpdateLandingSection(index, 'title', e.target.value)} />
-                                                    <Label>Image URL</Label>
-                                                    <Input value={section.image || ''} onChange={e => handleUpdateLandingSection(index, 'image', e.target.value)} />
-                                                    <Label>Button Text</Label>
-                                                    <Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
-                                                     <Label>AI Image Hint</Label>
-                                                    <Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
-                                                </div>
-                                            </Card>
-                                        ))}
-                                        <Button variant="outline" onClick={handleAddLandingSection}><PlusCircle className="mr-2"/> Add Section</Button>
-                                    </div>
-                                )}
+                                <div className="space-y-4 border-t pt-4">
+                                    <h3 className="text-lg font-semibold">Feature Sections</h3>
+                                    {(editingTheme.landingPage.landingSections || []).map((section, index) => (
+                                        <Card key={index} className="p-4 bg-muted/50">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <h4 className="font-semibold">Section {index + 1}</h4>
+                                                <Button variant="destructive" size="icon" onClick={() => handleRemoveLandingSection(index)}><Trash2 className="w-4 h-4" /></Button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label>Title</Label>
+                                                <Input value={section.title || ''} onChange={e => handleUpdateLandingSection(index, 'title', e.target.value)} />
+                                                <Label>Image URL</Label>
+                                                <Input value={section.image || ''} onChange={e => handleUpdateLandingSection(index, 'image', e.target.value)} />
+                                                <Label>Button Text</Label>
+                                                <Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
+                                                 <Label>AI Image Hint</Label>
+                                                <Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
+                                            </div>
+                                        </Card>
+                                    ))}
+                                    <Button variant="outline" onClick={handleAddLandingSection}><PlusCircle className="mr-2"/> Add Section</Button>
+                                </div>
                             </CardContent>
                         </Card>
                         <Card>

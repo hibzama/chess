@@ -21,7 +21,7 @@ const DefaultLanding = () => {
         'Marketing Support'
     ];
     const apkUrl = theme?.landingPage?.apkUrl || '#';
-    const heroImageUrl = theme?.landingPage.heroImageUrl;
+    const heroImageUrl = theme?.landingPage?.heroImageUrl;
 
     return (
     <div className="flex flex-col min-h-[calc(100vh-5rem)]">

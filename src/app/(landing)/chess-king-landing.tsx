@@ -1,3 +1,4 @@
+
 'use client';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -69,10 +70,10 @@ export default function ChessKingLanding() {
     }
     
     const { heroTitle, heroImageUrl, landingPage, landingSections = [], aboutContent, supportDetails, marketingContent } = theme;
-    const { playingNow, gamesToday } = landingPage;
+    const { playingNow, gamesToday } = landingPage || {};
 
 
-     const aboutSections = aboutContent.split('## ').slice(1).map(section => {
+     const aboutSections = (aboutContent || '').split('## ').slice(1).map(section => {
         const [title, ...contentParts] = section.split('\n');
         const content = contentParts.join('\n').trim();
         const icons: { [key: string]: React.ElementType } = {
