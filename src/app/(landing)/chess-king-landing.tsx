@@ -208,7 +208,7 @@ export default function ChessKingLanding() {
                 <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12">
                     {landingSections.map((section, index) => (
                         <div key={index} className="rounded-lg p-6 flex flex-col items-center text-center group" style={{ backgroundColor: section.borderColor || '#262421' }}>
-                            <div className="relative w-full aspect-square mb-4">
+                            <div className="relative w-full aspect-[500/500] mb-4">
                                 <Image src={section.image || 'https://placehold.co/500x500.png'} alt={section.title} fill className="object-cover rounded-md" data-ai-hint={section.aiHint || 'abstract'} />
                                  {section.overlayText && (
                                     <div className="absolute inset-0 bg-black/60 flex items-end justify-center p-4 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
@@ -221,9 +221,12 @@ export default function ChessKingLanding() {
                             </div>
                             <Button 
                                 asChild 
-                                variant={section.buttonStyle === 'box' ? 'outline' : 'link'} 
+                                variant={section.buttonStyle === 'box' ? 'default' : 'link'} 
                                 className="text-lg mt-4"
-                                style={{ color: section.buttonTextColor || '' }}
+                                style={{ 
+                                    color: section.buttonTextColor || '',
+                                    backgroundColor: section.buttonStyle === 'box' ? section.buttonBgColor : 'transparent'
+                                }}
                             >
                                 <Link href={getLinkForSection(section.buttonText)}>{section.buttonText}</Link>
                             </Button>

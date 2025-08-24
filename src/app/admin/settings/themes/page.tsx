@@ -24,6 +24,7 @@ interface LandingSection {
     borderColor?: string;
     buttonStyle?: 'link' | 'box';
     buttonTextColor?: string;
+    buttonBgColor?: string;
 }
 
 interface Theme {
@@ -130,12 +131,13 @@ export default function ThemeSettingsPage() {
         const newSections = [...(editingTheme.landingPage.landingSections || []), { 
             title: 'New Section', 
             buttonText: 'Learn More', 
-            image: 'https://placehold.co/400x250.png', 
+            image: 'https://placehold.co/500x500.png', 
             aiHint: '',
             overlayText: 'Overlay Text',
             borderColor: '#262421',
-            buttonStyle: 'link',
-            buttonTextColor: '#FFFFFF'
+            buttonStyle: 'box',
+            buttonTextColor: '#FFFFFF',
+            buttonBgColor: '#4A5568',
         }];
         handleUpdateNestedThemeValue('landingPage', 'landingSections', newSections);
     };
@@ -336,17 +338,19 @@ export default function ThemeSettingsPage() {
                                                         <Label>Button Text</Label><Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
                                                         <div className="grid grid-cols-2 gap-4">
                                                             <div><Label>Background Color</Label><Input type="color" value={section.borderColor || '#333333'} onChange={e => handleUpdateLandingSection(index, 'borderColor', e.target.value)} /></div>
-                                                            <div><Label>Button Text Color</Label><Input type="color" value={section.buttonTextColor || '#FFFFFF'} onChange={e => handleUpdateLandingSection(index, 'buttonTextColor', e.target.value)} /></div>
+                                                            <div><Label>Button Style</Label>
+                                                                <Select value={section.buttonStyle || 'link'} onValueChange={(v) => handleUpdateLandingSection(index, 'buttonStyle', v)}>
+                                                                    <SelectTrigger><SelectValue/></SelectTrigger>
+                                                                    <SelectContent>
+                                                                        <SelectItem value="link">Link</SelectItem>
+                                                                        <SelectItem value="box">Box</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <Label>Button Style</Label>
-                                                            <Select value={section.buttonStyle || 'link'} onValueChange={(v) => handleUpdateLandingSection(index, 'buttonStyle', v)}>
-                                                                <SelectTrigger><SelectValue/></SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="link">Link</SelectItem>
-                                                                    <SelectItem value="box">Box</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                             <div><Label>Button Text Color</Label><Input type="color" value={section.buttonTextColor || '#FFFFFF'} onChange={e => handleUpdateLandingSection(index, 'buttonTextColor', e.target.value)} /></div>
+                                                             <div><Label>Button Background</Label><Input type="color" value={section.buttonBgColor || '#4A5568'} onChange={e => handleUpdateLandingSection(index, 'buttonBgColor', e.target.value)} /></div>
                                                         </div>
                                                     </div>
                                                 </Card>

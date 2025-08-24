@@ -10,9 +10,10 @@ interface LandingSection {
     image: string;
     aiHint?: string;
     overlayText?: string;
-    borderColor?: string;
+    borderColor?: string; // Will be used as background color for the section box
     buttonStyle?: 'link' | 'box';
     buttonTextColor?: string;
+    buttonBgColor?: string; // New field for button background
 }
 
 interface Theme {
@@ -107,10 +108,8 @@ const initializeThemes = async () => {
                 playingNow: '168,623',
                 gamesToday: '19,057,572',
                 landingSections: [
-                    { title: "Play vs Computer", buttonText: "Play vs Computer", image: "https://i.postimg.cc/44N8XfW6/index-computervs-1f9f5a6b-2x.png", aiHint: "chess computer", overlayText: "Play against a powerful engine", borderColor: "#4a5568", buttonStyle: "box", buttonTextColor: "#cbd5e1" },
-                    { title: "Multiplayer System", buttonText: "Play Online", image: "https://i.postimg.cc/Qx7p6M2P/index-play-friend-2e3d362e-2x.png", aiHint: "chess world", overlayText: "Challenge players from around the globe", borderColor: "#4a5568", buttonStyle: "box", buttonTextColor: "#cbd5e1" },
-                    { title: "Earning System", buttonText: "Learn More", image: "https://placehold.co/400x250.png", aiHint: "money chess", overlayText: "Turn your skill into real rewards", borderColor: "#4a5568", buttonStyle: "box", buttonTextColor: "#cbd5e1" },
-                    { title: "Referral Campaigns", buttonText: "Learn More", image: "https://placehold.co/400x250.png", aiHint: "referral network", overlayText: "Earn by inviting your friends", borderColor: "#4a5568", buttonStyle: "box", buttonTextColor: "#cbd5e1" },
+                    { title: "Play vs Computer", buttonText: "Play vs Computer", image: "https://i.postimg.cc/44N8XfW6/index-computervs-1f9f5a6b-2x.png", aiHint: "chess computer", overlayText: "Play against a powerful engine", borderColor: "#262421", buttonStyle: "box", buttonTextColor: "#FFFFFF", buttonBgColor: "#4a5568" },
+                    { title: "Multiplayer System", buttonText: "Play Online", image: "https://i.postimg.cc/Qx7p6M2P/index-play-friend-2e3d362e-2x.png", aiHint: "chess world", overlayText: "Challenge players from around the globe", borderColor: "#262421", buttonStyle: "box", buttonTextColor: "#FFFFFF", buttonBgColor: "#4a5568" },
                 ]
             },
             colors: {
