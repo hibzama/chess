@@ -26,6 +26,8 @@ interface LandingSection {
     buttonStyle?: 'link' | 'box';
     buttonTextColor?: string;
     buttonBgColor?: string;
+    imageWidth?: number;
+    imageHeight?: number;
 }
 
 interface Theme {
@@ -140,6 +142,8 @@ export default function ThemeSettingsPage() {
             buttonStyle: 'box',
             buttonTextColor: '#FFFFFF',
             buttonBgColor: '#4A5568',
+            imageWidth: 500,
+            imageHeight: 500,
         }];
         handleUpdateNestedThemeValue('landingPage', 'landingSections', newSections);
     };
@@ -335,6 +339,10 @@ export default function ThemeSettingsPage() {
                                                     <div className="space-y-2">
                                                         <Label>Title</Label><Input value={section.title || ''} onChange={e => handleUpdateLandingSection(index, 'title', e.target.value)} />
                                                         <Label>Image URL</Label><Input value={section.image || ''} onChange={e => handleUpdateLandingSection(index, 'image', e.target.value)} />
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div><Label>Image Width (px)</Label><Input type="number" value={section.imageWidth || 500} onChange={e => handleUpdateLandingSection(index, 'imageWidth', Number(e.target.value))} /></div>
+                                                            <div><Label>Image Height (px)</Label><Input type="number" value={section.imageHeight || 500} onChange={e => handleUpdateLandingSection(index, 'imageHeight', Number(e.target.value))} /></div>
+                                                        </div>
                                                         <Label>Overlay Text</Label><Input value={section.overlayText || ''} onChange={e => handleUpdateLandingSection(index, 'overlayText', e.target.value)} />
                                                         <Label>AI Image Hint</Label><Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
                                                         <Label>Button Text</Label><Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
