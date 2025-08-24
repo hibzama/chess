@@ -13,6 +13,10 @@ import { useTranslationSystem } from "@/context/translation-context";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import React from "react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/hooks/use-translation";
+
+
+const T = ({ children }: { children: string }) => <>{useTranslation(children)}</>;
 
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -27,7 +31,7 @@ const ChessKingLogo = () => {
     if (!theme?.logoUrl) {
         return (
             <div className="flex items-center gap-2 text-xl font-bold text-white">
-                <span>Chess King</span>
+                <span><T>Chess King</T></span>
             </div>
         );
     }
@@ -49,7 +53,7 @@ const LanguageSwitcher = () => {
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 text-gray-400 hover:text-white w-full justify-start">
                     <Languages />
-                    <span>{currentLanguageName}</span>
+                    <span><T>{currentLanguageName}</T></span>
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -109,12 +113,12 @@ export default function ChessKingLanding() {
                         <ChessKingLogo />
                     </div>
                     <nav className="mt-8 space-y-2">
-                        <Link href="/puzzles"><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Puzzle/> Puzzles</Button></Link>
+                        <Link href="/puzzles"><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Puzzle/> <T>Puzzles</T></Button></Link>
                          <Dialog>
-                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Info/> About Us</Button></DialogTrigger>
+                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Info/> <T>About Us</T></Button></DialogTrigger>
                              <DialogContent className="max-w-2xl">
                                 <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
+                                    <DialogTitle className="flex items-center gap-2"><Info/> <T>About Nexbattle</T></DialogTitle>
                                 </DialogHeader>
                                 <ScrollArea className="h-[60vh] p-4">
                                     <div className="space-y-6">
@@ -122,9 +126,9 @@ export default function ChessKingLanding() {
                                         <div key={section.title}>
                                             <h3 className="font-semibold text-lg flex items-center gap-3 mb-2 text-primary">
                                                 <section.icon className="w-5 h-5"/>
-                                                {section.title}
+                                                <T>{section.title}</T>
                                             </h3>
-                                            <p className="text-sm text-muted-foreground whitespace-pre-line">{section.content}</p>
+                                            <p className="text-sm text-muted-foreground whitespace-pre-line"><T>{section.content}</T></p>
                                         </div>
                                     ))}
                                     </div>
@@ -132,20 +136,20 @@ export default function ChessKingLanding() {
                             </DialogContent>
                         </Dialog>
                          <Dialog>
-                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><LifeBuoy/> Support</Button></DialogTrigger>
+                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><LifeBuoy/> <T>Support</T></Button></DialogTrigger>
                              <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
+                                    <DialogTitle className="flex items-center gap-2"><LifeBuoy/> <T>Contact Support</T></DialogTitle>
                                 </DialogHeader>
                                  <div className="space-y-4 py-4">
                                     <Button asChild className="w-full justify-start gap-3" variant="outline">
                                         <a href={`tel:${supportDetails.phone}`}><Phone /> {supportDetails.phone}</a>
                                     </Button>
                                     <Button asChild className="w-full justify-start gap-3" variant="outline">
-                                        <a href={`https://wa.me/${supportDetails.whatsapp}`} target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
+                                        <a href={`https://wa.me/${supportDetails.whatsapp}`} target="_blank" rel="noopener noreferrer"><MessageSquare/> <T>WhatsApp</T></a>
                                     </Button>
                                     <Button asChild className="w-full justify-start gap-3" variant="outline">
-                                        <a href={`https://t.me/${supportDetails.telegram}`} target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
+                                        <a href={`https://t.me/${supportDetails.telegram}`} target="_blank" rel="noopener noreferrer"><TelegramIcon/> <T>Telegram</T></a>
                                     </Button>
                                     <Button asChild className="w-full justify-start gap-3" variant="outline">
                                         <a href={`mailto:${supportDetails.email}`}><Mail/> {supportDetails.email}</a>
@@ -154,16 +158,16 @@ export default function ChessKingLanding() {
                             </DialogContent>
                         </Dialog>
                          <Dialog>
-                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Trophy/> Join Marketing Team</Button></DialogTrigger>
+                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Trophy/> <T>Join Marketing Team</T></Button></DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2"><Trophy/> Join the Marketing Team</DialogTitle>
+                                    <DialogTitle className="flex items-center gap-2"><Trophy/> <T>Join the Marketing Team</T></DialogTitle>
                                 </DialogHeader>
                                 <Card className="bg-primary/5 border-primary/20 mt-4">
                                     <CardContent className="p-6 text-sm space-y-4">
-                                        <p className="whitespace-pre-line">{marketingContent}</p>
+                                        <p className="whitespace-pre-line"><T>{marketingContent}</T></p>
                                          <Button asChild className="w-full">
-                                            <Link href="/marketing/register">Apply to be a Marketer</Link>
+                                            <Link href="/marketing/register"><T>Apply to be a Marketer</T></Link>
                                         </Button>
                                     </CardContent>
                                 </Card>
@@ -173,8 +177,8 @@ export default function ChessKingLanding() {
                 </div>
                  <div>
                     <div className="space-y-2">
-                        <Button asChild className="w-full"><Link href="/register">Sign Up</Link></Button>
-                        <Button asChild variant="secondary" className="w-full"><Link href="/login">Log In</Link></Button>
+                        <Button asChild className="w-full"><Link href="/register"><T>Sign Up</T></Link></Button>
+                        <Button asChild variant="secondary" className="w-full"><Link href="/login"><T>Log In</T></Link></Button>
                     </div>
                     <div className="mt-4 border-t border-gray-700 pt-4">
                         <LanguageSwitcher />
@@ -186,8 +190,8 @@ export default function ChessKingLanding() {
             <main className="flex-1 overflow-y-auto flex flex-col">
                 <header className="py-4 px-8 text-center">
                      <div className="flex justify-center items-center gap-8 text-sm">
-                        <p><span className="font-bold">{playingNow}</span> PLAYING NOW</p>
-                        <p><span className="font-bold">{gamesToday}</span> GAMES TODAY</p>
+                        <p><span className="font-bold">{playingNow}</span> <T>PLAYING NOW</T></p>
+                        <p><span className="font-bold">{gamesToday}</span> <T>GAMES TODAY</T></p>
                     </div>
                 </header>
 
@@ -197,9 +201,9 @@ export default function ChessKingLanding() {
                            {heroImageUrl && <Image src={heroImageUrl} alt="Chess pieces" fill className="object-contain" data-ai-hint="chess pieces illustration" />}
                         </div>
                         <div className={cn(textAlignClass)}>
-                            <h1 className="text-4xl md:text-5xl font-bold leading-tight whitespace-pre-line">{heroTitle}</h1>
+                            <h1 className="text-4xl md:text-5xl font-bold leading-tight whitespace-pre-line"><T>{heroTitle}</T></h1>
                             <Button asChild size="lg" className="mt-6">
-                                <Link href="/register">Get Started</Link>
+                                <Link href="/register"><T>Get Started</T></Link>
                             </Button>
                         </div>
                     </div>
@@ -219,12 +223,12 @@ export default function ChessKingLanding() {
                                 <Image src={section.image || 'https://placehold.co/500x500.png'} alt={section.title} fill className="object-cover rounded-md" data-ai-hint={section.aiHint || 'abstract'} />
                                  {section.overlayText && (
                                     <div className="absolute inset-0 bg-black/60 flex items-end justify-center p-4 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
-                                        <p className="text-white text-center font-semibold">{section.overlayText}</p>
+                                        <p className="text-white text-center font-semibold"><T>{section.overlayText}</T></p>
                                     </div>
                                 )}
                             </div>
                             <div className="flex-grow flex flex-col items-center">
-                                <h2 className="text-xl font-semibold text-gray-200 mt-4">{section.title}</h2>
+                                <h2 className="text-xl font-semibold text-gray-200 mt-4"><T>{section.title}</T></h2>
                             </div>
                             <Button 
                                 asChild 
@@ -235,7 +239,7 @@ export default function ChessKingLanding() {
                                     backgroundColor: section.buttonStyle === 'box' ? section.buttonBgColor : 'transparent'
                                 }}
                             >
-                                <Link href={section.buttonLink || getLinkForSection(section.buttonText)}>{section.buttonText}</Link>
+                                <Link href={section.buttonLink || getLinkForSection(section.buttonText)}><T>{section.buttonText}</T></Link>
                             </Button>
                         </div>
                     ))}
@@ -248,3 +252,5 @@ export default function ChessKingLanding() {
         </div>
     );
 }
+
+    

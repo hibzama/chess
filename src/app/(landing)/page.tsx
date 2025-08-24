@@ -11,6 +11,9 @@ import { redirect } from 'next/navigation';
 import { useTheme } from '@/context/theme-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import ChessKingLanding from './chess-king-landing';
+import { useTranslation } from '@/hooks/use-translation';
+
+const T = ({ children }: { children: string }) => <>{useTranslation(children)}</>;
 
 const DefaultLanding = ({ theme }) => {
     if (!theme) return null;
@@ -29,24 +32,24 @@ const DefaultLanding = ({ theme }) => {
       <main className="flex-1 flex items-center justify-center p-4">
         <section className="container mx-auto grid grid-cols-1 md:grid-cols-2 items-center gap-12">
             <div className="hero-text text-center md:text-left">
-                <p className="font-bold text-primary mb-2">BECOME TODAY A NEXBATTLE PARTNER</p>
+                <p className="font-bold text-primary mb-2"><T>BECOME TODAY A NEXBATTLE PARTNER</T></p>
                 <h1 className="text-5xl lg:text-6xl font-bold leading-tight">
-                    {theme?.landingPage.heroTitle}
+                    <T>{theme?.landingPage.heroTitle}</T>
                 </h1>
                 <p className="my-6 text-lg text-muted-foreground">
-                   {theme?.landingPage.heroSubtitle}
+                   <T>{theme?.landingPage.heroSubtitle}</T>
                 </p>
                 <ul className="grid grid-cols-2 gap-4 text-left mb-8">
                     {landingFeatures.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> {feature}</li>
+                        <li key={index} className="flex items-center gap-2"><CheckCircle className="w-5 h-5 text-green-500"/> <T>{feature}</T></li>
                     ))}
                 </ul>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
                     <Button asChild size="lg">
-                        <Link href="/register">Register & Play</Link>
+                        <Link href="/register"><T>Register & Play</T></Link>
                     </Button>
                      <Button asChild size="lg" variant="outline">
-                        <Link href={apkUrl} target="_blank" rel="noopener noreferrer"><Download className="mr-2"/> Download APK</Link>
+                        <Link href={apkUrl} target="_blank" rel="noopener noreferrer"><Download className="mr-2"/> <T>Download APK</T></Link>
                     </Button>
                 </div>
                  <div className="mt-8">
@@ -93,3 +96,5 @@ export default function LandingPage() {
  
     return <DefaultLanding theme={theme} />;
 }
+
+    
