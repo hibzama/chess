@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, serverTimestamp } from 'firestore/lite';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +18,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 interface LandingSection {
     title: string;
     buttonText: string;
+    buttonLink?: string;
     image: string;
     aiHint?: string;
     overlayText?: string;
@@ -130,7 +131,8 @@ export default function ThemeSettingsPage() {
         if (!editingTheme) return;
         const newSections = [...(editingTheme.landingPage.landingSections || []), { 
             title: 'New Section', 
-            buttonText: 'Learn More', 
+            buttonText: 'Learn More',
+            buttonLink: '#',
             image: 'https://placehold.co/500x500.png', 
             aiHint: '',
             overlayText: 'Overlay Text',
@@ -336,6 +338,7 @@ export default function ThemeSettingsPage() {
                                                         <Label>Overlay Text</Label><Input value={section.overlayText || ''} onChange={e => handleUpdateLandingSection(index, 'overlayText', e.target.value)} />
                                                         <Label>AI Image Hint</Label><Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
                                                         <Label>Button Text</Label><Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
+                                                        <Label>Button Link</Label><Input value={section.buttonLink || ''} onChange={e => handleUpdateLandingSection(index, 'buttonLink', e.target.value)} placeholder="e.g., /puzzles" />
                                                         <div className="grid grid-cols-2 gap-4">
                                                             <div><Label>Background Color</Label><Input type="color" value={section.borderColor || '#333333'} onChange={e => handleUpdateLandingSection(index, 'borderColor', e.target.value)} /></div>
                                                             <div><Label>Button Style</Label>

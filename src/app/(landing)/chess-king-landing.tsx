@@ -228,7 +228,7 @@ export default function ChessKingLanding() {
                                     backgroundColor: section.buttonStyle === 'box' ? section.buttonBgColor : 'transparent'
                                 }}
                             >
-                                <Link href={getLinkForSection(section.buttonText)}>{section.buttonText}</Link>
+                                <Link href={section.buttonLink || getLinkForSection(section.buttonText)}>{section.buttonText}</Link>
                             </Button>
                         </div>
                     ))}
