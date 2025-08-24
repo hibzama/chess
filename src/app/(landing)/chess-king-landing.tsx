@@ -1,4 +1,3 @@
-
 'use client';
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -60,7 +59,7 @@ export default function ChessKingLanding() {
         return <Skeleton className="h-screen w-full" />;
     }
     
-    const { heroTitle, heroSubtitle, bgImageUrl, landingSections = [] } = theme.landingPage;
+    const { heroTitle, heroImageUrl, landingSections = [] } = theme.landingPage;
 
     return (
         <div className="flex h-screen bg-background text-white">
@@ -87,14 +86,17 @@ export default function ChessKingLanding() {
 
             {/* Scrollable Main Content */}
             <main className="flex-1 overflow-y-auto">
-                <div className="relative h-96 flex flex-col items-center justify-center text-center p-4 bg-cover bg-center" style={{ backgroundImage: `url(${bgImageUrl})` }}>
-                    <div className="absolute inset-0 bg-black/50" />
-                     <div className="relative z-10">
-                        <h1 className="text-4xl md:text-5xl font-bold leading-tight">{heroTitle}</h1>
-                        <p className="mt-4 text-lg text-gray-200">{heroSubtitle}</p>
-                        <Button asChild size="lg" className="mt-6 bg-green-600 hover:bg-green-700">
-                            <Link href="/register">Get Started</Link>
-                        </Button>
+                <div className="h-96 flex items-center justify-center p-4 bg-[#302e2c]">
+                     <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-8 container mx-auto">
+                        <div className="relative w-full h-48">
+                           {heroImageUrl && <Image src={heroImageUrl} alt="Chess pieces" fill className="object-contain" data-ai-hint="chess pieces illustration" />}
+                        </div>
+                        <div className="text-center md:text-left">
+                            <h1 className="text-4xl md:text-5xl font-bold leading-tight whitespace-pre-line">{heroTitle}</h1>
+                            <Button asChild size="lg" className="mt-6 bg-green-600 hover:bg-green-700">
+                                <Link href="/register">Get Started</Link>
+                            </Button>
+                        </div>
                     </div>
                 </div>
 

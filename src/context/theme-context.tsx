@@ -1,4 +1,3 @@
-
 'use client';
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { db } from '@/lib/firebase';
@@ -87,10 +86,10 @@ const initializeThemes = async () => {
             name: 'Chess King',
             landingPage: {
                 ...defaultThemeData.landingPage,
-                bgImageUrl: 'https://images.chesscomfiles.com/uploads/v1/images_files/2_16x9_webp/2464/2464_650_16x9_2.0-2.webp',
-                heroImageUrl: 'https://placehold.co/600x400.png',
-                heroTitle: 'Become the King of Chess',
-                heroSubtitle: 'Join the ultimate chess arena and prove your royalty. Wager, win, and rule the leaderboard.',
+                bgImageUrl: '', // Not used in the same way
+                heroImageUrl: 'https://i.postimg.cc/d3F9zdbb/index-illustration-9d2cb1c3-2x.png',
+                heroTitle: 'Play chess.\nImprove your game.\nHave fun!',
+                heroSubtitle: '', // Not used
                 landingSections: [
                     { title: "Play vs customizable training bots from total beginner to master.", buttonText: "Play vs Computer", image: "https://placehold.co/400x250.png", aiHint: "chess computer" },
                     { title: "Play online with over 100 million members from around the world.", buttonText: "Play Online", image: "https://placehold.co/400x250.png", aiHint: "chess world" },

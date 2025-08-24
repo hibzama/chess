@@ -1,4 +1,3 @@
-
 'use client'
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
@@ -252,6 +251,7 @@ export default function ThemeSettingsPage() {
 
             {editingTheme && (
                  <Card className="fixed inset-0 z-50 overflow-auto bg-background p-4 md:p-8">
+                    <ScrollArea className="h-full pr-6">
                      <CardHeader>
                         <CardTitle>Editing: {editingTheme.name}</CardTitle>
                         <CardDescription>Make changes to the content for this theme.</CardDescription>
@@ -286,22 +286,38 @@ export default function ThemeSettingsPage() {
                         <Card>
                             <CardHeader><CardTitle>Landing Page</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label>Background Image URL</Label>
-                                    <Input value={editingTheme.landingPage.bgImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
-                                </div>
-                                 <div className="space-y-2">
-                                    <Label>Hero/Banner Image URL</Label>
-                                    <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Hero Title</Label>
-                                    <Input value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
-                                </div>
-                                 <div className="space-y-2">
-                                    <Label>Hero Subtitle</Label>
-                                    <Textarea value={editingTheme.landingPage.heroSubtitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
-                                </div>
+                                {editingTheme.id === 'chess_king' ? (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label>Banner Image URL (Illustration)</Label>
+                                            <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Banner Title (use `\n` for new lines)</Label>
+                                            <Textarea value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label>Background Image URL</Label>
+                                            <Input value={editingTheme.landingPage.bgImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Hero/Banner Image URL</Label>
+                                            <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Hero Title</Label>
+                                            <Input value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Hero Subtitle</Label>
+                                            <Textarea value={editingTheme.landingPage.heroSubtitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
+                                        </div>
+                                    </>
+                                )}
+                                
                                 {editingTheme.id === 'default' && (
                                 <>
                                  <div className="space-y-2">
@@ -370,6 +386,7 @@ export default function ThemeSettingsPage() {
                         <Button onClick={handleSaveThemeDetails} disabled={saving}>{saving ? <Loader2 className="animate-spin"/> : 'Save Changes'}</Button>
                         <Button variant="outline" onClick={() => setEditingTheme(null)}>Cancel</Button>
                     </CardFooter>
+                    </ScrollArea>
                  </Card>
             )}
         </div>
