@@ -7,8 +7,12 @@ import Link from 'next/link';
 import { useTheme } from '@/context/theme-context';
 import { Skeleton } from '@/components/ui/skeleton';
 
+const TranslatedText = ({ text }: { text: string }) => {
+    const translated = useTranslation(text);
+    return <>{translated}</>;
+};
+
 export default function AboutPage() {
-    const t = useTranslation;
     const { theme, loading } = useTheme();
 
     if (loading || !theme) {
@@ -44,8 +48,8 @@ export default function AboutPage() {
     return (
         <div className="space-y-12">
              <div className="text-center">
-                <h1 className="text-4xl font-bold tracking-tight">{t('About Nexbattle')}</h1>
-                <p className="text-muted-foreground mt-2">{t('The ultimate platform where skill meets investment.')}</p>
+                <h1 className="text-4xl font-bold tracking-tight"><TranslatedText text="About Nexbattle" /></h1>
+                <p className="text-muted-foreground mt-2"><TranslatedText text="The ultimate platform where skill meets investment." /></p>
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
@@ -56,14 +60,14 @@ export default function AboutPage() {
                                 <section.icon className="w-6 h-6 text-primary"/>
                             </div>
                             <div>
-                                <CardTitle>{t(section.title)}</CardTitle>
+                                <CardTitle><TranslatedText text={section.title} /></CardTitle>
                             </div>
                         </CardHeader>
                         <CardContent>
-                           <p className="text-muted-foreground whitespace-pre-line">{t(section.content)}</p>
+                           <p className="text-muted-foreground whitespace-pre-line"><TranslatedText text={section.content} /></p>
                            {section.link && (
                                <Link href={section.link} className="text-primary font-semibold hover:underline mt-4 inline-block">
-                                    {t(section.linkText as string)} &rarr;
+                                    <TranslatedText text={section.linkText as string} /> &rarr;
                                </Link>
                            )}
                         </CardContent>
