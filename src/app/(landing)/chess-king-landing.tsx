@@ -205,22 +205,24 @@ export default function ChessKingLanding() {
                     </div>
                 </div>
 
-                <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12 bg-[#262421]/50">
+                <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12">
                     {landingSections.map((section, index) => (
-                        <div key={index} className="text-center p-4 rounded-lg" style={{ borderColor: section.borderColor || 'transparent', borderWidth: 2 }}>
-                            <div className="relative aspect-video mb-4 rounded-md overflow-hidden group">
-                                <Image src={section.image || 'https://placehold.co/400x250.png'} alt={section.title} fill className="object-cover" data-ai-hint={section.aiHint || 'abstract'} />
+                        <div key={index} className="rounded-lg p-6 flex flex-col items-center text-center group" style={{ backgroundColor: section.borderColor || '#262421' }}>
+                            <div className="relative w-full aspect-square mb-4">
+                                <Image src={section.image || 'https://placehold.co/500x500.png'} alt={section.title} fill className="object-cover rounded-md" data-ai-hint={section.aiHint || 'abstract'} />
                                  {section.overlayText && (
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="absolute inset-0 bg-black/60 flex items-end justify-center p-4 opacity-0 group-hover:opacity-100 transition-opacity rounded-md">
                                         <p className="text-white text-center font-semibold">{section.overlayText}</p>
                                     </div>
                                 )}
                             </div>
-                            <h2 className="text-xl font-semibold text-gray-200">{section.title}</h2>
+                            <div className="flex-grow flex flex-col items-center">
+                                <h2 className="text-xl font-semibold text-gray-200 mt-4">{section.title}</h2>
+                            </div>
                             <Button 
                                 asChild 
                                 variant={section.buttonStyle === 'box' ? 'outline' : 'link'} 
-                                className="text-lg mt-2"
+                                className="text-lg mt-4"
                                 style={{ color: section.buttonTextColor || '' }}
                             >
                                 <Link href={getLinkForSection(section.buttonText)}>{section.buttonText}</Link>

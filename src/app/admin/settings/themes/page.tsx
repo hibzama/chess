@@ -133,7 +133,7 @@ export default function ThemeSettingsPage() {
             image: 'https://placehold.co/400x250.png', 
             aiHint: '',
             overlayText: 'Overlay Text',
-            borderColor: '#333',
+            borderColor: '#262421',
             buttonStyle: 'link',
             buttonTextColor: '#FFFFFF'
         }];
@@ -335,7 +335,7 @@ export default function ThemeSettingsPage() {
                                                         <Label>AI Image Hint</Label><Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
                                                         <Label>Button Text</Label><Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
                                                         <div className="grid grid-cols-2 gap-4">
-                                                            <div><Label>Border Color</Label><Input type="color" value={section.borderColor || '#333333'} onChange={e => handleUpdateLandingSection(index, 'borderColor', e.target.value)} /></div>
+                                                            <div><Label>Background Color</Label><Input type="color" value={section.borderColor || '#333333'} onChange={e => handleUpdateLandingSection(index, 'borderColor', e.target.value)} /></div>
                                                             <div><Label>Button Text Color</Label><Input type="color" value={section.buttonTextColor || '#FFFFFF'} onChange={e => handleUpdateLandingSection(index, 'buttonTextColor', e.target.value)} /></div>
                                                         </div>
                                                         <div>
