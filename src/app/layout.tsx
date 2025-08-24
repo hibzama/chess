@@ -21,9 +21,10 @@ function ThemedLayout({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!themeLoading && theme?.colors) {
             const root = document.documentElement;
-            root.style.setProperty('--primary', theme.colors.primary);
-            root.style.setProperty('--background', theme.colors.background);
-            root.style.setProperty('--accent', theme.colors.accent);
+            Object.entries(theme.colors).forEach(([key, value]) => {
+                 const cssVar = `--${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
+                 root.style.setProperty(cssVar, value);
+            });
         }
     }, [theme, themeLoading]);
 

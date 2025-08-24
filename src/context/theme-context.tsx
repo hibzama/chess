@@ -20,15 +20,33 @@ interface LandingSection {
     padding?: number;
 }
 
+interface ThemeColors {
+    background: string;
+    foreground: string;
+    card: string;
+    cardForeground: string;
+    popover: string;
+    popoverForeground: string;
+    primary: string;
+    primaryForeground: string;
+    secondary: string;
+    secondaryForeground: string;
+    muted: string;
+    mutedForeground: string;
+    accent: string;
+    accentForeground: string;
+    destructive: string;
+    destructiveForeground: string;
+    border: string;
+    input: string;
+    ring: string;
+}
+
 interface Theme {
     id: string;
     name: string;
     logoUrl?: string;
-    colors: {
-        primary: string;
-        background: string;
-        accent: string;
-    };
+    colors: ThemeColors;
     landingPage: {
         bgImageUrl: string;
         heroImageUrl: string;
@@ -56,6 +74,28 @@ interface ThemeContextType {
     theme: Theme | null;
     loading: boolean;
 }
+
+const defaultColors: ThemeColors = {
+    background: "260 69% 8%",
+    foreground: "257 20% 90%",
+    card: "260 69% 12%",
+    cardForeground: "257 20% 90%",
+    popover: "260 69% 7%",
+    popoverForeground: "257 20% 90%",
+    primary: "326 100% 60%",
+    primaryForeground: "257 20% 90%",
+    secondary: "257 41% 20%",
+    secondaryForeground: "257 20% 90%",
+    muted: "257 41% 20%",
+    mutedForeground: "257 20% 65%",
+    accent: "326 100% 60%",
+    accentForeground: "257 20% 90%",
+    destructive: "0 100% 67%",
+    destructiveForeground: "0 0% 98%",
+    border: "257 41% 20%",
+    input: "257 41% 20%",
+    ring: "326 100% 60%",
+};
 
 const defaultThemeData: Theme = {
     id: 'default',
@@ -86,11 +126,7 @@ const defaultThemeData: Theme = {
     },
     termsContent: `## 1. Introduction\nWelcome to Nexbattle. These are the terms and conditions governing your access to and use of the website Nexbattle... (Placeholder text)`,
     marketingContent: `Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.\n\nIf you are a community builder with a vision for growth, we want you on our team. Apply now to get started.`,
-    colors: {
-        primary: '326 100% 60%',
-        background: '260 69% 8%',
-        accent: '326 100% 60%',
-    }
+    colors: defaultColors,
 };
 
 // Function to initialize themes in Firestore if they don't exist
@@ -117,6 +153,7 @@ const initializeThemes = async () => {
                 ]
             },
             colors: {
+                ...defaultColors,
                 primary: '95 38% 54%',
                 background: '30 3% 18%',
                 accent: '95 38% 54%',
@@ -158,7 +195,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
             const themeSnap = await getDoc(themeRef);
 
             if (themeSnap.exists()) {
-                setTheme({ id: themeSnap.id, ...themeSnap.data() } as Theme);
+                const themeData = { id: themeSnap.id, ...themeSnap.data() } as Theme;
+                // Ensure colors object exists and has all keys, merging with defaults
+                themeData.colors = { ...defaultColors, ...themeData.colors };
+                setTheme(themeData);
             } else {
                 setTheme(defaultThemeData); // Fallback to default
             }

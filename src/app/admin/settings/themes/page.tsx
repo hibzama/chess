@@ -31,15 +31,33 @@ interface LandingSection {
     padding?: number;
 }
 
+interface ThemeColors {
+    background: string;
+    foreground: string;
+    card: string;
+    cardForeground: string;
+    popover: string;
+    popoverForeground: string;
+    primary: string;
+    primaryForeground: string;
+    secondary: string;
+    secondaryForeground: string;
+    muted: string;
+    mutedForeground: string;
+    accent: string;
+    accentForeground: string;
+    destructive: string;
+    destructiveForeground: string;
+    border: string;
+    input: string;
+    ring: string;
+}
+
 interface Theme {
     id: string;
     name: string;
     logoUrl?: string;
-    colors: {
-        primary: string; // HSL format e.g., "326 100% 60%"
-        background: string;
-        accent: string;
-    };
+    colors: ThemeColors;
     landingPage: {
         bgImageUrl: string;
         heroImageUrl: string;
@@ -195,9 +213,25 @@ export default function ThemeSettingsPage() {
             name: newThemeName,
             logoUrl: 'https://placehold.co/120x40.png',
             colors: {
-                primary: '210 40% 96.1%',
-                background: '0 0% 3.9%',
-                accent: '217.2 91.2% 59.8%',
+                background: "260 69% 8%",
+                foreground: "257 20% 90%",
+                card: "260 69% 12%",
+                cardForeground: "257 20% 90%",
+                popover: "260 69% 7%",
+                popoverForeground: "257 20% 90%",
+                primary: "326 100% 60%",
+                primaryForeground: "257 20% 90%",
+                secondary: "257 41% 20%",
+                secondaryForeground: "257 20% 90%",
+                muted: "257 41% 20%",
+                mutedForeground: "257 20% 65%",
+                accent: "326 100% 60%",
+                accentForeground: "257 20% 90%",
+                destructive: "0 100% 67%",
+                destructiveForeground: "0 0% 98%",
+                border: "257 41% 20%",
+                input: "257 41% 20%",
+                ring: "326 100% 60%",
             },
             landingPage: {
                 bgImageUrl: 'https://placehold.co/1920x1080.png',
@@ -235,6 +269,28 @@ export default function ThemeSettingsPage() {
         return <Skeleton className="w-full h-96" />;
     }
     
+    const colorFields: { key: keyof ThemeColors, label: string }[] = [
+        { key: 'primary', label: 'Primary' },
+        { key: 'primaryForeground', label: 'Primary Foreground' },
+        { key: 'secondary', label: 'Secondary' },
+        { key: 'secondaryForeground', label: 'Secondary Foreground' },
+        { key: 'accent', label: 'Accent' },
+        { key: 'accentForeground', label: 'Accent Foreground' },
+        { key: 'destructive', label: 'Destructive' },
+        { key: 'destructiveForeground', label: 'Destructive Foreground' },
+        { key: 'background', label: 'Background' },
+        { key: 'foreground', label: 'Foreground' },
+        { key: 'card', label: 'Card' },
+        { key: 'cardForeground', label: 'Card Foreground' },
+        { key: 'popover', label: 'Popover' },
+        { key: 'popoverForeground', label: 'Popover Foreground' },
+        { key: 'muted', label: 'Muted' },
+        { key: 'mutedForeground', label: 'Muted Foreground' },
+        { key: 'border', label: 'Border' },
+        { key: 'input', label: 'Input' },
+        { key: 'ring', label: 'Ring' },
+    ];
+
     return (
         <div className="space-y-8">
             <Card>
@@ -300,9 +356,12 @@ export default function ThemeSettingsPage() {
                                 <Card>
                                     <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Enter HSL values without units (e.g., 210 40% 96.1%).</CardDescription></CardHeader>
                                     <CardContent className="grid md:grid-cols-3 gap-4">
-                                        <div className="space-y-2"><Label>Primary Color</Label><Input value={editingTheme.colors?.primary || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'primary', e.target.value)} /></div>
-                                        <div className="space-y-2"><Label>Background Color</Label><Input value={editingTheme.colors?.background || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'background', e.target.value)} /></div>
-                                        <div className="space-y-2"><Label>Accent Color</Label><Input value={editingTheme.colors?.accent || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'accent', e.target.value)} /></div>
+                                        {colorFields.map(field => (
+                                            <div key={field.key} className="space-y-2">
+                                                <Label>{field.label}</Label>
+                                                <Input value={editingTheme.colors?.[field.key] || ''} onChange={e => handleUpdateNestedThemeValue('colors', field.key, e.target.value)} />
+                                            </div>
+                                        ))}
                                     </CardContent>
                                 </Card>
                             </CardContent>

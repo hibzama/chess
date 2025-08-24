@@ -27,25 +27,25 @@
   }
  
   .dark {
-    --background: 260 69% 8%;
-    --foreground: 257 20% 90%;
-    --card: 260 69% 12%;
-    --card-foreground: 257 20% 90%;
-    --popover: 260 69% 7%;
-    --popover-foreground: 257 20% 90%;
-    --primary: 326 100% 60%;
-    --primary-foreground: 257 20% 90%;
-    --secondary: 257 41% 20%;
-    --secondary-foreground: 257 20% 90%;
-    --muted: 257 41% 20%;
-    --muted-foreground: 257 20% 65%;
-    --accent: 326 100% 60%;
-    --accent-foreground: 257 20% 90%;
-    --destructive: 0 100% 67%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 257 41% 20%;
-    --input: 257 41% 20%;
-    --ring: 326 100% 60%;
+    --background: hsl(var(--background));
+    --foreground: hsl(var(--foreground));
+    --card: hsl(var(--card));
+    --card-foreground: hsl(var(--card-foreground));
+    --popover: hsl(var(--popover));
+    --popover-foreground: hsl(var(--popover-foreground));
+    --primary: hsl(var(--primary));
+    --primary-foreground: hsl(var(--primary-foreground));
+    --secondary: hsl(var(--secondary));
+    --secondary-foreground: hsl(var(--secondary-foreground));
+    --muted: hsl(var(--muted));
+    --muted-foreground: hsl(var(--muted-foreground));
+    --accent: hsl(var(--accent));
+    --accent-foreground: hsl(var(--accent-foreground));
+    --destructive: hsl(var(--destructive));
+    --destructive-foreground: hsl(var(--destructive-foreground));
+    --border: hsl(var(--border));
+    --input: hsl(var(--input));
+    --ring: hsl(var(--ring));
   }
 }
  
