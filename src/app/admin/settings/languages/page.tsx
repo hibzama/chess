@@ -2,7 +2,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,11 +13,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Link from 'next/link';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 
 export interface Language {
     id: string;
     code: string;
     name: string;
+    direction: 'ltr' | 'rtl';
 }
 
 export default function LanguageSettingsPage() {
@@ -26,6 +29,7 @@ export default function LanguageSettingsPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [newLangCode, setNewLangCode] = useState('');
     const [newLangName, setNewLangName] = useState('');
+    const [newLangDirection, setNewLangDirection] = useState<'ltr' | 'rtl'>('ltr');
     const { toast } = useToast();
 
     const fetchLanguages = async () => {
@@ -51,11 +55,13 @@ export default function LanguageSettingsPage() {
             await addDoc(collection(db, 'languages'), {
                 code: newLangCode,
                 name: newLangName,
+                direction: newLangDirection,
                 createdAt: serverTimestamp()
             });
             toast({ title: "Success", description: "Language added successfully." });
             setNewLangCode('');
             setNewLangName('');
+            setNewLangDirection('ltr');
             fetchLanguages();
         } catch (error) {
             console.error("Error adding language:", error);
@@ -86,12 +92,24 @@ export default function LanguageSettingsPage() {
                     <form onSubmit={handleAddLanguage}>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="lang-code">Language Code (e.g., en, es, si)</Label>
-                                <Input id="lang-code" value={newLangCode} onChange={(e) => setNewLangCode(e.target.value)} placeholder="si" required />
+                                <Label htmlFor="lang-code">Language Code (e.g., en, es, ar)</Label>
+                                <Input id="lang-code" value={newLangCode} onChange={(e) => setNewLangCode(e.target.value)} placeholder="ar" required />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="lang-name">Language Name</Label>
-                                <Input id="lang-name" value={newLangName} onChange={(e) => setNewLangName(e.target.value)} placeholder="Sinhala" required />
+                                <Input id="lang-name" value={newLangName} onChange={(e) => setNewLangName(e.target.value)} placeholder="Arabic" required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="lang-direction">Text Direction</Label>
+                                <Select value={newLangDirection} onValueChange={(value: 'ltr' | 'rtl') => setNewLangDirection(value)}>
+                                    <SelectTrigger id="lang-direction">
+                                        <SelectValue placeholder="Select direction" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="ltr">Left-to-Right (LTR)</SelectItem>
+                                        <SelectItem value="rtl">Right-to-Left (RTL)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </CardContent>
                         <CardFooter>
@@ -133,6 +151,7 @@ export default function LanguageSettingsPage() {
                                     <TableRow>
                                         <TableHead>Name</TableHead>
                                         <TableHead>Code</TableHead>
+                                        <TableHead>Direction</TableHead>
                                         <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -141,6 +160,7 @@ export default function LanguageSettingsPage() {
                                         <TableRow key={lang.id}>
                                             <TableCell className="font-medium">{lang.name}</TableCell>
                                             <TableCell>{lang.code}</TableCell>
+                                            <TableCell><Badge variant="secondary">{lang.direction?.toUpperCase() || 'LTR'}</Badge></TableCell>
                                             <TableCell className="text-right">
                                                 <AlertDialog>
                                                     <AlertDialogTrigger asChild>

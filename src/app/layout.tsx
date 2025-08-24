@@ -6,6 +6,7 @@ import { Inter as FontSans } from 'next/font/google';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/context/theme-context';
 import { useEffect } from 'react';
+import { useTranslationSystem } from '@/context/translation-context';
 
 const fontSans = FontSans({
   subsets: ['latin'],
@@ -14,16 +15,23 @@ const fontSans = FontSans({
 
 
 function ThemedLayout({ children }: { children: React.ReactNode }) {
-    const { theme, loading } = useTheme();
+    const { theme, loading: themeLoading } = useTheme();
+    const { currentDirection, loading: langLoading } = useTranslationSystem();
 
     useEffect(() => {
-        if (!loading && theme?.colors) {
+        if (!themeLoading && theme?.colors) {
             const root = document.documentElement;
             root.style.setProperty('--primary', theme.colors.primary);
             root.style.setProperty('--background', theme.colors.background);
             root.style.setProperty('--accent', theme.colors.accent);
         }
-    }, [theme, loading]);
+    }, [theme, themeLoading]);
+
+    useEffect(() => {
+        if (!langLoading) {
+            document.documentElement.dir = currentDirection;
+        }
+    }, [currentDirection, langLoading]);
     
     return (
         <html lang="en" className="dark" suppressHydrationWarning>
