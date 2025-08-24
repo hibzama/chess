@@ -12,8 +12,9 @@ import { useTheme } from '@/context/theme-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import ChessKingLanding from './chess-king-landing';
 
-const DefaultLanding = () => {
-    const { theme } = useTheme();
+const DefaultLanding = ({ theme }) => {
+    if (!theme) return null;
+    
     const landingFeatures = theme?.landingPage?.features || [
         'High Conversion',
         'Profitable Commission',
@@ -90,5 +91,5 @@ export default function LandingPage() {
         return <ChessKingLanding />;
     }
  
-    return <DefaultLanding />;
+    return <DefaultLanding theme={theme} />;
 }
