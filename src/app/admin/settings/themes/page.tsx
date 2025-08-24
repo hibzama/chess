@@ -46,6 +46,7 @@ interface Theme {
         email: string;
     };
     termsContent: string;
+    marketingContent: string;
 }
 
 export default function ThemeSettingsPage() {
@@ -187,6 +188,7 @@ export default function ThemeSettingsPage() {
                 email: '',
             },
             termsContent: 'Terms and conditions for the new theme.',
+            marketingContent: 'Marketing content for the new theme.'
         };
 
         try {
@@ -367,6 +369,10 @@ export default function ThemeSettingsPage() {
                         <Card>
                              <CardHeader><CardTitle>About Us Content</CardTitle><CardDescription>Use markdown-style `## Title` for headings.</CardDescription></CardHeader>
                              <CardContent><Textarea value={editingTheme.aboutContent || ''} onChange={e => handleUpdateEditingTheme('aboutContent', e.target.value)} rows={10}/></CardContent>
+                        </Card>
+                        <Card>
+                             <CardHeader><CardTitle>Join Marketing Team Content</CardTitle></CardHeader>
+                             <CardContent><Textarea value={editingTheme.marketingContent || ''} onChange={e => handleUpdateEditingTheme('marketingContent', e.target.value)} rows={6}/></CardContent>
                         </Card>
                         <Card>
                              <CardHeader><CardTitle>Support Details</CardTitle></CardHeader>

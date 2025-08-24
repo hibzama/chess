@@ -36,6 +36,7 @@ interface Theme {
         email: string;
     };
     termsContent: string;
+    marketingContent: string;
 }
 
 interface ThemeContextType {
@@ -69,6 +70,7 @@ const defaultThemeData: Theme = {
         email: "nexbattlehelp@gmail.com",
     },
     termsContent: `## 1. Introduction\nWelcome to Nexbattle. These are the terms and conditions governing your access to and use of the website Nexbattle... (Placeholder text)`,
+    marketingContent: `Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.\n\nIf you are a community builder with a vision for growth, we want you on our team. Apply now to get started.`,
     colors: {
         primary: '326 100% 60%',
         background: '260 69% 8%',
@@ -84,6 +86,7 @@ const initializeThemes = async () => {
             ...defaultThemeData,
             id: 'chess_king',
             name: 'Chess King',
+            logoUrl: 'https://i.ibb.co/L0xJ0Pj/chess-king-logo.png',
             landingPage: {
                 ...defaultThemeData.landingPage,
                 bgImageUrl: '', // Not used in the same way

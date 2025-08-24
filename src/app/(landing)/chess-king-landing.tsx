@@ -10,6 +10,15 @@ import { useTheme } from "@/context/theme-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslationSystem } from "@/context/translation-context";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import React from "react";
+
+
+const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M22 2L11 13" />
+        <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+    </svg>
+)
 
 const ChessKingLogo = () => {
     const { theme } = useTheme();
@@ -59,7 +68,20 @@ export default function ChessKingLanding() {
         return <Skeleton className="h-screen w-full" />;
     }
     
-    const { heroTitle, heroImageUrl, landingSections = [] } = theme.landingPage;
+    const { heroTitle, heroImageUrl, landingSections = [], aboutContent, supportDetails, marketingContent } = theme;
+
+     const aboutSections = aboutContent.split('## ').slice(1).map(section => {
+        const [title, ...contentParts] = section.split('\n');
+        const content = contentParts.join('\n').trim();
+        const icons: { [key: string]: React.ElementType } = {
+            "Our Mission": Sword,
+            "Multiplayer Rules & Payouts": DollarSign,
+            "Standard Referral System": Network,
+            "Marketing Partner System": Megaphone,
+            "Ranking & Leaderboards": Trophy,
+        };
+        return { title, content, icon: icons[title.trim()] || Info };
+    });
 
     return (
         <div className="flex h-screen bg-background text-white">
@@ -68,9 +90,65 @@ export default function ChessKingLanding() {
                 <div>
                     <ChessKingLogo />
                     <nav className="mt-8 space-y-2">
-                         <Button variant="ghost" asChild className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Link href="/about"><Info/> About Us</Link></Button>
-                         <Button variant="ghost" asChild className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Link href="/support"><LifeBuoy/> Support</Link></Button>
-                         <Button variant="ghost" asChild className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Link href="/marketing/register"><Trophy/> Join Marketing Team</Link></Button>
+                         <Dialog>
+                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Info/> About Us</Button></DialogTrigger>
+                             <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
+                                </DialogHeader>
+                                <ScrollArea className="h-[60vh] p-4">
+                                    <div className="space-y-6">
+                                    {aboutSections.map(section => (
+                                        <div key={section.title}>
+                                            <h3 className="font-semibold text-lg flex items-center gap-3 mb-2 text-primary">
+                                                <section.icon className="w-5 h-5"/>
+                                                {section.title}
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground whitespace-pre-line">{section.content}</p>
+                                        </div>
+                                    ))}
+                                    </div>
+                                </ScrollArea>
+                            </DialogContent>
+                        </Dialog>
+                         <Dialog>
+                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><LifeBuoy/> Support</Button></DialogTrigger>
+                             <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
+                                </DialogHeader>
+                                 <div className="space-y-4 py-4">
+                                    <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                        <a href={`tel:${supportDetails.phone}`}><Phone /> {supportDetails.phone}</a>
+                                    </Button>
+                                    <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                        <a href={`https://wa.me/${supportDetails.whatsapp}`} target="_blank" rel="noopener noreferrer"><MessageSquare/> WhatsApp</a>
+                                    </Button>
+                                    <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                        <a href={`https://t.me/${supportDetails.telegram}`} target="_blank" rel="noopener noreferrer"><TelegramIcon/> Telegram</a>
+                                    </Button>
+                                    <Button asChild className="w-full justify-start gap-3" variant="outline">
+                                        <a href={`mailto:${supportDetails.email}`}><Mail/> {supportDetails.email}</a>
+                                    </Button>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                         <Dialog>
+                            <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Trophy/> Join Marketing Team</Button></DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2"><Trophy/> Join the Marketing Team</DialogTitle>
+                                </DialogHeader>
+                                <Card className="bg-primary/5 border-primary/20 mt-4">
+                                    <CardContent className="p-6 text-sm space-y-4">
+                                        <p className="whitespace-pre-line">{marketingContent}</p>
+                                         <Button asChild className="w-full">
+                                            <Link href="/marketing/register">Apply to be a Marketer</Link>
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            </DialogContent>
+                        </Dialog>
                     </nav>
                 </div>
                  <div>

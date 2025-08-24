@@ -12,6 +12,7 @@ import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu, DollarSign
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import React from "react";
 
 const DefaultLogo = () => (
     <div className="flex items-center gap-2 text-2xl font-bold">
@@ -42,7 +43,7 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 const DefaultLandingLayout = ({ children }: { children: React.ReactNode }) => {
     const { theme } = useTheme();
-    const { aboutContent, supportDetails } = theme!;
+    const { aboutContent, supportDetails, marketingContent } = theme!;
 
     // A simplified way to parse the markdown-like content from Firestore
     const aboutSections = aboutContent.split('## ').slice(1).map(section => {
@@ -79,7 +80,6 @@ const DefaultLandingLayout = ({ children }: { children: React.ReactNode }) => {
                          <DialogContent className="max-w-2xl">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2"><Info/> About Nexbattle</DialogTitle>
-                                <DialogDescription>The ultimate platform where skill meets investment.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="h-[60vh] p-4">
                                 <div className="space-y-6">
@@ -101,9 +101,6 @@ const DefaultLandingLayout = ({ children }: { children: React.ReactNode }) => {
                          <DialogContent>
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2"><LifeBuoy/> Contact Support</DialogTitle>
-                                <DialogDescription>
-                                    Have an issue? Reach out to us through any of the channels below.
-                                </DialogDescription>
                             </DialogHeader>
                              <div className="space-y-4 py-4">
                                 <Button asChild className="w-full justify-start gap-3" variant="outline">
@@ -126,14 +123,10 @@ const DefaultLandingLayout = ({ children }: { children: React.ReactNode }) => {
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2"><Trophy/> Join the Marketing Team</DialogTitle>
-                                <DialogDescription>
-                                    Supercharge your earnings by joining our official Marketing Partner program.
-                                </DialogDescription>
                             </DialogHeader>
                             <Card className="bg-primary/5 border-primary/20 mt-4">
                                 <CardContent className="p-6 text-sm space-y-4">
-                                    <p>Our Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn a 3% commission from every game played by a vast network of players, creating a significant passive income stream.</p>
-                                    <p className="text-muted-foreground">If you are a community builder with a vision for growth, we want you on our team. Apply now to get started.</p>
+                                    <p className="whitespace-pre-line">{marketingContent}</p>
                                      <Button asChild className="w-full">
                                         <Link href="/marketing/register">Apply to be a Marketer</Link>
                                     </Button>
