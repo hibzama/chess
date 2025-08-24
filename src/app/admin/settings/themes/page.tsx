@@ -286,20 +286,20 @@ export default function ThemeSettingsPage() {
                             </CardContent>
                         </Card>
                         <Card>
-                             <CardHeader><CardTitle>About Us Content</CardTitle></CardHeader>
+                             <CardHeader><CardTitle>About Us Content</CardTitle><CardDescription>Use markdown-style `## Title` for headings.</CardDescription></CardHeader>
                              <CardContent><Textarea value={editingTheme.aboutContent || ''} onChange={e => handleUpdateEditingTheme('aboutContent', e.target.value)} rows={10}/></CardContent>
                         </Card>
                         <Card>
                              <CardHeader><CardTitle>Support Details</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="space-y-2"><Label>Phone</Label><Input value={editingTheme.supportDetails.phone || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'phone', e.target.value)} /></div>
-                                <div className="space-y-2"><Label>WhatsApp</Label><Input value={editingTheme.supportDetails.whatsapp || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'whatsapp', e.target.value)} /></div>
-                                <div className="space-y-2"><Label>Telegram</Label><Input value={editingTheme.supportDetails.telegram || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'telegram', e.target.value)} /></div>
-                                <div className="space-y-2"><Label>Email</Label><Input value={editingTheme.supportDetails.email || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'email', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>Phone</Label><Input value={editingTheme.supportDetails?.phone || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'phone', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>WhatsApp (include country code, no +)</Label><Input value={editingTheme.supportDetails?.whatsapp || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'whatsapp', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>Telegram Username (without @)</Label><Input value={editingTheme.supportDetails?.telegram || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'telegram', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>Email</Label><Input value={editingTheme.supportDetails?.email || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'email', e.target.value)} /></div>
                             </CardContent>
                         </Card>
                          <Card>
-                             <CardHeader><CardTitle>Terms & Conditions</CardTitle></CardHeader>
+                             <CardHeader><CardTitle>Terms & Conditions Content</CardTitle><CardDescription>Use markdown-style `## Title` for headings.</CardDescription></CardHeader>
                              <CardContent><Textarea value={editingTheme.termsContent || ''} onChange={e => handleUpdateEditingTheme('termsContent', e.target.value)} rows={10} /></CardContent>
                         </Card>
                     </CardContent>

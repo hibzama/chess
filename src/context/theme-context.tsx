@@ -40,7 +40,7 @@ const defaultThemeData: Theme = {
     name: 'Default',
     landingPage: {
         bgImageUrl: "https://allnews.ltd/wp-content/uploads/2025/07/futuristic-video-game-controller-background-with-text-space_1017-54730.avif",
-        heroImageUrl: "https://allnews.ltd/wp-content/uploads/2025/07/video-game-controller-with-bright-neon-light-streaks-computer-gamer-background-3d-octane-render-game-concept-ideas-ai-generative-free-photo.jpg",
+        heroImageUrl: "https://i.postimg.cc/CL41DGdt/video-game-controller-with-bright-neon-light-streaks-computer-gamer-background-3d-octane-render-game.jpg",
         heroTitle: "Your Skill is Your Investment",
         heroSubtitle: "Your earnings are unlimited and have no restrictions. Promote Nexbattle and start increasing your earnings today!",
         apkUrl: "#",
@@ -58,7 +58,7 @@ const defaultThemeData: Theme = {
         telegram: "nexbattle_help",
         email: "nexbattlehelp@gmail.com",
     },
-    termsContent: `## 1. Introduction\nWelcome to Nexbattle. These are the terms and conditions governing your access to and use of the website Nexbattle...\n\n(Complete terms here)`,
+    termsContent: `## 1. Introduction\nWelcome to Nexbattle. These are the terms and conditions governing your access to and use of the website Nexbattle... (Placeholder text)`,
     colors: {
         primary: '326 100% 60%',
         background: '260 69% 8%',

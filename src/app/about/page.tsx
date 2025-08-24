@@ -2,41 +2,44 @@
 'use client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTranslation } from '@/hooks/use-translation';
-import { DollarSign, Network, Megaphone, Sword, Trophy } from 'lucide-react';
+import { DollarSign, Network, Megaphone, Sword, Trophy, Info } from 'lucide-react';
 import Link from 'next/link';
+import { useTheme } from '@/context/theme-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AboutPage() {
     const t = useTranslation;
+    const { theme, loading } = useTheme();
 
-    const sections = [
-        {
-            title: "Our Mission",
-            content: "Nexbattle is the ultimate online arena where strategy, skill, and stakes collide. We provide a secure and engaging platform for Chess and Checkers enthusiasts to compete for real rewards, fostering a global community of strategic thinkers.",
-            icon: Sword,
-        },
-        {
-            title: "Multiplayer Rules & Payouts",
-            content: "In Multiplayer Mode, your wager is your investment. A standard win by checkmate, timeout, or capturing all pieces earns you a 180% return. If the game ends in a draw, both players receive a 90% refund. To ensure fair play, if you resign or abandon a match, you still get a 75% refund, while your opponent is rewarded with a 105% payout for their time.",
-            icon: DollarSign,
-        },
-        {
-            title: "Standard Referral System",
-            content: "Every user can earn by inviting friends. Share your unique referral link, and when someone signs up, they become your Level 1 referral. You'll earn a commission from every game they play. The more direct referrals you have, the higher your commission rate becomes.",
-            icon: Network,
-        },
-        {
-            title: "Marketing Partner System",
-            content: "For our most dedicated community builders, the Marketing Partner Program unlocks a powerful 20-level deep referral network. As a marketer, you earn commissions from a vast network of players, creating a significant passive income stream. Anyone can apply to join the team.",
-            link: "/marketing/register",
-            linkText: "Apply to be a Marketer",
-            icon: Megaphone
-        },
-        {
-            title: "Ranking & Leaderboards",
-            content: "Your legacy is built on wins. Accumulate victories across both Chess and Checkers to increase your level and unlock prestigious Rank Titles, from 'Beginner' to 'Immortal'. Compete against everyone on the platform to climb the live World Rank leaderboard.",
-            icon: Trophy
-        }
-    ];
+    if (loading || !theme) {
+        return (
+            <div className="space-y-12">
+                <div className="text-center">
+                    <Skeleton className="h-10 w-1/2 mx-auto" />
+                    <Skeleton className="h-5 w-3/4 mx-auto mt-2" />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                    {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-48 w-full" />)}
+                </div>
+            </div>
+        )
+    }
+
+    const sections = theme.aboutContent.split('## ').slice(1).map(section => {
+        const [title, ...contentParts] = section.split('\n');
+        const content = contentParts.join('\n').trim();
+        const icons: { [key: string]: React.ElementType } = {
+            "Our Mission": Sword,
+            "Multiplayer Rules & Payouts": DollarSign,
+            "Standard Referral System": Network,
+            "Marketing Partner System": Megaphone,
+            "Ranking & Leaderboards": Trophy,
+        };
+        const link = content.includes('/marketing/register') ? '/marketing/register' : undefined;
+        const linkText = link ? 'Apply to be a Marketer' : undefined;
+        return { title: title.trim(), content, icon: icons[title.trim()] || Info, link, linkText };
+    });
+
 
     return (
         <div className="space-y-12">
@@ -57,7 +60,7 @@ export default function AboutPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                           <p className="text-muted-foreground">{t(section.content)}</p>
+                           <p className="text-muted-foreground whitespace-pre-line">{t(section.content)}</p>
                            {section.link && (
                                <Link href={section.link} className="text-primary font-semibold hover:underline mt-4 inline-block">
                                     {t(section.linkText as string)} &rarr;
