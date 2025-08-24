@@ -103,8 +103,12 @@ const initializeThemes = async () => {
                 playingNow: '168,623',
                 gamesToday: '19,057,572',
                 landingSections: [
-                    { title: "Play vs customizable training bots from total beginner to master.", buttonText: "Play vs Computer", image: "https://placehold.co/400x250.png", aiHint: "chess computer" },
-                    { title: "Play online with over 100 million members from around the world.", buttonText: "Play Online", image: "https://placehold.co/400x250.png", aiHint: "chess world" },
+                    { title: "Play vs customizable training bots from total beginner to master.", buttonText: "Play vs Computer", image: "https://i.postimg.cc/44N8XfW6/index-computervs-1f9f5a6b-2x.png", aiHint: "chess computer" },
+                    { title: "Play online with over 100 million members from around the world.", buttonText: "Play Online", image: "https://i.postimg.cc/Qx7p6M2P/index-play-friend-2e3d362e-2x.png", aiHint: "chess world" },
+                    { title: "About Our Multiplayer System", buttonText: "Learn More", image: "https://placehold.co/400x250.png", aiHint: "multiplayer system" },
+                    { title: "About Our Earning System", buttonText: "Learn More", image: "https://placehold.co/400x250.png", aiHint: "earning system" },
+                    { title: "About Our Referral Campaigns", buttonText: "Learn More", image: "https://placehold.co/400x250.png", aiHint: "referral campaign" },
+                    { title: "About Our Main Marketing System", buttonText: "Learn More", image: "https://placehold.co/400x250.png", aiHint: "marketing system" },
                 ]
             },
             colors: {
