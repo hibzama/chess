@@ -265,6 +265,7 @@ export default function ThemeSettingsPage() {
                         <CardDescription>Make changes to the content for this theme.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        {/* Common Settings */}
                         <Card>
                              <CardHeader><CardTitle>General Settings</CardTitle></CardHeader>
                              <CardContent className="space-y-4">
@@ -275,104 +276,67 @@ export default function ThemeSettingsPage() {
                                 <Card>
                                     <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Enter HSL values without units (e.g., 210 40% 96.1%).</CardDescription></CardHeader>
                                     <CardContent className="grid md:grid-cols-3 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Primary Color</Label>
-                                            <Input value={editingTheme.colors?.primary || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'primary', e.target.value)} />
-                                        </div>
-                                         <div className="space-y-2">
-                                            <Label>Background Color</Label>
-                                            <Input value={editingTheme.colors?.background || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'background', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Accent Color</Label>
-                                            <Input value={editingTheme.colors?.accent || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'accent', e.target.value)} />
-                                        </div>
+                                        <div className="space-y-2"><Label>Primary Color</Label><Input value={editingTheme.colors?.primary || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'primary', e.target.value)} /></div>
+                                        <div className="space-y-2"><Label>Background Color</Label><Input value={editingTheme.colors?.background || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'background', e.target.value)} /></div>
+                                        <div className="space-y-2"><Label>Accent Color</Label><Input value={editingTheme.colors?.accent || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'accent', e.target.value)} /></div>
                                     </CardContent>
                                 </Card>
                             </CardContent>
                         </Card>
+
+                        {/* Theme Specific Settings */}
                         <Card>
-                            <CardHeader><CardTitle>Landing Page</CardTitle></CardHeader>
+                            <CardHeader><CardTitle>Landing Page Content</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="grid md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Playing Now Count</Label>
-                                        <Input value={editingTheme.landingPage.playingNow || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'playingNow', e.target.value)} />
+                                {editingTheme.id === 'chess_king' && (
+                                    <div className="space-y-4">
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="space-y-2"><Label>Playing Now Count</Label><Input value={editingTheme.landingPage.playingNow || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'playingNow', e.target.value)} /></div>
+                                            <div className="space-y-2"><Label>Games Today Count</Label><Input value={editingTheme.landingPage.gamesToday || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'gamesToday', e.target.value)} /></div>
+                                        </div>
+                                        <Separator />
+                                        <div className="space-y-2"><Label>Banner Image URL</Label><Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} /></div>
+                                        <div className="space-y-2"><Label>Banner Title (use `\n` for new lines)</Label><Textarea value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} /></div>
+                                        
+                                        <div className="space-y-4 border-t pt-4">
+                                            <h3 className="text-lg font-semibold">Feature Sections</h3>
+                                            {(editingTheme.landingPage.landingSections || []).map((section, index) => (
+                                                <Card key={index} className="p-4 bg-muted/50">
+                                                    <div className="flex justify-between items-center mb-2"><h4 className="font-semibold">Section {index + 1}</h4><Button variant="destructive" size="icon" onClick={() => handleRemoveLandingSection(index)}><Trash2 className="w-4 h-4" /></Button></div>
+                                                    <div className="space-y-2">
+                                                        <Label>Title</Label><Input value={section.title || ''} onChange={e => handleUpdateLandingSection(index, 'title', e.target.value)} />
+                                                        <Label>Image URL</Label><Input value={section.image || ''} onChange={e => handleUpdateLandingSection(index, 'image', e.target.value)} />
+                                                        <Label>Button Text</Label><Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
+                                                        <Label>AI Image Hint</Label><Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
+                                                    </div>
+                                                </Card>
+                                            ))}
+                                            <Button variant="outline" onClick={handleAddLandingSection}><PlusCircle className="mr-2"/> Add Section</Button>
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Games Today Count</Label>
-                                        <Input value={editingTheme.landingPage.gamesToday || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'gamesToday', e.target.value)} />
-                                    </div>
-                                </div>
-                                <Separator />
-                                
-                                <div className="space-y-2">
-                                    <Label>Background Image URL</Label>
-                                    <Input value={editingTheme.landingPage.bgImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Hero/Banner Image URL</Label>
-                                    <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Hero Title (use `\n` for new lines)</Label>
-                                    <Textarea value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Hero Subtitle</Label>
-                                    <Textarea value={editingTheme.landingPage.heroSubtitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
-                                </div>
-                                
-                                 <div className="space-y-2">
-                                    <Label>Download APK URL</Label>
-                                    <Input value={editingTheme.landingPage.apkUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'apkUrl', e.target.value)} placeholder="https://example.com/app.apk"/>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Landing Page Features (for Default theme)</Label>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {(editingTheme.landingPage.features || ['', '', '', '']).map((feature, index) => (
-                                            <Input 
-                                                key={index}
-                                                value={feature || ''}
-                                                onChange={e => handleUpdateLandingFeature(index, e.target.value)}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="space-y-4 border-t pt-4">
-                                    <h3 className="text-lg font-semibold">Feature Sections</h3>
-                                    {(editingTheme.landingPage.landingSections || []).map((section, index) => (
-                                        <Card key={index} className="p-4 bg-muted/50">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <h4 className="font-semibold">Section {index + 1}</h4>
-                                                <Button variant="destructive" size="icon" onClick={() => handleRemoveLandingSection(index)}><Trash2 className="w-4 h-4" /></Button>
+                                )}
+                                {editingTheme.id === 'default' && (
+                                     <div className="space-y-4">
+                                        <div className="space-y-2"><Label>Background Image URL</Label><Input value={editingTheme.landingPage.bgImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} /></div>
+                                        <div className="space-y-2"><Label>Hero/Banner Image URL</Label><Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} /></div>
+                                        <div className="space-y-2"><Label>Hero Title</Label><Textarea value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} /></div>
+                                        <div className="space-y-2"><Label>Hero Subtitle</Label><Textarea value={editingTheme.landingPage.heroSubtitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} /></div>
+                                        <div className="space-y-2"><Label>Download APK URL</Label><Input value={editingTheme.landingPage.apkUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'apkUrl', e.target.value)} placeholder="https://example.com/app.apk"/></div>
+                                        <div className="space-y-2">
+                                            <Label>Landing Page Features</Label>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {(editingTheme.landingPage.features || ['', '', '', '']).map((feature, index) => (<Input key={index} value={feature || ''} onChange={e => handleUpdateLandingFeature(index, e.target.value)}/>))}
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>Title</Label>
-                                                <Input value={section.title || ''} onChange={e => handleUpdateLandingSection(index, 'title', e.target.value)} />
-                                                <Label>Image URL</Label>
-                                                <Input value={section.image || ''} onChange={e => handleUpdateLandingSection(index, 'image', e.target.value)} />
-                                                <Label>Button Text</Label>
-                                                <Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
-                                                 <Label>AI Image Hint</Label>
-                                                <Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
-                                            </div>
-                                        </Card>
-                                    ))}
-                                    <Button variant="outline" onClick={handleAddLandingSection}><PlusCircle className="mr-2"/> Add Section</Button>
-                                </div>
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
-                        <Card>
-                             <CardHeader><CardTitle>About Us Content</CardTitle><CardDescription>Use markdown-style `## Title` for headings.</CardDescription></CardHeader>
-                             <CardContent><Textarea value={editingTheme.aboutContent || ''} onChange={e => handleUpdateEditingTheme('aboutContent', e.target.value)} rows={10}/></CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader><CardTitle>Join Marketing Team Content</CardTitle></CardHeader>
-                             <CardContent><Textarea value={editingTheme.marketingContent || ''} onChange={e => handleUpdateEditingTheme('marketingContent', e.target.value)} rows={6}/></CardContent>
-                        </Card>
-                        <Card>
-                             <CardHeader><CardTitle>Support Details</CardTitle></CardHeader>
+                        
+                        {/* Common Content Sections */}
+                        <Card><CardHeader><CardTitle>About Us Content</CardTitle><CardDescription>Use markdown-style `## Title` for headings.</CardDescription></CardHeader><CardContent><Textarea value={editingTheme.aboutContent || ''} onChange={e => handleUpdateEditingTheme('aboutContent', e.target.value)} rows={10}/></CardContent></Card>
+                        <Card><CardHeader><CardTitle>Join Marketing Team Content</CardTitle></CardHeader><CardContent><Textarea value={editingTheme.marketingContent || ''} onChange={e => handleUpdateEditingTheme('marketingContent', e.target.value)} rows={6}/></CardContent></Card>
+                        <Card><CardHeader><CardTitle>Support Details</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="space-y-2"><Label>Phone</Label><Input value={editingTheme.supportDetails?.phone || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'phone', e.target.value)} /></div>
                                 <div className="space-y-2"><Label>WhatsApp (include country code, no +)</Label><Input value={editingTheme.supportDetails?.whatsapp || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'whatsapp', e.target.value)} /></div>
@@ -380,10 +344,7 @@ export default function ThemeSettingsPage() {
                                 <div className="space-y-2"><Label>Email</Label><Input value={editingTheme.supportDetails?.email || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'email', e.target.value)} /></div>
                             </CardContent>
                         </Card>
-                         <Card>
-                             <CardHeader><CardTitle>Terms & Conditions Content</CardTitle><CardDescription>Use markdown-style `## Title` for headings.</CardDescription></CardHeader>
-                             <CardContent><Textarea value={editingTheme.termsContent || ''} onChange={e => handleUpdateEditingTheme('termsContent', e.target.value)} rows={10} /></CardContent>
-                        </Card>
+                         <Card><CardHeader><CardTitle>Terms & Conditions Content</CardTitle><CardDescription>Use markdown-style `## Title` for headings.</CardDescription></CardHeader><CardContent><Textarea value={editingTheme.termsContent || ''} onChange={e => handleUpdateEditingTheme('termsContent', e.target.value)} rows={10} /></CardContent></Card>
                     </CardContent>
                     <CardFooter className="gap-4">
                         <Button onClick={handleSaveThemeDetails} disabled={saving}>{saving ? <Loader2 className="animate-spin"/> : 'Save Changes'}</Button>
