@@ -7,10 +7,17 @@ import { doc, getDoc, onSnapshot, collection, setDoc } from 'firebase/firestore'
 interface Theme {
     id: string;
     name: string;
+    colors: {
+        primary: string;
+        background: string;
+        accent: string;
+    };
     landingPage: {
         bgImageUrl: string;
         heroTitle: string;
         heroSubtitle: string;
+        apkUrl?: string;
+        features?: string[];
     };
     aboutContent: string;
     supportDetails: {
@@ -34,6 +41,13 @@ const defaultThemeData: Theme = {
         bgImageUrl: "https://allnews.ltd/wp-content/uploads/2025/07/futuristic-video-game-controller-background-with-text-space_1017-54730.avif",
         heroTitle: "Your Skill is Your Investment",
         heroSubtitle: "Your earnings are unlimited and have no restrictions. Promote Nexbattle and start increasing your earnings today!",
+        apkUrl: "#",
+        features: [
+            "High Conversion",
+            "Profitable Commission",
+            "Real-Time Statistics",
+            "Marketing Support"
+        ],
     },
     aboutContent: `## Our Mission\nNexbattle is the ultimate online arena where strategy, skill, and stakes collide. We provide a secure and engaging platform for Chess and Checkers enthusiasts to compete for real rewards, fostering a global community of strategic thinkers.\n\n## Multiplayer Rules & Payouts\nIn Multiplayer Mode, your wager is your investment. A standard win earns you a 180% return. A draw results in a 90% refund. If you resign, you get a 75% refund, while your opponent gets a 105% payout.`,
     supportDetails: {
@@ -42,7 +56,12 @@ const defaultThemeData: Theme = {
         telegram: "nexbattle_help",
         email: "nexbattlehelp@gmail.com",
     },
-    termsContent: `## 1. Introduction\nWelcome to Nexbattle. These are the terms and conditions governing your access to and use of the website Nexbattle...\n\n(Complete terms here)`
+    termsContent: `## 1. Introduction\nWelcome to Nexbattle. These are the terms and conditions governing your access to and use of the website Nexbattle...\n\n(Complete terms here)`,
+    colors: {
+        primary: '326 100% 60%',
+        background: '260 69% 8%',
+        accent: '326 100% 60%',
+    }
 };
 
 // Function to initialize themes in Firestore if they don't exist
@@ -57,6 +76,11 @@ const initializeThemes = async () => {
                 bgImageUrl: 'https://placehold.co/1920x1080.png',
                 heroTitle: 'Become the King of Chess',
                 heroSubtitle: 'Join the ultimate chess arena and prove your royalty. Wager, win, and rule the leaderboard.'
+            },
+            colors: {
+                primary: '45 100% 50%',
+                background: '240 10% 3.9%',
+                accent: '45 100% 50%',
             },
         }
     };

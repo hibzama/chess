@@ -25,6 +25,8 @@ interface Theme {
         bgImageUrl: string;
         heroTitle: string;
         heroSubtitle: string;
+        apkUrl?: string;
+        features?: string[];
     };
     aboutContent: string;
     supportDetails: {
@@ -88,8 +90,15 @@ export default function ThemeSettingsPage() {
         if (!editingTheme) return;
         setEditingTheme(prev => ({ ...prev!, [field]: value }));
     };
+    
+    const handleUpdateLandingFeature = (index: number, value: string) => {
+        if (!editingTheme) return;
+        const newFeatures = [...(editingTheme.landingPage.features || [])];
+        newFeatures[index] = value;
+        handleUpdateNestedThemeValue('landingPage', 'features', newFeatures);
+    }
 
-    const handleUpdateNestedThemeValue = (section: keyof Theme, field: string, value: string) => {
+    const handleUpdateNestedThemeValue = (section: keyof Theme, field: string, value: string | string[]) => {
         if (!editingTheme) return;
         setEditingTheme(prev => ({
             ...prev!,
@@ -135,6 +144,8 @@ export default function ThemeSettingsPage() {
                 bgImageUrl: 'https://placehold.co/1920x1080.png',
                 heroTitle: 'New Theme Title',
                 heroSubtitle: 'New theme subtitle goes here.',
+                 apkUrl: '#',
+                features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4']
             },
             aboutContent: 'About content for the new theme.',
             supportDetails: {
@@ -246,6 +257,26 @@ export default function ThemeSettingsPage() {
                                     <Label>Hero Subtitle</Label>
                                     <Textarea value={editingTheme.landingPage.heroSubtitle} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
                                 </div>
+                                {editingTheme.id === 'default' && (
+                                <>
+                                 <div className="space-y-2">
+                                    <Label>Download APK URL</Label>
+                                    <Input value={editingTheme.landingPage.apkUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'apkUrl', e.target.value)} placeholder="https://example.com/app.apk"/>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Landing Page Features</Label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {(editingTheme.landingPage.features || []).map((feature, index) => (
+                                            <Input 
+                                                key={index}
+                                                value={feature}
+                                                onChange={e => handleUpdateLandingFeature(index, e.target.value)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                                </>
+                                )}
                             </CardContent>
                         </Card>
                         <Card>
