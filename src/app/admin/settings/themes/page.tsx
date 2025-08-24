@@ -1,3 +1,4 @@
+
 'use client'
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
@@ -12,6 +13,7 @@ import { Palette, Check, Loader2, Edit, PlusCircle, Trash2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface LandingSection {
     title: string;
