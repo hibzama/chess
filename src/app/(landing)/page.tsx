@@ -21,6 +21,7 @@ const DefaultLanding = () => {
         'Marketing Support'
     ];
     const apkUrl = theme?.landingPage?.apkUrl || '#';
+    const heroImageUrl = theme?.landingPage.heroImageUrl;
 
     return (
     <div className="flex flex-col min-h-[calc(100vh-5rem)]">
@@ -53,13 +54,17 @@ const DefaultLanding = () => {
             </div>
             <div className="hero-image">
                 <div className="relative w-full h-full min-h-[300px] md:min-h-[400px] rounded-2xl overflow-hidden shadow-2xl shadow-primary/20">
-                    <Image
-                        src={theme?.landingPage.heroImageUrl || ''}
-                        alt="Hero Image"
-                        fill
-                        className="object-cover animate-zoom-in-out"
-                        data-ai-hint="neon gamepad"
-                    />
+                    {heroImageUrl ? (
+                        <Image
+                            src={heroImageUrl}
+                            alt="Hero Image"
+                            fill
+                            className="object-cover animate-zoom-in-out"
+                            data-ai-hint="neon gamepad"
+                        />
+                    ) : (
+                        <Skeleton className="h-full w-full" />
+                    )}
                 </div>
             </div>
         </section>
