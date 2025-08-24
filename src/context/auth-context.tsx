@@ -18,6 +18,7 @@ export interface GameAvailability {
     practiceCheckers: boolean;
     multiplayerCheckers: boolean;
     practiceOmi: boolean;
+    puzzles: boolean;
 }
 
 interface AuthContextType {
@@ -86,6 +87,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     practiceCheckers: true,
     multiplayerCheckers: true,
     practiceOmi: true,
+    puzzles: true,
   });
   const [loading, setLoading] = useState(true);
 

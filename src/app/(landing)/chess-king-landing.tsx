@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import React from "react";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "@/hooks/use-translation";
+import { useAuth } from "@/context/auth-context";
 
 
 const T = ({ children }: { children: string }) => {
@@ -73,6 +74,7 @@ const LanguageSwitcher = () => {
 
 export default function ChessKingLanding() {
     const { theme, loading: themeLoading } = useTheme();
+    const { gameAvailability } = useAuth();
 
     if (themeLoading || !theme) {
         return <Skeleton className="h-screen w-full" />;
@@ -117,7 +119,7 @@ export default function ChessKingLanding() {
                         <ChessKingLogo />
                     </div>
                     <nav className="mt-8 space-y-2">
-                        <Link href="/puzzles"><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Puzzle/> <T>Puzzles</T></Button></Link>
+                        {gameAvailability.puzzles && <Link href="/puzzles"><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Puzzle/> <T>Puzzles</T></Button></Link>}
                          <Dialog>
                             <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Info/> <T>About Us</T></Button></DialogTrigger>
                              <DialogContent className="max-w-2xl">

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Gamepad2, Loader2, BrainCircuit, Layers, Spade } from 'lucide-react';
+import { Gamepad2, Loader2, BrainCircuit, Layers, Spade, Puzzle } from 'lucide-react';
 import { GameAvailability } from '@/context/auth-context';
 
 
@@ -20,6 +20,7 @@ export default function GameAvailabilityPage() {
         practiceCheckers: true,
         multiplayerCheckers: true,
         practiceOmi: true,
+        puzzles: true,
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -59,12 +60,13 @@ export default function GameAvailabilityPage() {
         return <Skeleton className="w-full h-96" />
     }
 
-    const gameModes: { key: keyof GameAvailability; label: string; icon: React.ReactNode, type: 'practice' | 'multiplayer' }[] = [
+    const gameModes: { key: keyof GameAvailability; label: string; icon: React.ReactNode, type: 'practice' | 'multiplayer' | 'feature' }[] = [
         { key: 'practiceChess', label: 'Practice Chess', icon: <BrainCircuit />, type: 'practice' },
         { key: 'multiplayerChess', label: 'Multiplayer Chess', icon: <BrainCircuit />, type: 'multiplayer' },
         { key: 'practiceCheckers', label: 'Practice Checkers', icon: <Layers />, type: 'practice' },
         { key: 'multiplayerCheckers', label: 'Multiplayer Checkers', icon: <Layers />, type: 'multiplayer' },
         { key: 'practiceOmi', label: 'Practice Omi', icon: <Spade />, type: 'practice' },
+        { key: 'puzzles', label: 'Puzzles', icon: <Puzzle />, type: 'feature' },
     ];
 
     return (
@@ -83,7 +85,7 @@ export default function GameAvailabilityPage() {
                                     <div className="space-y-0.5">
                                         <Label htmlFor={mode.key} className="text-base">{mode.label}</Label>
                                         <p className="text-sm text-muted-foreground capitalize">
-                                        {mode.type} Mode
+                                        {mode.type}
                                         </p>
                                     </div>
                                 </div>

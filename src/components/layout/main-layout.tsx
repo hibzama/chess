@@ -177,7 +177,7 @@ export default function MainLayout({
   }: {
     children: React.ReactNode,
   }) {
-    const { logout, userData, loading, currencyConfig } = useAuth();
+    const { logout, userData, loading, currencyConfig, gameAvailability } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [isMounted, setIsMounted] = React.useState(false);
@@ -201,7 +201,7 @@ export default function MainLayout({
 
     const isMarketer = userData?.role === 'marketer';
     
-    const sidebarItems = isMarketer ? [
+    const sidebarItems = useMemo(() => isMarketer ? [
         { href: '/marketing/dashboard', icon: LayoutGrid, label: 'Dashboard' },
         { href: '/marketing/dashboard/wallet', icon: Wallet, label: 'Commission Wallet' },
     ] : [
@@ -213,12 +213,12 @@ export default function MainLayout({
         { href: '/dashboard/your-task', icon: ClipboardCheck, label: 'Your Tasks', condition: !!userData?.campaignInfo },
         { href: '/dashboard/friends', icon: Users, label: 'Friends & Community' },
         { href: '/dashboard/rankings', icon: Trophy, label: 'Rankings' },
-        { href: '/puzzles', icon: Puzzle, label: 'Puzzles' },
+        { href: '/puzzles', icon: Puzzle, label: 'Puzzles', condition: gameAvailability.puzzles },
         { href: '/dashboard/equipment', icon: Gamepad2, label: 'My Equipment' },
         { href: '/dashboard/referral-campaigns', icon: Award, label: 'Referral Campaigns' },
         { href: '/dashboard/chat', icon: MessageSquare, label: 'Direct Messages' },
         { href: '/about', icon: Info, label: 'About Us' },
-    ];
+    ], [isMarketer, userData?.campaignInfo, gameAvailability.puzzles]);
 
 
     return (
