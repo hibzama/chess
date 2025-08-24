@@ -28,7 +28,7 @@ export default function WinningMaterialPage() {
                     </p>
                 </CardContent>
                  <CardFooter className="flex-col items-start gap-4">
-                    <Button variant="outline" className="w-full">Next Puzzle</Button>
+                    <Button className="w-full" onClick={() => window.location.reload()}>Next Puzzle</Button>
                     <Button asChild variant="ghost" className="w-full justify-start text-muted-foreground">
                         <Link href="/puzzles"><ArrowLeft className="mr-2"/> Back to Puzzles</Link>
                     </Button>
