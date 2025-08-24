@@ -305,46 +305,30 @@ export default function ThemeSettingsPage() {
                                     </div>
                                 </div>
                                 <Separator />
-                                {editingTheme.id === 'chess_king' ? (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label>Banner Image URL (Illustration)</Label>
-                                            <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Banner Title (use `\n` for new lines)</Label>
-                                            <Textarea value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
-                                        </div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="space-y-2">
-                                            <Label>Background Image URL</Label>
-                                            <Input value={editingTheme.landingPage.bgImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Hero/Banner Image URL</Label>
-                                            <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Hero Title</Label>
-                                            <Input value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Hero Subtitle</Label>
-                                            <Textarea value={editingTheme.landingPage.heroSubtitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
-                                        </div>
-                                    </>
-                                )}
                                 
-                                {editingTheme.id === 'default' && (
-                                <>
+                                <div className="space-y-2">
+                                    <Label>Background Image URL</Label>
+                                    <Input value={editingTheme.landingPage.bgImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Hero/Banner Image URL</Label>
+                                    <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Hero Title (use `\n` for new lines)</Label>
+                                    <Textarea value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Hero Subtitle</Label>
+                                    <Textarea value={editingTheme.landingPage.heroSubtitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
+                                </div>
+                                
                                  <div className="space-y-2">
                                     <Label>Download APK URL</Label>
                                     <Input value={editingTheme.landingPage.apkUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'apkUrl', e.target.value)} placeholder="https://example.com/app.apk"/>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Landing Page Features</Label>
+                                    <Label>Landing Page Features (for Default theme)</Label>
                                     <div className="grid grid-cols-2 gap-4">
                                         {(editingTheme.landingPage.features || ['', '', '', '']).map((feature, index) => (
                                             <Input 
@@ -355,8 +339,6 @@ export default function ThemeSettingsPage() {
                                         ))}
                                     </div>
                                 </div>
-                                </>
-                                )}
                                 <div className="space-y-4 border-t pt-4">
                                     <h3 className="text-lg font-semibold">Feature Sections</h3>
                                     {(editingTheme.landingPage.landingSections || []).map((section, index) => (

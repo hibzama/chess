@@ -69,8 +69,8 @@ export default function ChessKingLanding() {
         return <Skeleton className="h-screen w-full" />;
     }
     
-    const { heroTitle, heroImageUrl, landingPage, landingSections = [], aboutContent, supportDetails, marketingContent } = theme;
-    const { playingNow, gamesToday } = landingPage || {};
+    const { landingPage, aboutContent, supportDetails, marketingContent } = theme;
+    const { heroTitle, heroImageUrl, landingSections = [], playingNow, gamesToday } = landingPage || {};
 
 
      const aboutSections = (aboutContent || '').split('## ').slice(1).map(section => {
