@@ -23,6 +23,7 @@ interface Theme {
     };
     landingPage: {
         bgImageUrl: string;
+        heroImageUrl: string;
         heroTitle: string;
         heroSubtitle: string;
         apkUrl?: string;
@@ -142,6 +143,7 @@ export default function ThemeSettingsPage() {
             },
             landingPage: {
                 bgImageUrl: 'https://placehold.co/1920x1080.png',
+                heroImageUrl: 'https://placehold.co/600x400.png',
                 heroTitle: 'New Theme Title',
                 heroSubtitle: 'New theme subtitle goes here.',
                  apkUrl: '#',
@@ -248,6 +250,10 @@ export default function ThemeSettingsPage() {
                                 <div className="space-y-2">
                                     <Label>Background Image URL</Label>
                                     <Input value={editingTheme.landingPage.bgImageUrl} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
+                                </div>
+                                 <div className="space-y-2">
+                                    <Label>Hero/Banner Image URL</Label>
+                                    <Input value={editingTheme.landingPage.heroImageUrl} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Hero Title</Label>

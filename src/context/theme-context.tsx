@@ -14,6 +14,7 @@ interface Theme {
     };
     landingPage: {
         bgImageUrl: string;
+        heroImageUrl: string;
         heroTitle: string;
         heroSubtitle: string;
         apkUrl?: string;
@@ -39,6 +40,7 @@ const defaultThemeData: Theme = {
     name: 'Default',
     landingPage: {
         bgImageUrl: "https://allnews.ltd/wp-content/uploads/2025/07/futuristic-video-game-controller-background-with-text-space_1017-54730.avif",
+        heroImageUrl: "https://allnews.ltd/wp-content/uploads/2025/07/video-game-controller-with-bright-neon-light-streaks-computer-gamer-background-3d-octane-render-game-concept-ideas-ai-generative-free-photo.jpg",
         heroTitle: "Your Skill is Your Investment",
         heroSubtitle: "Your earnings are unlimited and have no restrictions. Promote Nexbattle and start increasing your earnings today!",
         apkUrl: "#",
@@ -73,7 +75,9 @@ const initializeThemes = async () => {
             id: 'chess_king',
             name: 'Chess King',
             landingPage: {
-                bgImageUrl: 'https://placehold.co/1920x1080.png',
+                ...defaultThemeData.landingPage,
+                bgImageUrl: 'https://images.chesscomfiles.com/uploads/v1/images_files/2_16x9_webp/2464/2464_650_16x9_2.0-2.webp',
+                heroImageUrl: 'https://placehold.co/600x400.png',
                 heroTitle: 'Become the King of Chess',
                 heroSubtitle: 'Join the ultimate chess arena and prove your royalty. Wager, win, and rule the leaderboard.'
             },

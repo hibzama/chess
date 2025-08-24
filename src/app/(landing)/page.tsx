@@ -54,7 +54,7 @@ const DefaultLanding = () => {
             <div className="hero-image">
                 <div className="relative w-full h-full min-h-[300px] md:min-h-[400px] rounded-2xl overflow-hidden shadow-2xl shadow-primary/20">
                     <Image
-                        src={theme?.landingPage.bgImageUrl || ''}
+                        src={theme?.landingPage.heroImageUrl || ''}
                         alt="Hero Image"
                         fill
                         className="object-cover animate-zoom-in-out"
