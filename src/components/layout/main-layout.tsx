@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Award, ClipboardCheck, Languages } from "lucide-react";
+import { Home, LayoutGrid, BarChart3, Users, Swords, Trophy, Megaphone, MessageSquare, Info, Settings, LifeBuoy, Wallet, Bell, User, LogOut, Gamepad2, Circle, Phone, Mail, List, Gift, Award, ClipboardCheck, Languages, Puzzle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -213,6 +213,7 @@ export default function MainLayout({
         { href: '/dashboard/your-task', icon: ClipboardCheck, label: 'Your Tasks', condition: !!userData?.campaignInfo },
         { href: '/dashboard/friends', icon: Users, label: 'Friends & Community' },
         { href: '/dashboard/rankings', icon: Trophy, label: 'Rankings' },
+        { href: '/puzzles', icon: Puzzle, label: 'Puzzles' },
         { href: '/dashboard/equipment', icon: Gamepad2, label: 'My Equipment' },
         { href: '/dashboard/referral-campaigns', icon: Award, label: 'Referral Campaigns' },
         { href: '/dashboard/chat', icon: MessageSquare, label: 'Direct Messages' },

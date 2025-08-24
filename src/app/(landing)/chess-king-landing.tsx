@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu, DollarSign, Network, Sword, MessageSquare, Languages, Search } from "lucide-react";
+import { LifeBuoy, Phone, Mail, Megaphone, Info, Users, Trophy, Menu, DollarSign, Network, Sword, MessageSquare, Languages, Search, Puzzle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
@@ -109,6 +109,7 @@ export default function ChessKingLanding() {
                         <ChessKingLogo />
                     </div>
                     <nav className="mt-8 space-y-2">
+                        <Link href="/puzzles"><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Puzzle/> Puzzles</Button></Link>
                          <Dialog>
                             <DialogTrigger asChild><Button variant="ghost" className="w-full justify-start gap-2 text-gray-400 hover:text-white"><Info/> About Us</Button></DialogTrigger>
                              <DialogContent className="max-w-2xl">
