@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CreditCard, Loader2, Banknote, Percent, MessageSquare } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
