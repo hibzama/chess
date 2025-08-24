@@ -20,24 +20,34 @@ import { cn } from "@/lib/utils";
 import Image from 'next/image';
 import { useTranslationSystem } from '@/context/translation-context';
 import { useTranslation } from '@/hooks/use-translation';
+import { useTheme } from '@/context/theme-context';
 
 
-const Logo = () => (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="w-8 h-8 text-primary"
-    >
-        <circle cx="12" cy="12" r="10" />
-        <path d="m14.5 9.5-5 5" />
-        <path d="m9.5 9.5 5 5" />
-    </svg>
-  );
+const Logo = () => {
+    const { theme } = useTheme();
+    if (theme?.logoUrl) {
+        return <Image src={theme.logoUrl} alt="Logo" width={120} height={40} />;
+    }
+    return (
+        <div className="flex items-center gap-2">
+            <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-8 h-8 text-primary"
+            >
+                <circle cx="12" cy="12" r="10" />
+                <path d="m14.5 9.5-5 5" />
+                <path d="m9.5 9.5 5 5" />
+            </svg>
+            <h1 className="text-xl font-bold text-primary group-data-[collapsible=icon]:hidden">Nexbattle</h1>
+        </div>
+    );
+};
 
 type Notification = {
     id: string;
@@ -215,10 +225,7 @@ export default function MainLayout({
         <SidebarProvider>
             <Sidebar>
                 <SidebarHeader>
-                    <div className="flex items-center gap-2">
-                        <Logo />
-                        <h1 className="text-xl font-bold text-primary group-data-[collapsible=icon]:hidden">Nexbattle</h1>
-                    </div>
+                   <Logo />
                 </SidebarHeader>
                 <SidebarContent>
                     <SidebarMenu>

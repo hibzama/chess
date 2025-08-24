@@ -9,13 +9,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Palette, Check, Loader2, Edit, PlusCircle } from 'lucide-react';
+import { Palette, Check, Loader2, Edit, PlusCircle, Trash2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+
+interface LandingSection {
+    title: string;
+    buttonText: string;
+    image: string;
+    aiHint?: string;
+}
 
 interface Theme {
     id: string;
     name: string;
+    logoUrl?: string;
     colors: {
         primary: string; // HSL format e.g., "326 100% 60%"
         background: string;
@@ -28,6 +37,7 @@ interface Theme {
         heroSubtitle: string;
         apkUrl?: string;
         features?: string[];
+        landingSections?: LandingSection[];
     };
     aboutContent: string;
     supportDetails: {
@@ -91,15 +101,34 @@ export default function ThemeSettingsPage() {
         if (!editingTheme) return;
         setEditingTheme(prev => ({ ...prev!, [field]: value }));
     };
-    
+
     const handleUpdateLandingFeature = (index: number, value: string) => {
         if (!editingTheme) return;
         const newFeatures = [...(editingTheme.landingPage.features || [])];
         newFeatures[index] = value;
         handleUpdateNestedThemeValue('landingPage', 'features', newFeatures);
     }
+    
+    const handleUpdateLandingSection = (index: number, field: keyof LandingSection, value: string) => {
+        if (!editingTheme) return;
+        const newSections = [...(editingTheme.landingPage.landingSections || [])];
+        newSections[index] = { ...newSections[index], [field]: value };
+        handleUpdateNestedThemeValue('landingPage', 'landingSections', newSections);
+    };
+    
+    const handleAddLandingSection = () => {
+        if (!editingTheme) return;
+        const newSections = [...(editingTheme.landingPage.landingSections || []), { title: 'New Section', buttonText: 'Learn More', image: 'https://placehold.co/400x250.png', aiHint: '' }];
+        handleUpdateNestedThemeValue('landingPage', 'landingSections', newSections);
+    };
 
-    const handleUpdateNestedThemeValue = (section: keyof Theme, field: string, value: string | string[]) => {
+    const handleRemoveLandingSection = (index: number) => {
+        if (!editingTheme) return;
+        const newSections = (editingTheme.landingPage.landingSections || []).filter((_, i) => i !== index);
+        handleUpdateNestedThemeValue('landingPage', 'landingSections', newSections);
+    };
+
+    const handleUpdateNestedThemeValue = (section: keyof Theme, field: string, value: any) => {
         if (!editingTheme) return;
         setEditingTheme(prev => ({
             ...prev!,
@@ -116,7 +145,7 @@ export default function ThemeSettingsPage() {
         setSaving(true);
         try {
             const { id, ...themeData } = editingTheme;
-            await setDoc(doc(db, 'themes', id), themeData);
+            await setDoc(doc(db, 'themes', id), themeData, { merge: true });
             toast({ title: 'Success!', description: `${editingTheme.name} theme details updated.` });
             setEditingTheme(null);
             fetchThemes(); // Re-fetch to get the latest data
@@ -134,8 +163,9 @@ export default function ThemeSettingsPage() {
 
         const newThemeId = newThemeName.toLowerCase().replace(/\s+/g, '_');
         
-        const newThemeData = {
+        const newThemeData: Omit<Theme, 'id'> = {
             name: newThemeName,
+            logoUrl: 'https://placehold.co/120x40.png',
             colors: {
                 primary: '210 40% 96.1%',
                 background: '0 0% 3.9%',
@@ -147,7 +177,8 @@ export default function ThemeSettingsPage() {
                 heroTitle: 'New Theme Title',
                 heroSubtitle: 'New theme subtitle goes here.',
                  apkUrl: '#',
-                features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4']
+                features: ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4'],
+                landingSections: [],
             },
             aboutContent: 'About content for the new theme.',
             supportDetails: {
@@ -157,7 +188,6 @@ export default function ThemeSettingsPage() {
                 email: '',
             },
             termsContent: 'Terms and conditions for the new theme.',
-            createdAt: serverTimestamp(),
         };
 
         try {
@@ -214,7 +244,7 @@ export default function ThemeSettingsPage() {
                                 <CardTitle>{theme.name}</CardTitle>
                                 <CardDescription>ID: {theme.id}</CardDescription>
                             </div>
-                            <Button variant="outline" onClick={() => setEditingTheme(theme)}><Edit className="mr-2"/> Edit Content</Button>
+                            <Button variant="outline" onClick={() => setEditingTheme(JSON.parse(JSON.stringify(theme)))}><Edit className="mr-2"/> Edit Content</Button>
                         </CardHeader>
                     </Card>
                 ))}
@@ -227,21 +257,30 @@ export default function ThemeSettingsPage() {
                         <CardDescription>Make changes to the content for this theme.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                         <Card>
-                            <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Enter HSL values without units (e.g., 210 40% 96.1%).</CardDescription></CardHeader>
-                            <CardContent className="grid md:grid-cols-3 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Primary Color</Label>
-                                    <Input value={editingTheme.colors?.primary || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'primary', e.target.value)} />
-                                </div>
+                        <Card>
+                             <CardHeader><CardTitle>General Settings</CardTitle></CardHeader>
+                             <CardContent className="space-y-4">
                                  <div className="space-y-2">
-                                    <Label>Background Color</Label>
-                                    <Input value={editingTheme.colors?.background || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'background', e.target.value)} />
+                                    <Label>Logo Image URL</Label>
+                                    <Input value={editingTheme.logoUrl || ''} onChange={e => handleUpdateEditingTheme('logoUrl', e.target.value)} />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label>Accent Color</Label>
-                                    <Input value={editingTheme.colors?.accent || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'accent', e.target.value)} />
-                                </div>
+                                <Card>
+                                    <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Enter HSL values without units (e.g., 210 40% 96.1%).</CardDescription></CardHeader>
+                                    <CardContent className="grid md:grid-cols-3 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Primary Color</Label>
+                                            <Input value={editingTheme.colors?.primary || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'primary', e.target.value)} />
+                                        </div>
+                                         <div className="space-y-2">
+                                            <Label>Background Color</Label>
+                                            <Input value={editingTheme.colors?.background || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'background', e.target.value)} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Accent Color</Label>
+                                            <Input value={editingTheme.colors?.accent || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'accent', e.target.value)} />
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </CardContent>
                         </Card>
                         <Card>
@@ -272,7 +311,7 @@ export default function ThemeSettingsPage() {
                                 <div className="space-y-2">
                                     <Label>Landing Page Features</Label>
                                     <div className="grid grid-cols-2 gap-4">
-                                        {(editingTheme.landingPage.features || []).map((feature, index) => (
+                                        {(editingTheme.landingPage.features || ['', '', '', '']).map((feature, index) => (
                                             <Input 
                                                 key={index}
                                                 value={feature || ''}
@@ -282,6 +321,30 @@ export default function ThemeSettingsPage() {
                                     </div>
                                 </div>
                                 </>
+                                )}
+                                {editingTheme.id === 'chess_king' && (
+                                    <div className="space-y-4 border-t pt-4">
+                                        <h3 className="text-lg font-semibold">Feature Sections</h3>
+                                        {(editingTheme.landingPage.landingSections || []).map((section, index) => (
+                                            <Card key={index} className="p-4 bg-muted/50">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <h4 className="font-semibold">Section {index + 1}</h4>
+                                                    <Button variant="destructive" size="icon" onClick={() => handleRemoveLandingSection(index)}><Trash2 className="w-4 h-4" /></Button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Title</Label>
+                                                    <Input value={section.title || ''} onChange={e => handleUpdateLandingSection(index, 'title', e.target.value)} />
+                                                    <Label>Image URL</Label>
+                                                    <Input value={section.image || ''} onChange={e => handleUpdateLandingSection(index, 'image', e.target.value)} />
+                                                    <Label>Button Text</Label>
+                                                    <Input value={section.buttonText || ''} onChange={e => handleUpdateLandingSection(index, 'buttonText', e.target.value)} />
+                                                     <Label>AI Image Hint</Label>
+                                                    <Input value={section.aiHint || ''} onChange={e => handleUpdateLandingSection(index, 'aiHint', e.target.value)} />
+                                                </div>
+                                            </Card>
+                                        ))}
+                                        <Button variant="outline" onClick={handleAddLandingSection}><PlusCircle className="mr-2"/> Add Section</Button>
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>

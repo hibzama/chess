@@ -4,9 +4,17 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { db } from '@/lib/firebase';
 import { doc, getDoc, onSnapshot, collection, setDoc } from 'firebase/firestore';
 
+interface LandingSection {
+    title: string;
+    buttonText: string;
+    image: string;
+    aiHint?: string;
+}
+
 interface Theme {
     id: string;
     name: string;
+    logoUrl?: string;
     colors: {
         primary: string;
         background: string;
@@ -19,6 +27,7 @@ interface Theme {
         heroSubtitle: string;
         apkUrl?: string;
         features?: string[];
+        landingSections?: LandingSection[];
     };
     aboutContent: string;
     supportDetails: {
@@ -38,6 +47,7 @@ interface ThemeContextType {
 const defaultThemeData: Theme = {
     id: 'default',
     name: 'Default',
+    logoUrl: '',
     landingPage: {
         bgImageUrl: "https://allnews.ltd/wp-content/uploads/2025/07/futuristic-video-game-controller-background-with-text-space_1017-54730.avif",
         heroImageUrl: "https://i.postimg.cc/CL41DGdt/video-game-controller-with-bright-neon-light-streaks-computer-gamer-background-3d-octane-render-game.jpg",
@@ -50,6 +60,7 @@ const defaultThemeData: Theme = {
             "Real-Time Statistics",
             "Marketing Support"
         ],
+        landingSections: [],
     },
     aboutContent: `## Our Mission\nNexbattle is the ultimate online arena where strategy, skill, and stakes collide. We provide a secure and engaging platform for Chess and Checkers enthusiasts to compete for real rewards, fostering a global community of strategic thinkers.\n\n## Multiplayer Rules & Payouts\nIn Multiplayer Mode, your wager is your investment. A standard win earns you a 180% return. A draw results in a 90% refund. If you resign, you get a 75% refund, while your opponent gets a 105% payout.`,
     supportDetails: {
@@ -79,7 +90,11 @@ const initializeThemes = async () => {
                 bgImageUrl: 'https://images.chesscomfiles.com/uploads/v1/images_files/2_16x9_webp/2464/2464_650_16x9_2.0-2.webp',
                 heroImageUrl: 'https://placehold.co/600x400.png',
                 heroTitle: 'Become the King of Chess',
-                heroSubtitle: 'Join the ultimate chess arena and prove your royalty. Wager, win, and rule the leaderboard.'
+                heroSubtitle: 'Join the ultimate chess arena and prove your royalty. Wager, win, and rule the leaderboard.',
+                landingSections: [
+                    { title: "Play vs customizable training bots from total beginner to master.", buttonText: "Play vs Computer", image: "https://placehold.co/400x250.png", aiHint: "chess computer" },
+                    { title: "Play online with over 100 million members from around the world.", buttonText: "Play Online", image: "https://placehold.co/400x250.png", aiHint: "chess world" },
+                ]
             },
             colors: {
                 primary: '45 100% 50%',

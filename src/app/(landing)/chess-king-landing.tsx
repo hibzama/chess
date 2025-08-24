@@ -12,11 +12,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTranslationSystem } from "@/context/translation-context";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
-const ChessKingLogo = () => (
-    <div className="flex items-center gap-2 text-xl font-bold text-white">
-        <Image src="https://images.chesscomfiles.com/uploads/v1/images_files/_200/V1-images_nav-logo-h-wood.82363421.svg" alt="Chess King Logo" width={100} height={30} />
-    </div>
-);
+const ChessKingLogo = () => {
+    const { theme } = useTheme();
+    if (!theme?.logoUrl) {
+        return (
+            <div className="flex items-center gap-2 text-xl font-bold text-white">
+                <span>Chess King</span>
+            </div>
+        );
+    }
+    return (
+        <div className="flex items-center gap-2 text-xl font-bold text-white">
+            <Image src={theme.logoUrl} alt="Chess King Logo" width={120} height={40} />
+        </div>
+    );
+};
+
 
 const LanguageSwitcher = () => {
     const { languages, currentLang, changeLanguage, loading } = useTranslationSystem();
@@ -42,51 +53,6 @@ const LanguageSwitcher = () => {
     )
 }
 
-const landingSections = [
-    {
-        title: "Play vs customizable training bots from total beginner to master.",
-        buttonText: "Play vs Computer",
-        image: "https://placehold.co/400x250.png",
-        aiHint: "chess computer"
-    },
-    {
-        title: "Play online with over 100 million members from around the world.",
-        buttonText: "Play Online",
-        image: "https://placehold.co/400x250.png",
-        aiHint: "chess world"
-    },
-    {
-        title: "Learn from your games and relive your best moments with our virtual coach in Game Review.",
-        buttonText: "Analyze Your Game",
-        image: "https://placehold.co/400x250.png",
-        aiHint: "chess analysis"
-    },
-    {
-        title: "Train your tactical skills with 100,000+ puzzles.",
-        buttonText: "Solve Puzzles",
-        image: "https://placehold.co/400x250.png",
-        aiHint: "chess puzzle"
-    },
-    {
-        title: "Level up your game with fun, interactive lessons from top masters and coaches.",
-        buttonText: "Start a Lesson",
-        image: "https://placehold.co/400x250.png",
-        aiHint: "chess lesson"
-    },
-    {
-        title: "Watch the best players in the world play in the biggest events.",
-        buttonText: "Watch Live",
-        image: "https://placehold.co/400x250.png",
-        aiHint: "chess tournament"
-    },
-    {
-        title: "Play your friends and family anytime, anywhere with our mobile apps.",
-        buttonText: "Download on App Store",
-        image: "https://placehold.co/400x250.png",
-        aiHint: "chess mobile"
-    }
-];
-
 export default function ChessKingLanding() {
     const { theme, loading: themeLoading } = useTheme();
 
@@ -94,7 +60,7 @@ export default function ChessKingLanding() {
         return <Skeleton className="h-screen w-full" />;
     }
     
-    const { heroTitle, heroSubtitle, bgImageUrl } = theme.landingPage;
+    const { heroTitle, heroSubtitle, bgImageUrl, landingSections = [] } = theme.landingPage;
 
     return (
         <div className="flex h-screen bg-background text-white">
@@ -136,7 +102,7 @@ export default function ChessKingLanding() {
                     {landingSections.map((section, index) => (
                         <div key={index} className="text-center">
                             <div className="relative aspect-video mb-4 rounded-md overflow-hidden">
-                                <Image src={section.image} alt={section.title} fill className="object-cover" data-ai-hint={section.aiHint} />
+                                <Image src={section.image || 'https://placehold.co/400x250.png'} alt={section.title} fill className="object-cover" data-ai-hint={section.aiHint} />
                             </div>
                             <h2 className="text-xl font-semibold text-gray-200">{section.title}</h2>
                             <Button asChild variant="link" className="text-green-500 text-lg mt-2">
