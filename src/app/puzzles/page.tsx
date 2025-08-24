@@ -46,17 +46,17 @@ export default function PuzzlesPage() {
     const { gameAvailability, loading } = useAuth();
     
     const chessPuzzles = [
-        { title: 'Mate in 1', description: 'Find the winning checkmate in a single move.', icon: <Target className="w-6 h-6 text-primary"/>, href: '#' },
-        { title: 'Winning Material', description: 'Find the best move to gain a material advantage.', icon: <Crown className="w-6 h-6 text-primary"/>, href: '#' },
-        { title: 'Survival', description: 'Find the only move to escape a checkmate threat.', icon: <Shield className="w-6 h-6 text-primary"/>, href: '#' },
-        { title: 'Puzzle Rush', description: 'Solve as many puzzles as you can against the clock.', icon: <Zap className="w-6 h-6 text-primary"/>, href: '#' },
+        { title: 'Mate in 1', description: 'Find the winning checkmate in a single move.', icon: <Target className="w-6 h-6 text-primary"/>, href: '/puzzles/chess/mate-in-1' },
+        { title: 'Winning Material', description: 'Find the best move to gain a material advantage.', icon: <Crown className="w-6 h-6 text-primary"/>, href: '/puzzles/chess/winning-material' },
+        { title: 'Survival', description: 'Find the only move to escape a checkmate threat.', icon: <Shield className="w-6 h-6 text-primary"/>, href: '/puzzles/chess/survival' },
+        { title: 'Puzzle Rush', description: 'Solve as many puzzles as you can against the clock.', icon: <Zap className="w-6 h-6 text-primary"/>, href: '/puzzles/chess/puzzle-rush' },
     ];
 
     const checkersPuzzles = [
-        { title: 'Forced Capture', description: 'Find the sequence of jumps to capture the most pieces.', icon: <Target className="w-6 h-6 text-primary"/>, href: '#' },
-        { title: 'King Me', description: 'Find the path to promote one of your pieces to a king.', icon: <Crown className="w-6 h-6 text-primary"/>, href: '#' },
-        { title: 'Defensive Stand', description: 'Find the correct move to block your opponent from winning.', icon: <Shield className="w-6 h-6 text-primary"/>, href: '#' },
-        { title: 'Position Advantage', description: 'Solve puzzles to gain a positional advantage.', icon: <Zap className="w-6 h-6 text-primary"/>, href: '#' },
+        { title: 'Forced Capture', description: 'Find the sequence of jumps to capture the most pieces.', icon: <Target className="w-6 h-6 text-primary"/>, href: '/puzzles/checkers/forced-capture' },
+        { title: 'King Me', description: 'Find the path to promote one of your pieces to a king.', icon: <Crown className="w-6 h-6 text-primary"/>, href: '/puzzles/checkers/king-me' },
+        { title: 'Defensive Stand', description: 'Find the correct move to block your opponent from winning.', icon: <Shield className="w-6 h-6 text-primary"/>, href: '/puzzles/checkers/defensive-stand' },
+        { title: 'Position Advantage', description: 'Solve puzzles to gain a positional advantage.', icon: <Zap className="w-6 h-6 text-primary"/>, href: '/puzzles/checkers/position-advantage' },
     ];
 
     if (loading) {
