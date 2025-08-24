@@ -165,8 +165,8 @@ export default function ChessKingLanding() {
             {/* Scrollable Main Content */}
             <main className="flex-1 overflow-y-auto">
                 <div className="h-96 flex items-center justify-center p-4">
-                     <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-8 container mx-auto">
-                        <div className="relative w-full h-48">
+                    <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-8 container mx-auto">
+                        <div className="relative w-full h-full min-h-[300px]">
                            {heroImageUrl && <Image src={heroImageUrl} alt="Chess pieces" fill className="object-contain" data-ai-hint="chess pieces illustration" />}
                         </div>
                         <div className="text-center md:text-left">
