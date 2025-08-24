@@ -2,20 +2,25 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Palette, Check, Loader2, Edit } from 'lucide-react';
+import { Palette, Check, Loader2, Edit, PlusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 
 interface Theme {
     id: string;
     name: string;
+    colors: {
+        primary: string; // HSL format e.g., "326 100% 60%"
+        background: string;
+        accent: string;
+    };
     landingPage: {
         bgImageUrl: string;
         heroTitle: string;
@@ -70,7 +75,7 @@ export default function ThemeSettingsPage() {
         setSaving(true);
         try {
             await setDoc(doc(db, 'settings', 'siteConfig'), { activeThemeId });
-            toast({ title: 'Success!', description: 'Active theme updated successfully.' });
+            toast({ title: 'Success!', description: 'Active theme updated successfully. Changes will be visible on the public site.' });
         } catch (error) {
             console.error("Error saving active theme:", error);
             toast({ variant: "destructive", title: 'Error', description: 'Failed to save active theme.' });
@@ -113,6 +118,45 @@ export default function ThemeSettingsPage() {
         }
     };
 
+    const handleCreateNewTheme = async () => {
+        const newThemeName = prompt("Enter a name for the new theme:", "New Theme");
+        if (!newThemeName) return;
+
+        const newThemeId = newThemeName.toLowerCase().replace(/\s+/g, '_');
+        
+        const newThemeData = {
+            name: newThemeName,
+            colors: {
+                primary: '210 40% 96.1%',
+                background: '0 0% 3.9%',
+                accent: '217.2 91.2% 59.8%',
+            },
+            landingPage: {
+                bgImageUrl: 'https://placehold.co/1920x1080.png',
+                heroTitle: 'New Theme Title',
+                heroSubtitle: 'New theme subtitle goes here.',
+            },
+            aboutContent: 'About content for the new theme.',
+            supportDetails: {
+                phone: '',
+                whatsapp: '',
+                telegram: '',
+                email: '',
+            },
+            termsContent: 'Terms and conditions for the new theme.',
+            createdAt: serverTimestamp(),
+        };
+
+        try {
+            await setDoc(doc(db, 'themes', newThemeId), newThemeData);
+            toast({ title: 'Theme Created!', description: 'New theme has been added successfully.' });
+            fetchThemes();
+        } catch (error) {
+            console.error("Error creating new theme:", error);
+            toast({ variant: "destructive", title: 'Error', description: 'Could not create new theme.' });
+        }
+    }
+
     if (loading) {
         return <Skeleton className="w-full h-96" />;
     }
@@ -146,7 +190,10 @@ export default function ThemeSettingsPage() {
             </Card>
 
             <div className="space-y-4">
-                <h2 className="text-2xl font-bold">Manage Themes</h2>
+                <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold">Manage Themes</h2>
+                    <Button variant="outline" onClick={handleCreateNewTheme}><PlusCircle className="mr-2"/> Create New Theme</Button>
+                </div>
                 {themes.map(theme => (
                     <Card key={theme.id}>
                         <CardHeader className="flex flex-row justify-between items-center">
@@ -167,6 +214,23 @@ export default function ThemeSettingsPage() {
                         <CardDescription>Make changes to the content for this theme.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                         <Card>
+                            <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Enter HSL values without units (e.g., 210 40% 96.1%).</CardDescription></CardHeader>
+                            <CardContent className="grid md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Primary Color</Label>
+                                    <Input value={editingTheme.colors?.primary || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'primary', e.target.value)} />
+                                </div>
+                                 <div className="space-y-2">
+                                    <Label>Background Color</Label>
+                                    <Input value={editingTheme.colors?.background || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'background', e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Accent Color</Label>
+                                    <Input value={editingTheme.colors?.accent || ''} onChange={e => handleUpdateNestedThemeValue('colors', 'accent', e.target.value)} />
+                                </div>
+                            </CardContent>
+                        </Card>
                         <Card>
                             <CardHeader><CardTitle>Landing Page</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
