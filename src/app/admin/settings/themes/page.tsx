@@ -249,19 +249,19 @@ export default function ThemeSettingsPage() {
                             <CardContent className="space-y-4">
                                 <div className="space-y-2">
                                     <Label>Background Image URL</Label>
-                                    <Input value={editingTheme.landingPage.bgImageUrl} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
+                                    <Input value={editingTheme.landingPage.bgImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'bgImageUrl', e.target.value)} />
                                 </div>
                                  <div className="space-y-2">
                                     <Label>Hero/Banner Image URL</Label>
-                                    <Input value={editingTheme.landingPage.heroImageUrl} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
+                                    <Input value={editingTheme.landingPage.heroImageUrl || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroImageUrl', e.target.value)} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Hero Title</Label>
-                                    <Input value={editingTheme.landingPage.heroTitle} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
+                                    <Input value={editingTheme.landingPage.heroTitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroTitle', e.target.value)} />
                                 </div>
                                  <div className="space-y-2">
                                     <Label>Hero Subtitle</Label>
-                                    <Textarea value={editingTheme.landingPage.heroSubtitle} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
+                                    <Textarea value={editingTheme.landingPage.heroSubtitle || ''} onChange={e => handleUpdateNestedThemeValue('landingPage', 'heroSubtitle', e.target.value)} />
                                 </div>
                                 {editingTheme.id === 'default' && (
                                 <>
@@ -275,7 +275,7 @@ export default function ThemeSettingsPage() {
                                         {(editingTheme.landingPage.features || []).map((feature, index) => (
                                             <Input 
                                                 key={index}
-                                                value={feature}
+                                                value={feature || ''}
                                                 onChange={e => handleUpdateLandingFeature(index, e.target.value)}
                                             />
                                         ))}
@@ -287,20 +287,20 @@ export default function ThemeSettingsPage() {
                         </Card>
                         <Card>
                              <CardHeader><CardTitle>About Us Content</CardTitle></CardHeader>
-                             <CardContent><Textarea value={editingTheme.aboutContent} onChange={e => handleUpdateEditingTheme('aboutContent', e.target.value)} rows={10}/></CardContent>
+                             <CardContent><Textarea value={editingTheme.aboutContent || ''} onChange={e => handleUpdateEditingTheme('aboutContent', e.target.value)} rows={10}/></CardContent>
                         </Card>
                         <Card>
                              <CardHeader><CardTitle>Support Details</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
-                                <div className="space-y-2"><Label>Phone</Label><Input value={editingTheme.supportDetails.phone} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'phone', e.target.value)} /></div>
-                                <div className="space-y-2"><Label>WhatsApp</Label><Input value={editingTheme.supportDetails.whatsapp} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'whatsapp', e.target.value)} /></div>
-                                <div className="space-y-2"><Label>Telegram</Label><Input value={editingTheme.supportDetails.telegram} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'telegram', e.target.value)} /></div>
-                                <div className="space-y-2"><Label>Email</Label><Input value={editingTheme.supportDetails.email} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'email', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>Phone</Label><Input value={editingTheme.supportDetails.phone || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'phone', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>WhatsApp</Label><Input value={editingTheme.supportDetails.whatsapp || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'whatsapp', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>Telegram</Label><Input value={editingTheme.supportDetails.telegram || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'telegram', e.target.value)} /></div>
+                                <div className="space-y-2"><Label>Email</Label><Input value={editingTheme.supportDetails.email || ''} onChange={e => handleUpdateNestedThemeValue('supportDetails', 'email', e.target.value)} /></div>
                             </CardContent>
                         </Card>
                          <Card>
                              <CardHeader><CardTitle>Terms & Conditions</CardTitle></CardHeader>
-                             <CardContent><Textarea value={editingTheme.termsContent} onChange={e => handleUpdateEditingTheme('termsContent', e.target.value)} rows={10} /></CardContent>
+                             <CardContent><Textarea value={editingTheme.termsContent || ''} onChange={e => handleUpdateEditingTheme('termsContent', e.target.value)} rows={10} /></CardContent>
                         </Card>
                     </CardContent>
                     <CardFooter className="gap-4">
