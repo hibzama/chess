@@ -207,7 +207,14 @@ export default function ChessKingLanding() {
 
                 <div className="p-8 md:p-16 grid grid-cols-1 md:grid-cols-2 gap-12">
                     {landingSections.map((section, index) => (
-                        <div key={index} className="rounded-lg p-6 flex flex-col items-center text-center group" style={{ backgroundColor: section.borderColor || '#262421' }}>
+                        <div 
+                            key={index} 
+                            className="rounded-lg flex flex-col items-center text-center group" 
+                            style={{ 
+                                backgroundColor: section.borderColor || '#262421',
+                                padding: `${section.padding ?? 24}px` 
+                            }}
+                        >
                             <div className="relative w-full mb-4" style={{ aspectRatio: `${section.imageWidth || 500} / ${section.imageHeight || 500}` }}>
                                 <Image src={section.image || 'https://placehold.co/500x500.png'} alt={section.title} fill className="object-cover rounded-md" data-ai-hint={section.aiHint || 'abstract'} />
                                  {section.overlayText && (
