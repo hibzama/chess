@@ -9,6 +9,7 @@ import { ArrowLeft, BrainCircuit, Layers, DollarSign, Users, MessageSquare } fro
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/auth-context';
+import { cn } from '@/lib/utils';
 
 const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -19,7 +20,7 @@ const TelegramIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export default function EarningHomePage() {
     const router = useRouter();
-    const { gameAvailability } = useAuth();
+    const { gameAvailability, paymentConfig } = useAuth();
 
     const handleStartEarning = (game: 'chess' | 'checkers') => {
         router.push(`/lobby/${game}`);
@@ -57,7 +58,10 @@ export default function EarningHomePage() {
                     <p className="mt-2 text-lg text-muted-foreground max-w-md mx-auto">Turn your strategic skills into real rewards. Choose your game to get started.</p>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+                <div className={cn(
+                    "grid gap-8 w-full max-w-4xl",
+                    earningOptions.length === 1 ? "grid-cols-1 md:max-w-sm" : "grid-cols-1 md:grid-cols-2"
+                )}>
                     {earningOptions.length > 0 ? earningOptions.map((option) => (
                          <Card key={option.name} className="bg-card/50 hover:border-primary/50 transition-all flex flex-col">
                             <CardHeader className="items-center text-center">
@@ -91,9 +95,9 @@ export default function EarningHomePage() {
                     </CardHeader>
                     <CardContent>
                         <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
-                            <a href="https://t.me/nexbattlerooms" target="_blank" rel="noopener noreferrer">
+                            <a href={paymentConfig.telegramChannelUrl} target="_blank" rel="noopener noreferrer">
                                 <TelegramIcon className="mr-2 h-5 w-5" />
-                                Join @nexbattlerooms
+                                Join Channel
                             </a>
                         </Button>
                     </CardContent>
@@ -106,13 +110,13 @@ export default function EarningHomePage() {
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Button asChild size="lg" className="w-full bg-green-600 hover:bg-green-700 text-white">
-                            <a href="https://chat.whatsapp.com/EJFHx4y9n9EDstQ971Bvf5?mode=ac_t" target="_blank" rel="noopener noreferrer">
+                            <a href={paymentConfig.whatsappCommunityUrl} target="_blank" rel="noopener noreferrer">
                                 <MessageSquare className="mr-2 h-5 w-5" />
                                 Join WhatsApp Group
                             </a>
                         </Button>
                          <Button asChild size="lg" className="w-full bg-blue-500 hover:bg-blue-600 text-white">
-                            <a href="https://t.me/nexbattlechat" target="_blank" rel="noopener noreferrer">
+                            <a href={paymentConfig.telegramCommunityUrl} target="_blank" rel="noopener noreferrer">
                                 <TelegramIcon className="mr-2 h-5 w-5" />
                                 Join Telegram Group
                             </a>

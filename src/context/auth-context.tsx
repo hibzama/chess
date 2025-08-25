@@ -32,6 +32,9 @@ interface PaymentConfig {
     withdrawalFeePercentage: number;
     supportWhatsapp: string;
     supportTelegram: string;
+    telegramChannelUrl?: string;
+    whatsappCommunityUrl?: string;
+    telegramCommunityUrl?: string;
 }
 
 interface AuthContextType {
@@ -114,6 +117,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         withdrawalFeePercentage: 5,
         supportWhatsapp: '94704894587',
         supportTelegram: 'nexbattle_help',
+        telegramChannelUrl: 'https://t.me/nexbattlerooms',
+        whatsappCommunityUrl: 'https://chat.whatsapp.com/EJFHx4y9n9EDstQ971Bvf5?mode=ac_t',
+        telegramCommunityUrl: 'https://t.me/nexbattlechat',
     });
   const [loading, setLoading] = useState(true);
 

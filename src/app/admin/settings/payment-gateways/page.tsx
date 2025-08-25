@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CreditCard, Loader2, Banknote, Percent, MessageSquare } from 'lucide-react';
+import { CreditCard, Loader2, Banknote, Percent, MessageSquare, Link as LinkIcon } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -33,6 +33,9 @@ export default function PaymentGatewaySettingsPage() {
         withdrawalFeePercentage: 5,
         supportWhatsapp: '94704894587',
         supportTelegram: 'nexbattle_help',
+        telegramChannelUrl: 'https://t.me/nexbattlerooms',
+        whatsappCommunityUrl: 'https://chat.whatsapp.com/EJFHx4y9n9EDstQ971Bvf5?mode=ac_t',
+        telegramCommunityUrl: 'https://t.me/nexbattlechat',
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -79,8 +82,8 @@ export default function PaymentGatewaySettingsPage() {
         <div className="space-y-6">
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2"><CreditCard /> Payment Gateway Settings</CardTitle>
-                <CardDescription>Manage deposit and withdrawal methods, fees, and support contacts.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><CreditCard /> Payment & Community Settings</CardTitle>
+                <CardDescription>Manage deposit/withdrawal methods, fees, and community links.</CardDescription>
             </CardHeader>
         </Card>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -132,16 +135,28 @@ export default function PaymentGatewaySettingsPage() {
                     </div>
 
                     <div className="space-y-4 rounded-lg border p-4">
-                        <Label className="text-base font-semibold">Support Contacts</Label>
-                        <p className="text-sm text-muted-foreground">These contacts are shown to users for deposit verification.</p>
+                        <Label className="text-base font-semibold">Support & Community Links</Label>
+                        <p className="text-sm text-muted-foreground">These contacts are shown to users.</p>
                         <Separator/>
                          <div className="space-y-2">
-                             <Label className="flex items-center gap-2"><MessageSquare/> WhatsApp Number</Label>
+                             <Label className="flex items-center gap-2"><MessageSquare/> Support WhatsApp Number</Label>
                             <Input value={config.supportWhatsapp} onChange={(e) => handleChange('supportWhatsapp', e.target.value)} placeholder="e.g., 94704894587"/>
                          </div>
                           <div className="space-y-2">
-                             <Label className="flex items-center gap-2"><TelegramIcon/> Telegram Username</Label>
+                             <Label className="flex items-center gap-2"><TelegramIcon/> Support Telegram Username</Label>
                             <Input value={config.supportTelegram} onChange={(e) => handleChange('supportTelegram', e.target.value)} placeholder="e.g., nexbattle_help"/>
+                         </div>
+                          <div className="space-y-2">
+                             <Label className="flex items-center gap-2"><LinkIcon/> Public Rooms Telegram Channel URL</Label>
+                            <Input value={config.telegramChannelUrl} onChange={(e) => handleChange('telegramChannelUrl', e.target.value)} placeholder="https://t.me/yourchannel"/>
+                         </div>
+                         <div className="space-y-2">
+                             <Label className="flex items-center gap-2"><LinkIcon/> Community WhatsApp Group URL</Label>
+                            <Input value={config.whatsappCommunityUrl} onChange={(e) => handleChange('whatsappCommunityUrl', e.target.value)} placeholder="https://chat.whatsapp.com/yourgroup"/>
+                         </div>
+                         <div className="space-y-2">
+                             <Label className="flex items-center gap-2"><LinkIcon/> Community Telegram Group URL</Label>
+                            <Input value={config.telegramCommunityUrl} onChange={(e) => handleChange('telegramCommunityUrl', e.target.value)} placeholder="https://t.me/yourgroup"/>
                          </div>
                     </div>
                  </CardContent>
