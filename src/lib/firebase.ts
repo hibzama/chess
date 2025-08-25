@@ -1,4 +1,3 @@
-
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -9,12 +8,13 @@ import { getFunctions } from "firebase/functions";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyB4fJwImSsfy7bLBUcJnGgqsdzHKDzIpfo",
-  authDomain: "nexbattle-ymmmq.firebaseapp.com",
-  projectId: "nexbattle-ymmmq",
-  storageBucket: "nexbattle-ymmmq.appspot.com",
-  messagingSenderId: "1022888526676",
-  appId: "1:1022888526676:web:2cf620984302526cbe3ec1"
+  apiKey: "AIzaSyCohB4psuWDBKK65kP7q5ZkuQB1Md1Lq_E",
+  authDomain: "xn--rgbjim0f.firebaseapp.com",
+  projectId: "xn--rgbjim0f",
+  storageBucket: "xn--rgbjim0f.appspot.com",
+  messagingSenderId: "2223721000",
+  appId: "1:2223721000:web:2e25b3343fc6473094431d",
+  measurementId: "G-380G5LH948"
 };
 
 // Initialize Firebase
