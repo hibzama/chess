@@ -103,6 +103,29 @@ const defaultColors: ThemeColors = {
     ring: "326 100% 60%",
 };
 
+const chessKingDraftColors: ThemeColors = {
+    background: "25 35% 15%",
+    foreground: "35 33% 88%",
+    card: "25 35% 18%",
+    cardForeground: "35 33% 88%",
+    popover: "25 35% 12%",
+    popoverForeground: "35 33% 88%",
+    primary: "95 38% 48%",
+    primaryForeground: "35 33% 98%",
+    secondary: "25 25% 25%",
+    secondaryForeground: "35 33% 90%",
+    muted: "25 25% 25%",
+    mutedForeground: "35 20% 65%",
+    accent: "95 38% 48%",
+    accentForeground: "35 33% 98%",
+    destructive: "0 63% 40%",
+    destructiveForeground: "35 33% 98%",
+    border: "25 30% 30%",
+    input: "25 30% 30%",
+    ring: "95 38% 48%",
+};
+
+
 const defaultThemeData: Theme = {
     id: 'default',
     name: 'Default',
@@ -158,27 +181,7 @@ const initializeThemes = async () => {
                     { title: "Multiplayer System", buttonText: "Play Online", image: "https://i.postimg.cc/Qx7p6M2P/index-play-friend-2e3d362e-2x.png", aiHint: "chess world", overlayText: "Challenge players from around the globe", borderColor: "#262421", buttonStyle: "box", buttonTextColor: "#FFFFFF", buttonBgColor: "#4a5568", imageWidth: 500, imageHeight: 500, padding: 24, },
                 ]
             },
-            colors: {
-                background: "25 35% 15%",
-                foreground: "35 33% 88%",
-                card: "25 35% 18%",
-                cardForeground: "35 33% 88%",
-                popover: "25 35% 12%",
-                popoverForeground: "35 33% 88%",
-                primary: "95 38% 48%",
-                primaryForeground: "35 33% 98%",
-                secondary: "25 25% 25%",
-                secondaryForeground: "35 33% 90%",
-                muted: "25 25% 25%",
-                mutedForeground: "35 20% 65%",
-                accent: "95 38% 48%",
-                accentForeground: "35 33% 98%",
-                destructive: "0 63% 40%",
-                destructiveForeground: "35 33% 98%",
-                border: "25 30% 30%",
-                input: "25 30% 30%",
-                ring: "95 38% 48%",
-            },
+            colors: chessKingDraftColors,
         }
     };
 
@@ -206,6 +209,7 @@ export default function ThemeSettingsPage() {
     const [editingTheme, setEditingTheme] = useState<Theme | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [colorPalette, setColorPalette] = useState('custom');
     const { toast } = useToast();
 
     const fetchThemes = useCallback(async () => {
@@ -303,6 +307,13 @@ export default function ThemeSettingsPage() {
                 [field]: value
             }
         }));
+    };
+    
+    const handlePaletteChange = (palette: string) => {
+        setColorPalette(palette);
+        if (palette === 'draft') {
+            handleUpdateEditingTheme('colors', chessKingDraftColors);
+        }
     };
 
     const handleSaveThemeDetails = async () => {
@@ -474,13 +485,29 @@ export default function ThemeSettingsPage() {
                                 </div>
                                 <Card>
                                     <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Enter HSL values without units (e.g., 210 40% 96.1%).</CardDescription></CardHeader>
-                                    <CardContent className="grid md:grid-cols-3 gap-4">
-                                        {colorFields.map(field => (
-                                            <div key={field.key} className="space-y-2">
-                                                <Label>{field.label}</Label>
-                                                <Input value={editingTheme.colors?.[field.key] || ''} onChange={e => handleUpdateNestedThemeValue('colors', field.key, e.target.value)} />
+                                    <CardContent className="space-y-4">
+                                        {editingTheme.id === 'chess_king' && (
+                                            <div className="space-y-2">
+                                                <Label>Color Palette</Label>
+                                                <Select value={colorPalette} onValueChange={handlePaletteChange}>
+                                                    <SelectTrigger className="w-full md:w-1/3">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="custom">Custom</SelectItem>
+                                                        <SelectItem value="draft">Draft Theme</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
-                                        ))}
+                                        )}
+                                        <div className="grid md:grid-cols-3 gap-4">
+                                            {colorFields.map(field => (
+                                                <div key={field.key} className="space-y-2">
+                                                    <Label>{field.label}</Label>
+                                                    <Input value={editingTheme.colors?.[field.key] || ''} onChange={e => { handleUpdateNestedThemeValue('colors', field.key, e.target.value); setColorPalette('custom'); }} />
+                                                </div>
+                                            ))}
+                                        </div>
                                     </CardContent>
                                 </Card>
                             </CardContent>
