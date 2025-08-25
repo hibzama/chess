@@ -14,11 +14,9 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { useTranslation } from '@/hooks/use-translation';
 
 const CountdownTimer = ({ targetDate, onEnd }: { targetDate: Date, onEnd?: () => void }) => {
     const [timeLeft, setTimeLeft] = useState('');
-    const t = useTranslation;
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -54,7 +52,6 @@ const getBonusForBalance = (tiers: BonusTiers, balance: number): number => {
 const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, onClaimed: (taskId: string) => void, alreadyClaimed: boolean, balance: number }) => {
     const { user } = useAuth();
     const { toast } = useToast();
-    const t = useTranslation;
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [currentWorkIndex, setCurrentWorkIndex] = useState(0);
@@ -63,7 +60,7 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, on
 
     const handleNextWork = () => {
         if (!answers[task.works[currentWorkIndex].id]?.trim()) {
-            toast({ variant: 'destructive', title: t('Answer Required'), description: t('Please provide an answer for the current work.')});
+            toast({ variant: 'destructive', title: 'Answer Required', description: 'Please provide an answer for the current work.'});
             return;
         }
         if (currentWorkIndex < task.works.length - 1) {
@@ -75,7 +72,7 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, on
 
     const handleSubmit = async () => {
         if (!user || Object.keys(answers).length !== task.works.length) {
-            toast({ variant: 'destructive', title: t('Error'), description: t('Please complete all work items.')});
+            toast({ variant: 'destructive', title: 'Error', description: 'Please complete all work items.'});
             return;
         }
         setIsSubmitting(true);
@@ -92,11 +89,11 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, on
                 createdAt: serverTimestamp(),
             });
 
-            toast({ title: t('Task Submitted!'), description: t('Your submission is pending admin approval.')});
+            toast({ title: 'Task Submitted!', description: 'Your submission is pending admin approval.'});
             onClaimed(task.id);
         } catch (error) {
             console.error("Error submitting task:", error);
-            toast({ variant: 'destructive', title: t('Error'), description: t('Could not submit your task.') });
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not submit your task.' });
         } finally {
             setIsSubmitting(false);
         }
@@ -105,54 +102,54 @@ const TaskCard = ({ task, onClaimed, alreadyClaimed, balance }: { task: Task, on
     return (
         <Card className="flex flex-col">
             <CardHeader>
-                <CardTitle>{t(task.title)}</CardTitle>
-                <CardDescription>{t('Ends in:')} <CountdownTimer targetDate={task.endDate.toDate()} /></CardDescription>
+                <CardTitle>{task.title}</CardTitle>
+                <CardDescription>Ends in: <CountdownTimer targetDate={task.endDate.toDate()} /></CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
                 <div className="text-sm font-semibold text-green-400">
-                    {t('Reward:')} LKR {bonus.toFixed(2)}
+                    Reward: LKR {bonus.toFixed(2)}
                 </div>
             </CardContent>
             <CardFooter>
                  <Dialog>
                     <DialogTrigger asChild>
                         <Button className="w-full" disabled={alreadyClaimed}>
-                            {alreadyClaimed ? <><Check className="mr-2"/> {t('Submitted')}</> : t("Complete Task")}
+                            {alreadyClaimed ? <><Check className="mr-2"/> Submitted</> : "Complete Task"}
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>{t(task.title)}</DialogTitle>
+                            <DialogTitle>{task.title}</DialogTitle>
                              <DialogDescription>
-                                {t('Work')} {currentWorkIndex + 1} of {task.works.length}. {t('Complete all to claim your reward.')}
+                                Work {currentWorkIndex + 1} of {task.works.length}. Complete all to claim your reward.
                             </DialogDescription>
                         </DialogHeader>
                          <div className="py-4 space-y-4">
                             <div className="p-4 bg-muted rounded-md space-y-2">
-                                <p className="font-semibold">{t(task.works[currentWorkIndex].description)}</p>
+                                <p className="font-semibold">{task.works[currentWorkIndex].description}</p>
                             </div>
                             {task.works[currentWorkIndex].link && (
                                 <Button asChild className="w-full">
                                     <a href={task.works[currentWorkIndex].link} target="_blank" rel="noopener noreferrer">
                                         <ExternalLink className="mr-2"/>
-                                        {t(task.works[currentWorkIndex].buttonText || 'Open Link')}
+                                        {task.works[currentWorkIndex].buttonText || 'Open Link'}
                                     </a>
                                 </Button>
                             )}
                             <div className="space-y-1">
-                                <Label htmlFor="answer" className="font-semibold">{t(task.works[currentWorkIndex].verificationQuestion)}</Label>
+                                <Label htmlFor="answer" className="font-semibold">{task.works[currentWorkIndex].verificationQuestion}</Label>
                                 <Textarea 
                                     id="answer" 
                                     value={answers[task.works[currentWorkIndex].id] || ''}
                                     onChange={e => setAnswers(prev => ({...prev, [task.works[currentWorkIndex].id]: e.target.value}))} 
-                                    placeholder={t('Your answer here...')}
+                                    placeholder='Your answer here...'
                                 />
                             </div>
                          </div>
                         <DialogFooter>
                             <Button onClick={handleNextWork} disabled={isSubmitting}>
                                 {isSubmitting ? <Loader2 className="animate-spin" /> : 
-                                 currentWorkIndex < task.works.length - 1 ? t('Next Work') : t('Submit for Review')
+                                 currentWorkIndex < task.works.length - 1 ? 'Next Work' : 'Submit for Review'
                                 }
                             </Button>
                         </DialogFooter>
@@ -168,7 +165,6 @@ export default function TasksPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [claimedTaskIds, setClaimedTaskIds] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(true);
-    const t = useTranslation;
 
     const fetchTasks = async () => {
         if (!user) {
@@ -223,14 +219,14 @@ export default function TasksPage() {
     return (
         <div className="space-y-8">
             <div className="text-center">
-                <h1 className="text-4xl font-bold tracking-tight">{t('Task & Earn')}</h1>
-                <p className="text-muted-foreground mt-2">{t('Complete simple tasks to earn bonus rewards.')}</p>
+                <h1 className="text-4xl font-bold tracking-tight">Task & Earn</h1>
+                <p className="text-muted-foreground mt-2">Complete simple tasks to earn bonus rewards.</p>
             </div>
             
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><ClipboardCheck/> {t('Available Tasks')}</CardTitle>
-                    <CardDescription>{t('Complete these tasks before they expire to claim your bonus.')}</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><ClipboardCheck/> Available Tasks</CardTitle>
+                    <CardDescription>Complete these tasks before they expire to claim your bonus.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {availableTasks.length > 0 ? (
@@ -238,7 +234,7 @@ export default function TasksPage() {
                             <TaskCard key={task.id} task={task} onClaimed={handleClaimed} alreadyClaimed={claimedTaskIds.has(task.id)} balance={userData?.balance || 0} />
                         ))
                     ) : (
-                        <p className="text-center text-muted-foreground py-8 col-span-full">{t('No new tasks available right now. Check back later!')}</p>
+                        <p className="text-center text-muted-foreground py-8 col-span-full">No new tasks available right now. Check back later!</p>
                     )}
                 </CardContent>
             </Card>
@@ -246,23 +242,23 @@ export default function TasksPage() {
             {upcomingTasks.length > 0 && (
                  <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><Clock/> {t('Upcoming Tasks')}</CardTitle>
-                        <CardDescription>{t('These tasks are not yet active. Check back soon!')}</CardDescription>
+                        <CardTitle className="flex items-center gap-2"><Clock/> Upcoming Tasks</CardTitle>
+                        <CardDescription>These tasks are not yet active. Check back soon!</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {upcomingTasks.map(task => (
                              <Card key={task.id} className="opacity-60">
                                 <CardHeader>
-                                    <CardTitle>{t(task.title)}</CardTitle>
-                                    <CardDescription>{t('Starts in:')} <CountdownTimer targetDate={task.startDate.toDate()} onEnd={fetchTasks} /></CardDescription>
+                                    <CardTitle>{task.title}</CardTitle>
+                                    <CardDescription>Starts in: <CountdownTimer targetDate={task.startDate.toDate()} onEnd={fetchTasks} /></CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="text-sm font-semibold text-green-400/70">
-                                        {t('Tiered Bonus')}
+                                        Tiered Bonus
                                     </div>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button className="w-full" disabled>{t('Not Active')}</Button>
+                                    <Button className="w-full" disabled>Not Active</Button>
                                 </CardFooter>
                             </Card>
                         ))}
