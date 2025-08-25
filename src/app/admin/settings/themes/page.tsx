@@ -53,34 +53,6 @@ interface ThemeColors {
     ring: string;
 }
 
-interface Theme {
-    id: string;
-    name: string;
-    logoUrl?: string;
-    colors: ThemeColors;
-    landingPage: {
-        bgImageUrl: string;
-        heroImageUrl: string;
-        heroTitle: string;
-        heroSubtitle: string;
-        heroTitleAlign?: 'left' | 'center' | 'right';
-        apkUrl?: string;
-        features?: string[];
-        landingSections?: LandingSection[];
-        playingNow?: string;
-        gamesToday?: string;
-    };
-    aboutContent: string;
-    supportDetails: {
-        phone: string;
-        whatsapp: string;
-        telegram: string;
-        email: string;
-    };
-    termsContent: string;
-    marketingContent: string;
-}
-
 const defaultColors: ThemeColors = {
     background: "260 69% 8%",
     foreground: "257 20% 90%",
@@ -201,6 +173,79 @@ const initializeThemes = async () => {
 };
 
 initializeThemes();
+
+const HSLToHex = (h: number, s: number, l: number): string => {
+    s /= 100;
+    l /= 100;
+    const k = (n: number) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    return `#${[0, 8, 4].map(n => Math.round(f(n) * 255).toString(16).padStart(2, '0')).join('')}`;
+};
+
+const HexToHSL = (hex: string): string => {
+    let r = 0, g = 0, b = 0;
+    if (hex.length === 4) {
+        r = parseInt(hex[1] + hex[1], 16);
+        g = parseInt(hex[2] + hex[2], 16);
+        b = parseInt(hex[3] + hex[3], 16);
+    } else if (hex.length === 7) {
+        r = parseInt(hex.substring(1, 3), 16);
+        g = parseInt(hex.substring(3, 5), 16);
+        b = parseInt(hex.substring(5, 7), 16);
+    }
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+    if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+    h = Math.round(h * 360);
+    s = Math.round(s * 100);
+    l = Math.round(l * 100);
+    return `${h} ${s}% ${l}%`;
+};
+
+const HSLStringToHex = (hslString: string): string => {
+    const parts = hslString.match(/(\d+)\s+(\d+)%\s+(\d+)%/);
+    if (!parts) return '#000000';
+    return HSLToHex(parseInt(parts[1]), parseInt(parts[2]), parseInt(parts[3]));
+}
+
+interface Theme {
+    id: string;
+    name: string;
+    logoUrl?: string;
+    colors: ThemeColors;
+    landingPage: {
+        bgImageUrl: string;
+        heroImageUrl: string;
+        heroTitle: string;
+        heroSubtitle: string;
+        heroTitleAlign?: 'left' | 'center' | 'right';
+        apkUrl?: string;
+        features?: string[];
+        landingSections?: LandingSection[];
+        playingNow?: string;
+        gamesToday?: string;
+    };
+    aboutContent: string;
+    supportDetails: {
+        phone: string;
+        whatsapp: string;
+        telegram: string;
+        email: string;
+    };
+    termsContent: string;
+    marketingContent: string;
+}
 
 
 export default function ThemeSettingsPage() {
@@ -484,7 +529,7 @@ export default function ThemeSettingsPage() {
                                     <Input value={editingTheme.logoUrl || ''} onChange={e => handleUpdateEditingTheme('logoUrl', e.target.value)} />
                                 </div>
                                 <Card>
-                                    <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Enter HSL values without units (e.g., 210 40% 96.1%).</CardDescription></CardHeader>
+                                    <CardHeader><CardTitle>Theme Colors</CardTitle><CardDescription>Click the color box to open the picker. The HSL value will update automatically.</CardDescription></CardHeader>
                                     <CardContent className="space-y-4">
                                         {editingTheme.id === 'chess_king' && (
                                             <div className="space-y-2">
@@ -504,7 +549,19 @@ export default function ThemeSettingsPage() {
                                             {colorFields.map(field => (
                                                 <div key={field.key} className="space-y-2">
                                                     <Label>{field.label}</Label>
-                                                    <Input value={editingTheme.colors?.[field.key] || ''} onChange={e => { handleUpdateNestedThemeValue('colors', field.key, e.target.value); setColorPalette('custom'); }} />
+                                                    <div className="flex items-center gap-2">
+                                                        <Input 
+                                                            type="color" 
+                                                            className="w-10 h-10 p-1"
+                                                            value={HSLStringToHex(editingTheme.colors?.[field.key] || '0 0% 0%')} 
+                                                            onChange={e => { handleUpdateNestedThemeValue('colors', field.key, HexToHSL(e.target.value)); setColorPalette('custom'); }} 
+                                                        />
+                                                        <Input 
+                                                            value={editingTheme.colors?.[field.key] || ''} 
+                                                            onChange={e => { handleUpdateNestedThemeValue('colors', field.key, e.target.value); setColorPalette('custom'); }} 
+                                                            placeholder="e.g., 210 40% 96.1%"
+                                                        />
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
